@@ -11,8 +11,8 @@ export default defineConfig({
   },
   worker: { format: 'es' },
   server: {
-    // 开发时把 API 与 WebSocket 转发给本地 Go 服务
-    proxy: { '/api': { target: 'http://127.0.0.1:8080', ws: true } },
+    // 开发时把 API 与 WebSocket 转发给本地 Go 服务（端口与 scripts/dev.sh 的 API_PORT 一致）
+    proxy: { '/api': { target: `http://127.0.0.1:${process.env.API_PORT ?? 8080}`, ws: true } },
   },
   test: { environment: 'node' },
 })
