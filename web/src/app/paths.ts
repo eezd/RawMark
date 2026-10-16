@@ -1,0 +1,40 @@
+import { encodePath } from './api'
+
+export const NOTE_EXT = '.md'
+
+export function dirname(path: string): string {
+  const i = path.lastIndexOf('/')
+  return i < 0 ? '' : path.slice(0, i)
+}
+
+export function basename(path: string): string {
+  return path.slice(path.lastIndexOf('/') + 1)
+}
+
+export function joinPath(dir: string, name: string): string {
+  return dir ? `${dir}/${name}` : name
+}
+
+export function noteTitle(path: string): string {
+  return basename(path).replace(/\.md$/, '')
+}
+
+// 把笔记中的图片地址解析为可加载的 URL：绝对地址原样返回，相对地址基于笔记所在目录走 /api/v1/raw
+export function resolveAssetUrl(notePath: string, src: string): string {
+  if (/^[a-z][a-z\d+.-]*:/i.test(src) || src.startsWith('/') || src.startsWith('#')) return src
+  const parts = dirname(notePath) ? dirname(notePath).split('/') : []
+  for (const seg of src.split(/[?#]/)[0].split('/')) {
+    if (seg === '' || seg === '.') continue
+    if (seg === '..') parts.pop()
+    else {
+      let decoded = seg
+      try {
+        decoded = decodeURIComponent(seg)
+      } catch {
+        // 非法的百分号序列按原样使用
+      }
+      parts.push(decoded)
+    }
+  }
+  return '/api/v1/raw/' + encodePath(parts.join('/'))
+}

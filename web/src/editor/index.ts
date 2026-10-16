@@ -1,21 +1,24 @@
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown'
 import { EditorState, Prec, type Extension } from '@codemirror/state'
-import { drawSelection, EditorView, keymap } from '@codemirror/view'
+import { drawSelection, EditorView, keymap, type ViewUpdate } from '@codemirror/view'
 import { codeBlockHighlight } from './codeblocks'
 import { livePreview, resolveImageUrl } from './livepreview'
 import { tableEditing } from './table'
 import { markdownTheme } from './theme'
 
-export interface EditorOptions {
-  parent: HTMLElement
+export { pasteImages } from './paste'
+
+export interface EditorStateOptions {
   doc: string
   resolveImage?: (src: string) => string
-  onChange?: (state: EditorState) => void
+  // 文档变化回调，仅对挂载在视图上的状态触发；未激活标签页的状态由调用方直接更新
+  onChange?: (update: ViewUpdate) => void
   extensions?: Extension[]
 }
 
-export function createEditor(opts: EditorOptions): EditorView {
+// 每个打开的笔记各自持有一个 EditorState（含撤销历史），切换标签页时整体替换
+export function createEditorState(opts: EditorStateOptions): EditorState {
   const extensions: Extension[] = [
     history(),
     drawSelection(),
@@ -34,8 +37,12 @@ export function createEditor(opts: EditorOptions): EditorView {
   if (opts.resolveImage) extensions.push(resolveImageUrl.of(opts.resolveImage))
   if (opts.onChange) {
     const onChange = opts.onChange
-    extensions.push(EditorView.updateListener.of((u) => u.docChanged && onChange(u.state)))
+    extensions.push(EditorView.updateListener.of((u) => u.docChanged && onChange(u)))
   }
   if (opts.extensions) extensions.push(...opts.extensions)
-  return new EditorView({ parent: opts.parent, state: EditorState.create({ doc: opts.doc, extensions }) })
+  return EditorState.create({ doc: opts.doc, extensions })
+}
+
+export function createEditorView(parent: HTMLElement, state: EditorState): EditorView {
+  return new EditorView({ parent, state })
 }
