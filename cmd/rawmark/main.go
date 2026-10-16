@@ -1,0 +1,145 @@
+// RawMark 服务入口。配置全部来自环境变量：
+//
+//	RAWMARK_DATA   数据目录，默认 /data（存放 rawmark.db 与默认仓库）
+//	RAWMARK_VAULT  笔记仓库目录，默认 $RAWMARK_DATA/vault；可指向已有的 Typora 笔记目录
+//	RAWMARK_ADDR   监听地址，默认 :8080
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+	"time"
+
+	"rawmark/internal/api"
+	"rawmark/internal/auth"
+	"rawmark/internal/events"
+	"rawmark/internal/store"
+	"rawmark/internal/vault"
+	"rawmark/internal/watch"
+	"rawmark/web"
+)
+
+func env(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+func main() {
+	addr := env("RAWMARK_ADDR", ":8080")
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck(addr))
+	}
+	if err := run(addr); err != nil {
+		slog.Error("服务退出", "err", err)
+		os.Exit(1)
+	}
+}
+
+func run(addr string) error {
+	dataDir := env("RAWMARK_DATA", "/data")
+	vaultDir := env("RAWMARK_VAULT", filepath.Join(dataDir, "vault"))
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		return err
+	}
+	v, err := vault.Open(vaultDir)
+	if err != nil {
+		return fmt.Errorf("打开笔记仓库失败: %w", err)
+	}
+	st, err := store.Open(filepath.Join(dataDir, "rawmark.db"))
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	am, err := auth.New(st)
+	if err != nil {
+		return err
+	}
+
+	// 启动码写入数据目录下的文件而非日志：只有能访问服务器的人才能完成首次初始化
+	codeFile := filepath.Join(dataDir, "setup-code.txt")
+	if code := am.SetupCode(); code != "" {
+		if err := os.WriteFile(codeFile, []byte(code+"\n"), 0o600); err != nil {
+			return fmt.Errorf("写入启动码失败: %w", err)
+		}
+		slog.Warn("尚未初始化：请在浏览器中打开 RawMark，输入启动码完成设置", "启动码文件", codeFile)
+	} else {
+		os.Remove(codeFile)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	hub := events.NewHub()
+	if err := watch.Start(ctx, v, hub); err != nil {
+		return fmt.Errorf("启动文件监听失败: %w", err)
+	}
+	go cleanupSessions(ctx, st)
+
+	srv := api.New(v, am, hub)
+	srv.OnSetup = func() { os.Remove(codeFile) }
+	httpServer := &http.Server{
+		Addr:              addr,
+		Handler:           srv.Handler(web.Dist()),
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	errCh := make(chan error, 1)
+	go func() { errCh <- httpServer.ListenAndServe() }()
+	slog.Info("RawMark 已启动", "addr", addr, "vault", v.Root())
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+	}
+	slog.Info("正在关闭")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := httpServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
+
+func cleanupSessions(ctx context.Context, st *store.Store) {
+	t := time.NewTicker(time.Hour)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if err := st.DeleteExpiredSessions(); err != nil {
+				slog.Warn("清理过期会话失败", "err", err)
+			}
+		}
+	}
+}
+
+// healthcheck 供 Docker HEALTHCHECK 使用（distroless 镜像中没有 curl）
+func healthcheck(addr string) int {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 1
+	}
+	client := http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://127.0.0.1:" + port + "/api/v1/health")
+	if err != nil {
+		return 1
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
+}

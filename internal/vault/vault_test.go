@@ -1,0 +1,154 @@
+package vault
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func newVault(t *testing.T) *Vault {
+	t.Helper()
+	v, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+func TestCleanPathRejectsUnsafe(t *testing.T) {
+	for _, p := range []string{"", "/a.md", "../a.md", "a/../b.md", "a//b.md", "./a.md", ".rawmark/x.md", "a/.git/b.md", "a\\b.md", "a\x00.md"} {
+		if _, err := CleanPath(p); !errors.Is(err, ErrInvalidPath) {
+			t.Errorf("%q 应被拒绝", p)
+		}
+	}
+	for _, p := range []string{"a.md", "目录/笔记 1.md", "a/b/c.md"} {
+		if _, err := CleanPath(p); err != nil {
+			t.Errorf("%q 应被接受: %v", p, err)
+		}
+	}
+}
+
+func TestSymlinkEscapeRejected(t *testing.T) {
+	v := newVault(t)
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(v.Root(), "link")); err != nil {
+		t.Skip("无法创建符号链接:", err)
+	}
+	if _, err := v.Write("link/x.md", []byte("x"), Precondition{}); !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("经符号链接写到仓库外应被拒绝, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "x.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("仓库外出现了文件")
+	}
+}
+
+func TestWritePreconditions(t *testing.T) {
+	v := newVault(t)
+	rev, err := v.Write("a/b.md", []byte("one"), Precondition{IfNoneMatch: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.Write("a/b.md", []byte("x"), Precondition{IfNoneMatch: true}); !errors.Is(err, ErrExists) {
+		t.Fatalf("重复创建应失败, got %v", err)
+	}
+	var conflict *ConflictError
+	if _, err := v.Write("a/b.md", []byte("x"), Precondition{IfMatch: "stale"}); !errors.As(err, &conflict) || conflict.Rev != rev {
+		t.Fatalf("旧版本写入应返回冲突与当前版本, got %v", err)
+	}
+	rev2, err := v.Write("a/b.md", []byte("two"), Precondition{IfMatch: rev})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, got, err := v.Read("a/b.md")
+	if err != nil || string(data) != "two" || got != rev2 {
+		t.Fatalf("读取结果不符: %q %s %v", data, got, err)
+	}
+	if _, err := v.Write("a.txt", []byte("x"), Precondition{}); !errors.Is(err, ErrInvalidPath) {
+		t.Fatal("非 .md 文件应被拒绝")
+	}
+}
+
+func TestMoveCarriesAssetsAndRewritesLinks(t *testing.T) {
+	v := newVault(t)
+	src := "笔记 A.md\n![](笔记%20A.assets/x.png)\n![](./笔记 A.assets/y.png)\n```\n![](笔记%20A.assets/code.png)\n```\n`笔记%20A.assets/inline`\n"
+	if _, err := v.Write("dir/笔记 A.md", []byte(src), Precondition{}); err != nil {
+		t.Fatal(err)
+	}
+	link, err := v.SaveAsset("dir/笔记 A.md", "x.png", strings.NewReader("png"), 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(link, "笔记%20A.assets/") {
+		t.Fatalf("资源链接不符: %s", link)
+	}
+	if err := v.Move("dir/笔记 A.md", "other/B.md"); err != nil {
+		t.Fatal(err)
+	}
+	data, _, err := v.Read("other/B.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "笔记 A.md\n![](B.assets/x.png)\n![](./B.assets/y.png)\n```\n![](笔记%20A.assets/code.png)\n```\n`笔记%20A.assets/inline`\n"
+	if string(data) != want {
+		t.Fatalf("链接改写不符:\n%s", data)
+	}
+	if _, err := os.Stat(filepath.Join(v.Root(), "other", "B.assets", strings.TrimPrefix(link, "笔记%20A.assets/"))); err != nil {
+		t.Fatal("图片目录未随笔记移动:", err)
+	}
+	if err := v.Move("other", "other/sub"); !errors.Is(err, ErrInvalidPath) {
+		t.Fatal("文件夹移入自身应被拒绝")
+	}
+}
+
+func TestDeleteRestore(t *testing.T) {
+	v := newVault(t)
+	v.Write("n.md", []byte("x"), Precondition{})
+	v.SaveAsset("n.md", "a.png", strings.NewReader("img"), 100)
+	item, err := v.Delete("n.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(v.Root(), "n.assets")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("图片目录应一并移入回收站")
+	}
+	items, _ := v.TrashList()
+	if len(items) != 1 || items[0].ID != item.ID {
+		t.Fatalf("回收站列表不符: %+v", items)
+	}
+	if _, err := v.Restore(item.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := v.Read("n.md"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(v.Root(), "n.assets")); err != nil {
+		t.Fatal("图片目录未恢复")
+	}
+	if items, _ := v.TrashList(); len(items) != 0 {
+		t.Fatal("恢复后回收站应为空")
+	}
+	if _, err := v.Restore("../../etc"); !errors.Is(err, ErrInvalidPath) {
+		t.Fatal("非法回收站 ID 应被拒绝")
+	}
+}
+
+func TestTreeHidesMetaAndAssets(t *testing.T) {
+	v := newVault(t)
+	v.Write("a.md", []byte("x"), Precondition{})
+	v.SaveAsset("a.md", "i.png", strings.NewReader("i"), 10)
+	v.Mkdir("folder")
+	os.WriteFile(filepath.Join(v.Root(), "note.txt"), []byte("x"), 0o644)
+	entries, err := v.Tree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	for _, e := range entries {
+		paths = append(paths, e.Path)
+	}
+	if strings.Join(paths, ",") != "a.md,folder" {
+		t.Fatalf("目录树不符: %v", paths)
+	}
+}
