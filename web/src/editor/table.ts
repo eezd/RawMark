@@ -1,7 +1,7 @@
 import { isolateHistory, redo, undo } from '@codemirror/commands'
 import { syntaxTree } from '@codemirror/language'
-import { StateField, type EditorState, type Range } from '@codemirror/state'
-import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view'
+import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state'
+import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
 import { renderInlineMarkdown } from '../markdown/html'
 
@@ -402,10 +402,42 @@ function bindCell(view: EditorView, wrap: HTMLElement, cell: HTMLElement) {
 
 // ---- 装饰 ----
 
-// 块级替换装饰跨越多行，只能由 StateField 提供，不能来自 ViewPlugin
+// StateField 拿不到视图的焦点状态，由视图插件把焦点变化同步进状态
+const setEditorFocus = StateEffect.define<boolean>()
+
+const editorFocused = StateField.define<boolean>({
+  create: () => false,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setEditorFocus)) value = e.value
+    return value
+  },
+})
+
+const focusTracker = ViewPlugin.fromClass(
+  class {
+    constructor(readonly view: EditorView) {
+      this.sync()
+    }
+    update(u: ViewUpdate) {
+      if (u.focusChanged) this.sync()
+    }
+    // 不能在 update 中同步 dispatch，推迟到微任务
+    sync() {
+      queueMicrotask(() => {
+        const focused = this.view.hasFocus
+        if (this.view.state.field(editorFocused, false) !== undefined && this.view.state.field(editorFocused) !== focused) {
+          this.view.dispatch({ effects: setEditorFocus.of(focused) })
+        }
+      })
+    }
+  },
+)
+
+// 块级替换装饰跨越多行，只能由 StateField 提供，不能来自 ViewPlugin。
+// 与其他语法一致：编辑器获得焦点且光标在表格内时才显示源码（打开笔记时光标默认在文首，不应因此展开开头的表格）
 function buildTables(state: EditorState): DecorationSet {
   const out: Range<Decoration>[] = []
-  const sel = state.selection.ranges
+  const sel = state.field(editorFocused) ? state.selection.ranges : []
   // 只渲染顶层表格；引用、列表内的表格以源码显示
   for (let node = syntaxTree(state).topNode.firstChild; node; node = node.nextSibling) {
     if (node.name !== 'Table') continue
@@ -417,11 +449,22 @@ function buildTables(state: EditorState): DecorationSet {
   return Decoration.set(out)
 }
 
-export const tableEditing = StateField.define<DecorationSet>({
+export const tableField = StateField.define<DecorationSet>({
   create: buildTables,
   update(value, tr) {
-    if (tr.docChanged || tr.selection || syntaxTree(tr.startState) !== syntaxTree(tr.state)) return buildTables(tr.state)
+    if (
+      tr.docChanged ||
+      tr.selection ||
+      tr.effects.some((e) => e.is(setEditorFocus)) ||
+      syntaxTree(tr.startState) !== syntaxTree(tr.state)
+    ) {
+      return buildTables(tr.state)
+    }
     return value
   },
   provide: (f) => EditorView.decorations.from(f),
 })
+
+export { setEditorFocus }
+
+export const tableEditing = [editorFocused, tableField, focusTracker]

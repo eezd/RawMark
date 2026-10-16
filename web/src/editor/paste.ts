@@ -42,7 +42,11 @@ export function pasteImages(opts: PasteImagesOptions): Extension {
   }
   return EditorView.domEventHandlers({
     paste(e, view) {
-      const files = [...(e.clipboardData?.files ?? [])]
+      // 个别浏览器/来源只在 items 中提供图片
+      let files = [...(e.clipboardData?.files ?? [])]
+      if (!files.length) {
+        files = [...(e.clipboardData?.items ?? [])].filter((i) => i.kind === 'file').map((i) => i.getAsFile()).filter((f) => f !== null)
+      }
       if (!insert(view, files)) return false
       e.preventDefault()
       return true

@@ -1,4 +1,4 @@
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap, indentWithTab, redo } from '@codemirror/commands'
 import { markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown'
 import { EditorState, Prec, type Extension } from '@codemirror/state'
 import { drawSelection, EditorView, keymap, type ViewUpdate } from '@codemirror/view'
@@ -31,7 +31,9 @@ export function createEditorState(opts: EditorStateOptions): EditorState {
     livePreview,
     codeBlockHighlight,
     tableEditing,
-    keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+    // CodeMirror 只在 Linux/Mac 上把 Ctrl/Cmd+Shift+Z 绑定为重做，Windows 上会退化成撤销；
+    // 与 Typora、VS Code 保持一致，所有平台都支持
+    keymap.of([indentWithTab, { key: 'Mod-Shift-z', run: redo, preventDefault: true }, ...defaultKeymap, ...historyKeymap]),
     EditorView.contentAttributes.of({ spellcheck: 'false', autocapitalize: 'sentences' }),
   ]
   if (opts.resolveImage) extensions.push(resolveImageUrl.of(opts.resolveImage))

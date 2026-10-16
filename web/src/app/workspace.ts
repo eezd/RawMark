@@ -197,9 +197,12 @@ export async function flush(path: string, keepalive = false): Promise<void> {
   const seq = s.seq
   const baseRev = tab.rev
   s.inflight = (async () => {
+    // 草稿与请求并行：页面关闭时等待 IndexedDB 写完再发请求，请求往往来不及发出
+    // 草稿只是兜底，写入失败不影响保存本身
+    const draftSaved = drafts.put({ path, content, baseRev, updatedAt: Date.now() }).catch((err) => console.warn('写入本地草稿失败', err))
     try {
-      await drafts.put({ path, content, baseRev, updatedAt: Date.now() })
       const rev = await api.writeFile(path, content, baseRev, keepalive)
+      await draftSaved
       tab.rev = rev
       tab.saveError = undefined
       s.savedSeq = seq
@@ -597,9 +600,11 @@ export async function startWorkspace() {
     () => [ws.tabs.map((t) => t.path), ws.active] as const,
     ([paths, active]) => localStorage.setItem(TABS_KEY, JSON.stringify({ paths, active })),
   )
+  // 页面隐藏/关闭前尽力发出待保存的修改（部分浏览器关闭标签页时只触发 pagehide）
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void flushAll(true)
   })
+  window.addEventListener('pagehide', () => void flushAll(true))
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
       e.preventDefault()
