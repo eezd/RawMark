@@ -117,7 +117,7 @@ class TableWidget extends WidgetType {
   }
 
   get estimatedHeight() {
-    return this.model.rows.length * 34 + 8
+    return this.model.rows.length * 34 + 44
   }
 
   toDOM(view: EditorView) {
@@ -195,23 +195,35 @@ class TableWidget extends WidgetType {
   private toolbar(view: EditorView, wrap: HTMLElement): HTMLElement {
     const bar = document.createElement('div')
     bar.className = 'cm-rm-table-toolbar'
-    const button = (label: string, title: string, run: () => void) => {
+    const tools = document.createElement('div')
+    tools.className = 'cm-rm-table-tools'
+    bar.append(tools)
+    const button = (icon: string, label: string, title: string, run: () => void, danger = false) => {
       const b = document.createElement('button')
       b.type = 'button'
-      b.textContent = label
       b.title = title
+      if (danger) b.className = 'cm-rm-danger'
+      b.innerHTML = svg(icon)
+      b.append(label)
       // mousedown 阻止默认行为，保持当前单元格的焦点与光标
       b.addEventListener('mousedown', (e) => {
         e.preventDefault()
         run()
       })
-      bar.append(b)
+      tools.append(b)
     }
-    button('+行', '在下方插入行', () => insertRow(view, wrap))
-    button('+列', '在右侧插入列', () => insertColumn(view, wrap))
-    button('−行', '删除当前行', () => deleteRow(view, wrap))
-    button('−列', '删除当前列', () => deleteColumn(view, wrap))
-    button('源码', '以 Markdown 源码编辑', () => {
+    const separator = () => {
+      const sep = document.createElement('span')
+      sep.className = 'cm-rm-sep'
+      tools.append(sep)
+    }
+    button(ICONS.addRow, '行', '在下方插入行', () => insertRow(view, wrap))
+    button(ICONS.addColumn, '列', '在右侧插入列', () => insertColumn(view, wrap))
+    separator()
+    button(ICONS.deleteRow, '行', '删除当前行', () => deleteRow(view, wrap), true)
+    button(ICONS.deleteColumn, '列', '删除当前列', () => deleteColumn(view, wrap), true)
+    separator()
+    button(ICONS.source, '源码', '以 Markdown 源码编辑', () => {
       const model = currentModel(view, wrap)
       if (!model) return
       view.dispatch({ selection: { anchor: model.from } })
@@ -219,6 +231,18 @@ class TableWidget extends WidgetType {
     })
     return bar
   }
+}
+
+const ICONS = {
+  addRow: '<rect x="3" y="3" width="18" height="8" rx="1.5"/><path d="M12 14v7M8.5 17.5h7"/>',
+  addColumn: '<rect x="3" y="3" width="8" height="18" rx="1.5"/><path d="M14 12h7M17.5 8.5v7"/>',
+  deleteRow: '<rect x="3" y="3" width="18" height="8" rx="1.5"/><path d="M8.5 17.5h7"/>',
+  deleteColumn: '<rect x="3" y="3" width="8" height="18" rx="1.5"/><path d="M14 12h7"/>',
+  source: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
+}
+
+function svg(body: string): string {
+  return `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`
 }
 
 // 结构变更：基于文档中的最新表格重新生成整张表的源码，返回变更后应聚焦的单元格

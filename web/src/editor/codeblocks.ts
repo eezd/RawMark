@@ -1,6 +1,7 @@
 import { syntaxTree } from '@codemirror/language'
-import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state'
-import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
+import { Prec, StateEffect, StateField, type EditorState, type Range } from '@codemirror/state'
+import { Decoration, EditorView, keymap, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
+import type { SyntaxNode } from '@lezer/common'
 import { cachedTokens, requestTokens, type TokenRun } from '../highlight/client'
 
 interface CodeBlock {
@@ -63,6 +64,33 @@ export function fenceLanguage(state: EditorState, infoFrom: number, infoTo: numb
   return state.sliceDoc(infoFrom, infoTo).trim().split(/\s/)[0].toLowerCase()
 }
 
+// 围栏代码块的内容范围（不含围栏行）；有闭合围栏时到闭合行之前为止，否则到块尾
+export function codeContentRange(state: EditorState, node: SyntaxNode): { from: number; to: number } {
+  const open = state.doc.lineAt(node.from)
+  const marks = node.getChildren('CodeMark')
+  const to = marks.length > 1 ? state.doc.lineAt(node.to).from - 1 : node.to
+  return { from: Math.min(open.to + 1, to), to }
+}
+
+export function fencedCodeAt(state: EditorState, pos: number): SyntaxNode | null {
+  for (let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1); node; node = node.parent) {
+    if (node.name === 'FencedCode') return node
+  }
+  return null
+}
+
+// Ctrl/Cmd+A：光标在代码块内时先选中整块代码，已选中整块时交给默认的全选
+function selectCodeBlock(view: EditorView): boolean {
+  const { state } = view
+  const main = state.selection.main
+  const node = fencedCodeAt(state, main.head)
+  if (!node) return false
+  const { from, to } = codeContentRange(state, node)
+  if (to <= from || main.head < from || main.head > to || (main.from === from && main.to === to)) return false
+  view.dispatch({ selection: { anchor: from, head: to }, userEvent: 'select' })
+  return true
+}
+
 function visibleCodeBlocks(view: EditorView): CodeBlock[] {
   const { state } = view
   const blocks: CodeBlock[] = []
@@ -74,12 +102,7 @@ function visibleCodeBlocks(view: EditorView): CodeBlock[] {
         if (node.name !== 'FencedCode') return
         const info = node.node.getChild('CodeInfo')
         if (info) {
-          const open = state.doc.lineAt(node.from)
-          const close = state.doc.lineAt(node.to)
-          const marks = node.node.getChildren('CodeMark')
-          // 有闭合围栏时内容到闭合行之前为止，否则到块尾
-          const end = marks.length > 1 ? close.from - 1 : node.to
-          const start = Math.min(open.to + 1, end)
+          const { from: start, to: end } = codeContentRange(state, node.node)
           if (end > start) {
             blocks.push({ from: start, to: end, lang: fenceLanguage(state, info.from, info.to), code: state.sliceDoc(start, end) })
           }
@@ -139,4 +162,8 @@ const codeHighlighter = ViewPlugin.fromClass(
   },
 )
 
-export const codeBlockHighlight = [codeTokenField, codeHighlighter]
+export const codeBlockHighlight = [
+  codeTokenField,
+  codeHighlighter,
+  Prec.high(keymap.of([{ key: 'Mod-a', run: selectCodeBlock }])),
+]

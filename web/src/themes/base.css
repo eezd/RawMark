@@ -99,26 +99,52 @@ body {
   border-radius: 4px;
 }
 
-/* 代码块 */
+/* 代码块
+ * 背景画在 ::before 上并置于选区图层之下：若直接给 .cm-line 设背景，会盖住 CodeMirror 绘制的选区 */
 .cm-line.cm-rm-code {
+  position: relative;
   font-family: var(--rm-font-mono);
   font-size: var(--rm-code-font-size);
   line-height: 1.5;
-  background: var(--rm-code-bg);
   color: var(--rm-code-text);
   padding: 0 24px;
   tab-size: 4;
 }
-.cm-line.cm-rm-code .cm-rm-mono { font-family: inherit; }
-.cm-line.cm-rm-code-begin { border-radius: 8px 8px 0 0; padding-top: 10px; }
-.cm-line.cm-rm-code-end { border-radius: 0 0 8px 8px; padding-bottom: 10px; }
-.cm-line.cm-rm-code-begin.cm-rm-code-end { border-radius: 8px; }
-/* 未激活时的围栏行：压低行高，只显示右上角语言标签 */
-.cm-line.cm-rm-code-fence { font-size: 12px; line-height: 1.2; text-align: right; }
-.cm-rm-code-lang {
-  color: rgba(235, 235, 235, 0.38);
-  user-select: none;
+.cm-line.cm-rm-code::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--rm-code-bg);
+  z-index: -10;
+  pointer-events: none;
 }
+.cm-line.cm-rm-code .cm-rm-mono { font-family: inherit; }
+.cm-line.cm-rm-code-begin { padding-top: 10px; }
+.cm-line.cm-rm-code-end { padding-bottom: 10px; }
+.cm-line.cm-rm-code-begin::before { border-radius: 8px 8px 0 0; }
+.cm-line.cm-rm-code-end::before { border-radius: 0 0 8px 8px; }
+.cm-line.cm-rm-code-begin.cm-rm-code-end::before { border-radius: 8px; }
+/* 未激活时的围栏行：压低行高，只显示右上角语言标签与复制按钮 */
+.cm-line.cm-rm-code-fence { font-size: 12px; line-height: 1.2; text-align: right; padding-right: 12px; }
+.cm-rm-code-header { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; user-select: none; }
+.cm-line.cm-rm-code-begin:not(.cm-rm-code-fence) .cm-rm-code-header { position: absolute; top: 6px; right: 12px; }
+.cm-rm-code-lang { color: rgba(235, 235, 235, 0.38); font-size: 12px; line-height: 1; }
+.cm-rm-code-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(235, 235, 235, 0.45);
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+.cm-rm-code-copy:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.cm-rm-code-copy.cm-rm-copied { color: #42d392; }
 .cm-rm-code .cm-rm-markup { color: rgba(235, 235, 235, 0.38); }
 
 /* 引用 */
@@ -142,7 +168,7 @@ body {
 
 /* 表格：光标在表格内时以等宽源码显示，否则为可编辑的渲染表格 */
 .cm-line.cm-rm-table { font-family: var(--rm-font-mono); font-size: 0.9em; }
-.cm-rm-table-widget { position: relative; padding: 4px 0; width: fit-content; max-width: 100%; }
+.cm-rm-table-widget { padding: 2px 0 4px; width: fit-content; max-width: 100%; }
 .cm-rm-table-scroll { overflow-x: auto; }
 .cm-rm-table-widget table { border-collapse: collapse; font-size: 0.95em; line-height: 1.5; }
 .cm-rm-table-widget th,
@@ -157,33 +183,51 @@ body {
 .cm-rm-table-widget [contenteditable] { box-shadow: inset 0 0 0 2px var(--rm-accent); font-family: var(--rm-font-mono); font-size: 0.9em; }
 .cm-rm-table-widget code { font-family: var(--rm-font-mono); font-size: 0.875em; background: var(--rm-inline-code-bg); color: var(--rm-inline-code-text); padding: 0.1em 0.35em; border-radius: 4px; }
 .cm-rm-table-widget a { color: var(--rm-accent-strong); }
+/* 工具栏占据表格上方的固定空间，只切换可见性，不遮挡表格也不引起跳动 */
 .cm-rm-table-toolbar {
-  position: absolute;
-  top: -22px;
-  right: 0;
-  display: none;
-  gap: 2px;
-  font-size: 12px;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 .cm-rm-table-widget:hover .cm-rm-table-toolbar,
-.cm-rm-table-widget:focus-within .cm-rm-table-toolbar { display: flex; }
-.cm-rm-table-toolbar button {
-  font: inherit;
-  padding: 2px 8px;
-  min-height: 22px;
+.cm-rm-table-widget:focus-within .cm-rm-table-toolbar { visibility: visible; opacity: 1; }
+.cm-rm-table-tools {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
   border: 1px solid var(--rm-divider);
-  border-radius: 4px;
+  border-radius: 8px;
   background: var(--rm-bg);
-  color: var(--rm-text-muted);
-  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
-.cm-rm-table-toolbar button:hover { color: var(--rm-accent-strong); border-color: var(--rm-accent); }
+.cm-rm-table-tools button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rm-text-muted);
+  font: 12px/1 var(--rm-font-text);
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+.cm-rm-table-tools button:hover { color: var(--rm-accent-strong); background: var(--rm-selection); }
+.cm-rm-table-tools button.cm-rm-danger:hover { color: #e5484d; background: rgba(229, 72, 77, 0.1); }
+.cm-rm-table-tools svg { flex: none; }
+.cm-rm-table-tools .cm-rm-sep { width: 1px; height: 16px; margin: 0 2px; background: var(--rm-divider); }
 .cm-rm-image { cursor: pointer; }
 
 @media (max-width: 640px) {
   .cm-editor .cm-content { padding: 16px 16px 40vh; }
-  /* 触屏没有悬停，工具栏常显 */
-  .cm-rm-table-toolbar { display: flex; position: static; justify-content: flex-end; margin-bottom: 4px; }
-  .cm-rm-table-toolbar button { min-height: 32px; padding: 4px 10px; }
+  /* 触屏没有悬停，工具栏常显，按钮加大触控热区 */
+  .cm-rm-table-toolbar { visibility: visible; opacity: 1; }
+  .cm-rm-table-tools button { height: 36px; padding: 0 10px; }
+  .cm-rm-code-copy { width: 36px; height: 36px; }
   .cm-line.cm-rm-code { padding: 0 12px; }
 }

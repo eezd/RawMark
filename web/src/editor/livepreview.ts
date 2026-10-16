@@ -2,8 +2,8 @@ import { syntaxTree } from '@codemirror/language'
 import { Facet, type EditorState, type Range } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
-import { fenceLanguage } from './codeblocks'
-import { BulletWidget, CheckboxWidget, CodeLangWidget, HorizontalRuleWidget, ImageWidget } from './widgets'
+import { codeContentRange, fenceLanguage, fencedCodeAt } from './codeblocks'
+import { BulletWidget, CheckboxWidget, CodeHeaderWidget, HorizontalRuleWidget, ImageWidget } from './widgets'
 
 // 把笔记中书写的图片地址解析为浏览器可加载的 URL（相对路径需结合笔记所在目录）
 export const resolveImageUrl = Facet.define<(src: string) => string, (src: string) => string>({
@@ -181,12 +181,16 @@ function buildDecorations(view: EditorView): DecorationSet {
     classLines(node.from, node.to, (n, first, last) =>
       n === first ? 'cm-rm-code cm-rm-code-begin' : n === last && closed ? 'cm-rm-code cm-rm-code-end' : 'cm-rm-code',
     )
-    if (isActive(node.from, node.to)) return
     const info = node.getChild('CodeInfo')
     const openLine = doc.lineAt(node.from)
     const lang = info ? fenceLanguage(state, info.from, info.to) : ''
+    if (isActive(node.from, node.to)) {
+      // 编辑中显示围栏源码，复制按钮浮在行尾
+      out.push(Decoration.widget({ widget: new CodeHeaderWidget(lang, false, codeAt), side: 1 }).range(openLine.to))
+      return
+    }
     out.push(lineDeco('cm-rm-code-fence').range(openLine.from))
-    out.push(Decoration.replace({ widget: new CodeLangWidget(lang) }).range(marks[0].from, openLine.to))
+    out.push(Decoration.replace({ widget: new CodeHeaderWidget(lang, true, codeAt) }).range(marks[0].from, openLine.to))
     if (closed) {
       const closeMark = marks[marks.length - 1]
       out.push(lineDeco('cm-rm-code-fence').range(doc.lineAt(closeMark.from).from))
@@ -195,6 +199,13 @@ function buildDecorations(view: EditorView): DecorationSet {
   }
 
   return Decoration.set(out, true)
+}
+
+function codeAt(view: EditorView, pos: number): string | null {
+  const node = fencedCodeAt(view.state, pos)
+  if (!node) return null
+  const { from, to } = codeContentRange(view.state, node)
+  return view.state.sliceDoc(from, to)
 }
 
 function trailingSpaceStart(state: EditorState, pos: number): number {

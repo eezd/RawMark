@@ -50,17 +50,70 @@ export class HorizontalRuleWidget extends WidgetType {
   }
 }
 
-export class CodeLangWidget extends WidgetType {
-  constructor(readonly lang: string) {
+// 写入剪贴板；Clipboard API 只在 HTTPS/localhost 可用，局域网 HTTP 访问时退回 execCommand
+async function copyText(text: string): Promise<boolean> {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // 权限被拒时继续尝试旧方法
+    }
+  }
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0'
+  document.body.append(ta)
+  ta.select()
+  const ok = document.execCommand('copy')
+  ta.remove()
+  return ok
+}
+
+const COPY_ICON =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+const CHECK_ICON =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
+
+// 代码块右上角：语言标签（未激活时）+ 复制按钮
+export class CodeHeaderWidget extends WidgetType {
+  constructor(
+    readonly lang: string,
+    readonly showLang: boolean,
+    // 根据组件所在位置取出代码块内容，由调用方结合语法树实现
+    readonly codeAt: (view: EditorView, pos: number) => string | null,
+  ) {
     super()
   }
-  eq(other: CodeLangWidget) {
-    return other.lang === this.lang
+  eq(other: CodeHeaderWidget) {
+    return other.lang === this.lang && other.showLang === this.showLang
   }
-  toDOM() {
+  toDOM(view: EditorView) {
     const el = document.createElement('span')
-    el.className = 'cm-rm-code-lang'
-    el.textContent = this.lang
+    el.className = 'cm-rm-code-header'
+    if (this.showLang && this.lang) {
+      const label = document.createElement('span')
+      label.className = 'cm-rm-code-lang'
+      label.textContent = this.lang
+      el.append(label)
+    }
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'cm-rm-code-copy'
+    btn.title = '复制代码'
+    btn.innerHTML = COPY_ICON
+    btn.addEventListener('mousedown', (e) => e.preventDefault())
+    btn.addEventListener('click', async () => {
+      const code = this.codeAt(view, view.posAtDOM(el))
+      if (code === null || !(await copyText(code))) return
+      btn.innerHTML = CHECK_ICON
+      btn.classList.add('cm-rm-copied')
+      setTimeout(() => {
+        btn.innerHTML = COPY_ICON
+        btn.classList.remove('cm-rm-copied')
+      }, 1500)
+    })
+    el.append(btn)
     return el
   }
 }
