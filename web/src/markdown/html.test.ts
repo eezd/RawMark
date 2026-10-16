@@ -43,11 +43,24 @@ const examples = specTests.map((t) => ({
 // 用 it.fails 标记：上游修复后这些用例会转为通过并报错，提醒移出此列表。
 const PARSER_DEVIATIONS = new Set([10, 171, 280, 493, 512, 523, 528, 569, 571, 621, 625, 626])
 
+describe('安全模式', () => {
+  it('转义原始 HTML', () => {
+    expect(renderMarkdown('<img src=x onerror=alert(1)>\n\na <b>b</b>')).toBe(
+      '&lt;img src=x onerror=alert(1)&gt;\n<p>a &lt;b&gt;b&lt;/b&gt;</p>\n',
+    )
+  })
+  it('过滤危险链接协议', () => {
+    expect(renderMarkdown('[a](javascript:alert(1)) <javascript:x> ![i](data:image/png;base64,AA)')).toBe(
+      '<p><a href="#">a</a> <a href="#">javascript:x</a> <img src="data:image/png;base64,AA" alt="i" /></p>\n',
+    )
+  })
+})
+
 describe('CommonMark spec', () => {
   for (const e of examples) {
     const test = PARSER_DEVIATIONS.has(e.number) ? it.fails : it
     test(`#${e.number} ${e.section}`, () => {
-      expect(normalize(renderMarkdown(e.markdown, commonmarkParser))).toBe(normalize(e.html))
+      expect(normalize(renderMarkdown(e.markdown, { parser: commonmarkParser, unsafe: true }))).toBe(normalize(e.html))
     })
   }
 })

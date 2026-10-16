@@ -140,10 +140,50 @@ body {
 .cm-rm-image img { max-width: 100%; border-radius: 4px; }
 .cm-rm-image-error { color: var(--rm-text-muted); font-style: italic; }
 
-/* 表格（M2 前以等宽源码显示） */
+/* 表格：光标在表格内时以等宽源码显示，否则为可编辑的渲染表格 */
 .cm-line.cm-rm-table { font-family: var(--rm-font-mono); font-size: 0.9em; }
+.cm-rm-table-widget { position: relative; padding: 4px 0; width: fit-content; max-width: 100%; }
+.cm-rm-table-scroll { overflow-x: auto; }
+.cm-rm-table-widget table { border-collapse: collapse; font-size: 0.95em; line-height: 1.5; }
+.cm-rm-table-widget th,
+.cm-rm-table-widget td {
+  border: 1px solid var(--rm-divider);
+  padding: 6px 12px;
+  min-width: 3em;
+  cursor: text;
+  outline: none;
+}
+.cm-rm-table-widget th { font-weight: 600; text-align: left; background: var(--rm-inline-code-bg); }
+.cm-rm-table-widget [contenteditable] { box-shadow: inset 0 0 0 2px var(--rm-accent); font-family: var(--rm-font-mono); font-size: 0.9em; }
+.cm-rm-table-widget code { font-family: var(--rm-font-mono); font-size: 0.875em; background: var(--rm-inline-code-bg); color: var(--rm-inline-code-text); padding: 0.1em 0.35em; border-radius: 4px; }
+.cm-rm-table-widget a { color: var(--rm-accent-strong); }
+.cm-rm-table-toolbar {
+  position: absolute;
+  top: -22px;
+  right: 0;
+  display: none;
+  gap: 2px;
+  font-size: 12px;
+}
+.cm-rm-table-widget:hover .cm-rm-table-toolbar,
+.cm-rm-table-widget:focus-within .cm-rm-table-toolbar { display: flex; }
+.cm-rm-table-toolbar button {
+  font: inherit;
+  padding: 2px 8px;
+  min-height: 22px;
+  border: 1px solid var(--rm-divider);
+  border-radius: 4px;
+  background: var(--rm-bg);
+  color: var(--rm-text-muted);
+  cursor: pointer;
+}
+.cm-rm-table-toolbar button:hover { color: var(--rm-accent-strong); border-color: var(--rm-accent); }
+.cm-rm-image { cursor: pointer; }
 
 @media (max-width: 640px) {
   .cm-editor .cm-content { padding: 16px 16px 40vh; }
+  /* 触屏没有悬停，工具栏常显 */
+  .cm-rm-table-toolbar { display: flex; position: static; justify-content: flex-end; margin-bottom: 4px; }
+  .cm-rm-table-toolbar button { min-height: 32px; padding: 4px 10px; }
   .cm-line.cm-rm-code { padding: 0 12px; }
 }

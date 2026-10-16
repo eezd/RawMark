@@ -4,6 +4,7 @@ import { EditorState, Prec, type Extension } from '@codemirror/state'
 import { drawSelection, EditorView, keymap } from '@codemirror/view'
 import { codeBlockHighlight } from './codeblocks'
 import { livePreview, resolveImageUrl } from './livepreview'
+import { tableEditing } from './table'
 import { markdownTheme } from './theme'
 
 export interface EditorOptions {
@@ -26,6 +27,7 @@ export function createEditor(opts: EditorOptions): EditorView {
     markdownTheme,
     livePreview,
     codeBlockHighlight,
+    tableEditing,
     keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
     EditorView.contentAttributes.of({ spellcheck: 'false', autocapitalize: 'sentences' }),
   ]

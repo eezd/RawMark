@@ -85,6 +85,13 @@ export class ImageWidget extends WidgetType {
     img.decoding = 'async'
     // 图片加载完成后高度变化，需通知编辑器重新测量，否则光标定位会错位
     img.addEventListener('load', () => view.requestMeasure())
+    // 组件内的事件默认被编辑器忽略，需手动把光标移到图片语法处以展开源码
+    wrap.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      // 先设光标再聚焦：focus() 会把编辑器选区写回 DOM，反之会读到残留在别处（如表格单元格）的 DOM 选区
+      view.dispatch({ selection: { anchor: view.posAtDOM(wrap) } })
+      view.focus()
+    })
     img.addEventListener('error', () => {
       wrap.classList.add('cm-rm-image-error')
       wrap.textContent = this.alt || this.src

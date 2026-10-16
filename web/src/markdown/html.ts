@@ -46,8 +46,19 @@ function tabWidth(col: number): number {
   return 4 - (col % 4)
 }
 
-export function renderMarkdown(src: string, parser: MarkdownParser = markdownParser): string {
+export interface RenderOptions {
+  parser?: MarkdownParser
+  // 为 true 时原样输出原始 HTML、不过滤危险链接协议；仅用于可信内容（如规范测试）
+  unsafe?: boolean
+}
+
+const UNSAFE_PROTOCOL = /^\s*(javascript|vbscript|file|data):/i
+const SAFE_DATA_IMAGE = /^\s*data:image\/(png|gif|jpeg|webp);/i
+
+export function renderMarkdown(src: string, { parser = markdownParser, unsafe = false }: RenderOptions = {}): string {
   const tree = parser.parse(src)
+  const safeHref = (href: string) => (unsafe || !UNSAFE_PROTOCOL.test(href) || SAFE_DATA_IMAGE.test(href) ? href : '#')
+  const rawHtml = (s: string) => (unsafe ? s : escapeHtml(s))
   const text = (from: number, to: number) => src.slice(from, to)
   const defs = new Map<string, LinkDefinition>()
 
@@ -261,19 +272,19 @@ export function renderMarkdown(src: string, parser: MarkdownParser = markdownPar
       case 'HTMLTag':
       case 'Comment':
       case 'ProcessingInstruction':
-        return text(node.from, node.to)
+        return rawHtml(text(node.from, node.to))
       case 'Autolink': {
         const url = node.getChild('URL')
         if (!url) return escapeHtml(text(node.from, node.to))
         const raw = text(url.from, url.to)
         const href = /^[^@\s]+@[^@\s]+$/.test(raw) && !raw.includes(':') ? 'mailto:' + raw : raw
-        return `<a href="${escapeAttr(normalizeUrl(href))}">${escapeHtml(raw)}</a>`
+        return `<a href="${escapeAttr(safeHref(normalizeUrl(href)))}">${escapeHtml(raw)}</a>`
       }
       case 'URL': {
         // GFM 裸链接
         const raw = text(node.from, node.to)
         const href = raw.startsWith('www.') ? 'http://' + raw : raw.includes('@') && !raw.includes(':') ? 'mailto:' + raw : raw
-        return `<a href="${escapeAttr(normalizeUrl(href))}">${escapeHtml(raw)}</a>`
+        return `<a href="${escapeAttr(safeHref(normalizeUrl(href)))}">${escapeHtml(raw)}</a>`
       }
       case 'Link':
       case 'Image':
@@ -305,8 +316,8 @@ export function renderMarkdown(src: string, parser: MarkdownParser = markdownPar
       }
     }
     const title = def.title !== null ? ` title="${escapeAttr(def.title)}"` : ''
-    if (isImage) return `<img src="${escapeAttr(def.href)}" alt="${escapeAttr(plainText(content))}"${title} />`
-    return `<a href="${escapeAttr(def.href)}"${title}>${content}</a>`
+    if (isImage) return `<img src="${escapeAttr(safeHref(def.href))}" alt="${escapeAttr(plainText(content))}"${title} />`
+    return `<a href="${escapeAttr(safeHref(def.href))}"${title}>${content}</a>`
   }
 
   // ---- 块级 ----
@@ -402,7 +413,7 @@ export function renderMarkdown(src: string, parser: MarkdownParser = markdownPar
       case 'HTMLBlock':
       case 'CommentBlock':
       case 'ProcessingInstructionBlock':
-        return contentLines(node, false, false).map((l) => l.rest).join('\n') + '\n'
+        return rawHtml(contentLines(node, false, false).map((l) => l.rest).join('\n')) + '\n'
       case 'Table':
         return table(node)
       default:
@@ -459,4 +470,11 @@ export function renderMarkdown(src: string, parser: MarkdownParser = markdownPar
   }
 
   return blocks(tree.topNode)
+}
+
+// 渲染单行行内 Markdown（表格单元格等），不产生块级结构
+export function renderInlineMarkdown(src: string, options?: RenderOptions): string {
+  const html = renderMarkdown(src, options)
+  const m = /^<p>([\s\S]*)<\/p>\n$/.exec(html)
+  return m ? m[1] : escapeHtml(src)
 }

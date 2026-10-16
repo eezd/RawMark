@@ -138,7 +138,7 @@ function buildDecorations(view: EditorView): DecorationSet {
             classLines(node.from, node.to, () => 'cm-rm-code')
             return false
           case 'Table':
-            // 表格可视化编辑在 M2 实现，目前以等宽源码显示，内部语法不做隐藏以免列对不齐
+            // 光标在表格内时由此以等宽源码显示（其余情况由 table.ts 渲染为可编辑表格），内部语法不做隐藏以免列对不齐
             classLines(node.from, node.to, () => 'cm-rm-table')
             return false
           case 'HTMLBlock':
