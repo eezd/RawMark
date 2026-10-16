@@ -4,6 +4,7 @@ import { api } from './api'
 import EditorPane from './EditorPane.vue'
 import Icon from './Icon.vue'
 import NoteBanner from './NoteBanner.vue'
+import QuickSwitcher from './QuickSwitcher.vue'
 import { noteTitle } from './paths'
 import Sidebar from './Sidebar.vue'
 import TabBar from './TabBar.vue'
@@ -50,10 +51,12 @@ onBeforeUnmount(stopWorkspace)
         <button class="rm-icon-btn" title="目录" @click="ws.sidebarOpen = true"><Icon name="menu" :size="20" /></button>
         <span class="rm-mobile-title">{{ title }}</span>
         <span class="rm-save-state" :class="{ on: saving }" />
+        <button class="rm-icon-btn" title="快速打开" @click="ws.switcherOpen = true"><Icon name="search" :size="20" /></button>
       </header>
       <TabBar />
       <NoteBanner />
       <EditorPane />
     </main>
+    <QuickSwitcher v-if="ws.switcherOpen" />
   </div>
 </template>

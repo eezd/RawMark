@@ -29,6 +29,9 @@ export interface Toast {
   action?: { label: string; run: () => void }
 }
 
+const RECENT_KEY = 'rawmark.recent'
+const RECENT_MAX = 30
+
 export const ws = reactive({
   entries: [] as Entry[],
   tabs: [] as Tab[],
@@ -39,6 +42,10 @@ export const ws = reactive({
   sidebarOpen: false,
   // 侧栏显示搜索而非目录树
   searchOpen: false,
+  // 快速切换对话框
+  switcherOpen: false,
+  // 最近打开的笔记，最新的在前
+  recent: JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[],
   toasts: [] as Toast[],
 })
 
@@ -279,30 +286,33 @@ export async function keepLocalVersion(path: string) {
   }
 }
 
-// ---- 搜索结果跳转 ----
+// ---- 打开并聚焦（快速切换、搜索结果跳转） ----
 
 interface RevealTarget {
   path: string
   line: number
   terms: string[]
 }
-// 待定位的位置：笔记可能尚未载入，由编辑器面板在显示该笔记时执行
+// 笔记可能尚未载入或编辑器尚未显示，由编辑器面板在显示该笔记后执行
 let pendingReveal: RevealTarget | null = null
 
-/** 打开笔记并定位到第 line 行（从 1 开始，0 表示不定位），选中该行第一个搜索词 */
-export async function openAt(path: string, line: number, terms: string[]) {
-  pendingReveal = line > 0 ? { path, line, terms } : null
-  if (pendingReveal && path === ws.active && view && editorStates.has(path)) {
+/** 打开笔记并聚焦编辑器；line > 0 时定位到该行（从 1 开始）并选中该行第一个搜索词 */
+export async function openAt(path: string, line = 0, terms: string[] = []) {
+  pendingReveal = { path, line, terms }
+  if (path === ws.active && view && editorStates.has(path)) {
     ws.sidebarOpen = false
     revealPending(view, path)
   } else await openNote(path)
 }
 
-/** 编辑器面板显示笔记后调用；返回 true 表示已定位（不应再恢复原来的滚动位置） */
+/** 编辑器面板显示笔记后调用；返回 true 表示已定位到指定行（不应再恢复原来的滚动位置） */
 export function revealPending(v: EditorView, path: string): boolean {
   const r = pendingReveal
   if (!r || r.path !== path) return false
   pendingReveal = null
+  // 触屏设备上聚焦会弹出软键盘遮住内容，只在有鼠标的设备上聚焦
+  if (!matchMedia('(pointer: coarse)').matches) v.focus()
+  if (r.line === 0) return false
   const line = v.state.doc.line(Math.min(r.line, v.state.doc.lines))
   const text = line.text.toLowerCase()
   let at = -1
@@ -313,8 +323,6 @@ export function revealPending(v: EditorView, path: string): boolean {
   }
   const from = line.from + Math.max(at, 0)
   v.dispatch({ selection: { anchor: from, head: from + len }, effects: EditorView.scrollIntoView(from, { y: 'center' }) })
-  // 触屏设备上聚焦会弹出软键盘遮住内容，只在有鼠标的设备上聚焦
-  if (!matchMedia('(pointer: coarse)').matches) v.focus()
   return true
 }
 
@@ -388,26 +396,62 @@ function remapOpenNotes(from: string, to: string) {
   }
 }
 
+function remapRecent(from: string, to: string) {
+  ws.recent = ws.recent.map((p) => remapPath(p, from, to) ?? p)
+}
+
 function affected(path: string): string[] {
   return ws.tabs.map((t) => t.path).filter((p) => p === path || p.startsWith(path + '/'))
 }
 
 // ---- 目录树 ----
 
+// 目录刷新：同一时间只有一个请求；请求期间又有刷新请求或本地操作时，结果可能已过时，丢弃后重新获取。
+// 本地操作会先乐观修改目录，过时的结果会抹掉刚加入的条目（例如新建笔记的重命名框随之消失）。
+// 等待中的调用者在下一次被采用的结果（或请求失败）后统一完成
 let treeTimer: ReturnType<typeof setTimeout> | undefined
+let treeFetching = false
+let treeAgain = false
+let localTreeEdits = 0
+const treeWaiters: (() => void)[] = []
+
 export function refreshTree(): Promise<void> {
-  clearTimeout(treeTimer)
   return new Promise((resolve) => {
-    treeTimer = setTimeout(async () => {
-      try {
-        ws.entries = await api.tree()
-        if (opsInFlight === 0) markMissingTabsDeleted()
-      } catch (err) {
-        toast('刷新目录失败：' + errorText(err))
-      }
-      resolve()
-    }, 50)
+    treeWaiters.push(resolve)
+    scheduleTreeRefresh()
   })
+}
+
+function scheduleTreeRefresh() {
+  if (treeFetching) {
+    treeAgain = true
+    return
+  }
+  clearTimeout(treeTimer)
+  treeTimer = setTimeout(() => void fetchTree(), 50)
+}
+
+async function fetchTree() {
+  treeFetching = true
+  treeAgain = false
+  const edits = localTreeEdits
+  let entries: Entry[] | null = null
+  try {
+    entries = await api.tree()
+  } catch (err) {
+    toast('刷新目录失败：' + errorText(err))
+  }
+  treeFetching = false
+  if (entries && (treeAgain || edits !== localTreeEdits || opsInFlight > 0)) {
+    // 有操作进行中时由 withOp 在全部结束后重新调度
+    if (opsInFlight === 0) scheduleTreeRefresh()
+    return
+  }
+  if (entries) {
+    ws.entries = entries
+    markMissingTabsDeleted()
+  }
+  for (const resolve of treeWaiters.splice(0)) resolve()
 }
 
 function markMissingTabsDeleted() {
@@ -430,27 +474,52 @@ function uniqueName(dir: string, base: string, ext: string): string {
 
 async function withOp<T>(fn: () => Promise<T>): Promise<T> {
   opsInFlight++
+  localTreeEdits++
   try {
     return await fn()
   } finally {
-    opsInFlight--
+    localTreeEdits++
+    if (--opsInFlight === 0 && treeWaiters.length) scheduleTreeRefresh()
   }
 }
 
 export async function createNote(dir: string) {
   const path = uniqueName(dir, '未命名', NOTE_EXT)
-  ws.entries.push({ path, dir: false, size: 0, mtime: Date.now() })
   ws.renaming = path
-  await withOp(async () => {
+  await createNoteAt(path)
+}
+
+// 进行中的新建：新建后立即出现重命名输入框，重命名须等文件真正创建后再执行
+const creating = new Map<string, Promise<boolean>>()
+
+/** 在指定路径新建空笔记并打开，返回是否成功；不存在的上级目录由服务器创建 */
+export async function createNoteAt(path: string): Promise<boolean> {
+  const done = createNoteFile(path)
+  creating.set(path, done)
+  try {
+    return await done
+  } finally {
+    creating.delete(path)
+  }
+}
+
+async function createNoteFile(path: string): Promise<boolean> {
+  const exists = new Set(ws.entries.map((e) => e.path))
+  const added = [path]
+  for (let d = dirname(path); d && !exists.has(d); d = dirname(d)) added.push(d)
+  ws.entries.push(...added.map((p, i) => ({ path: p, dir: i > 0, size: 0, mtime: Date.now() })))
+  return withOp(async () => {
     try {
       const rev = await api.writeFile(path, '', '')
       ws.tabs.push({ path, rev, status: 'ready', dirty: false })
       editorStates.set(path, buildState(path, ''))
       ws.active = path
+      return true
     } catch (err) {
-      ws.entries = ws.entries.filter((e) => e.path !== path)
+      ws.entries = ws.entries.filter((e) => !added.includes(e.path))
       if (ws.renaming === path) ws.renaming = null
       toast('新建笔记失败：' + errorText(err))
+      return false
     }
   })
 }
@@ -480,6 +549,7 @@ export function renameTarget(path: string, name: string): string | null {
 
 export async function move(from: string, to: string) {
   if (from === to) return
+  if (creating.has(from) && !(await creating.get(from))) return
   if (ws.entries.some((e) => e.path === to)) {
     toast(`“${basename(to)}”已存在`)
     return
@@ -492,11 +562,13 @@ export async function move(from: string, to: string) {
     const snapshot = ws.entries
     ws.entries = ws.entries.map((e) => ({ ...e, path: remapPath(e.path, from, to) ?? e.path }))
     remapOpenNotes(from, to)
+    remapRecent(from, to)
     try {
       await api.move(from, to)
     } catch (err) {
       ws.entries = snapshot
       remapOpenNotes(to, from)
+      remapRecent(to, from)
       toast('移动失败：' + errorText(err))
       return
     } finally {
@@ -575,6 +647,7 @@ function handleEvents(evs: VaultEvent[]) {
       if (tab && tab.rev !== ev.rev) void syncOpenTab(tab)
     } else if (ev.type === 'moved') {
       if (tabOf(ev.from!) && !tabOf(ev.path!)) remapOpenNotes(ev.from!, ev.path!)
+      remapRecent(ev.from!, ev.path!)
     } else if (ev.type === 'deleted') {
       const tab = tabOf(ev.path!)
       if (tab && tab.status === 'ready' && opsInFlight === 0) {
@@ -640,6 +713,19 @@ export async function startWorkspace() {
   watch(
     () => [ws.tabs.map((t) => t.path), ws.active] as const,
     ([paths, active]) => localStorage.setItem(TABS_KEY, JSON.stringify({ paths, active })),
+    // 启动期间（如等待目录刷新时）打开的标签页也要立即记录
+    { immediate: true },
+  )
+  watch(
+    () => ws.active,
+    (p) => {
+      if (p) ws.recent = [p, ...ws.recent.filter((r) => r !== p)].slice(0, RECENT_MAX)
+    },
+    { immediate: true },
+  )
+  watch(
+    () => ws.recent,
+    (r) => localStorage.setItem(RECENT_KEY, JSON.stringify(r)),
   )
   // 页面隐藏/关闭前尽力发出待保存的修改（部分浏览器关闭标签页时只触发 pagehide）
   document.addEventListener('visibilitychange', () => {
@@ -655,6 +741,10 @@ export async function startWorkspace() {
     } else if (key === 'f' && e.shiftKey) {
       e.preventDefault()
       openSearch()
+    } else if (key === 'p' && !e.shiftKey) {
+      // 覆盖浏览器的打印快捷键
+      e.preventDefault()
+      ws.switcherOpen = !ws.switcherOpen
     }
   })
 }

@@ -199,6 +199,24 @@ button {
   word-break: break-all;
 }
 .rm-search-hit { background: rgba(66, 184, 131, 0.28); color: var(--rm-text); border-radius: 2px; }
+/* ---- 快速切换 ---- */
+.rm-switcher-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; background: rgba(0, 0, 0, 0.18); }
+.rm-switcher {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 24px));
+  max-height: 60vh;
+  padding-top: 10px;
+  border-radius: 10px;
+  background: var(--rm-bg);
+  box-shadow: var(--rm-shadow);
+  overflow: hidden;
+}
+.rm-switcher-list { flex: 1; overflow: auto; list-style: none; margin: 0; padding: 0 6px 6px; }
+.rm-switcher-item { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border-radius: 6px; font-size: 14px; color: var(--rm-text-muted); cursor: pointer; }
+.rm-switcher-item.active { background: var(--rm-active); }
+.rm-switcher-title { color: var(--rm-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-switcher-dir { flex: 1; min-width: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
 .rm-sidebar-foot { display: flex; gap: 4px; padding: 8px; border-top: 1px solid var(--rm-divider); }
 .rm-foot-btn {
   flex: 1;
@@ -392,5 +410,9 @@ button {
   /* 小于 16px 时 iOS Safari 聚焦输入框会自动放大页面 */
   .rm-search-input { height: 40px; font-size: 16px; }
   .rm-search-item { padding: 10px 8px; }
+  /* 手机上从顶部弹出，给软键盘留出空间 */
+  .rm-switcher-backdrop { padding-top: calc(8px + env(safe-area-inset-top)); }
+  .rm-switcher { max-height: 50vh; }
+  .rm-switcher-item { height: 44px; font-size: 15px; }
   .rm-trash-list li { flex-wrap: wrap; }
 }
