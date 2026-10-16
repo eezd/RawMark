@@ -1,0 +1,7 @@
+# 本地交接文件与设计文档不入库
+CONTEXT.md
+docs/
+
+# 前端
+node_modules/
+web/dist/
