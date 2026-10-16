@@ -34,20 +34,23 @@ type Watcher struct {
 	fw      *fsnotify.Watcher
 	snap    map[string]fileState
 	watched map[string]bool
+	onScan  func(notes map[string]string)
 }
 
-func Start(ctx context.Context, v *vault.Vault, hub *events.Hub) error {
+// Start 开始监听。onScan 在首次扫描及之后每次有变化的扫描后调用，参数为全部笔记的路径 -> rev（用于更新搜索索引）
+func Start(ctx context.Context, v *vault.Vault, hub *events.Hub, onScan func(notes map[string]string)) error {
 	fw, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
 	}
-	w := &Watcher{v: v, hub: hub, fw: fw, snap: map[string]fileState{}, watched: map[string]bool{}}
+	w := &Watcher{v: v, hub: hub, fw: fw, snap: map[string]fileState{}, watched: map[string]bool{}, onScan: onScan}
 	snap, err := w.scan()
 	if err != nil {
 		fw.Close()
 		return err
 	}
 	w.snap = snap
+	w.onScan(notes(snap))
 	go w.loop(ctx)
 	return nil
 }
@@ -90,7 +93,20 @@ func (w *Watcher) rescan() {
 	}
 	evs := diff(w.snap, next)
 	w.snap = next
+	if len(evs) > 0 {
+		w.onScan(notes(next))
+	}
 	w.hub.Broadcast(evs...)
+}
+
+func notes(snap map[string]fileState) map[string]string {
+	out := make(map[string]string, len(snap))
+	for p, st := range snap {
+		if !st.dir {
+			out[p] = st.rev
+		}
+	}
+	return out
 }
 
 // scan 读取当前目录树；内容版本只对新出现或大小/修改时间变化的文件重新计算

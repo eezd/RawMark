@@ -16,6 +16,7 @@ import (
 
 	"rawmark/internal/auth"
 	"rawmark/internal/events"
+	"rawmark/internal/search"
 	"rawmark/internal/vault"
 )
 
@@ -30,12 +31,13 @@ type Server struct {
 	vault *vault.Vault
 	auth  *auth.Manager
 	hub   *events.Hub
+	index *search.Index
 	// OnSetup 在首次初始化完成后调用（用于删除启动码文件）
 	OnSetup func()
 }
 
-func New(v *vault.Vault, a *auth.Manager, hub *events.Hub) *Server {
-	return &Server{vault: v, auth: a, hub: hub}
+func New(v *vault.Vault, a *auth.Manager, hub *events.Hub, index *search.Index) *Server {
+	return &Server{vault: v, auth: a, hub: hub, index: index}
 }
 
 func (s *Server) Handler(static fs.FS) http.Handler {
@@ -59,6 +61,7 @@ func (s *Server) Handler(static fs.FS) http.Handler {
 		"POST /api/v1/trash/{id}/restore": s.trashRestore,
 		"DELETE /api/v1/trash/{id}":       s.trashPurge,
 		"GET /api/v1/events":              s.events,
+		"GET /api/v1/search":              s.search,
 	}
 	for pattern, h := range protected {
 		mux.Handle(pattern, s.requireAuth(h))
@@ -209,6 +212,17 @@ func (s *Server) tree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"entries": entries})
+}
+
+const searchLimit = 50
+
+func (s *Server) search(w http.ResponseWriter, r *http.Request) {
+	results, err := s.index.Search(r.URL.Query().Get("q"), searchLimit)
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"results": results})
 }
 
 func (s *Server) readFile(w http.ResponseWriter, r *http.Request) {

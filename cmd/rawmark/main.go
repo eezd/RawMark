@@ -1,6 +1,6 @@
 // RawMark 服务入口。配置全部来自环境变量：
 //
-//	RAWMARK_DATA   数据目录，默认 /data（存放 rawmark.db 与默认仓库）
+//	RAWMARK_DATA   数据目录，默认 /data（存放 rawmark.db、可重建的搜索索引 index.db 与默认仓库）
 //	RAWMARK_VAULT  笔记仓库目录，默认 $RAWMARK_DATA/vault；可指向已有的 Typora 笔记目录
 //	RAWMARK_ADDR   监听地址，默认 :8080
 package main
@@ -22,6 +22,7 @@ import (
 	"rawmark/internal/api"
 	"rawmark/internal/auth"
 	"rawmark/internal/events"
+	"rawmark/internal/search"
 	"rawmark/internal/store"
 	"rawmark/internal/vault"
 	"rawmark/internal/watch"
@@ -80,13 +81,20 @@ func run(addr string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	idx, err := search.Open(filepath.Join(dataDir, "index.db"), v)
+	if err != nil {
+		return err
+	}
+	defer idx.Close()
+	go idx.Run(ctx)
+
 	hub := events.NewHub()
-	if err := watch.Start(ctx, v, hub); err != nil {
+	if err := watch.Start(ctx, v, hub, idx.Update); err != nil {
 		return fmt.Errorf("启动文件监听失败: %w", err)
 	}
 	go cleanupSessions(ctx, st)
 
-	srv := api.New(v, am, hub)
+	srv := api.New(v, am, hub, idx)
 	srv.OnSetup = func() { os.Remove(codeFile) }
 	httpServer := &http.Server{
 		Addr:              addr,

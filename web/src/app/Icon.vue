@@ -13,6 +13,7 @@ const paths = {
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
   restore: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5',
   edit: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
+  search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.35-4.35',
 }
 defineProps<{ name: keyof typeof paths; size?: number }>()
 </script>

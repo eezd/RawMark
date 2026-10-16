@@ -14,6 +14,13 @@ export interface TrashItem {
   deletedAt: number
 }
 
+export interface SearchResult {
+  path: string
+  // 第一处匹配所在行（从 1 开始）及其摘录；只有路径匹配时 line 为 0
+  line: number
+  snippet: string
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -68,6 +75,7 @@ export const api = {
   logout: () => request('POST', '/api/v1/auth/logout'),
 
   tree: async () => (await json<{ entries: Entry[] }>(request('GET', '/api/v1/tree'))).entries,
+  search: async (q: string) => (await json<{ results: SearchResult[] }>(request('GET', '/api/v1/search?q=' + encodeURIComponent(q)))).results,
 
   async readFile(path: string): Promise<{ content: string; rev: string }> {
     const res = await request('GET', '/api/v1/files/' + encodePath(path))

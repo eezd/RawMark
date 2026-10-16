@@ -22,7 +22,7 @@ docker run -d --name rawmark \
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `RAWMARK_DATA` | `/data` | 数据目录（数据库、默认笔记仓库） |
+| `RAWMARK_DATA` | `/data` | 数据目录（数据库、可重建的搜索索引 `index.db`、默认笔记仓库） |
 | `RAWMARK_VAULT` | `$RAWMARK_DATA/vault` | 笔记仓库目录，可指向已有的笔记文件夹 |
 | `RAWMARK_ADDR` | `:8080` | 监听地址 |
 

@@ -154,6 +154,51 @@ button {
 .rm-tree-row:hover .rm-tree-more,
 .rm-tree-row.menu-open .rm-tree-more { opacity: 1; }
 .rm-tree-empty { padding: 16px; color: var(--rm-text-muted); font-size: 13px; text-align: center; }
+/* ---- 搜索 ---- */
+.rm-sidebar-head .rm-icon-btn.on { background: var(--rm-active); color: var(--rm-accent-strong); }
+.rm-search { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.rm-search-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 10px 8px;
+  padding: 0 4px 0 8px;
+  border: 1px solid var(--rm-divider);
+  border-radius: 6px;
+  background: var(--rm-bg);
+  color: var(--rm-text-muted);
+}
+.rm-search-box:focus-within { border-color: var(--rm-accent); }
+.rm-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  border: 0;
+  background: none;
+  color: var(--rm-text);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+.rm-search-input::-webkit-search-cancel-button { display: none; }
+.rm-search-results { flex: 1; overflow: auto; list-style: none; margin: 0; padding: 0 6px 12px; }
+.rm-search-item { padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.rm-search-item.active { background: var(--rm-hover); }
+.rm-search-item.current .rm-search-title { color: var(--rm-accent-strong); }
+.rm-search-title { display: flex; align-items: baseline; gap: 6px; font-size: 14px; overflow: hidden; white-space: nowrap; }
+.rm-search-dir { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--rm-text-muted); font-size: 12px; }
+.rm-search-snippet {
+  margin-top: 2px;
+  color: var(--rm-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
+.rm-search-hit { background: rgba(66, 184, 131, 0.28); color: var(--rm-text); border-radius: 2px; }
 .rm-sidebar-foot { display: flex; gap: 4px; padding: 8px; border-top: 1px solid var(--rm-divider); }
 .rm-foot-btn {
   flex: 1;
@@ -344,5 +389,8 @@ button {
   .rm-tree-row { height: 40px; font-size: 15px; }
   .rm-tree-more { opacity: 1; width: 36px; height: 36px; }
   .rm-sidebar-head .rm-icon-btn { width: 40px; height: 40px; }
+  /* 小于 16px 时 iOS Safari 聚焦输入框会自动放大页面 */
+  .rm-search-input { height: 40px; font-size: 16px; }
+  .rm-search-item { padding: 10px 8px; }
   .rm-trash-list li { flex-wrap: wrap; }
 }

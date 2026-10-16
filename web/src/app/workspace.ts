@@ -1,8 +1,8 @@
 // 工作区状态与操作：目录树、标签页、保存队列、冲突处理、实时同步。
 // 文件操作一律先更新界面再请求服务器，失败时回滚，保证"操作即时生效"。
 import { Annotation, Transaction, type EditorState } from '@codemirror/state'
-import type { EditorView } from '@codemirror/view'
-import { reactive, watch } from 'vue'
+import { EditorView } from '@codemirror/view'
+import { nextTick, reactive, watch } from 'vue'
 import { createEditorState, pasteImages } from '../editor'
 import { api, ApiError, type Entry } from './api'
 import { drafts } from './drafts'
@@ -37,6 +37,8 @@ export const ws = reactive({
   renaming: null as string | null,
   // 移动端侧栏抽屉
   sidebarOpen: false,
+  // 侧栏显示搜索而非目录树
+  searchOpen: false,
   toasts: [] as Toast[],
 })
 
@@ -275,6 +277,45 @@ export async function keepLocalVersion(path: string) {
       toast('服务器上的版本又变化了，请再次选择')
     } else toast('保存失败：' + errorText(err))
   }
+}
+
+// ---- 搜索结果跳转 ----
+
+interface RevealTarget {
+  path: string
+  line: number
+  terms: string[]
+}
+// 待定位的位置：笔记可能尚未载入，由编辑器面板在显示该笔记时执行
+let pendingReveal: RevealTarget | null = null
+
+/** 打开笔记并定位到第 line 行（从 1 开始，0 表示不定位），选中该行第一个搜索词 */
+export async function openAt(path: string, line: number, terms: string[]) {
+  pendingReveal = line > 0 ? { path, line, terms } : null
+  if (pendingReveal && path === ws.active && view && editorStates.has(path)) {
+    ws.sidebarOpen = false
+    revealPending(view, path)
+  } else await openNote(path)
+}
+
+/** 编辑器面板显示笔记后调用；返回 true 表示已定位（不应再恢复原来的滚动位置） */
+export function revealPending(v: EditorView, path: string): boolean {
+  const r = pendingReveal
+  if (!r || r.path !== path) return false
+  pendingReveal = null
+  const line = v.state.doc.line(Math.min(r.line, v.state.doc.lines))
+  const text = line.text.toLowerCase()
+  let at = -1
+  let len = 0
+  for (const t of r.terms) {
+    const i = text.indexOf(t.toLowerCase())
+    if (i >= 0 && (at < 0 || i < at)) [at, len] = [i, t.length]
+  }
+  const from = line.from + Math.max(at, 0)
+  v.dispatch({ selection: { anchor: from, head: from + len }, effects: EditorView.scrollIntoView(from, { y: 'center' }) })
+  // 触屏设备上聚焦会弹出软键盘遮住内容，只在有鼠标的设备上聚焦
+  if (!matchMedia('(pointer: coarse)').matches) v.focus()
+  return true
 }
 
 // ---- 标签页 ----
@@ -606,10 +647,26 @@ export async function startWorkspace() {
   })
   window.addEventListener('pagehide', () => void flushAll(true))
   window.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    if (!(e.ctrlKey || e.metaKey)) return
+    const key = e.key.toLowerCase()
+    if (key === 's' && !e.shiftKey) {
       e.preventDefault()
       if (ws.active) void flush(ws.active)
+    } else if (key === 'f' && e.shiftKey) {
+      e.preventDefault()
+      openSearch()
     }
+  })
+}
+
+export function openSearch() {
+  ws.searchOpen = true
+  ws.sidebarOpen = true
+  // 已打开时重新聚焦并全选，便于直接输入新的搜索词
+  void nextTick(() => {
+    const input = document.querySelector<HTMLInputElement>('.rm-search-input')
+    input?.focus()
+    input?.select()
   })
 }
 

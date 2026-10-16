@@ -5,7 +5,8 @@ import { basename } from './paths'
 import TrashDialog from './TrashDialog.vue'
 import { tree } from './tree'
 import TreeNode from './TreeNode.vue'
-import { createFolder, createNote, move } from './workspace'
+import SearchPanel from './SearchPanel.vue'
+import { createFolder, createNote, move, openSearch, ws } from './workspace'
 
 const emit = defineEmits<{ logout: [] }>()
 const trashOpen = ref(false)
@@ -30,10 +31,14 @@ function onRootDrop(e: DragEvent) {
   <div class="rm-sidebar-inner">
     <div class="rm-sidebar-head">
       <span class="rm-brand">RawMark</span>
+      <button class="rm-icon-btn" :class="{ on: ws.searchOpen }" title="搜索（Ctrl+Shift+F）" @click="ws.searchOpen ? (ws.searchOpen = false) : openSearch()">
+        <Icon name="search" />
+      </button>
       <button class="rm-icon-btn" title="新建笔记" @click="createNote('')"><Icon name="noteAdd" /></button>
       <button class="rm-icon-btn" title="新建文件夹" @click="createFolder('')"><Icon name="folderAdd" /></button>
     </div>
-    <div class="rm-tree" :class="{ drop: rootDrop }" @dragover="onRootDragOver" @dragleave="rootDrop = false" @drop="onRootDrop">
+    <SearchPanel v-if="ws.searchOpen" />
+    <div v-else class="rm-tree" :class="{ drop: rootDrop }" @dragover="onRootDragOver" @dragleave="rootDrop = false" @drop="onRootDrop">
       <ul class="rm-tree-list">
         <TreeNode v-for="node in tree" :key="node.path" :node="node" :depth="0" />
       </ul>
