@@ -5,3 +5,6 @@ docs/
 # 前端
 node_modules/
 web/dist/
+
+# 本地开发数据
+.dev-data/

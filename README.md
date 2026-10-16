@@ -28,9 +28,21 @@ docker run -d --name rawmark \
 
 ## 开发
 
+需要 Go 1.27+ 与 Node 24+。开发时不必构建前端或 Docker 镜像，开两个终端：
+
 ```sh
-cd web && npm install
-npm run dev        # 前端开发服务器，/api 转发到 127.0.0.1:8080
-npm run typecheck && npm test
-go test ./internal/...
+# 终端 1：后端（-tags dev 不嵌入前端资源，数据放在仓库下的 .dev-data/）
+RAWMARK_DATA=.dev-data RAWMARK_ADDR=127.0.0.1:8080 go run -tags dev ./cmd/rawmark
+
+# 终端 2：前端（热更新，/api 与 WebSocket 转发到 127.0.0.1:8080）
+cd web && npm install && npm run dev
+```
+
+浏览器打开 http://localhost:5173 ，启动码在 `.dev-data/setup-code.txt`。手机调试用 `npm run dev -- --host`，再访问 `http://<电脑 IP>:5173`。
+
+检查：
+
+```sh
+cd web && npm run typecheck && npm test
+go vet -tags dev ./... && go test ./internal/...
 ```
