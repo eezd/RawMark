@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -49,11 +50,11 @@ func run(addr string) error {
 	dataDir := env("RAWMARK_DATA", "/data")
 	vaultDir := env("RAWMARK_VAULT", filepath.Join(dataDir, "vault"))
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
-		return err
+		return permissionHint(err)
 	}
 	v, err := vault.Open(vaultDir)
 	if err != nil {
-		return fmt.Errorf("打开笔记仓库失败: %w", err)
+		return permissionHint(fmt.Errorf("打开笔记仓库失败: %w", err))
 	}
 	st, err := store.Open(filepath.Join(dataDir, "rawmark.db"))
 	if err != nil {
@@ -109,6 +110,14 @@ func run(addr string) error {
 		return err
 	}
 	return nil
+}
+
+// permissionHint 为权限错误补充排查提示：Docker 绑定挂载的宿主机目录常常对容器内的非 root 用户不可写
+func permissionHint(err error) error {
+	if errors.Is(err, fs.ErrPermission) {
+		return fmt.Errorf("%w（当前 UID %d 对数据目录没有写权限：请用 --user 指定宿主机目录所有者的 UID:GID，或执行 chown 修改目录所有者）", err, os.Getuid())
+	}
+	return err
 }
 
 func cleanupSessions(ctx context.Context, st *store.Store) {
