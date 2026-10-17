@@ -18,7 +18,7 @@ docker run -d --name rawmark \
 - 首次打开需要输入启动码，位于数据目录的 `setup-code.txt`（如 `~/rawmark-data/setup-code.txt`），设置密码后自动删除。
 - 笔记以普通 `.md` 文件保存在 `数据目录/vault/`，图片按 Typora 习惯存放在同级的 `笔记名.assets/`，可直接用 Typora 等编辑器打开；外部修改会实时同步到网页。
 - `--user` 让容器以宿主机用户身份读写数据目录；不指定时容器以 UID 65532 运行，需要该用户对目录有写权限。
-- 请通过 HTTPS 反向代理（Caddy、Nginx 等）访问，并转发 WebSocket（`/api/v1/events`）。笔记加密等功能依赖浏览器的安全上下文，纯 HTTP 下不可用。
+- 请通过 HTTPS 反向代理（Caddy、Nginx 等）访问，并转发 WebSocket（`/api/v1/events`）。
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
