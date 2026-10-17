@@ -21,6 +21,11 @@ export const resolveImageUrl = Facet.define<(src: string) => string, (src: strin
   combine: (values) => values[0] ?? ((src) => src),
 })
 
+// 需要先取回处理的图片（加密笔记的图片要下载后在浏览器解密）：返回可显示的地址；返回 null 表示直接加载
+export const imageLoader = Facet.define<(src: string) => Promise<string> | null, (src: string) => Promise<string> | null>({
+  combine: (values) => values[0] ?? (() => null),
+})
+
 const hidden = Decoration.replace({})
 const inlineCode = Decoration.mark({ class: 'cm-rm-inline-code' })
 const linkText = Decoration.mark({ class: 'cm-rm-link' })
@@ -247,7 +252,7 @@ function buildDecorations(view: EditorView): DecorationSet {
     const marks = node.getChildren('LinkMark')
     if (!url || marks.length < 2) return
     const src = resolveUrl(state.sliceDoc(url.from, url.to).replace(/^<|>$/g, ''))
-    const widget = new ImageWidget(src, state.sliceDoc(marks[0].to, marks[1].from))
+    const widget = new ImageWidget(src, state.sliceDoc(marks[0].to, marks[1].from), state.facet(imageLoader))
     if (touches(node)) out.push(Decoration.widget({ widget, side: 1 }).range(node.to))
     else if (lineOf(node.from) === lineOf(node.to)) out.push(Decoration.replace({ widget }).range(node.from, node.to))
   }

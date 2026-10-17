@@ -5,12 +5,38 @@ import { EditorView } from '@codemirror/view'
 import { nextTick, reactive, watch } from 'vue'
 import { createEditorState, pasteImages } from '../editor'
 import { handleShortcut, registerCommand } from './commands'
-import { api, ApiError, type Entry } from './api'
+import { imageLinks, rewriteImageLinks } from '../markdown/links'
+import { api, ApiError, encodePath, type Entry } from './api'
+import { decryptNote, encryptNote, newNoteKey, type NoteKey } from './crypto'
 import { drafts } from './drafts'
+import {
+  decryptImage,
+  encryptImage,
+  ensureUnlocked,
+  keyState,
+  loadEncryptedImage,
+  lockKey,
+  masterKey,
+  openKeyDialog,
+} from './encryption'
 import { connectEvents, type VaultEvent } from './events'
-import { basename, dirname, joinPath, NOTE_EXT, resolveAssetUrl } from './paths'
+import {
+  assetPathOf,
+  assetsDirOf,
+  basename,
+  dirname,
+  ENCRYPTED_EXT,
+  escapeLinkPath,
+  isEncrypted,
+  joinPath,
+  NOTE_EXT,
+  noteTitle,
+  RAW_PREFIX,
+  resolveAssetUrl,
+} from './paths'
 
-export type TabStatus = 'loading' | 'ready' | 'conflict' | 'deleted' | 'error'
+// locked：加密笔记未解锁（或浏览器不支持加密），内容未载入
+export type TabStatus = 'loading' | 'ready' | 'conflict' | 'deleted' | 'error' | 'locked'
 
 export interface Tab {
   path: string
@@ -59,6 +85,8 @@ const MAX_RETRIES = 12
 const editorStates = new Map<string, EditorState>()
 // 每个打开的笔记一个可变引用，编辑器扩展通过它取得笔记的当前路径（重命名后随之更新）
 const noteRefs = new Map<string, { path: string }>()
+// 打开的加密笔记的笔记密钥，保存时用它加密
+const noteKeys = new Map<string, NoteKey>()
 
 interface SaveSlot {
   timer?: ReturnType<typeof setTimeout>
@@ -101,7 +129,10 @@ export function dismissToast(id: number) {
 }
 
 function errorText(err: unknown): string {
-  return err instanceof ApiError ? err.message : '网络错误，请检查连接'
+  if (err instanceof ApiError) return err.message
+  // fetch 的网络错误是 TypeError；其余（如解密失败）给出原因
+  if (err instanceof TypeError || !(err instanceof Error)) return '网络错误，请检查连接'
+  return err.message
 }
 
 // ---- 编辑器状态 ----
@@ -130,13 +161,14 @@ function buildState(path: string, doc: string): EditorState {
   return createEditorState({
     doc,
     resolveImage: (src) => resolveAssetUrl(ref.path, src),
+    loadImage: (src) => (isEncrypted(ref.path) && src.startsWith(RAW_PREFIX) ? loadEncryptedImage(src) : null),
     onChange: (u) => {
       editorStates.set(ref.path, u.state)
       if (!u.transactions.some((tr) => tr.annotation(externalChange))) scheduleSave(ref.path)
     },
     extensions: [
       pasteImages({
-        upload: (file) => api.upload(ref.path, file),
+        upload: async (file) => api.upload(ref.path, isEncrypted(ref.path) ? await encryptImage(file) : file),
         onError: (err) => toast('图片上传失败：' + errorText(err)),
         onPending: (d) => {
           slot(ref.path).uploads += d
@@ -168,9 +200,43 @@ function replaceDoc(path: string, content: string) {
   else editorStates.set(path, state.update(spec).state)
 }
 
+// 按地址映射改写打开的笔记中的图片链接。external 为 true 时不进入撤销历史、不触发保存
+function editImageLinks(path: string, map: (url: string) => string | undefined, external: boolean) {
+  const active = path === ws.active && view !== null
+  const state = active ? view!.state : editorStates.get(path)
+  if (!state) return
+  const changes = imageLinks(state.doc.toString()).flatMap((l) => {
+    const insert = map(l.url)
+    return insert === undefined ? [] : [{ from: l.from, to: l.to, insert }]
+  })
+  if (!changes.length) return
+  const spec = { changes, annotations: external ? [externalChange.of(true), Transaction.addToHistory.of(false)] : [] }
+  if (active) view!.dispatch(spec)
+  else {
+    editorStates.set(path, state.update(spec).state)
+    if (!external) scheduleSave(path)
+  }
+}
+
 function docOf(path: string): string | undefined {
   if (path === ws.active && view && editorStates.has(path)) return view.state.doc.toString()
   return editorStates.get(path)?.doc.toString()
+}
+
+// ---- 读写（加密笔记在浏览器端加解密） ----
+
+/** 读取笔记；加密笔记返回解密后的正文及其笔记密钥（须已解锁） */
+async function readNote(path: string): Promise<{ content: string; rev: string; key?: NoteKey }> {
+  const file = await api.readFile(path)
+  if (!isEncrypted(path)) return file
+  const { text, key } = await decryptNote(masterKey(), file.content)
+  return { content: text, rev: file.rev, key }
+}
+
+function encryptFor(path: string, content: string): Promise<string> {
+  const key = noteKeys.get(path)
+  if (!key) throw new Error('缺少笔记密钥：' + path)
+  return encryptNote(key, content)
 }
 
 // ---- 保存队列 ----
@@ -207,12 +273,16 @@ export async function flush(path: string, keepalive = false): Promise<void> {
   if (content === undefined) return
   const seq = s.seq
   const baseRev = tab.rev
+  const encrypted = isEncrypted(path)
   s.inflight = (async () => {
     // 草稿与请求并行：页面关闭时等待 IndexedDB 写完再发请求，请求往往来不及发出
-    // 草稿只是兜底，写入失败不影响保存本身
-    const draftSaved = drafts.put({ path, content, baseRev, updatedAt: Date.now() }).catch((err) => console.warn('写入本地草稿失败', err))
+    // 草稿只是兜底，写入失败不影响保存本身。加密笔记不写草稿，避免明文落在本地
+    const draftSaved = encrypted
+      ? undefined
+      : drafts.put({ path, content, baseRev, updatedAt: Date.now() }).catch((err) => console.warn('写入本地草稿失败', err))
     try {
-      const rev = await api.writeFile(path, content, baseRev, keepalive)
+      // 未加密的笔记不能在发请求前 await：页面关闭时异步之后的请求可能发不出去
+      const rev = await api.writeFile(path, encrypted ? await encryptFor(path, content) : content, baseRev, keepalive)
       await draftSaved
       tab.rev = rev
       tab.saveError = undefined
@@ -220,7 +290,7 @@ export async function flush(path: string, keepalive = false): Promise<void> {
       s.retries = 0
       if (s.seq === seq) {
         tab.dirty = false
-        await drafts.delete(path)
+        if (!encrypted) await drafts.delete(path)
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 412) {
@@ -257,7 +327,8 @@ export async function useServerVersion(path: string) {
   const tab = tabOf(path)
   if (!tab) return
   try {
-    const { content, rev } = await api.readFile(path)
+    const { content, rev, key } = await readNote(path)
+    if (key) noteKeys.set(path, key)
     replaceDoc(path, content)
     const s = slot(path)
     s.savedSeq = s.seq
@@ -274,7 +345,8 @@ export async function keepLocalVersion(path: string) {
   const content = docOf(path)
   if (!tab || content === undefined) return
   try {
-    const rev = await api.writeFile(path, content, tab.conflictRev ?? '')
+    const body = isEncrypted(path) ? await encryptFor(path, content) : content
+    const rev = await api.writeFile(path, body, tab.conflictRev ?? '')
     const s = slot(path)
     s.savedSeq = s.seq
     Object.assign(tab, { rev, status: 'ready', dirty: false, conflictRev: undefined, saveError: undefined })
@@ -336,11 +408,16 @@ export async function openNote(path: string) {
     ws.active = path
     return
   }
-  const tab: Tab = { path, rev: '', status: 'loading', dirty: false }
-  ws.tabs.push(tab)
+  const locked = isEncrypted(path) && !keyState.unlocked
+  ws.tabs.push({ path, rev: '', status: locked ? 'locked' : 'loading', dirty: false })
   ws.active = path
+  if (!locked) await loadTab(path)
+}
+
+async function loadTab(path: string) {
   try {
-    const { content, rev } = await api.readFile(path)
+    const { content, rev, key } = await readNote(path)
+    if (key) noteKeys.set(path, key)
     editorStates.set(path, buildState(path, content))
     const t = tabOf(path)
     if (t) Object.assign(t, { rev, status: 'ready' })
@@ -368,6 +445,7 @@ export async function closeTab(path: string) {
 function forget(path: string) {
   editorStates.delete(path)
   noteRefs.delete(path)
+  noteKeys.delete(path)
   const s = slots.get(path)
   if (s) clearTimeout(s.timer)
   slots.delete(path)
@@ -387,7 +465,7 @@ function remapOpenNotes(from: string, to: string) {
     const old = tab.path
     tab.path = next
     if (ws.active === old) ws.active = next
-    for (const map of [editorStates, noteRefs, slots] as Map<string, unknown>[]) {
+    for (const map of [editorStates, noteRefs, noteKeys, slots] as Map<string, unknown>[]) {
       if (map.has(old)) {
         map.set(next, map.get(old))
         map.delete(old)
@@ -470,7 +548,8 @@ function uniqueName(dir: string, base: string, ext: string): string {
   const taken = new Set(ws.entries.map((e) => e.path))
   for (let i = 0; ; i++) {
     const name = base + (i ? ` ${i}` : '') + ext
-    if (!taken.has(joinPath(dir, name))) return joinPath(dir, name)
+    // 同名的加密笔记与未加密笔记不能共存（共用图片目录）
+    if (!taken.has(joinPath(dir, name)) && !(ext === NOTE_EXT && taken.has(joinPath(dir, name + '.enc')))) return joinPath(dir, name)
   }
 }
 
@@ -545,7 +624,8 @@ export function renameTarget(path: string, name: string): string | null {
   name = name.trim().replace(/\//g, '')
   if (!name || name.startsWith('.')) return null
   const entry = ws.entries.find((e) => e.path === path)
-  if (entry && !entry.dir && !name.endsWith(NOTE_EXT)) name += NOTE_EXT
+  const ext = isEncrypted(path) ? ENCRYPTED_EXT : NOTE_EXT
+  if (entry && !entry.dir && !name.endsWith(ext)) name += ext
   return joinPath(dirname(path), name)
 }
 
@@ -556,6 +636,9 @@ export async function move(from: string, to: string) {
     toast(`“${basename(to)}”已存在`)
     return
   }
+  // 服务器读不到加密笔记的正文，无法随图片目录改名改写其中的链接，须解锁后由浏览器改写
+  const relink = isEncrypted(from) && noteTitle(from) !== noteTitle(to)
+  if (relink && !(await unlockNotes())) return
   await withOp(async () => {
     // 先保存待保存的修改，确保移动的是最新内容；移动期间暂停保存，避免写到旧路径
     await Promise.all(affected(from).map((p) => flush(p)))
@@ -576,6 +659,7 @@ export async function move(from: string, to: string) {
     } finally {
       paused.forEach((s) => s.paused--)
     }
+    affected(to).forEach(resumeSaving)
     // 笔记改名时服务器会改写正文中的图片链接，版本随之变化，需要重新同步
     await Promise.all(affected(to).map(async (p) => {
       const tab = tabOf(p)
@@ -586,8 +670,37 @@ export async function move(from: string, to: string) {
         if (rev !== tab.rev) Object.assign(tab, { status: 'conflict', conflictRev: rev })
       } else await syncOpenTab(tab)
     }))
+    if (relink) await relinkRenamedNote(from, to)
   })
   void refreshTree()
+}
+
+// 暂停期间到期的保存计时器绑定的是旧路径，移动/转换后按新路径重新安排
+function resumeSaving(path: string) {
+  const s = slots.get(path)
+  if (!s || s.seq === s.savedSeq) return
+  clearTimeout(s.timer)
+  s.timer = setTimeout(() => void flush(path), SAVE_DELAY)
+}
+
+async function relinkRenamedNote(from: string, to: string) {
+  const oldDir = assetsDirOf(from)
+  const newDir = escapeLinkPath(basename(assetsDirOf(to)))
+  const map = (url: string) => {
+    const p = assetPathOf(from, url)
+    return p !== null && dirname(p) === oldDir ? newDir + '/' + escapeLinkPath(basename(p)) : undefined
+  }
+  if (tabOf(to)?.status === 'ready') {
+    editImageLinks(to, map, false)
+    return
+  }
+  try {
+    const { content, rev, key } = await readNote(to)
+    const next = rewriteImageLinks(content, map)
+    if (next !== content) await api.writeFile(to, await encryptNote(key!, next), rev)
+  } catch (err) {
+    toast('改写图片链接失败：' + errorText(err))
+  }
 }
 
 export async function remove(path: string) {
@@ -601,7 +714,7 @@ export async function remove(path: string) {
     for (const p of paths) await closeTab(p)
     try {
       const item = await api.deleteFile(path)
-      toast(`已删除“${basename(path).replace(/\.md$/, '')}”`, {
+      toast(`已删除“${noteTitle(path)}”`, {
         label: '撤销',
         run: () => void restore(item.id),
       })
@@ -628,8 +741,9 @@ async function syncOpenTab(tab: Tab) {
   const s = slots.get(tab.path)
   if (tab.status !== 'ready' || tab.dirty || s?.inflight) return
   try {
-    const { content, rev } = await api.readFile(tab.path)
+    const { content, rev, key } = await readNote(tab.path)
     if (rev === tab.rev || tab.dirty) return
+    if (key) noteKeys.set(tab.path, key)
     replaceDoc(tab.path, content)
     tab.rev = rev
   } catch (err) {
@@ -663,6 +777,100 @@ function handleEvents(evs: VaultEvent[]) {
 async function resync() {
   await refreshTree()
   await Promise.all(ws.tabs.map(syncOpenTab))
+}
+
+// ---- 加密 ----
+
+/** 解锁并载入处于锁定状态的标签页，返回是否已解锁 */
+export async function unlockNotes(): Promise<boolean> {
+  try {
+    if (!(await ensureUnlocked())) return false
+  } catch (err) {
+    toast('读取加密密钥失败：' + errorText(err))
+    return false
+  }
+  await Promise.all(ws.tabs.filter((t) => t.status === 'locked').map((t) => ((t.status = 'loading'), loadTab(t.path))))
+  return true
+}
+
+/** 锁定：丢弃主密钥和已打开的加密笔记内容。有保存失败的修改时不锁定，否则修改会丢失 */
+export async function lockNotes() {
+  const tabs = ws.tabs.filter((t) => isEncrypted(t.path))
+  await Promise.all(tabs.map((t) => flush(t.path)))
+  if (tabs.some((t) => t.dirty)) {
+    toast('有加密笔记的修改尚未保存成功，暂不能锁定')
+    return
+  }
+  lockKey()
+  for (const t of tabs) {
+    editorStates.delete(t.path)
+    noteKeys.delete(t.path)
+    Object.assign(t, { status: 'locked', conflictRev: undefined, saveError: undefined })
+  }
+  toast('已锁定加密笔记')
+}
+
+/**
+ * 加密或取消加密笔记（a.md ↔ a.md.enc）。本篇图片目录中被引用的图片一并加密/解密为新文件并改写链接，
+ * 转换成功后永久删除原图片（加密前的明文图片不应留在回收站）
+ */
+export async function toggleEncryption(path: string) {
+  if (!(await unlockNotes())) return
+  const tab = tabOf(path)
+  if (!tab || tab.status !== 'ready') return
+  const encrypting = !isEncrypted(path)
+  const to = encrypting ? path.slice(0, -NOTE_EXT.length) + ENCRYPTED_EXT : path.slice(0, -ENCRYPTED_EXT.length) + NOTE_EXT
+  const action = encrypting ? '加密' : '取消加密'
+  await withOp(async () => {
+    await flush(path)
+    if (tab.dirty || tab.status !== 'ready') {
+      toast(`笔记尚未保存成功，暂不能${action}`)
+      return
+    }
+    // 转换期间暂停保存；期间的输入在转换后保存到新路径
+    const s = slot(path)
+    s.paused++
+    const replaced = new Map<string, string>()
+    const converted: string[] = []
+    try {
+      const text = docOf(path)!
+      for (const { url } of imageLinks(text)) {
+        const p = assetPathOf(path, url)
+        if (replaced.has(url) || p === null || dirname(p) !== assetsDirOf(path) || p.endsWith('.enc') === encrypting) continue
+        let file: Blob
+        try {
+          file = await api.raw(RAW_PREFIX + encodePath(p))
+        } catch (err) {
+          // 链接指向的图片已不存在，没有可转换的
+          if (err instanceof ApiError && err.status === 404) continue
+          throw err
+        }
+        replaced.set(url, await api.upload(to, encrypting ? await encryptImage(file) : await decryptImage(file)))
+        converted.push(p)
+      }
+      const content = rewriteImageLinks(text, (u) => replaced.get(u))
+      const key = encrypting ? await newNoteKey(masterKey()) : undefined
+      tab.rev = await api.convert(path, to, key ? await encryptNote(key, content) : content, tab.rev)
+      if (key) noteKeys.set(path, key)
+      else noteKeys.delete(path)
+      ws.entries = ws.entries.map((e) => (e.path === path ? { ...e, path: to } : e))
+      remapOpenNotes(path, to)
+      remapRecent(path, to)
+      // 已写入的内容含新链接；转换期间若有输入，其中的旧链接一并改写，随后续保存写入
+      editImageLinks(to, (u) => replaced.get(u), true)
+    } catch (err) {
+      toast(`${action}失败：` + errorText(err))
+      return
+    } finally {
+      s.paused--
+    }
+    resumeSaving(to)
+    toast(`已${action}“${noteTitle(to)}”`)
+    for (const p of converted) {
+      api.deleteAsset(p).catch((err) => toast('删除原图片失败：' + errorText(err)))
+    }
+  })
+  void refreshTree()
 }
 
 // ---- 启动 ----
@@ -734,6 +942,10 @@ export async function startWorkspace() {
     if (document.visibilityState === 'hidden') void flushAll(true)
   })
   window.addEventListener('pagehide', () => void flushAll(true))
+  // 加密笔记要先异步加密才能发出请求，页面关闭时往往来不及，且没有本地草稿兜底：有未保存的修改时请浏览器确认
+  window.addEventListener('beforeunload', (e) => {
+    if (ws.tabs.some((t) => t.dirty && isEncrypted(t.path))) e.preventDefault()
+  })
   window.addEventListener('keydown', handleShortcut)
 }
 
@@ -742,6 +954,7 @@ registerBuiltinCommands()
 
 function registerBuiltinCommands() {
   const hasNote = () => ws.active !== null
+  const activeEncrypted = () => ws.active !== null && isEncrypted(ws.active)
   const toggleSwitcher = (initial: string) => {
     ws.switcher = ws.switcher === null ? initial : null
   }
@@ -758,6 +971,11 @@ function registerBuiltinCommands() {
     // 浏览器不允许网页覆盖 Ctrl+W
     { id: 'tab.close', title: '关闭当前标签页', when: hasNote, run: () => void closeTab(ws.active!) },
     { id: 'app.trash', title: '打开回收站', run: () => (ws.trashOpen = true) },
+    { id: 'note.encrypt', title: '加密当前笔记', when: () => keyState.supported && hasNote() && !activeEncrypted(), run: () => void toggleEncryption(ws.active!) },
+    { id: 'note.decrypt', title: '取消加密当前笔记', when: () => keyState.supported && activeEncrypted(), run: () => void toggleEncryption(ws.active!) },
+    { id: 'vault.unlock', title: '解锁加密笔记', when: () => keyState.supported && !keyState.unlocked, run: () => void unlockNotes() },
+    { id: 'vault.lock', title: '锁定加密笔记', when: () => keyState.unlocked, run: () => void lockNotes() },
+    { id: 'vault.password', title: '修改加密密码', when: () => keyState.supported, run: () => void openKeyDialog('change') },
   ]) {
     registerCommand(cmd)
   }

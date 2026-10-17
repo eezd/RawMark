@@ -8,7 +8,7 @@ import { typoraExtensions } from '../markdown/extensions'
 import { renderedBlocks } from './blocks'
 import { codeBlockHighlight } from './codeblocks'
 import { editorFocus } from './focus'
-import { livePreview, resolveImageUrl } from './livepreview'
+import { imageLoader, livePreview, resolveImageUrl } from './livepreview'
 import { tableEditing } from './table'
 import { markdownTheme } from './theme'
 
@@ -26,6 +26,8 @@ const rawmarkLanguage = new Language(
 export interface EditorStateOptions {
   doc: string
   resolveImage?: (src: string) => string
+  // 见 imageLoader
+  loadImage?: (src: string) => Promise<string> | null
   // 文档变化回调，仅对挂载在视图上的状态触发；未激活标签页的状态由调用方直接更新
   onChange?: (update: ViewUpdate) => void
   extensions?: Extension[]
@@ -53,6 +55,7 @@ export function createEditorState(opts: EditorStateOptions): EditorState {
     EditorView.contentAttributes.of({ spellcheck: 'false', autocapitalize: 'sentences' }),
   ]
   if (opts.resolveImage) extensions.push(resolveImageUrl.of(opts.resolveImage))
+  if (opts.loadImage) extensions.push(imageLoader.of(opts.loadImage))
   if (opts.onChange) {
     const onChange = opts.onChange
     extensions.push(EditorView.updateListener.of((u) => u.docChanged && onChange(u)))

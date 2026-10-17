@@ -96,6 +96,15 @@ export const api = {
     return (await json<{ rev: string }>(res)).rev
   },
 
+  // 加密/取消加密：写入 path 并删除同名的另一种笔记 from，ifMatch 为 from 的版本
+  async convert(from: string, path: string, content: string, ifMatch: string): Promise<string> {
+    const res = request('PUT', `/api/v1/files/${encodePath(path)}?convertFrom=${encodeURIComponent(from)}`, {
+      body: content,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'If-Match': `"${ifMatch}"` },
+    })
+    return (await json<{ rev: string }>(res)).rev
+  },
+
   deleteFile: (path: string) => json<TrashItem>(request('DELETE', '/api/v1/files/' + encodePath(path))),
   move: (from: string, to: string) => request('POST', '/api/v1/move', { json: { from, to } }),
   mkdir: (path: string) => request('POST', '/api/v1/folders', { json: { path } }),
@@ -104,6 +113,32 @@ export const api = {
     const form = new FormData()
     form.append('file', file, file.name || 'image')
     return (await json<{ link: string }>(request('POST', '/api/v1/assets?note=' + encodeURIComponent(note), { body: form }))).link
+  },
+
+  // 读取 /api/v1/raw 地址的文件内容（加密图片需要取回后在浏览器解密）
+  async raw(url: string): Promise<Blob> {
+    return (await request('GET', url)).blob()
+  },
+
+  deleteAsset: (path: string) => request('DELETE', '/api/v1/assets/' + encodePath(path)),
+
+  // 未设置过加密密码时返回 null
+  async keyring(): Promise<{ text: string; rev: string } | null> {
+    try {
+      const res = await request('GET', '/api/v1/keyring')
+      return { text: await res.text(), rev: (res.headers.get('ETag') ?? '').replace(/"/g, '') }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null
+      throw err
+    }
+  },
+
+  // ifMatch 为空字符串表示首次创建
+  async putKeyring(text: string, ifMatch: string): Promise<string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (ifMatch) headers['If-Match'] = `"${ifMatch}"`
+    else headers['If-None-Match'] = '*'
+    return (await json<{ rev: string }>(request('PUT', '/api/v1/keyring', { body: text, headers }))).rev
   },
 
   trash: async () => (await json<{ items: TrashItem[] }>(request('GET', '/api/v1/trash'))).items,
