@@ -19,6 +19,8 @@ docker run -d --name rawmark \
 - 笔记以普通 `.md` 文件保存在 `数据目录/vault/`，图片按 Typora 习惯存放在同级的 `笔记名.assets/`，可直接用 Typora 等编辑器打开；外部修改会实时同步到网页。
 - `--user` 让容器以宿主机用户身份读写数据目录；不指定时容器以 UID 65532 运行，需要该用户对目录有写权限。
 - 请通过 HTTPS 反向代理（Caddy、Nginx 等）访问，并转发 WebSocket（`/api/v1/events`）。
+- 分享：命令面板（F1）中「分享当前笔记」生成只读链接 `/s/…`，可设访问密码与有效期；「管理分享链接」查看与撤销。
+- 自动化：「API 令牌」中创建只读或读写令牌，以 `Authorization: Bearer <令牌>` 调用 REST API，接口说明见 `/api/v1/openapi.json`。
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |

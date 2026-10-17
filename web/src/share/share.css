@@ -1,0 +1,112 @@
+/* 只读分享页：排版与编辑器渲染效果保持一致（同一套 --rm-* 变量） */
+.rm-share {
+  max-width: var(--rm-content-width);
+  margin: 0 auto;
+  padding: 24px 24px 80px;
+  font-size: var(--rm-font-size);
+  line-height: var(--rm-line-height);
+  overflow-wrap: break-word;
+}
+
+.rm-share-message { margin-top: 30vh; text-align: center; color: var(--rm-text-muted); }
+
+.rm-share-password { display: flex; flex-direction: column; gap: 12px; max-width: 300px; margin: 25vh auto 0; }
+.rm-share-password p { margin: 0; }
+.rm-share-password input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--rm-divider);
+  border-radius: 8px;
+  background: var(--rm-bg);
+  color: var(--rm-text);
+  font-size: 15px;
+  outline: none;
+}
+.rm-share-password input:focus { border-color: var(--rm-accent); box-shadow: 0 0 0 3px var(--rm-selection); }
+.rm-share-password button {
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--rm-accent);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+}
+.rm-share-password button:disabled { opacity: 0.6; }
+.rm-share-error { min-height: 1.2em; color: #e5484d; font-size: 13px; }
+
+.rm-share-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rm-divider);
+  color: var(--rm-text-muted);
+  font-size: 13px;
+}
+.rm-share-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-share-time { flex: none; }
+
+.rm-share-content h1 { font-size: 2em; line-height: 1.3; margin: 0.9em 0 0.4em; }
+.rm-share-content h2 { font-size: 1.6em; line-height: 1.35; margin: 0.9em 0 0.4em; }
+.rm-share-content h3 { font-size: 1.3em; line-height: 1.4; margin: 0.8em 0 0.4em; }
+.rm-share-content h4 { font-size: 1.15em; margin: 0.8em 0 0.4em; }
+.rm-share-content h5,
+.rm-share-content h6 { font-size: 1em; margin: 0.8em 0 0.4em; }
+.rm-share-content h6 { color: var(--rm-text-muted); }
+.rm-share-content p { margin: 0.6em 0; }
+.rm-share-content a { color: var(--rm-accent-strong); text-decoration: none; }
+.rm-share-content a:hover { text-decoration: underline; }
+.rm-share-content img { max-width: 100%; border-radius: 4px; }
+.rm-share-content mark { background: var(--rm-highlight-bg); color: inherit; padding: 0 2px; border-radius: 2px; }
+.rm-share-content hr { border: 0; border-top: 1px solid var(--rm-divider); margin: 1.5em 0; }
+.rm-share-content blockquote { margin: 0.8em 0; padding-left: 16px; border-left: 3px solid var(--rm-divider); color: var(--rm-text-muted); }
+.rm-share-content ul,
+.rm-share-content ol { padding-left: 1.6em; }
+.rm-share-content li > input[type='checkbox'] { margin: 0 0.4em 0 -1.4em; accent-color: var(--rm-accent); vertical-align: -0.1em; }
+.rm-share-content li:has(> input[type='checkbox']) { list-style: none; }
+
+.rm-share-content code {
+  font-family: var(--rm-font-mono);
+  font-size: 0.875em;
+  background: var(--rm-inline-code-bg);
+  color: var(--rm-inline-code-text);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+.rm-share-content pre {
+  margin: 0.8em 0;
+  padding: 12px 24px;
+  border-radius: 8px;
+  background: var(--rm-code-bg);
+  overflow-x: auto;
+  line-height: 1.5;
+  tab-size: 4;
+}
+.rm-share-content pre code {
+  padding: 0;
+  background: none;
+  color: var(--rm-code-text);
+  font-size: var(--rm-code-font-size);
+}
+
+.rm-share-content table { border-collapse: collapse; display: block; max-width: 100%; width: fit-content; overflow-x: auto; margin: 0.8em 0; font-size: 0.95em; line-height: 1.5; }
+.rm-share-content th,
+.rm-share-content td { border: 1px solid var(--rm-divider); padding: 6px 12px; }
+.rm-share-content th { font-weight: 600; background: var(--rm-inline-code-bg); }
+
+.rm-share-content div[data-math] { margin: 0.8em 0; overflow-x: auto; }
+.rm-share-mermaid { margin: 0.8em 0; text-align: center; overflow-x: auto; }
+
+.rm-share-content nav.toc { margin: 0.8em 0; padding: 8px 16px; border-left: 3px solid var(--rm-divider); }
+.rm-share-content nav.toc ul { list-style: none; margin: 0; padding: 0; }
+.rm-share-content nav.toc li { margin: 2px 0; }
+
+.rm-share-content .footnote-ref a { text-decoration: none; }
+.rm-share-content .footnote { margin-top: 0.4em; font-size: 0.9em; color: var(--rm-text-muted); }
+.rm-share-content .footnote:first-of-type { margin-top: 2em; padding-top: 1em; border-top: 1px solid var(--rm-divider); }
+
+@media (max-width: 600px) {
+  .rm-share { padding: 16px 16px 60px; }
+  .rm-share-time { display: none; }
+}

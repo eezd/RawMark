@@ -354,6 +354,30 @@ button {
 }
 .rm-dialog-head { display: flex; align-items: center; padding: 14px 16px 8px 20px; }
 .rm-dialog-head h2 { flex: 1; margin: 0; font-size: 16px; }
+.rm-share-dialog { max-width: 640px; }
+.rm-share-form { display: flex; gap: 8px; padding: 4px 20px 0; }
+.rm-share-form input,
+.rm-share-form select {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--rm-divider);
+  border-radius: 6px;
+  background: var(--rm-bg);
+  color: var(--rm-text);
+  font-size: 14px;
+  outline: none;
+}
+.rm-share-form input { flex: 1; min-width: 0; }
+.rm-share-form input:focus,
+.rm-share-form select:focus { border-color: var(--rm-accent); }
+.rm-share-note { margin: 10px 20px 4px; font-size: 12px; color: var(--rm-text-muted); line-height: 1.6; }
+.rm-share-note a { color: var(--rm-accent-strong); }
+.rm-share-link { font-family: var(--rm-font-mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-share-bad { color: var(--rm-danger); }
+.rm-token-created { margin: 12px 20px 0; padding: 10px 12px; border-radius: 8px; background: var(--rm-selection); font-size: 13px; }
+.rm-token-created p { margin: 0 0 6px; }
+.rm-token-value { display: flex; align-items: center; gap: 8px; }
+.rm-token-value code { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--rm-font-mono); font-size: 12px; user-select: all; }
 .rm-trash-list { list-style: none; margin: 0; padding: 0 12px 12px; overflow: auto; }
 .rm-trash-list li { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; color: var(--rm-text-muted); }
 .rm-trash-list li:hover { background: var(--rm-hover); }

@@ -41,13 +41,14 @@ function commitRename() {
   if (target && target !== props.node.path) void move(props.node.path, target)
 }
 
-function runMenu(action: 'note' | 'folder' | 'rename' | 'delete') {
+function runMenu(action: 'note' | 'folder' | 'rename' | 'share' | 'delete') {
   menuOpen.value = false
   const path = props.node.path
   if (action === 'note' || action === 'folder') {
     expanded.add(path)
     void (action === 'note' ? createNote(path) : createFolder(path))
   } else if (action === 'rename') ws.renaming = path
+  else if (action === 'share') ws.shareDialog = { path }
   else void remove(path)
 }
 
@@ -114,6 +115,7 @@ function onDrop(e: DragEvent) {
           <button @click="runMenu('folder')"><Icon name="folderAdd" />新建文件夹</button>
         </template>
         <button @click="runMenu('rename')"><Icon name="edit" />重命名</button>
+        <button v-if="!node.dir" @click="runMenu('share')"><Icon name="link" />分享</button>
         <button class="danger" @click="runMenu('delete')"><Icon name="trash" />删除</button>
       </div>
       <div v-if="menuOpen" class="rm-menu-backdrop" @click.stop="menuOpen = false" @contextmenu.prevent.stop="menuOpen = false" />

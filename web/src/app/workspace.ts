@@ -46,6 +46,9 @@ export const ws = reactive({
   // 快速切换/命令面板的初始输入，null 为关闭；以 > 开头时列出命令
   switcher: null as string | null,
   trashOpen: false,
+  // 分享对话框：path 为笔记路径，null 为全部分享的管理列表
+  shareDialog: null as { path: string | null } | null,
+  tokensOpen: false,
   // 最近打开的笔记，最新的在前
   recent: JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[],
   toasts: [] as Toast[],
@@ -758,6 +761,9 @@ function registerBuiltinCommands() {
     // 浏览器不允许网页覆盖 Ctrl+W
     { id: 'tab.close', title: '关闭当前标签页', when: hasNote, run: () => void closeTab(ws.active!) },
     { id: 'app.trash', title: '打开回收站', run: () => (ws.trashOpen = true) },
+    { id: 'note.share', title: '分享当前笔记', when: hasNote, run: () => (ws.shareDialog = { path: ws.active }) },
+    { id: 'app.shares', title: '管理分享链接', run: () => (ws.shareDialog = { path: null }) },
+    { id: 'app.tokens', title: 'API 令牌', run: () => (ws.tokensOpen = true) },
   ]) {
     registerCommand(cmd)
   }

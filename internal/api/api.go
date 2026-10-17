@@ -17,6 +17,7 @@ import (
 	"rawmark/internal/auth"
 	"rawmark/internal/events"
 	"rawmark/internal/search"
+	"rawmark/internal/store"
 	"rawmark/internal/vault"
 )
 
@@ -30,41 +31,82 @@ const (
 type Server struct {
 	vault *vault.Vault
 	auth  *auth.Manager
+	store *store.Store
 	hub   *events.Hub
 	index *search.Index
 	// OnSetup 在首次初始化完成后调用（用于删除启动码文件）
 	OnSetup func()
 }
 
-func New(v *vault.Vault, a *auth.Manager, hub *events.Hub, index *search.Index) *Server {
-	return &Server{vault: v, auth: a, hub: hub, index: index}
+func New(v *vault.Vault, a *auth.Manager, st *store.Store, hub *events.Hub, index *search.Index) *Server {
+	return &Server{vault: v, auth: a, store: st, hub: hub, index: index}
+}
+
+// access 为接口的访问要求
+type access int
+
+const (
+	public access = iota
+	// 登录会话或 API 令牌（只读令牌只能用 GET）
+	authed
+	// 只允许登录会话：管理分享与 API 令牌，避免令牌给自己扩权
+	sessionOnly
+)
+
+type route struct {
+	pattern string
+	access  access
+	handler http.HandlerFunc
+}
+
+// routes 为全部接口；openapi.json 须与之一致（见 TestOpenAPICoversRoutes）
+func (s *Server) routes() []route {
+	return []route{
+		{"GET /api/v1/health", public, func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]bool{"ok": true}) }},
+		{"GET /api/v1/openapi.json", public, serveOpenAPI},
+		{"GET /api/v1/auth/state", public, s.authState},
+		{"POST /api/v1/auth/setup", public, s.setup},
+		{"POST /api/v1/auth/login", public, s.login},
+		{"POST /api/v1/auth/logout", public, s.logout},
+
+		{"GET /api/v1/tree", authed, s.tree},
+		{"GET /api/v1/files/{path...}", authed, s.readFile},
+		{"PUT /api/v1/files/{path...}", authed, s.writeFile},
+		{"DELETE /api/v1/files/{path...}", authed, s.deleteFile},
+		{"POST /api/v1/move", authed, s.move},
+		{"POST /api/v1/folders", authed, s.mkdir},
+		{"POST /api/v1/assets", authed, s.uploadAsset},
+		{"GET /api/v1/raw/{path...}", authed, s.raw},
+		{"GET /api/v1/trash", authed, s.trashList},
+		{"POST /api/v1/trash/{id}/restore", authed, s.trashRestore},
+		{"DELETE /api/v1/trash/{id}", authed, s.trashPurge},
+		{"GET /api/v1/events", authed, s.events},
+		{"GET /api/v1/search", authed, s.search},
+
+		{"GET /api/v1/shares", sessionOnly, s.listShares},
+		{"POST /api/v1/shares", sessionOnly, s.createShare},
+		{"DELETE /api/v1/shares/{token}", sessionOnly, s.deleteShare},
+		{"GET /api/v1/tokens", sessionOnly, s.listTokens},
+		{"POST /api/v1/tokens", sessionOnly, s.createToken},
+		{"DELETE /api/v1/tokens/{id}", sessionOnly, s.deleteToken},
+
+		{"GET /api/v1/public/shares/{token}", public, s.publicShare},
+		{"POST /api/v1/public/shares/{token}/unlock", public, s.unlockShare},
+		{"GET /api/v1/public/shares/{token}/assets/{path...}", public, s.publicShareAsset},
+	}
 }
 
 func (s *Server) Handler(static fs.FS) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]bool{"ok": true}) })
-	mux.HandleFunc("GET /api/v1/auth/state", s.authState)
-	mux.HandleFunc("POST /api/v1/auth/setup", s.setup)
-	mux.HandleFunc("POST /api/v1/auth/login", s.login)
-	mux.HandleFunc("POST /api/v1/auth/logout", s.logout)
-
-	protected := map[string]http.HandlerFunc{
-		"GET /api/v1/tree":                s.tree,
-		"GET /api/v1/files/{path...}":     s.readFile,
-		"PUT /api/v1/files/{path...}":     s.writeFile,
-		"DELETE /api/v1/files/{path...}":  s.deleteFile,
-		"POST /api/v1/move":               s.move,
-		"POST /api/v1/folders":            s.mkdir,
-		"POST /api/v1/assets":             s.uploadAsset,
-		"GET /api/v1/raw/{path...}":       s.raw,
-		"GET /api/v1/trash":               s.trashList,
-		"POST /api/v1/trash/{id}/restore": s.trashRestore,
-		"DELETE /api/v1/trash/{id}":       s.trashPurge,
-		"GET /api/v1/events":              s.events,
-		"GET /api/v1/search":              s.search,
-	}
-	for pattern, h := range protected {
-		mux.Handle(pattern, s.requireAuth(h))
+	for _, rt := range s.routes() {
+		var h http.Handler = rt.handler
+		switch rt.access {
+		case authed:
+			h = s.requireAuth(h, true)
+		case sessionOnly:
+			h = s.requireAuth(h, false)
+		}
+		mux.Handle(rt.pattern, h)
 	}
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeError(w, 404, "接口不存在") })
 	mux.Handle("/", newStaticHandler(static))
@@ -99,8 +141,30 @@ func sameOrigin(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) requireAuth(next http.Handler) http.Handler {
+// requireAuth 校验登录会话；allowToken 时也接受 Authorization: Bearer 的 API 令牌
+func (s *Server) requireAuth(next http.Handler, allowToken bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+			if !allowToken {
+				writeError(w, 403, "此接口只能在登录后使用，不接受 API 令牌")
+				return
+			}
+			scope, valid, err := s.auth.ValidateAPIToken(strings.TrimSpace(bearer))
+			if err != nil {
+				internalError(w, r, err)
+				return
+			}
+			if !valid {
+				writeError(w, 401, "API 令牌无效")
+				return
+			}
+			if scope != "write" && r.Method != http.MethodGet && r.Method != http.MethodHead {
+				writeError(w, 403, "只读令牌不能修改数据")
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
 		c, err := r.Cookie(cookieName)
 		if err != nil {
 			writeError(w, 401, "未登录")
@@ -275,6 +339,10 @@ func (s *Server) move(w http.ResponseWriter, r *http.Request) {
 		vaultError(w, r, err)
 		return
 	}
+	if err := s.store.MoveShares(body.From, body.To); err != nil {
+		internalError(w, r, err)
+		return
+	}
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
@@ -309,7 +377,11 @@ func (s *Server) uploadAsset(w http.ResponseWriter, r *http.Request) {
 
 // raw 输出仓库内任意非隐藏文件（主要是图片）。以沙箱 CSP 返回，防止 SVG/HTML 中的脚本在本站执行
 func (s *Server) raw(w http.ResponseWriter, r *http.Request) {
-	f, info, err := s.vault.OpenRaw(r.PathValue("path"))
+	s.serveRaw(w, r, r.PathValue("path"))
+}
+
+func (s *Server) serveRaw(w http.ResponseWriter, r *http.Request, rel string) {
+	f, info, err := s.vault.OpenRaw(rel)
 	if err != nil {
 		vaultError(w, r, err)
 		return

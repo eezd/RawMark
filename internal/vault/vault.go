@@ -107,8 +107,8 @@ func CleanPath(p string) (string, error) {
 
 func IsNote(p string) bool { return strings.HasSuffix(p, NoteExt) && len(p) > len(NoteExt) }
 
-// assetsDir 返回笔记对应的 Typora 风格图片目录：a.md -> a.assets
-func assetsDir(note string) string { return strings.TrimSuffix(note, NoteExt) + AssetsExt }
+// AssetsDir 返回笔记对应的 Typora 风格图片目录：a.md -> a.assets
+func AssetsDir(note string) string { return strings.TrimSuffix(note, NoteExt) + AssetsExt }
 
 func (v *Vault) abs(rel string) (string, error) {
 	rel, err := CleanPath(rel)
@@ -166,6 +166,22 @@ func (v *Vault) Read(rel string) ([]byte, string, error) {
 		return nil, "", err
 	}
 	return data, Rev(data), nil
+}
+
+// Stat 返回笔记的文件信息；不存在时返回 ErrNotFound
+func (v *Vault) Stat(rel string) (fs.FileInfo, error) {
+	if !IsNote(rel) {
+		return nil, ErrInvalidPath
+	}
+	p, err := v.abs(rel)
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Stat(p)
+	if errors.Is(err, fs.ErrNotExist) || (err == nil && !info.Mode().IsRegular()) {
+		return nil, ErrNotFound
+	}
+	return info, err
 }
 
 // Precondition 对应 HTTP 条件请求：IfMatch 要求当前版本一致，IfNoneMatch 要求文件尚不存在；都为空则无条件覆盖
@@ -352,8 +368,8 @@ func (v *Vault) Move(from, to string) error {
 	}
 	srcAssets, dstAssets := "", ""
 	if isNote {
-		if st, err := os.Stat(assetsDir(src)); err == nil && st.IsDir() {
-			srcAssets, dstAssets = assetsDir(src), assetsDir(dst)
+		if st, err := os.Stat(AssetsDir(src)); err == nil && st.IsDir() {
+			srcAssets, dstAssets = AssetsDir(src), AssetsDir(dst)
 			if _, err := os.Lstat(dstAssets); err == nil {
 				return ErrExists
 			}
@@ -422,9 +438,9 @@ func (v *Vault) Delete(rel string) (TrashItem, error) {
 		return TrashItem{}, err
 	}
 	if !item.Dir {
-		if st, err := os.Stat(assetsDir(p)); err == nil && st.IsDir() {
-			item.Assets = filepath.Base(assetsDir(p))
-			if err := os.Rename(assetsDir(p), filepath.Join(dir, item.Assets)); err != nil {
+		if st, err := os.Stat(AssetsDir(p)); err == nil && st.IsDir() {
+			item.Assets = filepath.Base(AssetsDir(p))
+			if err := os.Rename(AssetsDir(p), filepath.Join(dir, item.Assets)); err != nil {
 				return TrashItem{}, fmt.Errorf("移动图片目录到回收站失败: %w", err)
 			}
 		}
@@ -486,7 +502,7 @@ func (v *Vault) Restore(id string) (TrashItem, error) {
 		return TrashItem{}, ErrExists
 	}
 	if item.Assets != "" {
-		if _, err := os.Lstat(assetsDir(dst)); err == nil {
+		if _, err := os.Lstat(AssetsDir(dst)); err == nil {
 			return TrashItem{}, ErrExists
 		}
 	}
@@ -498,7 +514,7 @@ func (v *Vault) Restore(id string) (TrashItem, error) {
 		return TrashItem{}, err
 	}
 	if item.Assets != "" {
-		if err := os.Rename(filepath.Join(dir, item.Assets), assetsDir(dst)); err != nil {
+		if err := os.Rename(filepath.Join(dir, item.Assets), AssetsDir(dst)); err != nil {
 			return TrashItem{}, fmt.Errorf("恢复图片目录失败: %w", err)
 		}
 	}
@@ -539,7 +555,7 @@ func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (stri
 	}
 	sum := sha256.Sum256(data)
 	name := hex.EncodeToString(sum[:8]) + ext
-	dir := assetsDir(p)
+	dir := AssetsDir(p)
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -553,7 +569,7 @@ func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (stri
 	} else if err != nil {
 		return "", err
 	}
-	return EscapeLinkPath(path.Base(assetsDir(note))) + "/" + name, nil
+	return EscapeLinkPath(path.Base(AssetsDir(note))) + "/" + name, nil
 }
 
 func sniffExt(data []byte) string {

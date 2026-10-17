@@ -42,6 +42,11 @@ func (h *staticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+	// 分享页 /s/{token} 是独立的入口，只加载渲染器
+	share := strings.HasPrefix(name, "s/")
+	if share {
+		name = "share.html"
+	}
 	f, err := h.load(name)
 	if err != nil {
 		// 前端路由：未知路径一律返回入口页面
@@ -59,6 +64,9 @@ func (h *staticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasSuffix(name, ".html") {
 		hd.Set("Content-Security-Policy", appCSP)
+	}
+	if share {
+		hd.Set("X-Robots-Tag", "noindex")
 	}
 	if ct := mime.TypeByExtension(path.Ext(name)); ct != "" {
 		hd.Set("Content-Type", ct)

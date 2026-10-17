@@ -19,6 +19,8 @@ interface LinkDefinition {
 
 const BLOCK_CONTAINERS = new Set(['Blockquote', 'ListItem'])
 
+const footnoteId = (label: string) => 'fn-' + label.toLowerCase().replace(/\s+/g, '-')
+
 export function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;'))
 }
@@ -275,8 +277,10 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
         const raw = text(node.from, node.to)
         return `<span data-emoji="${escapeHtml(raw.slice(1, -1))}">${escapeHtml(raw)}</span>`
       }
-      case 'FootnoteReference':
-        return `<sup class="footnote-ref">${escapeHtml(text(node.from + 2, node.to - 1))}</sup>`
+      case 'FootnoteReference': {
+        const label = text(node.from + 2, node.to - 1)
+        return `<sup class="footnote-ref"><a href="#${escapeAttr(footnoteId(label))}">${escapeHtml(label)}</a></sup>`
+      }
       case 'InlineCode': {
         const marks = node.getChildren('CodeMark')
         let code = text(marks[0].to, marks[marks.length - 1].from).replace(/\n/g, ' ')
@@ -439,9 +443,13 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
       }
       case 'FootnoteDefinition': {
         const label = node.getChild('FootnoteLabel')!
-        return `<div class="footnote"><sup>${escapeHtml(text(label.from + 2, label.to - 2))}</sup> ${inline(node, label.to, node.to).trim()}</div>\n`
+        const name = text(label.from + 2, label.to - 2)
+        return `<div class="footnote" id="${escapeAttr(footnoteId(name))}"><sup>${escapeHtml(name)}</sup> ${inline(node, label.to, node.to).trim()}</div>\n`
       }
-      // front matter 是元数据，不输出；[TOC] 在只读分享页面（M4）中生成
+      // 目录占位，由分享页根据标题填充
+      case 'TableOfContents':
+        return '<nav class="toc"></nav>\n'
+      // front matter 是元数据，不输出
       default:
         return ''
     }

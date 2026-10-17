@@ -21,6 +21,26 @@ export interface SearchResult {
   snippet: string
 }
 
+export interface Share {
+  token: string
+  path: string
+  createdAt: number
+  // 0 为永久
+  expiresAt: number
+  hasPassword: boolean
+  // 笔记是否仍存在
+  exists: boolean
+}
+
+export interface ApiToken {
+  id: string
+  name: string
+  scope: 'read' | 'write'
+  createdAt: number
+  // 0 为从未使用
+  lastUsedAt: number
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -105,6 +125,19 @@ export const api = {
     form.append('file', file, file.name || 'image')
     return (await json<{ link: string }>(request('POST', '/api/v1/assets?note=' + encodeURIComponent(note), { body: form }))).link
   },
+
+  shares: async (path?: string) =>
+    (await json<{ shares: Share[] }>(request('GET', '/api/v1/shares' + (path ? '?path=' + encodeURIComponent(path) : '')))).shares,
+  // expiresIn 为有效时长（秒），0 为永久
+  createShare: (path: string, password: string, expiresIn: number) =>
+    json<Share>(request('POST', '/api/v1/shares', { json: { path, password, expiresIn } })),
+  deleteShare: (token: string) => request('DELETE', '/api/v1/shares/' + encodeURIComponent(token)),
+
+  tokens: async () => (await json<{ tokens: ApiToken[] }>(request('GET', '/api/v1/tokens'))).tokens,
+  // 返回的 token 明文只有这一次
+  createToken: (name: string, scope: ApiToken['scope']) =>
+    json<{ token: string; info: ApiToken }>(request('POST', '/api/v1/tokens', { json: { name, scope } })),
+  deleteToken: (id: string) => request('DELETE', '/api/v1/tokens/' + encodeURIComponent(id)),
 
   trash: async () => (await json<{ items: TrashItem[] }>(request('GET', '/api/v1/trash'))).items,
   restore: (id: string) => json<TrashItem>(request('POST', `/api/v1/trash/${id}/restore`)),

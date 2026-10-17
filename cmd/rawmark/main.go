@@ -94,8 +94,9 @@ func run(addr string) error {
 	}
 	go cleanupSessions(ctx, st)
 
-	srv := api.New(v, am, hub, idx)
+	srv := api.New(v, am, st, hub, idx)
 	srv.OnSetup = func() { os.Remove(codeFile) }
+	go srv.FollowMoves(ctx)
 	httpServer := &http.Server{
 		Addr:              addr,
 		Handler:           srv.Handler(web.Dist()),
