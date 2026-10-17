@@ -56,9 +56,6 @@ func (s *Server) Handler(static fs.FS) http.Handler {
 		"POST /api/v1/move":               s.move,
 		"POST /api/v1/folders":            s.mkdir,
 		"POST /api/v1/assets":             s.uploadAsset,
-		"DELETE /api/v1/assets/{path...}": s.deleteAsset,
-		"GET /api/v1/keyring":             s.readKeyring,
-		"PUT /api/v1/keyring":             s.writeKeyring,
 		"GET /api/v1/raw/{path...}":       s.raw,
 		"GET /api/v1/trash":               s.trashList,
 		"POST /api/v1/trash/{id}/restore": s.trashRestore,
@@ -240,34 +237,24 @@ func (s *Server) readFile(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// writeFile 以请求体整体作为笔记内容。If-Match: "rev" 要求版本一致；If-None-Match: * 要求文件不存在；都不带则直接覆盖。
-// 带 ?convertFrom=同名笔记 时为加密/取消加密：写入本笔记并永久删除原笔记，If-Match 校验原笔记的版本
+// writeFile 以请求体整体作为笔记内容。If-Match: "rev" 要求版本一致；If-None-Match: * 要求文件不存在；都不带则直接覆盖
 func (s *Server) writeFile(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxNoteBytes))
 	if err != nil {
 		writeError(w, 413, "笔记过大")
 		return
 	}
-	pre := preconditionOf(r)
-	var rev string
-	if from := r.URL.Query().Get("convertFrom"); from != "" {
-		rev, err = s.vault.Convert(from, r.PathValue("path"), data, pre)
-	} else {
-		rev, err = s.vault.Write(r.PathValue("path"), data, pre)
+	pre := vault.Precondition{
+		IfMatch:     strings.Trim(r.Header.Get("If-Match"), `"`),
+		IfNoneMatch: r.Header.Get("If-None-Match") == "*",
 	}
+	rev, err := s.vault.Write(r.PathValue("path"), data, pre)
 	if err != nil {
 		vaultError(w, r, err)
 		return
 	}
 	w.Header().Set("ETag", `"`+rev+`"`)
 	writeJSON(w, 200, map[string]string{"rev": rev})
-}
-
-func preconditionOf(r *http.Request) vault.Precondition {
-	return vault.Precondition{
-		IfMatch:     strings.Trim(r.Header.Get("If-Match"), `"`),
-		IfNoneMatch: r.Header.Get("If-None-Match") == "*",
-	}
 }
 
 func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request) {
@@ -318,43 +305,6 @@ func (s *Server) uploadAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]string{"link": link})
-}
-
-func (s *Server) deleteAsset(w http.ResponseWriter, r *http.Request) {
-	if err := s.vault.DeleteAsset(r.PathValue("path")); err != nil {
-		vaultError(w, r, err)
-		return
-	}
-	writeJSON(w, 200, map[string]bool{"ok": true})
-}
-
-// ---- 加密密钥环（内容由浏览器生成，服务端只保存） ----
-
-func (s *Server) readKeyring(w http.ResponseWriter, r *http.Request) {
-	data, rev, err := s.vault.ReadKeyring()
-	if err != nil {
-		vaultError(w, r, err)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("ETag", `"`+rev+`"`)
-	w.Header().Set("Cache-Control", "no-store")
-	w.Write(data)
-}
-
-func (s *Server) writeKeyring(w http.ResponseWriter, r *http.Request) {
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxJSONBytes))
-	if err != nil {
-		writeError(w, 413, "密钥环过大")
-		return
-	}
-	rev, err := s.vault.WriteKeyring(data, preconditionOf(r))
-	if err != nil {
-		vaultError(w, r, err)
-		return
-	}
-	w.Header().Set("ETag", `"`+rev+`"`)
-	writeJSON(w, 200, map[string]string{"rev": rev})
 }
 
 // raw 输出仓库内任意非隐藏文件（主要是图片）。以沙箱 CSP 返回，防止 SVG/HTML 中的脚本在本站执行

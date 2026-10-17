@@ -92,15 +92,15 @@ func TestSearchTerms(t *testing.T) {
 	f.sync()
 
 	cases := map[string]string{
-		"装饰器":        "a.md,目录/c.md", // 3 个字符以上走 FTS
-		"检索":         "b.md,目录/c.md", // 不足 3 个字符走 LIKE
-		"codemirror": "a.md",         // 不区分大小写
-		"装饰器 检索":     "目录/c.md",      // 多个词同时满足
-		"目录":         "目录/c.md",      // 命中路径
-		"不存在的词":      "",
-		"100%":       "",
-		`"引号"`:       "",
-		"   ":        "",
+		"装饰器":           "a.md,目录/c.md", // 3 个字符以上走 FTS
+		"检索":            "b.md,目录/c.md", // 不足 3 个字符走 LIKE
+		"codemirror":    "a.md",          // 不区分大小写
+		"装饰器 检索":        "目录/c.md",       // 多个词同时满足
+		"目录":            "目录/c.md",       // 命中路径
+		"不存在的词":         "",
+		"100%":          "",
+		`"引号"`:          "",
+		"   ":           "",
 	}
 	for q, want := range cases {
 		if got := f.paths(q); got != want && !(strings.Contains(want, ",") && sameSet(got, want)) {
@@ -177,15 +177,5 @@ func TestSyncTracksChanges(t *testing.T) {
 	f.sync()
 	if got := f.paths("新内容"); got != "a.md" {
 		t.Errorf("重启后搜索 = %q", got)
-	}
-}
-
-func TestEncryptedNotesNotIndexed(t *testing.T) {
-	f := newFixture(t)
-	f.write("明文.md", "公开内容")
-	f.write("秘密.md.enc", `{"data":"公开内容"}`)
-	f.sync()
-	if got := f.paths("公开内容"); got != "明文.md" {
-		t.Errorf("加密笔记不应入索引: %q", got)
 	}
 }

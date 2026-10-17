@@ -35,15 +35,10 @@ type ConflictError struct{ Rev string }
 func (e *ConflictError) Error() string { return "版本冲突" }
 
 const (
-	NoteExt = ".md"
-	// 加密笔记：内容为浏览器端加密的信封，服务端只做不透明存储
-	EncryptedNoteExt = ".md.enc"
-	AssetsExt        = ".assets"
-	// 加密笔记的图片（密文）统一使用此扩展名
-	encryptedAssetExt = ".enc"
-	metaDir           = ".rawmark"
-	keyringFile       = "keyring.json"
-	tmpPrefix         = ".rawmark-tmp-"
+	NoteExt   = ".md"
+	AssetsExt = ".assets"
+	metaDir   = ".rawmark"
+	tmpPrefix = ".rawmark-tmp-"
 )
 
 type Vault struct {
@@ -110,35 +105,10 @@ func CleanPath(p string) (string, error) {
 	return p, nil
 }
 
-func IsNote(p string) bool { return noteBase(p) != "" }
+func IsNote(p string) bool { return strings.HasSuffix(p, NoteExt) && len(p) > len(NoteExt) }
 
-func IsEncrypted(p string) bool { return strings.HasSuffix(p, EncryptedNoteExt) }
-
-// noteBase 去掉笔记扩展名（.md 或 .md.enc）；不是笔记时返回空串
-func noteBase(p string) string {
-	for _, ext := range []string{EncryptedNoteExt, NoteExt} {
-		if strings.HasSuffix(p, ext) && len(p) > len(ext) && !strings.HasSuffix(p, "/"+ext) {
-			return strings.TrimSuffix(p, ext)
-		}
-	}
-	return ""
-}
-
-// twin 返回同名的另一种笔记：a.md <-> a.md.enc。二者共用 a.assets，不允许同时存在
-func twin(note string) string {
-	if IsEncrypted(note) {
-		return noteBase(note) + NoteExt
-	}
-	return noteBase(note) + EncryptedNoteExt
-}
-
-// assetsDir 返回笔记对应的 Typora 风格图片目录：a.md、a.md.enc -> a.assets
-func assetsDir(note string) string { return noteBase(note) + AssetsExt }
-
-func exists(p string) bool {
-	_, err := os.Lstat(p)
-	return err == nil
-}
+// assetsDir 返回笔记对应的 Typora 风格图片目录：a.md -> a.assets
+func assetsDir(note string) string { return strings.TrimSuffix(note, NoteExt) + AssetsExt }
 
 func (v *Vault) abs(rel string) (string, error) {
 	rel, err := CleanPath(rel)
@@ -214,24 +184,16 @@ func (v *Vault) Write(rel string, content []byte, pre Precondition) (string, err
 	}
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if !exists(p) && exists(twin(p)) {
-		return "", ErrExists
-	}
-	return writeChecked(p, content, pre)
-}
-
-// writeChecked 按前置条件写入文件，调用方须持有 v.mu
-func writeChecked(p string, content []byte, pre Precondition) (string, error) {
 	cur, err := os.ReadFile(p)
-	found := err == nil
+	exists := err == nil
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return "", err
 	}
-	if pre.IfNoneMatch && found {
+	if pre.IfNoneMatch && exists {
 		return "", ErrExists
 	}
 	if pre.IfMatch != "" {
-		if !found {
+		if !exists {
 			return "", &ConflictError{}
 		}
 		if Rev(cur) != pre.IfMatch {
@@ -360,7 +322,6 @@ func (v *Vault) Tree() ([]Entry, error) {
 // ---- 移动 / 重命名 ----
 
 // Move 移动或重命名笔记/文件夹。笔记的 .assets 目录随之移动；笔记改名时同步改写正文中指向自身图片目录的链接
-// （加密笔记的正文服务端无法改写，由浏览器解密后处理）。不能借移动在普通笔记与加密笔记之间转换
 func (v *Vault) Move(from, to string) error {
 	src, err := v.abs(from)
 	if err != nil {
@@ -383,10 +344,10 @@ func (v *Vault) Move(from, to string) error {
 		return err
 	}
 	isNote := !info.IsDir()
-	if isNote && (!IsNote(from) || !IsNote(to) || IsEncrypted(from) != IsEncrypted(to)) {
+	if isNote && (!IsNote(from) || !IsNote(to)) {
 		return ErrInvalidPath
 	}
-	if exists(dst) || (isNote && exists(twin(dst))) {
+	if _, err := os.Lstat(dst); err == nil {
 		return ErrExists
 	}
 	srcAssets, dstAssets := "", ""
@@ -408,9 +369,9 @@ func (v *Vault) Move(from, to string) error {
 		if err := os.Rename(srcAssets, dstAssets); err != nil {
 			return fmt.Errorf("移动图片目录失败: %w", err)
 		}
-		oldBase := path.Base(noteBase(from))
-		newBase := path.Base(noteBase(to))
-		if oldBase != newBase && !IsEncrypted(to) {
+		oldBase := strings.TrimSuffix(path.Base(from), NoteExt)
+		newBase := strings.TrimSuffix(path.Base(to), NoteExt)
+		if oldBase != newBase {
 			data, err := os.ReadFile(dst)
 			if err != nil {
 				return err
@@ -521,7 +482,7 @@ func (v *Vault) Restore(id string) (TrashItem, error) {
 	}
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if exists(dst) || (!item.Dir && exists(twin(dst))) {
+	if _, err := os.Lstat(dst); err == nil {
 		return TrashItem{}, ErrExists
 	}
 	if item.Assets != "" {
@@ -573,9 +534,7 @@ func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (stri
 		return "", ErrTooLarge
 	}
 	ext := strings.ToLower(filepath.Ext(origName))
-	if IsEncrypted(note) {
-		ext = encryptedAssetExt
-	} else if !extPattern.MatchString(ext) {
+	if !extPattern.MatchString(ext) {
 		ext = sniffExt(data)
 	}
 	sum := sha256.Sum256(data)
@@ -618,90 +577,3 @@ func EscapeLinkPath(s string) string {
 }
 
 var linkEscaper = strings.NewReplacer(" ", "%20", "(", "%28", ")", "%29", "<", "%3C", ">", "%3E")
-
-// DeleteAsset 永久删除笔记 .assets 目录中的一个文件。用于加密/取消加密笔记后清理转换前的图片：
-// 加密前的明文图片不应留在回收站中
-func (v *Vault) DeleteAsset(rel string) error {
-	if !strings.HasSuffix(path.Dir(rel), AssetsExt) {
-		return ErrInvalidPath
-	}
-	p, err := v.abs(rel)
-	if err != nil {
-		return err
-	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	info, err := os.Lstat(p)
-	if errors.Is(err, fs.ErrNotExist) {
-		return ErrNotFound
-	}
-	if err != nil {
-		return err
-	}
-	if !info.Mode().IsRegular() {
-		return ErrInvalidPath
-	}
-	return os.Remove(p)
-}
-
-// ---- 加密 ----
-
-// Convert 在普通笔记与同名加密笔记之间转换：写入 to 并永久删除 from（明文不进回收站）。
-// pre 校验的是 from 的版本，确保转换的是最新内容
-func (v *Vault) Convert(from, to string, content []byte, pre Precondition) (string, error) {
-	if !IsNote(from) || twin(from) != to {
-		return "", ErrInvalidPath
-	}
-	src, err := v.abs(from)
-	if err != nil {
-		return "", err
-	}
-	dst, err := v.abs(to)
-	if err != nil {
-		return "", err
-	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	cur, err := os.ReadFile(src)
-	if errors.Is(err, fs.ErrNotExist) {
-		return "", ErrNotFound
-	}
-	if err != nil {
-		return "", err
-	}
-	if pre.IfMatch != "" && Rev(cur) != pre.IfMatch {
-		return "", &ConflictError{Rev: Rev(cur)}
-	}
-	if exists(dst) {
-		return "", ErrExists
-	}
-	if err := atomicWrite(dst, content); err != nil {
-		return "", err
-	}
-	if err := os.Remove(src); err != nil {
-		return "", err
-	}
-	return Rev(content), nil
-}
-
-// ReadKeyring 读取加密密钥环（被加密密码包裹的主密钥，浏览器端生成和解开）；尚未设置时返回 ErrNotFound
-func (v *Vault) ReadKeyring() ([]byte, string, error) {
-	data, err := os.ReadFile(filepath.Join(v.root, metaDir, keyringFile))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, "", ErrNotFound
-	}
-	if err != nil {
-		return nil, "", err
-	}
-	return data, Rev(data), nil
-}
-
-// WriteKeyring 写入密钥环。首次设置用 IfNoneMatch，修改加密密码用 IfMatch，防止覆盖另一端的修改
-func (v *Vault) WriteKeyring(data []byte, pre Precondition) (string, error) {
-	if !json.Valid(data) {
-		return "", ErrInvalidPath
-	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	return writeChecked(filepath.Join(v.root, metaDir, keyringFile), data, pre)
-}
