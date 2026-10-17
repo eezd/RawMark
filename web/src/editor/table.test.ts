@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createEditorState } from './index'
-import { setEditorFocus, tableField } from './table'
+import { setEditorFocus } from './focus'
+import { tableField } from './table'
 
 const doc = '| a | b |\n| --- | --- |\n| 1 | 2 |\n\n正文'
 

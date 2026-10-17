@@ -1,13 +1,27 @@
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo } from '@codemirror/commands'
 import { markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown'
+import { Language } from '@codemirror/language'
 import { EditorState, Prec, type Extension } from '@codemirror/state'
 import { drawSelection, EditorView, keymap, type ViewUpdate } from '@codemirror/view'
+import type { MarkdownParser } from '@lezer/markdown'
+import { typoraExtensions } from '../markdown/extensions'
+import { renderedBlocks } from './blocks'
 import { codeBlockHighlight } from './codeblocks'
+import { editorFocus } from './focus'
 import { livePreview, resolveImageUrl } from './livepreview'
 import { tableEditing } from './table'
 import { markdownTheme } from './theme'
 
 export { pasteImages } from './paste'
+
+// 在 lang-markdown 的语法集（CommonMark + GFM + 上下标 + emoji）上加 Typora 扩展。
+// 沿用其语言数据，markdownKeymap 中的命令据此识别 Markdown（isActiveAt 按语言数据判断）
+const rawmarkLanguage = new Language(
+  markdownLanguage.data,
+  (markdownLanguage.parser as MarkdownParser).configure(typoraExtensions),
+  [],
+  'markdown',
+)
 
 export interface EditorStateOptions {
   doc: string
@@ -25,12 +39,14 @@ export function createEditorState(opts: EditorStateOptions): EditorState {
     EditorView.lineWrapping,
     // 不用 lang-markdown 的 markdown()：它会静态引入 lang-html/css/javascript 用于嵌套 HTML 高亮，
     // 首屏包 gzip 从约 108 KB 增至约 180 KB，而 Live Preview 不需要 HTML 高亮
-    markdownLanguage,
+    rawmarkLanguage,
     Prec.high(keymap.of(markdownKeymap)),
     markdownTheme,
     livePreview,
     codeBlockHighlight,
+    editorFocus,
     tableEditing,
+    renderedBlocks,
     // CodeMirror 只在 Linux/Mac 上把 Ctrl/Cmd+Shift+Z 绑定为重做，Windows 上会退化成撤销；
     // 与 Typora、VS Code 保持一致，所有平台都支持
     keymap.of([indentWithTab, { key: 'Mod-Shift-z', run: redo, preventDefault: true }, ...defaultKeymap, ...historyKeymap]),

@@ -1,9 +1,11 @@
 import { isolateHistory, redo, undo } from '@codemirror/commands'
 import { syntaxTree } from '@codemirror/language'
-import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state'
-import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view'
+import { StateField, type EditorState, type Range } from '@codemirror/state'
+import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
 import { renderInlineMarkdown } from '../markdown/html'
+import { hydrate } from '../markdown/render'
+import { editorFocused, setEditorFocus } from './focus'
 
 type Align = '' | 'left' | 'center' | 'right'
 
@@ -94,6 +96,11 @@ function findTable(state: EditorState, pos: number): SyntaxNode | null {
 
 // ---- 渲染组件 ----
 
+function renderCell(cell: HTMLElement, raw: string) {
+  cell.innerHTML = renderInlineMarkdown(raw)
+  hydrate(cell)
+}
+
 interface WidgetState {
   model: TableModel
   // 最近编辑的单元格，工具栏操作以它为准
@@ -164,7 +171,7 @@ class TableWidget extends WidgetType {
           cell.textContent = raw
           placeCaretAtEnd(cell)
         }
-      } else if (old.rows[r].cells[c] !== raw) cell.innerHTML = renderInlineMarkdown(raw)
+      } else if (old.rows[r].cells[c] !== raw) renderCell(cell, raw)
     })
     return true
   }
@@ -184,7 +191,7 @@ class TableWidget extends WidgetType {
         cell.dataset.r = String(r)
         cell.dataset.c = String(c)
         if (this.model.aligns[c]) cell.style.textAlign = this.model.aligns[c]
-        cell.innerHTML = renderInlineMarkdown(raw)
+        renderCell(cell, raw)
         bindCell(view, wrap, cell)
         tr.append(cell)
       })
@@ -356,7 +363,7 @@ function bindCell(view: EditorView, wrap: HTMLElement, cell: HTMLElement) {
 
   cell.addEventListener('blur', () => {
     cell.removeAttribute('contenteditable')
-    cell.innerHTML = renderInlineMarkdown(st().model.rows[r()]?.cells[c()] ?? '')
+    renderCell(cell, st().model.rows[r()]?.cells[c()] ?? '')
   })
 
   const moveTo = (nr: number, nc: number) => {
@@ -402,39 +409,8 @@ function bindCell(view: EditorView, wrap: HTMLElement, cell: HTMLElement) {
 
 // ---- 装饰 ----
 
-// StateField 拿不到视图的焦点状态，由视图插件把焦点变化同步进状态
-const setEditorFocus = StateEffect.define<boolean>()
-
-const editorFocused = StateField.define<boolean>({
-  create: () => false,
-  update(value, tr) {
-    for (const e of tr.effects) if (e.is(setEditorFocus)) value = e.value
-    return value
-  },
-})
-
-const focusTracker = ViewPlugin.fromClass(
-  class {
-    constructor(readonly view: EditorView) {
-      this.sync()
-    }
-    update(u: ViewUpdate) {
-      if (u.focusChanged) this.sync()
-    }
-    // 不能在 update 中同步 dispatch，推迟到微任务
-    sync() {
-      queueMicrotask(() => {
-        const focused = this.view.hasFocus
-        if (this.view.state.field(editorFocused, false) !== undefined && this.view.state.field(editorFocused) !== focused) {
-          this.view.dispatch({ effects: setEditorFocus.of(focused) })
-        }
-      })
-    }
-  },
-)
-
 // 块级替换装饰跨越多行，只能由 StateField 提供，不能来自 ViewPlugin。
-// 与其他语法一致：编辑器获得焦点且光标在表格内时才显示源码（打开笔记时光标默认在文首，不应因此展开开头的表格）
+// 与其他语法一致：编辑器获得焦点且光标在表格内时才显示源码（见 focus.ts）
 function buildTables(state: EditorState): DecorationSet {
   const out: Range<Decoration>[] = []
   const sel = state.field(editorFocused) ? state.selection.ranges : []
@@ -465,6 +441,4 @@ export const tableField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 })
 
-export { setEditorFocus }
-
-export const tableEditing = [editorFocused, tableField, focusTracker]
+export const tableEditing = tableField

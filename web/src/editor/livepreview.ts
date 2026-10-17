@@ -3,7 +3,18 @@ import { Facet, type EditorState, type Range } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
 import { codeContentRange, fenceLanguage, fencedCodeAt } from './codeblocks'
-import { BulletWidget, CheckboxWidget, CodeHeaderWidget, HorizontalRuleWidget, ImageWidget } from './widgets'
+import {
+  BulletWidget,
+  CheckboxWidget,
+  CodeHeaderWidget,
+  EmojiWidget,
+  FootnoteRefWidget,
+  HorizontalRuleWidget,
+  ImageWidget,
+  MathWidget,
+  TocWidget,
+  type TocEntry,
+} from './widgets'
 
 // 把笔记中书写的图片地址解析为浏览器可加载的 URL（相对路径需结合笔记所在目录）
 export const resolveImageUrl = Facet.define<(src: string) => string, (src: string) => string>({
@@ -13,6 +24,10 @@ export const resolveImageUrl = Facet.define<(src: string) => string, (src: strin
 const hidden = Decoration.replace({})
 const inlineCode = Decoration.mark({ class: 'cm-rm-inline-code' })
 const linkText = Decoration.mark({ class: 'cm-rm-link' })
+const highlightText = Decoration.mark({ class: 'cm-rm-highlight' })
+const superscriptText = Decoration.mark({ class: 'cm-rm-sup' })
+const subscriptText = Decoration.mark({ class: 'cm-rm-sub' })
+const footnoteLabel = Decoration.mark({ class: 'cm-rm-footnote-label' })
 const lineDecos = new Map<string, Decoration>()
 
 function lineDeco(cls: string): Decoration {
@@ -66,6 +81,32 @@ function buildDecorations(view: EditorView): DecorationSet {
     return end
   }
 
+  // 脚注定义（标签 → 内容）与目录条目，只在可见区域出现相应语法时才计算
+  let footnoteMap: Map<string, string> | undefined
+  function footnotes() {
+    if (!footnoteMap) {
+      footnoteMap = new Map()
+      for (let n = syntaxTree(state).topNode.firstChild; n; n = n.nextSibling) {
+        if (n.name !== 'FootnoteDefinition') continue
+        const label = n.getChild('FootnoteLabel')!
+        footnoteMap.set(state.sliceDoc(label.from + 2, label.to - 2), state.sliceDoc(label.to, n.to).trim())
+      }
+    }
+    return footnoteMap
+  }
+
+  function tocEntries(): TocEntry[] {
+    const entries: TocEntry[] = []
+    for (let n = syntaxTree(state).topNode.firstChild; n; n = n.nextSibling) {
+      const m = /^(ATX|Setext)Heading(\d)$/.exec(n.name)
+      if (!m) continue
+      const raw = m[1] === 'ATX' ? state.sliceDoc(n.from, n.to).replace(/^#+\s*/, '').replace(/\s+#+\s*$/, '') : doc.lineAt(n.from).text
+      const text = raw.replace(/\*\*|__|==|~~|`/g, '').trim()
+      if (text) entries.push({ level: Number(m[2]), text, pos: n.from })
+    }
+    return entries
+  }
+
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(state).iterate({
       from,
@@ -90,8 +131,51 @@ function buildDecorations(view: EditorView): DecorationSet {
           case 'StrikethroughMark':
           case 'SuperscriptMark':
           case 'SubscriptMark':
+          case 'HighlightMark':
             if (!touches(node.parent!)) hide(node.from, node.to)
             return
+          case 'Highlight':
+            out.push(highlightText.range(node.from, node.to))
+            return
+          case 'Superscript':
+            out.push(superscriptText.range(node.from, node.to))
+            return
+          case 'Subscript':
+            out.push(subscriptText.range(node.from, node.to))
+            return
+          case 'InlineMath':
+            if (!touches(node) && lineOf(node.from) === lineOf(node.to)) {
+              const widget = new MathWidget(state.sliceDoc(node.from + 1, node.to - 1), false, 1)
+              out.push(Decoration.replace({ widget }).range(node.from, node.to))
+            }
+            return false
+          case 'Emoji':
+            if (!touches(node)) out.push(Decoration.replace({ widget: new EmojiWidget(state.sliceDoc(node.from + 1, node.to - 1)) }).range(node.from, node.to))
+            return
+          case 'FootnoteReference':
+            if (!touches(node)) {
+              const label = state.sliceDoc(node.from + 2, node.to - 1)
+              out.push(Decoration.replace({ widget: new FootnoteRefWidget(label, footnotes().get(label)) }).range(node.from, node.to))
+            }
+            return
+          case 'FootnoteDefinition':
+            classLines(node.from, node.to, () => 'cm-rm-footnote')
+            return
+          case 'FootnoteLabel':
+            if (!isActive(node.from)) out.push(footnoteLabel.range(node.from, node.to))
+            return
+          case 'TableOfContents':
+            if (!isActive(node.from)) out.push(Decoration.replace({ widget: new TocWidget(tocEntries()) }).range(node.from, node.to))
+            return
+          case 'FrontMatter':
+            classLines(node.from, node.to, (n, first, last) =>
+              n === first ? 'cm-rm-frontmatter cm-rm-frontmatter-begin' : n === last ? 'cm-rm-frontmatter cm-rm-frontmatter-end' : 'cm-rm-frontmatter',
+            )
+            return false
+          case 'BlockMath':
+            // 未编辑时由 blocks.ts 整块替换为渲染结果，这里只负责编辑时的源码样式
+            classLines(node.from, node.to, () => 'cm-rm-math-source')
+            return false
           case 'InlineCode':
             out.push(inlineCode.range(node.from, node.to))
             return

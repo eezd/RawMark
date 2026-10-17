@@ -56,6 +56,21 @@ describe('安全模式', () => {
   })
 })
 
+describe('Typora 扩展', () => {
+  it('高亮、上下标、脚注引用', () => {
+    expect(renderMarkdown('==a== x^2^ H~2~O[^1]')).toBe('<p><mark>a</mark> x<sup>2</sup> H<sub>2</sub>O<sup class="footnote-ref">1</sup></p>\n')
+  })
+  it('公式与 emoji 输出待填充的占位元素，内容被转义', () => {
+    expect(renderMarkdown('$a<b$ :smile:')).toBe('<p><span data-math="a&lt;b">a&lt;b</span> <span data-emoji="smile">:smile:</span></p>\n')
+    expect(renderMarkdown('$$\n"><img src=x onerror=alert(1)>\n$$')).toBe(
+      '<div data-math="&quot;&gt;&lt;img src=x onerror=alert(1)&gt;">&quot;&gt;&lt;img src=x onerror=alert(1)&gt;</div>\n',
+    )
+  })
+  it('脚注定义、front matter 与 [TOC]', () => {
+    expect(renderMarkdown('---\ntitle: x\n---\n[TOC]\n\n[^1]: 说明 **重点**')).toBe('<div class="footnote"><sup>1</sup> 说明 <strong>重点</strong></div>\n')
+  })
+})
+
 describe('CommonMark spec', () => {
   for (const e of examples) {
     const test = PARSER_DEVIATIONS.has(e.number) ? it.fails : it

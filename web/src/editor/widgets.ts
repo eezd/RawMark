@@ -1,4 +1,5 @@
-import { WidgetType, type EditorView } from '@codemirror/view'
+import { EditorView, WidgetType } from '@codemirror/view'
+import { emojiFor, renderMath, renderMermaid } from '../markdown/render'
 
 export class BulletWidget extends WidgetType {
   eq() {
@@ -154,5 +155,204 @@ export class ImageWidget extends WidgetType {
   }
   get estimatedHeight() {
     return 200
+  }
+}
+
+// ---- 扩展语法（公式、Mermaid、emoji、脚注、目录） ----
+
+// 点击渲染结果时把光标移到源码中（offset 为相对组件起点的位置）以展开编辑，做法同图片
+function editOnMousedown(el: HTMLElement, view: EditorView, offset: number) {
+  el.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    view.dispatch({ selection: { anchor: Math.min(view.posAtDOM(el) + offset, view.state.doc.length) } })
+    view.focus()
+  })
+}
+
+function showRenderError(el: HTMLElement, err: unknown) {
+  const pre = document.createElement('pre')
+  pre.className = 'cm-rm-render-error'
+  pre.textContent = err instanceof Error ? err.message : String(err)
+  el.replaceChildren(pre)
+}
+
+/**
+ * 公式。editOffset 为 null 时是编辑中显示在源码下方的预览（不响应点击，内容变化时原地更新），
+ * 否则是替换源码的渲染结果，点击后光标移到源码 editOffset 处
+ */
+export class MathWidget extends WidgetType {
+  constructor(
+    readonly tex: string,
+    readonly display: boolean,
+    readonly editOffset: number | null,
+  ) {
+    super()
+  }
+  eq(other: MathWidget) {
+    return other.tex === this.tex && other.display === this.display && other.editOffset === this.editOffset
+  }
+  toDOM(view: EditorView) {
+    const el = document.createElement(this.display ? 'div' : 'span')
+    el.className = this.display ? 'cm-rm-math-block' : 'cm-rm-math'
+    if (this.editOffset === null) el.classList.add('cm-rm-preview')
+    else editOnMousedown(el, view, this.editOffset)
+    this.render(el, view)
+    return el
+  }
+  // 只复用预览元素：从渲染结果切到编辑时，编辑器会尝试用新组件更新旧元素（旧元素带点击编辑的监听）
+  updateDOM(dom: HTMLElement, view: EditorView) {
+    if (this.editOffset !== null || !dom.classList.contains('cm-rm-preview')) return false
+    this.render(dom, view)
+    return true
+  }
+  private render(el: HTMLElement, view: EditorView) {
+    if (!this.tex.trim()) {
+      el.textContent = '空公式'
+      el.classList.add('cm-rm-placeholder')
+      return
+    }
+    el.classList.remove('cm-rm-placeholder')
+    // 加载 KaTeX 前先显示源码
+    if (!el.firstChild) el.textContent = this.tex
+    void renderMath(el, this.tex, this.display).then(() => view.requestMeasure())
+  }
+  get estimatedHeight() {
+    return this.display ? 60 : -1
+  }
+}
+
+const mermaidSeqs = new WeakMap<HTMLElement, number>()
+let mermaidSeq = 0
+
+/** Mermaid 图表，editOffset 含义同 MathWidget */
+export class MermaidWidget extends WidgetType {
+  constructor(
+    readonly code: string,
+    readonly editOffset: number | null,
+  ) {
+    super()
+  }
+  eq(other: MermaidWidget) {
+    return other.code === this.code && other.editOffset === this.editOffset
+  }
+  toDOM(view: EditorView) {
+    const el = document.createElement('div')
+    el.className = 'cm-rm-mermaid'
+    if (this.editOffset === null) el.classList.add('cm-rm-preview')
+    else editOnMousedown(el, view, this.editOffset)
+    el.textContent = '图表渲染中…'
+    this.render(el, view)
+    return el
+  }
+  // 只复用预览元素：从渲染结果切到编辑时，编辑器会尝试用新组件更新旧元素（旧元素带点击编辑的监听）
+  updateDOM(dom: HTMLElement, view: EditorView) {
+    if (this.editOffset !== null || !dom.classList.contains('cm-rm-preview')) return false
+    this.render(dom, view)
+    return true
+  }
+  // 渲染是异步的，连续输入时只采用最后一次的结果，并保留旧图直到新图就绪，避免闪烁
+  private render(el: HTMLElement, view: EditorView) {
+    const seq = ++mermaidSeq
+    mermaidSeqs.set(el, seq)
+    if (!this.code.trim()) {
+      el.textContent = '空图表'
+      return
+    }
+    renderMermaid(this.code).then(
+      (svg) => {
+        if (mermaidSeqs.get(el) !== seq) return
+        el.innerHTML = svg
+        view.requestMeasure()
+      },
+      (err) => {
+        if (mermaidSeqs.get(el) !== seq) return
+        showRenderError(el, err)
+        view.requestMeasure()
+      },
+    )
+  }
+  get estimatedHeight() {
+    return 240
+  }
+}
+
+export class EmojiWidget extends WidgetType {
+  constructor(readonly name: string) {
+    super()
+  }
+  eq(other: EmojiWidget) {
+    return other.name === this.name
+  }
+  toDOM(view: EditorView) {
+    const el = document.createElement('span')
+    el.className = 'cm-rm-emoji'
+    // 名称表加载前或名称未知时显示原文
+    el.textContent = `:${this.name}:`
+    void emojiFor(this.name).then((e) => {
+      if (e) el.textContent = e
+    })
+    editOnMousedown(el, view, 1)
+    return el
+  }
+}
+
+export class FootnoteRefWidget extends WidgetType {
+  constructor(
+    readonly label: string,
+    readonly definition: string | undefined,
+  ) {
+    super()
+  }
+  eq(other: FootnoteRefWidget) {
+    return other.label === this.label && other.definition === this.definition
+  }
+  toDOM(view: EditorView) {
+    const el = document.createElement('sup')
+    el.className = 'cm-rm-footnote-ref'
+    el.textContent = this.label
+    el.title = this.definition ?? '未找到脚注定义'
+    editOnMousedown(el, view, 2)
+    return el
+  }
+}
+
+export interface TocEntry {
+  level: number
+  text: string
+  pos: number
+}
+
+export class TocWidget extends WidgetType {
+  constructor(readonly entries: TocEntry[]) {
+    super()
+  }
+  eq(other: TocWidget) {
+    return JSON.stringify(other.entries) === JSON.stringify(this.entries)
+  }
+  toDOM(view: EditorView) {
+    const el = document.createElement('div')
+    el.className = 'cm-rm-toc'
+    if (!this.entries.length) {
+      el.textContent = '目录（还没有标题）'
+      el.classList.add('cm-rm-placeholder')
+    }
+    const minLevel = Math.min(...this.entries.map((e) => e.level))
+    for (const entry of this.entries) {
+      const item = document.createElement('a')
+      item.className = 'cm-rm-toc-item'
+      item.style.paddingLeft = `${(entry.level - minLevel) * 1.2}em`
+      item.textContent = entry.text
+      item.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        view.dispatch({ selection: { anchor: entry.pos }, effects: EditorView.scrollIntoView(entry.pos, { y: 'start', yMargin: 24 }) })
+        view.focus()
+      })
+      el.append(item)
+    }
+    // 点击目录空白处展开 [TOC] 源码
+    editOnMousedown(el, view, 0)
+    return el
   }
 }

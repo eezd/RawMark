@@ -24,6 +24,7 @@
   --rm-code-bg: #292d3e;
   --rm-code-text: #e1e4e8;
   --rm-code-font-size: 14px;
+  --rm-highlight-bg: rgba(255, 213, 0, 0.35);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -37,6 +38,7 @@
     --rm-inline-code-bg: #2f2f2f;
     --rm-inline-code-text: #aac8e4;
     --rm-code-bg: #242424;
+    --rm-highlight-bg: rgba(255, 213, 0, 0.28);
   }
 }
 
@@ -231,3 +233,45 @@ body {
   .cm-rm-code-copy { width: 36px; height: 36px; }
   .cm-line.cm-rm-code { padding: 0 12px; }
 }
+
+/* ---- Typora 扩展语法 ---- */
+.cm-rm-highlight,
+.cm-rm-table-widget mark { background: var(--rm-highlight-bg); color: inherit; border-radius: 2px; padding: 0 1px; }
+.cm-rm-sup { vertical-align: super; font-size: 0.75em; line-height: 0; }
+.cm-rm-sub { vertical-align: sub; font-size: 0.75em; line-height: 0; }
+.cm-rm-placeholder { color: var(--rm-text-muted); font-style: italic; }
+
+.cm-rm-math { cursor: pointer; }
+.cm-rm-math-block { display: block; padding: 8px 0; text-align: center; overflow-x: auto; overflow-y: hidden; cursor: pointer; }
+.cm-rm-math-block .katex-display { margin: 0; }
+.cm-line.cm-rm-math-source { font-family: var(--rm-font-mono); font-size: 0.9em; color: var(--rm-text-muted); }
+/* 编辑时显示在源码下方的预览 */
+.cm-rm-preview { margin: 4px 0 8px; padding: 8px 12px; border: 1px dashed var(--rm-divider); border-radius: 6px; cursor: default; }
+
+.cm-rm-mermaid { display: block; padding: 8px 0; text-align: center; overflow-x: auto; cursor: pointer; color: var(--rm-text-muted); }
+.cm-rm-mermaid svg { max-width: 100%; height: auto; }
+.cm-rm-render-error {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(229, 72, 77, 0.08);
+  color: #e5484d;
+  font-family: var(--rm-font-mono);
+  font-size: 12px;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.cm-rm-emoji { cursor: text; }
+
+.cm-rm-footnote-ref { color: var(--rm-accent-strong); font-size: 0.75em; cursor: pointer; padding: 0 1px; }
+.cm-line.cm-rm-footnote { font-size: 0.9em; color: var(--rm-text-muted); }
+.cm-rm-footnote-label { color: var(--rm-accent-strong); }
+
+.cm-rm-toc { display: block; padding: 8px 12px; border-left: 3px solid var(--rm-divider); cursor: pointer; }
+.cm-rm-toc-item { display: block; color: var(--rm-accent-strong); line-height: 1.8; cursor: pointer; text-decoration: none; }
+.cm-rm-toc-item:hover { text-decoration: underline; }
+
+.cm-line.cm-rm-frontmatter { font-family: var(--rm-font-mono); font-size: 0.85em; color: var(--rm-text-muted); background: var(--rm-inline-code-bg); padding: 0 12px; }
+.cm-line.cm-rm-frontmatter-begin { border-radius: 6px 6px 0 0; padding-top: 4px; }
+.cm-line.cm-rm-frontmatter-end { border-radius: 0 0 6px 6px; padding-bottom: 4px; }

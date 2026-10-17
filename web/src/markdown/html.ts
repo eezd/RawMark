@@ -1,8 +1,9 @@
 import type { SyntaxNode } from '@lezer/common'
 import { Emoji, GFM, parser as commonmarkParser, Subscript, Superscript, type MarkdownParser } from '@lezer/markdown'
+import { typoraExtensions } from './extensions'
 
-// 与编辑器（lang-markdown 的 markdownLanguage）一致的语法集
-export const markdownParser = commonmarkParser.configure([GFM, Subscript, Superscript, Emoji])
+// 与编辑器一致的语法集（lang-markdown 的 markdownLanguage 加 Typora 扩展）
+export const markdownParser = commonmarkParser.configure([GFM, Subscript, Superscript, Emoji, ...typoraExtensions])
 
 export { commonmarkParser }
 
@@ -263,6 +264,19 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
         return `<sup>${innerOf(node, 'SuperscriptMark')}</sup>`
       case 'Subscript':
         return `<sub>${innerOf(node, 'SubscriptMark')}</sub>`
+      case 'Highlight':
+        return `<mark>${innerOf(node, 'HighlightMark')}</mark>`
+      // 公式与 emoji 输出占位元素，由 render.ts 的 hydrate 按需加载依赖后填充
+      case 'InlineMath': {
+        const tex = text(node.from + 1, node.to - 1)
+        return `<span data-math="${escapeHtml(tex)}">${escapeHtml(tex)}</span>`
+      }
+      case 'Emoji': {
+        const raw = text(node.from, node.to)
+        return `<span data-emoji="${escapeHtml(raw.slice(1, -1))}">${escapeHtml(raw)}</span>`
+      }
+      case 'FootnoteReference':
+        return `<sup class="footnote-ref">${escapeHtml(text(node.from + 2, node.to - 1))}</sup>`
       case 'InlineCode': {
         const marks = node.getChildren('CodeMark')
         let code = text(marks[0].to, marks[marks.length - 1].from).replace(/\n/g, ' ')
@@ -416,6 +430,18 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
         return rawHtml(contentLines(node, false, false).map((l) => l.rest).join('\n')) + '\n'
       case 'Table':
         return table(node)
+      case 'BlockMath': {
+        const marks = node.getChildren('BlockMathMark')
+        const from = Math.min(lineEnd(node.from) + 1, node.to)
+        const to = marks.length > 1 ? Math.max(from, lineStart(marks[marks.length - 1].from) - 1) : node.to
+        const tex = text(from, to)
+        return `<div data-math="${escapeHtml(tex)}">${escapeHtml(tex)}</div>\n`
+      }
+      case 'FootnoteDefinition': {
+        const label = node.getChild('FootnoteLabel')!
+        return `<div class="footnote"><sup>${escapeHtml(text(label.from + 2, label.to - 2))}</sup> ${inline(node, label.to, node.to).trim()}</div>\n`
+      }
+      // front matter 是元数据，不输出；[TOC] 在只读分享页面（M4）中生成
       default:
         return ''
     }

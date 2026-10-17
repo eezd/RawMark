@@ -17,6 +17,9 @@
     "@lezer/common": "^1.5.3",
     "@lezer/highlight": "^1.2.5",
     "@lezer/markdown": "^1.8.0",
+    "gemoji": "^8.1.0",
+    "katex": "^0.18.11",
+    "mermaid": "^12.2.0",
     "shiki": "^4.5.0",
     "vue": "^3.5.44"
   },
