@@ -1,30 +1,38 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { availableCommands, formatKeys } from './commands'
 import { fuzzyMatch } from './fuzzy'
 import Icon from './Icon.vue'
 import { dirname, NOTE_EXT, noteTitle } from './paths'
 import { createNoteAt, openAt, ws } from './workspace'
 
 const MAX_ITEMS = 50
+const RECENT_COMMANDS_KEY = 'rawmark.recentCommands'
+const RECENT_COMMANDS_MAX = 10
 
 interface Item {
-  path: string
+  key: string
+  icon: 'note' | 'noteAdd' | 'command'
   title: string
-  dir: string
+  // 笔记为所在目录，命令为快捷键
+  detail: string
   // 命中字符在标题、目录中的下标
   titleHits: Set<number>
-  dirHits: Set<number>
+  detailHits: Set<number>
+  run: () => void
 }
 
 const input = ref<HTMLInputElement>()
 const list = ref<HTMLElement>()
-const query = ref('')
+const query = ref(ws.switcher ?? '')
 const selected = ref(0)
+// 以 > 开头时列出命令（与 VS Code 一致），删掉 > 回到找笔记
+const commandMode = computed(() => query.value.startsWith('>'))
 
 // 取消时把焦点还给打开前的元素（通常是编辑器）
 const previousFocus = document.activeElement as HTMLElement | null
 function close() {
-  ws.switcherOpen = false
+  ws.switcher = null
 }
 function cancel() {
   close()
@@ -43,19 +51,20 @@ function segments(text: string, hits: Set<number>) {
   return out
 }
 
-const items = computed<Item[]>(() => {
-  const q = query.value.trim()
+function noteItems(q: string): Item[] {
   const recentRank = new Map(ws.recent.map((p, i) => [p, i]))
   const notes = ws.entries.filter((e) => !e.dir)
   const toItem = (path: string, positions: number[] = []): Item => {
     const dir = dirname(path)
     const offset = dir ? dir.length + 1 : 0
     return {
-      path,
+      key: path,
+      icon: 'note',
       title: noteTitle(path),
-      dir,
+      detail: dir,
       titleHits: new Set(positions.filter((p) => p >= offset).map((p) => p - offset)),
-      dirHits: new Set(positions.filter((p) => p < offset)),
+      detailHits: new Set(positions.filter((p) => p < offset)),
+      run: () => void openAt(path),
     }
   }
   if (!q) {
@@ -78,38 +87,75 @@ const items = computed<Item[]>(() => {
   scored.sort(
     (a, b) => b.score - a.score || (recentRank.get(a.path) ?? Infinity) - (recentRank.get(b.path) ?? Infinity) || a.path.length - b.path.length,
   )
-  return scored.slice(0, MAX_ITEMS).map((s) => toItem(s.path, s.positions))
-})
+  const items = scored.slice(0, MAX_ITEMS).map((s) => toItem(s.path, s.positions))
+  // 没有同名笔记时提供"新建"；输入中的 / 表示目录
+  const name = q.replace(/\.md$/i, '')
+  const path = name + NOTE_EXT
+  if (
+    name.split('/').every((seg) => seg.trim() && !seg.startsWith('.')) &&
+    !ws.entries.some((e) => e.path.toLowerCase() === path.toLowerCase())
+  ) {
+    items.push({
+      key: '\0create',
+      icon: 'noteAdd',
+      title: `新建笔记“${name}”`,
+      detail: '',
+      titleHits: new Set(),
+      detailHits: new Set(),
+      run: () =>
+        void createNoteAt(path).then((ok) => {
+          if (ok) void openAt(path)
+        }),
+    })
+  }
+  return items
+}
 
-// 没有同名笔记时提供"新建"；输入中的 / 表示目录
-const createPath = computed(() => {
-  const q = query.value.trim().replace(/\.md$/i, '')
-  if (!q || !q.split('/').every((seg) => seg.trim() && !seg.startsWith('.'))) return null
-  const path = q + NOTE_EXT
-  return ws.entries.some((e) => e.path.toLowerCase() === path.toLowerCase()) ? null : path
-})
-const count = computed(() => items.value.length + (createPath.value ? 1 : 0))
+const recentCommands = ref<string[]>(JSON.parse(localStorage.getItem(RECENT_COMMANDS_KEY) ?? '[]'))
+
+function commandItems(q: string): Item[] {
+  const rank = (id: string) => {
+    const i = recentCommands.value.indexOf(id)
+    return i < 0 ? Infinity : i
+  }
+  const scored = availableCommands()
+    .filter((c) => c.id !== 'app.commandPalette')
+    .map((c, order) => ({ c, order, m: q ? fuzzyMatch(q, c.title, 0) : { score: 0, positions: [] } }))
+    .filter((x) => x.m)
+  // 无输入时最近用过的在前，其余保持注册顺序
+  scored.sort((a, b) => b.m!.score - a.m!.score || rank(a.c.id) - rank(b.c.id) || a.order - b.order)
+  return scored.map(({ c, m }) => ({
+    key: c.id,
+    icon: 'command',
+    title: c.title,
+    detail: c.keys ? formatKeys(c.keys[0]) : '',
+    titleHits: new Set(m!.positions),
+    detailHits: new Set(),
+    run: () => {
+      recentCommands.value = [c.id, ...recentCommands.value.filter((id) => id !== c.id)].slice(0, RECENT_COMMANDS_MAX)
+      localStorage.setItem(RECENT_COMMANDS_KEY, JSON.stringify(recentCommands.value))
+      c.run()
+    },
+  }))
+}
+
+const items = computed(() => (commandMode.value ? commandItems(query.value.slice(1).trim()) : noteItems(query.value.trim())))
 
 watch(query, () => (selected.value = 0))
 watch(selected, (i) => list.value?.children[i]?.scrollIntoView({ block: 'nearest' }))
 
 function choose(i: number) {
   const item = items.value[i]
-  const create = createPath.value
   close()
-  if (item) void openAt(item.path)
-  else if (create) {
-    void createNoteAt(create).then((ok) => {
-      if (ok) void openAt(create)
-    })
-  }
+  item?.run()
 }
 
 function onKeydown(e: KeyboardEvent) {
+  const n = items.value.length
   if (e.key === 'Escape') cancel()
-  else if (e.key === 'ArrowDown' && count.value) selected.value = (selected.value + 1) % count.value
-  else if (e.key === 'ArrowUp' && count.value) selected.value = (selected.value - 1 + count.value) % count.value
-  else if (e.key === 'Enter' && !e.isComposing && count.value) choose(selected.value)
+  else if (e.key === 'ArrowDown' && n) selected.value = (selected.value + 1) % n
+  else if (e.key === 'ArrowUp' && n) selected.value = (selected.value - 1 + n) % n
+  else if (e.key === 'Enter' && !e.isComposing && n) choose(selected.value)
   else return
   e.preventDefault()
 }
@@ -119,48 +165,38 @@ onMounted(() => input.value?.focus())
 
 <template>
   <div class="rm-switcher-backdrop" @mousedown.self="cancel">
-    <div class="rm-switcher" role="dialog" aria-label="快速打开">
+    <div class="rm-switcher" role="dialog" :aria-label="commandMode ? '命令面板' : '快速打开'">
       <div class="rm-search-box">
-        <Icon name="search" />
+        <Icon :name="commandMode ? 'command' : 'search'" />
         <input
           ref="input"
           v-model="query"
           class="rm-search-input"
-          placeholder="输入笔记名称，回车打开或新建"
+          :placeholder="commandMode ? '输入命令名称' : '输入笔记名称，回车打开或新建；输入 > 执行命令'"
           enterkeyhint="go"
           @keydown="onKeydown"
           @blur="close"
         />
       </div>
-      <ul v-if="count" ref="list" class="rm-switcher-list" @mousedown.prevent>
+      <ul v-if="items.length" ref="list" class="rm-switcher-list" @mousedown.prevent>
         <li
           v-for="(item, i) in items"
-          :key="item.path"
+          :key="item.key"
           class="rm-switcher-item"
           :class="{ active: i === selected }"
           @click="choose(i)"
           @mousemove="selected = i"
         >
-          <Icon name="note" />
+          <Icon :name="item.icon" />
           <span class="rm-switcher-title">
             <span v-for="(s, j) in segments(item.title, item.titleHits)" :key="j" :class="{ 'rm-search-hit': s.hit }">{{ s.text }}</span>
           </span>
-          <span v-if="item.dir" class="rm-switcher-dir">
-            <span v-for="(s, j) in segments(item.dir, item.dirHits)" :key="j" :class="{ 'rm-search-hit': s.hit }">{{ s.text }}</span>
+          <span v-if="item.detail" class="rm-switcher-dir" :class="{ 'rm-switcher-keys': item.icon === 'command' }">
+            <span v-for="(s, j) in segments(item.detail, item.detailHits)" :key="j" :class="{ 'rm-search-hit': s.hit }">{{ s.text }}</span>
           </span>
         </li>
-        <li
-          v-if="createPath"
-          class="rm-switcher-item"
-          :class="{ active: selected === items.length }"
-          @click="choose(items.length)"
-          @mousemove="selected = items.length"
-        >
-          <Icon name="noteAdd" />
-          <span class="rm-switcher-title">新建笔记“{{ createPath.slice(0, -NOTE_EXT.length) }}”</span>
-        </li>
       </ul>
-      <p v-else class="rm-tree-empty">还没有笔记</p>
+      <p v-else class="rm-tree-empty">{{ commandMode ? '没有匹配的命令' : '还没有笔记' }}</p>
     </div>
   </div>
 </template>

@@ -4,6 +4,7 @@ import { Annotation, Transaction, type EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { nextTick, reactive, watch } from 'vue'
 import { createEditorState, pasteImages } from '../editor'
+import { handleShortcut, registerCommand } from './commands'
 import { api, ApiError, type Entry } from './api'
 import { drafts } from './drafts'
 import { connectEvents, type VaultEvent } from './events'
@@ -42,8 +43,9 @@ export const ws = reactive({
   sidebarOpen: false,
   // 侧栏显示搜索而非目录树
   searchOpen: false,
-  // 快速切换对话框
-  switcherOpen: false,
+  // 快速切换/命令面板的初始输入，null 为关闭；以 > 开头时列出命令
+  switcher: null as string | null,
+  trashOpen: false,
   // 最近打开的笔记，最新的在前
   recent: JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[],
   toasts: [] as Toast[],
@@ -732,21 +734,40 @@ export async function startWorkspace() {
     if (document.visibilityState === 'hidden') void flushAll(true)
   })
   window.addEventListener('pagehide', () => void flushAll(true))
-  window.addEventListener('keydown', (e) => {
-    if (!(e.ctrlKey || e.metaKey)) return
-    const key = e.key.toLowerCase()
-    if (key === 's' && !e.shiftKey) {
-      e.preventDefault()
-      if (ws.active) void flush(ws.active)
-    } else if (key === 'f' && e.shiftKey) {
-      e.preventDefault()
-      openSearch()
-    } else if (key === 'p' && !e.shiftKey) {
-      // 覆盖浏览器的打印快捷键
-      e.preventDefault()
-      ws.switcherOpen = !ws.switcherOpen
-    }
-  })
+  window.addEventListener('keydown', handleShortcut)
+}
+
+// 内置命令不依赖工作区状态，模块载入时注册，排在组件注册的命令（如退出登录）之前
+registerBuiltinCommands()
+
+function registerBuiltinCommands() {
+  const hasNote = () => ws.active !== null
+  const toggleSwitcher = (initial: string) => {
+    ws.switcher = ws.switcher === null ? initial : null
+  }
+  for (const cmd of [
+    // Mod+P 覆盖浏览器的打印；Firefox 不允许网页覆盖 Ctrl+Shift+P（隐私窗口），F1 作为通用的替代
+    { id: 'app.quickOpen', title: '快速打开笔记', keys: ['Mod+P'], run: () => toggleSwitcher('') },
+    { id: 'app.commandPalette', title: '命令面板', keys: ['Mod+Shift+P', 'F1'], run: () => toggleSwitcher('>') },
+    { id: 'app.search', title: '全文搜索', keys: ['Mod+Shift+F'], run: openSearch },
+    { id: 'note.new', title: '新建笔记', run: () => withSidebar(() => createNote('')) },
+    { id: 'folder.new', title: '新建文件夹', run: () => withSidebar(() => createFolder('')) },
+    { id: 'note.save', title: '保存当前笔记', keys: ['Mod+S'], when: hasNote, run: () => void flush(ws.active!) },
+    { id: 'note.rename', title: '重命名当前笔记', when: hasNote, run: () => withSidebar(() => (ws.renaming = ws.active)) },
+    { id: 'note.delete', title: '删除当前笔记', when: hasNote, run: () => void remove(ws.active!) },
+    // 浏览器不允许网页覆盖 Ctrl+W
+    { id: 'tab.close', title: '关闭当前标签页', when: hasNote, run: () => void closeTab(ws.active!) },
+    { id: 'app.trash', title: '打开回收站', run: () => (ws.trashOpen = true) },
+  ]) {
+    registerCommand(cmd)
+  }
+}
+
+// 需要在目录树中操作的命令：切回目录树，移动端打开侧栏
+function withSidebar(fn: () => unknown) {
+  ws.searchOpen = false
+  ws.sidebarOpen = true
+  void fn()
 }
 
 export function openSearch() {

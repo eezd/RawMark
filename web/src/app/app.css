@@ -217,6 +217,7 @@ button {
 .rm-switcher-item.active { background: var(--rm-active); }
 .rm-switcher-title { color: var(--rm-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rm-switcher-dir { flex: 1; min-width: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.rm-switcher-keys span { padding: 1px 6px; border: 1px solid var(--rm-divider); border-radius: 4px; font-family: inherit; }
 .rm-sidebar-foot { display: flex; gap: 4px; padding: 8px; border-top: 1px solid var(--rm-divider); }
 .rm-foot-btn {
   flex: 1;

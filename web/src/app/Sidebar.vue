@@ -2,14 +2,12 @@
 import { ref } from 'vue'
 import Icon from './Icon.vue'
 import { basename } from './paths'
-import TrashDialog from './TrashDialog.vue'
 import { tree } from './tree'
 import TreeNode from './TreeNode.vue'
 import SearchPanel from './SearchPanel.vue'
 import { createFolder, createNote, move, openSearch, ws } from './workspace'
 
 const emit = defineEmits<{ logout: [] }>()
-const trashOpen = ref(false)
 const rootDrop = ref(false)
 
 function onRootDragOver(e: DragEvent) {
@@ -45,9 +43,9 @@ function onRootDrop(e: DragEvent) {
       <p v-if="!tree.length" class="rm-tree-empty">还没有笔记</p>
     </div>
     <div class="rm-sidebar-foot">
-      <button class="rm-foot-btn" @click="trashOpen = true"><Icon name="trash" />回收站</button>
+      <button class="rm-foot-btn" title="命令面板（F1）" @click="ws.switcher = '>'"><Icon name="command" />命令</button>
+      <button class="rm-foot-btn" @click="ws.trashOpen = true"><Icon name="trash" />回收站</button>
       <button class="rm-foot-btn" @click="emit('logout')"><Icon name="logout" />退出</button>
     </div>
-    <TrashDialog v-if="trashOpen" @close="trashOpen = false" />
   </div>
 </template>

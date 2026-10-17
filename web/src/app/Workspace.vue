@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { api } from './api'
+import { registerCommand } from './commands'
 import EditorPane from './EditorPane.vue'
 import Icon from './Icon.vue'
 import NoteBanner from './NoteBanner.vue'
@@ -8,6 +9,7 @@ import QuickSwitcher from './QuickSwitcher.vue'
 import { noteTitle } from './paths'
 import Sidebar from './Sidebar.vue'
 import TabBar from './TabBar.vue'
+import TrashDialog from './TrashDialog.vue'
 import { activeTab, flushAll, startWorkspace, stopWorkspace, toast, ws } from './workspace'
 
 const emit = defineEmits<{ logout: [] }>()
@@ -38,8 +40,13 @@ function onTouchMove(e: TouchEvent) {
   }
 }
 
+const unregisterLogout = registerCommand({ id: 'app.logout', title: '退出登录', run: () => void logout() })
+
 onMounted(() => void startWorkspace())
-onBeforeUnmount(stopWorkspace)
+onBeforeUnmount(() => {
+  unregisterLogout()
+  stopWorkspace()
+})
 </script>
 
 <template>
@@ -51,12 +58,14 @@ onBeforeUnmount(stopWorkspace)
         <button class="rm-icon-btn" title="目录" @click="ws.sidebarOpen = true"><Icon name="menu" :size="20" /></button>
         <span class="rm-mobile-title">{{ title }}</span>
         <span class="rm-save-state" :class="{ on: saving }" />
-        <button class="rm-icon-btn" title="快速打开" @click="ws.switcherOpen = true"><Icon name="search" :size="20" /></button>
+        <button class="rm-icon-btn" title="快速打开" @click="ws.switcher = ''"><Icon name="search" :size="20" /></button>
+        <button class="rm-icon-btn" title="命令" @click="ws.switcher = '>'"><Icon name="command" :size="20" /></button>
       </header>
       <TabBar />
       <NoteBanner />
       <EditorPane />
     </main>
-    <QuickSwitcher v-if="ws.switcherOpen" />
+    <QuickSwitcher v-if="ws.switcher !== null" />
+    <TrashDialog v-if="ws.trashOpen" @close="ws.trashOpen = false" />
   </div>
 </template>
