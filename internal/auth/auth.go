@@ -32,8 +32,10 @@ const (
 	argonThreads = 4
 	argonKeyLen  = 32
 
-	maxFailures   = 5
+	// 同一来源在窗口内累计失败 maxFailures 次（登录与分享密码合计）即封禁 lockout
+	maxFailures   = 30
 	failureWindow = 15 * time.Minute
+	lockout       = 15 * time.Minute
 )
 
 var (
@@ -52,10 +54,12 @@ type Manager struct {
 
 	mu       sync.Mutex
 	failures map[string][]time.Time
+	blocked  map[string]time.Time // 来源 -> 解封时间
+	now      func() time.Time
 }
 
 func New(s *store.Store) (*Manager, error) {
-	m := &Manager{store: s, failures: map[string][]time.Time{}}
+	m := &Manager{store: s, failures: map[string][]time.Time{}, blocked: map[string]time.Time{}, now: time.Now}
 	ok, err := m.IsSetUp()
 	if err != nil {
 		return nil, err
@@ -149,7 +153,8 @@ func HashSharePassword(password string) string {
 	return hashPassword(password)
 }
 
-// CheckSharePassword 校验分享密码，与登录共用按来源的失败限速
+// CheckSharePassword 校验分享密码，与登录共用按来源的失败限速。
+// 成功不清零失败计数：否则知道某个分享密码的人可以借此反复重置计数，无限尝试登录密码
 func (m *Manager) CheckSharePassword(ip, hash, password string) error {
 	if !m.allow(ip) {
 		return ErrRateLimited
@@ -225,26 +230,37 @@ func (m *Manager) ValidateAPIToken(plain string) (scope string, ok bool, err err
 	return m.store.UseAPIToken(hashToken(plain), time.Now().UnixMilli())
 }
 
-// ---- 限速：同一来源在时间窗口内失败过多则拒绝 ----
+// ---- 限速：同一来源在时间窗口内失败过多则封禁一段时间 ----
 
 func (m *Manager) allow(ip string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	cutoff := time.Now().Add(-failureWindow)
+	until, ok := m.blocked[ip]
+	if ok && m.now().Before(until) {
+		return false
+	}
+	delete(m.blocked, ip)
+	return true
+}
+
+func (m *Manager) recordFailure(ip string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := m.now()
+	cutoff := now.Add(-failureWindow)
 	recent := m.failures[ip][:0]
 	for _, t := range m.failures[ip] {
 		if t.After(cutoff) {
 			recent = append(recent, t)
 		}
 	}
+	recent = append(recent, now)
+	if len(recent) >= maxFailures {
+		m.blocked[ip] = now.Add(lockout)
+		delete(m.failures, ip)
+		return
+	}
 	m.failures[ip] = recent
-	return len(recent) < maxFailures
-}
-
-func (m *Manager) recordFailure(ip string) {
-	m.mu.Lock()
-	m.failures[ip] = append(m.failures[ip], time.Now())
-	m.mu.Unlock()
 }
 
 func (m *Manager) clearFailures(ip string) {
