@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Icon from './Icon.vue'
-import { isEncrypted, noteTitle } from './paths'
+import { noteTitle } from './paths'
 import { closeTab, ws } from './workspace'
 </script>
 
@@ -17,7 +17,6 @@ import { closeTab, ws } from './workspace'
       @click="ws.active = tab.path"
       @auxclick.prevent="$event.button === 1 && closeTab(tab.path)"
     >
-      <Icon v-if="isEncrypted(tab.path)" name="lock" :size="12" class="rm-lock-icon" />
       <span class="rm-tab-title">{{ noteTitle(tab.path) }}</span>
       <button class="rm-tab-close" :class="{ dirty: tab.dirty }" title="关闭" @click.stop="closeTab(tab.path)">
         <span class="rm-dirty-dot" />

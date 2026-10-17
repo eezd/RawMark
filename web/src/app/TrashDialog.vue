@@ -48,7 +48,7 @@ onMounted(load)
         <li v-for="item in items ?? []" :key="item.id">
           <Icon :name="item.dir ? 'folder' : 'note'" />
           <div class="rm-trash-info">
-            <span class="rm-trash-path">{{ item.path.replace(/\.md(\.enc)?$/, '') }}</span>
+            <span class="rm-trash-path">{{ item.path.replace(/\.md$/, '') }}</span>
             <span class="rm-trash-time">{{ fmt.format(item.deletedAt) }}</span>
           </div>
           <button class="rm-btn" @click="doRestore(item)">恢复</button>

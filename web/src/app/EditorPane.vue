@@ -3,8 +3,7 @@ import { EditorState, type StateEffect, type Text } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { createEditorView } from '../editor'
-import { keyState } from './encryption'
-import { activeTab, attachView, editorStateOf, noteRefOf, revealPending, storeViewState, unlockNotes, ws } from './workspace'
+import { activeTab, attachView, editorStateOf, noteRefOf, revealPending, storeViewState, ws } from './workspace'
 
 const host = ref<HTMLElement>()
 const tab = computed(activeTab)
@@ -29,8 +28,6 @@ function show() {
     scrollPositions.set(shown, { doc: view.state.doc, snapshot: view.scrollSnapshot(), top: view.scrollDOM.scrollTop })
   }
   if (!ref || !state) {
-    // 锁定后视图中不能留下已解密的内容
-    if (shown) view.setState(EditorState.create())
     shown = undefined
     return
   }
@@ -63,17 +60,10 @@ watch(() => [ws.active, tab.value?.status], show, { flush: 'post' })
 
 <template>
   <div class="rm-editor-pane">
-    <div v-show="tab && !['loading', 'error', 'locked'].includes(tab.status)" ref="host" class="rm-editor-host" />
+    <div v-show="tab && tab.status !== 'loading' && tab.status !== 'error'" ref="host" class="rm-editor-host" />
     <div v-if="!tab" class="rm-empty">
       <p>选择或新建一篇笔记</p>
     </div>
     <div v-else-if="tab.status === 'error'" class="rm-empty"><p>笔记打开失败</p></div>
-    <div v-else-if="tab.status === 'locked'" class="rm-empty">
-      <template v-if="keyState.supported">
-        <p>这是一篇加密笔记</p>
-        <button class="rm-btn rm-btn-primary" @click="unlockNotes()">解锁</button>
-      </template>
-      <p v-else class="rm-locked-hint">这是一篇加密笔记。当前连接不是 HTTPS，浏览器不允许网页使用加密功能，无法查看。请通过 HTTPS 访问。</p>
-    </div>
   </div>
 </template>

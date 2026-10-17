@@ -354,10 +354,6 @@ button {
 }
 .rm-dialog-head { display: flex; align-items: center; padding: 14px 16px 8px 20px; }
 .rm-dialog-head h2 { flex: 1; margin: 0; font-size: 16px; }
-.rm-key-dialog { max-width: 400px; }
-.rm-locked-hint { max-width: 360px; padding: 0 24px; text-align: center; line-height: 1.6; }
-.rm-key-form { max-width: none; box-sizing: border-box; padding: 4px 20px 20px; }
-.rm-lock-icon { flex: none; color: var(--rm-text-muted); }
 .rm-trash-list { list-style: none; margin: 0; padding: 0 12px 12px; overflow: auto; }
 .rm-trash-list li { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; color: var(--rm-text-muted); }
 .rm-trash-list li:hover { background: var(--rm-hover); }

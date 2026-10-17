@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { availableCommands, formatKeys } from './commands'
 import { fuzzyMatch } from './fuzzy'
 import Icon from './Icon.vue'
-import { dirname, ENCRYPTED_EXT, isEncrypted, NOTE_EXT, noteTitle } from './paths'
+import { dirname, NOTE_EXT, noteTitle } from './paths'
 import { createNoteAt, openAt, ws } from './workspace'
 
 const MAX_ITEMS = 50
@@ -12,7 +12,7 @@ const RECENT_COMMANDS_MAX = 10
 
 interface Item {
   key: string
-  icon: 'note' | 'lock' | 'noteAdd' | 'command'
+  icon: 'note' | 'noteAdd' | 'command'
   title: string
   // 笔记为所在目录，命令为快捷键
   detail: string
@@ -59,7 +59,7 @@ function noteItems(q: string): Item[] {
     const offset = dir ? dir.length + 1 : 0
     return {
       key: path,
-      icon: isEncrypted(path) ? 'lock' : 'note',
+      icon: 'note',
       title: noteTitle(path),
       detail: dir,
       titleHits: new Set(positions.filter((p) => p >= offset).map((p) => p - offset)),
@@ -80,7 +80,7 @@ function noteItems(q: string): Item[] {
   }
   const scored: { path: string; score: number; positions: number[] }[] = []
   for (const e of notes) {
-    const target = e.path.replace(/\.md(\.enc)?$/, '')
+    const target = e.path.slice(0, -NOTE_EXT.length)
     const m = fuzzyMatch(q, target, target.lastIndexOf('/') + 1)
     if (m) scored.push({ path: e.path, ...m })
   }
@@ -93,7 +93,7 @@ function noteItems(q: string): Item[] {
   const path = name + NOTE_EXT
   if (
     name.split('/').every((seg) => seg.trim() && !seg.startsWith('.')) &&
-    !ws.entries.some((e) => [path, name + ENCRYPTED_EXT].some((p) => e.path.toLowerCase() === p.toLowerCase()))
+    !ws.entries.some((e) => e.path.toLowerCase() === path.toLowerCase())
   ) {
     items.push({
       key: '\0create',

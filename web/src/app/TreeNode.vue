@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import Icon from './Icon.vue'
-import { basename, isEncrypted, joinPath, noteTitle } from './paths'
+import { basename, joinPath } from './paths'
 import { expanded, type TreeNode } from './tree'
 import { createFolder, createNote, move, openNote, remove, renameTarget, ws } from './workspace'
 
@@ -26,7 +26,7 @@ watch(
   isRenaming,
   async (on) => {
     if (!on) return
-    draft.value = props.node.dir ? props.node.name : noteTitle(props.node.name)
+    draft.value = props.node.dir ? props.node.name : props.node.name.replace(/\.md$/, '')
     await nextTick()
     input.value?.focus()
     input.value?.select()
@@ -104,8 +104,7 @@ function onDrop(e: DragEvent) {
         @keydown.esc.prevent="cancelRename"
         @blur="commitRename"
       />
-      <span v-else class="rm-tree-name">{{ node.dir ? node.name : noteTitle(node.name) }}</span>
-      <Icon v-if="!isRenaming && isEncrypted(node.path)" name="lock" :size="12" class="rm-lock-icon" />
+      <span v-else class="rm-tree-name">{{ node.dir ? node.name : node.name.replace(/\.md$/, '') }}</span>
       <button class="rm-icon-btn rm-tree-more" title="更多操作" @click.stop="menuOpen = !menuOpen">
         <Icon name="more" />
       </button>

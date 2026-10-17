@@ -3,8 +3,6 @@ import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { api } from './api'
 import { registerCommand } from './commands'
 import EditorPane from './EditorPane.vue'
-import { keyState } from './encryption'
-import KeyDialog from './KeyDialog.vue'
 import Icon from './Icon.vue'
 import NoteBanner from './NoteBanner.vue'
 import QuickSwitcher from './QuickSwitcher.vue'
@@ -69,6 +67,5 @@ onBeforeUnmount(() => {
     </main>
     <QuickSwitcher v-if="ws.switcher !== null" />
     <TrashDialog v-if="ws.trashOpen" @close="ws.trashOpen = false" />
-    <KeyDialog v-if="keyState.dialog" :key="keyState.dialog" />
   </div>
 </template>

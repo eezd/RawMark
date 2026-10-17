@@ -123,7 +123,6 @@ export class ImageWidget extends WidgetType {
   constructor(
     readonly src: string,
     readonly alt: string,
-    readonly load: (src: string) => Promise<string> | null = () => null,
   ) {
     super()
   }
@@ -134,9 +133,7 @@ export class ImageWidget extends WidgetType {
     const wrap = document.createElement('span')
     wrap.className = 'cm-rm-image'
     const img = document.createElement('img')
-    const loading = this.load(this.src)
-    if (loading) loading.then((url) => (img.src = url), () => img.dispatchEvent(new Event('error')))
-    else img.src = this.src
+    img.src = this.src
     img.alt = this.alt
     img.loading = 'lazy'
     img.decoding = 'async'
