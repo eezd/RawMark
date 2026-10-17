@@ -144,7 +144,7 @@ func (x *Index) sync(files map[string]string) error {
 		next[p] = d
 	}
 	for p, d := range x.known {
-		if _, ok := files[p]; !ok {
+		if _, ok := files[p]; !ok || vault.IsEncrypted(p) {
 			if err := remove(tx, d.id); err != nil {
 				return err
 			}
@@ -152,6 +152,10 @@ func (x *Index) sync(files map[string]string) error {
 		}
 	}
 	for p, rev := range files {
+		// 加密笔记的内容服务端无法读取，不入索引
+		if vault.IsEncrypted(p) {
+			continue
+		}
 		old, ok := x.known[p]
 		if ok && old.rev == rev {
 			continue
