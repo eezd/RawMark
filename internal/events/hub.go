@@ -13,6 +13,7 @@ import (
 //	changed  笔记内容变化，Rev 为新版本
 //	deleted  笔记被删除
 //	moved    笔记被移动（From -> Path），内容版本不变
+//	settings 应用设置变化，客户端重新读取
 type Event struct {
 	Type string `json:"type"`
 	Path string `json:"path,omitempty"`

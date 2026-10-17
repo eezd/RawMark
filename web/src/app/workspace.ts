@@ -9,6 +9,7 @@ import { api, ApiError, type Entry } from './api'
 import { drafts } from './drafts'
 import { connectEvents, type VaultEvent } from './events'
 import { basename, dirname, joinPath, NOTE_EXT, resolveAssetUrl } from './paths'
+import { loadSettings, settings } from './settings'
 
 export type TabStatus = 'loading' | 'ready' | 'conflict' | 'deleted' | 'error'
 
@@ -23,6 +24,8 @@ export interface Tab {
   // 冲突时服务器上的版本；为空字符串表示服务器上已不存在
   conflictRev?: string
 }
+
+export type SettingsSection = 'appearance' | 'account' | 'shortcuts' | 'shares' | 'tokens' | 'trash'
 
 export interface Toast {
   id: number
@@ -45,10 +48,10 @@ export const ws = reactive({
   searchOpen: false,
   // 快速切换/命令面板的初始输入，null 为关闭；以 > 开头时列出命令
   switcher: null as string | null,
-  trashOpen: false,
-  // 分享对话框：path 为笔记路径，null 为全部分享的管理列表
-  shareDialog: null as { path: string | null } | null,
-  tokensOpen: false,
+  // 打开的设置分组，null 为关闭；index 为从通用入口打开（手机上先显示分组列表，电脑上显示第一组）
+  settings: null as SettingsSection | 'index' | null,
+  // 分享当前笔记的对话框（笔记路径）
+  sharing: null as string | null,
   // 最近打开的笔记，最新的在前
   recent: JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[],
   toasts: [] as Toast[],
@@ -646,6 +649,7 @@ async function syncOpenTab(tab: Tab) {
 function handleEvents(evs: VaultEvent[]) {
   for (const ev of evs) {
     if (ev.type === 'tree') void refreshTree()
+    else if (ev.type === 'settings') void loadSettings().catch((err) => toast('同步设置失败：' + errorText(err)))
     else if (ev.type === 'changed') {
       const tab = tabOf(ev.path!)
       // 自己保存产生的事件 rev 与本地一致；有本地修改时不覆盖，交由下次保存的冲突检测处理
@@ -701,7 +705,10 @@ let disconnect: (() => void) | undefined
 let listenersInstalled = false
 
 export async function startWorkspace() {
+  // 设置读取失败不影响使用，沿用本地缓存的值
+  const settingsLoaded = loadSettings().catch((err) => toast('读取设置失败：' + errorText(err)))
   await refreshTree()
+  await settingsLoaded
   const saved = JSON.parse(localStorage.getItem(TABS_KEY) ?? '{"paths":[],"active":null}') as { paths: string[]; active: string | null }
   const exists = new Set(ws.entries.map((e) => e.path))
   await Promise.all(saved.paths.filter((p) => exists.has(p)).map(openNote))
@@ -732,6 +739,11 @@ export async function startWorkspace() {
     () => ws.recent,
     (r) => localStorage.setItem(RECENT_KEY, JSON.stringify(r)),
   )
+  // 字号、正文宽度变化后行高随之改变，编辑器需要重新测量
+  watch(
+    () => [settings.fontSize, settings.contentWidth],
+    () => view?.requestMeasure(),
+  )
   // 页面隐藏/关闭前尽力发出待保存的修改（部分浏览器关闭标签页时只触发 pagehide）
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void flushAll(true)
@@ -760,10 +772,11 @@ function registerBuiltinCommands() {
     { id: 'note.delete', title: '删除当前笔记', when: hasNote, run: () => void remove(ws.active!) },
     // 浏览器不允许网页覆盖 Ctrl+W
     { id: 'tab.close', title: '关闭当前标签页', when: hasNote, run: () => void closeTab(ws.active!) },
-    { id: 'app.trash', title: '打开回收站', run: () => (ws.trashOpen = true) },
-    { id: 'note.share', title: '分享当前笔记', when: hasNote, run: () => (ws.shareDialog = { path: ws.active }) },
-    { id: 'app.shares', title: '管理分享链接', run: () => (ws.shareDialog = { path: null }) },
-    { id: 'app.tokens', title: 'API 令牌', run: () => (ws.tokensOpen = true) },
+    { id: 'app.settings', title: '设置', keys: ['Mod+,'], run: () => (ws.settings = 'index') },
+    { id: 'app.trash', title: '打开回收站', run: () => (ws.settings = 'trash') },
+    { id: 'note.share', title: '分享当前笔记', when: hasNote, run: () => (ws.sharing = ws.active) },
+    { id: 'app.shares', title: '管理分享链接', run: () => (ws.settings = 'shares') },
+    { id: 'app.tokens', title: 'API 令牌', run: () => (ws.settings = 'tokens') },
   ]) {
     registerCommand(cmd)
   }

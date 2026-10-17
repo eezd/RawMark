@@ -143,6 +143,32 @@ func (m *Manager) Validate(token string) (bool, error) {
 
 func (m *Manager) Logout(token string) error { return m.store.DeleteSession(hashToken(token)) }
 
+// ChangePassword 校验当前密码后设置新密码，并注销 keepToken 以外的所有会话
+func (m *Manager) ChangePassword(ip, keepToken, current, next string) error {
+	if !m.allow(ip) {
+		return ErrRateLimited
+	}
+	encoded, _, err := m.store.Setting(passwordKey)
+	if err != nil {
+		return err
+	}
+	ok, err := verifyPassword(encoded, current)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		m.recordFailure(ip)
+		return ErrBadCredentials
+	}
+	if len([]rune(next)) < MinPasswordLen {
+		return ErrWeakPassword
+	}
+	if err := m.store.SetSetting(passwordKey, hashPassword(next)); err != nil {
+		return err
+	}
+	return m.store.DeleteOtherSessions(hashToken(keepToken))
+}
+
 // ---- 分享 ----
 
 // HashSharePassword 为分享密码生成哈希；空密码表示不设密码，返回空字符串

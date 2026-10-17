@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"net"
 	"net/http"
 	"path"
 	"strings"
@@ -191,11 +190,7 @@ func (s *Server) unlockShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if sh.PasswordHash != "" {
-		host, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			host = r.RemoteAddr
-		}
-		switch err := s.auth.CheckSharePassword(host, sh.PasswordHash, body.Password); {
+		switch err := s.auth.CheckSharePassword(clientIP(r), sh.PasswordHash, body.Password); {
 		case errors.Is(err, auth.ErrRateLimited):
 			writeError(w, 429, err.Error())
 			return

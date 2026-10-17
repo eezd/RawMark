@@ -245,6 +245,160 @@
         }
       }
     },
+    "/auth/password": {
+      "post": {
+        "summary": "修改登录密码；当前会话保留，其他设备需重新登录",
+        "tags": [
+          "登录"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "string"
+                  },
+                  "next": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "current",
+                  "next"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "新密码过短",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "当前密码错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "失败次数过多",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings": {
+      "get": {
+        "summary": "应用设置（全部设备共用的一份 JSON 对象）",
+        "tags": [
+          "设置"
+        ],
+        "responses": {
+          "200": {
+            "description": "设置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "合并修改设置",
+        "tags": [
+          "设置"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "description": "按顶层键合并：请求中的键覆盖原值，值为 null 的键被删除。成功后经 WebSocket 推送 settings 事件。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "合并后的设置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "不是 JSON 对象",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "超过 1 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tree": {
       "get": {
         "summary": "全部笔记与文件夹（不含 .assets 图片目录与隐藏文件）",
@@ -1446,7 +1600,7 @@
       },
       "Event": {
         "type": "object",
-        "description": "tree：目录结构变化；changed：内容变化（rev 为新版本）；deleted：删除；moved：移动（from → path）",
+        "description": "tree：目录结构变化；changed：内容变化（rev 为新版本）；deleted：删除；moved：移动（from → path）；settings：设置变化",
         "properties": {
           "type": {
             "type": "string",
@@ -1454,7 +1608,8 @@
               "tree",
               "changed",
               "deleted",
-              "moved"
+              "moved",
+              "settings"
             ]
           },
           "path": {

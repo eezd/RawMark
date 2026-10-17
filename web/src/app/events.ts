@@ -1,7 +1,7 @@
 // 订阅服务端的仓库变更事件；断线后指数退避重连，重连成功时触发全量同步
 
 export interface VaultEvent {
-  type: 'tree' | 'changed' | 'deleted' | 'moved'
+  type: 'tree' | 'changed' | 'deleted' | 'moved' | 'settings'
   path?: string
   from?: string
   rev?: string

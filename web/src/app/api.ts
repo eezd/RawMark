@@ -94,6 +94,12 @@ export const api = {
   login: (password: string) => request('POST', '/api/v1/auth/login', { json: { password } }),
   logout: () => request('POST', '/api/v1/auth/logout'),
 
+  changePassword: (current: string, next: string) => request('POST', '/api/v1/auth/password', { json: { current, next } }),
+
+  settings: () => json<Record<string, unknown>>(request('GET', '/api/v1/settings')),
+  // 按顶层键合并，值为 null 的键被删除
+  patchSettings: (patch: Record<string, unknown>) => json<Record<string, unknown>>(request('PATCH', '/api/v1/settings', { json: patch })),
+
   tree: async () => (await json<{ entries: Entry[] }>(request('GET', '/api/v1/tree'))).entries,
   search: async (q: string) => (await json<{ results: SearchResult[] }>(request('GET', '/api/v1/search?q=' + encodeURIComponent(q)))).results,
 

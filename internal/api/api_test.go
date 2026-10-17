@@ -309,3 +309,58 @@ func TestAPITokenScopes(t *testing.T) {
 		t.Errorf("吊销后应为 401，得到 %d", code)
 	}
 }
+
+func TestSettingsMerge(t *testing.T) {
+	f := newFixture(t)
+	if got := decode[map[string]any](t, f.do(f.admin, "GET", "/api/v1/settings", "", nil)); len(got) != 0 {
+		t.Fatalf("初始为空对象: %v", got)
+	}
+	f.do(f.admin, "PATCH", "/api/v1/settings", `{"fontSize":18,"theme":"dark"}`, nil)
+	got := decode[map[string]any](t, f.do(f.admin, "PATCH", "/api/v1/settings", `{"fontSize":20,"theme":null,"cssSnippets":[{"id":"a"}]}`, nil))
+	if got["fontSize"] != 20.0 || got["theme"] != nil || len(got["cssSnippets"].([]any)) != 1 {
+		t.Fatalf("合并结果: %v", got)
+	}
+	if again := decode[map[string]any](t, f.do(f.admin, "GET", "/api/v1/settings", "", nil)); again["fontSize"] != 20.0 || len(again) != 2 {
+		t.Fatalf("读取: %v", again)
+	}
+	for _, body := range []string{`[1]`, `null`, `"x"`, `{`} {
+		if code := f.status(f.admin, "PATCH", "/api/v1/settings", body, nil); code != 400 {
+			t.Errorf("%s 应为 400，得到 %d", body, code)
+		}
+	}
+	tok := decode[struct{ Token string }](t, f.do(f.admin, "POST", "/api/v1/tokens", `{"name":"x","scope":"write"}`, nil)).Token
+	bearer := map[string]string{"Authorization": "Bearer " + tok}
+	if code := f.status(&http.Client{}, "GET", "/api/v1/settings", "", bearer); code != 200 {
+		t.Errorf("令牌可读设置，得到 %d", code)
+	}
+	if code := f.status(&http.Client{}, "PATCH", "/api/v1/settings", `{"a":1}`, bearer); code != 403 {
+		t.Errorf("令牌不能改设置（自定义 CSS 等会影响页面），得到 %d", code)
+	}
+}
+
+func TestChangePassword(t *testing.T) {
+	f := newFixture(t)
+	other := newClient()
+	f.do(other, "POST", "/api/v1/auth/login", `{"password":"password123"}`, nil)
+	if code := f.status(f.admin, "POST", "/api/v1/auth/password", `{"current":"wrong","next":"new-password"}`, nil); code != 401 {
+		t.Errorf("当前密码错误应为 401，得到 %d", code)
+	}
+	if code := f.status(f.admin, "POST", "/api/v1/auth/password", `{"current":"password123","next":"short"}`, nil); code != 400 {
+		t.Errorf("新密码过短应为 400，得到 %d", code)
+	}
+	if code := f.status(f.admin, "POST", "/api/v1/auth/password", `{"current":"password123","next":"new-password"}`, nil); code != 200 {
+		t.Fatalf("修改密码: %d", code)
+	}
+	if code := f.status(f.admin, "GET", "/api/v1/tree", "", nil); code != 200 {
+		t.Errorf("当前会话应保留，得到 %d", code)
+	}
+	if code := f.status(other, "GET", "/api/v1/tree", "", nil); code != 401 {
+		t.Errorf("其他会话应失效，得到 %d", code)
+	}
+	if code := f.status(newClient(), "POST", "/api/v1/auth/login", `{"password":"password123"}`, nil); code != 401 {
+		t.Errorf("旧密码应失效，得到 %d", code)
+	}
+	if code := f.status(newClient(), "POST", "/api/v1/auth/login", `{"password":"new-password"}`, nil); code != 200 {
+		t.Errorf("新密码登录，得到 %d", code)
+	}
+}

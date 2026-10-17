@@ -44,7 +44,7 @@ function onRootDrop(e: DragEvent) {
     </div>
     <div class="rm-sidebar-foot">
       <button class="rm-foot-btn" title="命令面板（F1）" @click="ws.switcher = '>'"><Icon name="command" />命令</button>
-      <button class="rm-foot-btn" @click="ws.trashOpen = true"><Icon name="trash" />回收站</button>
+      <button class="rm-foot-btn" title="设置（Ctrl+,）" @click="ws.settings = 'index'"><Icon name="settings" />设置</button>
       <button class="rm-foot-btn" @click="emit('logout')"><Icon name="logout" />退出</button>
     </div>
   </div>

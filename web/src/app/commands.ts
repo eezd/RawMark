@@ -21,6 +21,11 @@ export function registerCommand(cmd: Command): () => void {
   }
 }
 
+/** 全部已注册的命令（含当前不可用的），用于快捷键一览 */
+export function allCommands(): Command[] {
+  return [...commands.values()]
+}
+
 export function availableCommands(): Command[] {
   return [...commands.values()].filter((c) => c.when?.() ?? true)
 }

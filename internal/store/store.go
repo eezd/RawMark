@@ -101,8 +101,9 @@ func (s *Store) DeleteSession(tokenHash string) error {
 	return err
 }
 
-func (s *Store) DeleteAllSessions() error {
-	_, err := s.db.Exec(`DELETE FROM sessions`)
+// DeleteOtherSessions 删除除 keepHash 之外的所有会话（修改密码后让其他设备重新登录）
+func (s *Store) DeleteOtherSessions(keepHash string) error {
+	_, err := s.db.Exec(`DELETE FROM sessions WHERE token_hash <> ?`, keepHash)
 	return err
 }
 

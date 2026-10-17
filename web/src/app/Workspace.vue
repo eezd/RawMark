@@ -6,12 +6,11 @@ import EditorPane from './EditorPane.vue'
 import Icon from './Icon.vue'
 import NoteBanner from './NoteBanner.vue'
 import QuickSwitcher from './QuickSwitcher.vue'
+import SettingsDialog from './SettingsDialog.vue'
 import ShareDialog from './ShareDialog.vue'
-import TokensDialog from './TokensDialog.vue'
 import { noteTitle } from './paths'
 import Sidebar from './Sidebar.vue'
 import TabBar from './TabBar.vue'
-import TrashDialog from './TrashDialog.vue'
 import { activeTab, flushAll, startWorkspace, stopWorkspace, toast, ws } from './workspace'
 
 const emit = defineEmits<{ logout: [] }>()
@@ -68,8 +67,7 @@ onBeforeUnmount(() => {
       <EditorPane />
     </main>
     <QuickSwitcher v-if="ws.switcher !== null" />
-    <TrashDialog v-if="ws.trashOpen" @close="ws.trashOpen = false" />
-    <ShareDialog v-if="ws.shareDialog" :path="ws.shareDialog.path" @close="ws.shareDialog = null" />
-    <TokensDialog v-if="ws.tokensOpen" @close="ws.tokensOpen = false" />
+    <SettingsDialog v-if="ws.settings" />
+    <ShareDialog v-if="ws.sharing" :path="ws.sharing" @close="ws.sharing = null" />
   </div>
 </template>

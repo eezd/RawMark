@@ -48,7 +48,7 @@ function runMenu(action: 'note' | 'folder' | 'rename' | 'share' | 'delete') {
     expanded.add(path)
     void (action === 'note' ? createNote(path) : createFolder(path))
   } else if (action === 'rename') ws.renaming = path
-  else if (action === 'share') ws.shareDialog = { path }
+  else if (action === 'share') ws.sharing = path
   else void remove(path)
 }
 

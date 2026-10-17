@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"rawmark/internal/auth"
@@ -34,6 +35,8 @@ type Server struct {
 	store *store.Store
 	hub   *events.Hub
 	index *search.Index
+	// 串行化设置的"读取-合并-写入"
+	settingsMu sync.Mutex
 	// OnSetup 在首次初始化完成后调用（用于删除启动码文件）
 	OnSetup func()
 }
@@ -68,6 +71,7 @@ func (s *Server) routes() []route {
 		{"POST /api/v1/auth/setup", public, s.setup},
 		{"POST /api/v1/auth/login", public, s.login},
 		{"POST /api/v1/auth/logout", public, s.logout},
+		{"POST /api/v1/auth/password", sessionOnly, s.changePassword},
 
 		{"GET /api/v1/tree", authed, s.tree},
 		{"GET /api/v1/files/{path...}", authed, s.readFile},
@@ -83,6 +87,8 @@ func (s *Server) routes() []route {
 		{"GET /api/v1/events", authed, s.events},
 		{"GET /api/v1/search", authed, s.search},
 
+		{"GET /api/v1/settings", authed, s.getSettings},
+		{"PATCH /api/v1/settings", sessionOnly, s.patchSettings},
 		{"GET /api/v1/shares", sessionOnly, s.listShares},
 		{"POST /api/v1/shares", sessionOnly, s.createShare},
 		{"DELETE /api/v1/shares/{token}", sessionOnly, s.deleteShare},
@@ -230,11 +236,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) startSession(w http.ResponseWriter, r *http.Request, password string) {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
-	token, err := s.auth.Login(host, password)
+	token, err := s.auth.Login(clientIP(r), password)
 	switch {
 	case errors.Is(err, auth.ErrRateLimited):
 		writeError(w, 429, err.Error())
@@ -425,6 +427,15 @@ func (s *Server) trashPurge(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---- 响应工具 ----
+
+// clientIP 返回限速用的来源地址（未经反向代理头部，避免伪造）
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
 
 func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxJSONBytes)).Decode(v); err != nil {
