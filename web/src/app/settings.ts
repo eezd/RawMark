@@ -12,7 +12,9 @@ export const CONTENT_WIDTHS = [
   { label: '全宽', value: 0 },
 ]
 
-const DEFAULTS = { fontSize: 16, contentWidth: 760 }
+export const SIDEBAR_WIDTH = { min: 200, max: 480 }
+
+const DEFAULTS = { fontSize: 16, contentWidth: 760, sidebarWidth: 260 }
 export type Settings = typeof DEFAULTS
 
 const CACHE_KEY = 'rawmark.settings'
@@ -29,6 +31,10 @@ function sanitize(raw: Record<string, unknown>): Settings {
       CONTENT_WIDTHS.map((w) => w.value),
       DEFAULTS.contentWidth,
     ),
+    sidebarWidth:
+      Number.isInteger(raw.sidebarWidth) && (raw.sidebarWidth as number) >= SIDEBAR_WIDTH.min && (raw.sidebarWidth as number) <= SIDEBAR_WIDTH.max
+        ? (raw.sidebarWidth as number)
+        : DEFAULTS.sidebarWidth,
   }
 }
 
@@ -38,6 +44,7 @@ function applied(next: Settings) {
   const root = document.documentElement.style
   root.setProperty('--rm-font-size', settings.fontSize + 'px')
   root.setProperty('--rm-content-width', settings.contentWidth ? settings.contentWidth + 'px' : 'none')
+  root.setProperty('--rm-sidebar-width', settings.sidebarWidth + 'px')
 }
 
 applied({ ...settings })

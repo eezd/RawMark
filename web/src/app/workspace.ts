@@ -35,6 +35,9 @@ export interface Toast {
 }
 
 const RECENT_KEY = 'rawmark.recent'
+// 本机的界面状态（不属于设置）：侧栏折叠、大纲面板
+const LAYOUT_KEY = 'rawmark.layout'
+const layout = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? '{}') as { sidebarCollapsed?: boolean; outlineOpen?: boolean }
 const RECENT_MAX = 30
 
 export const ws = reactive({
@@ -55,6 +58,10 @@ export const ws = reactive({
   sharing: null as string | null,
   // 「移动到…」对话框（笔记或文件夹路径）
   moving: null as string | null,
+  // 电脑上侧栏折叠
+  sidebarCollapsed: layout.sidebarCollapsed ?? false,
+  // 大纲面板（电脑上在右侧常驻，手机上为浮层）
+  outlineOpen: layout.outlineOpen ?? false,
   // 最近打开的笔记，最新的在前
   recent: JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[],
   toasts: [] as Toast[],
@@ -86,6 +93,13 @@ let view: EditorView | null = null
 let opsInFlight = 0
 
 const externalChange = Annotation.define<boolean>()
+
+// 编辑器内容或光标变化的订阅者（大纲面板）；不经过 Vue 响应式，避免每次按键都触发组件更新
+const editorListeners = new Set<() => void>()
+export function onEditorUpdate(fn: () => void): () => void {
+  editorListeners.add(fn)
+  return () => editorListeners.delete(fn)
+}
 
 export function tabOf(path: string | null): Tab | undefined {
   return path === null ? undefined : ws.tabs.find((t) => t.path === path)
@@ -164,6 +178,9 @@ function buildState(path: string, doc: string): EditorState {
       if (!u.transactions.some((tr) => tr.annotation(externalChange))) scheduleSave(ref.path)
     },
     extensions: [
+      EditorView.updateListener.of((u) => {
+        if (u.docChanged || u.selectionSet) editorListeners.forEach((fn) => fn())
+      }),
       pasteImages({
         upload: (file) => api.upload(ref.path, file),
         onError: (err) => toast('图片上传失败：' + errorText(err)),
@@ -762,9 +779,17 @@ export async function startWorkspace() {
     () => ws.recent,
     (r) => localStorage.setItem(RECENT_KEY, JSON.stringify(r)),
   )
+  watch(
+    () => ({ sidebarCollapsed: ws.sidebarCollapsed, outlineOpen: ws.outlineOpen }),
+    (l) => {
+      localStorage.setItem(LAYOUT_KEY, JSON.stringify(l))
+      // 编辑区宽度变化，需要重新测量
+      requestAnimationFrame(() => view?.requestMeasure())
+    },
+  )
   // 字号、正文宽度变化后行高随之改变，编辑器需要重新测量
   watch(
-    () => [settings.fontSize, settings.contentWidth],
+    () => [settings.fontSize, settings.contentWidth, settings.sidebarWidth],
     () => view?.requestMeasure(),
   )
   // 页面隐藏/关闭前尽力发出待保存的修改（部分浏览器关闭标签页时只触发 pagehide）
@@ -802,6 +827,8 @@ function registerBuiltinCommands() {
     // 浏览器不允许网页覆盖 Ctrl+W
     { id: 'tab.close', title: '关闭当前标签页', when: hasNote, run: () => void closeTab(ws.active!) },
     { id: 'app.settings', title: '设置', keys: ['Mod+,'], run: () => (ws.settings = 'index') },
+    { id: 'view.sidebar', title: '显示/隐藏侧栏', keys: ['Mod+\\'], run: toggleSidebar },
+    { id: 'view.outline', title: '显示/隐藏大纲', keys: ['Mod+Shift+O'], when: hasNote, run: () => (ws.outlineOpen = !ws.outlineOpen) },
     { id: 'app.trash', title: '打开回收站', run: () => (ws.settings = 'trash') },
     { id: 'note.share', title: '分享当前笔记', when: hasNote, run: () => (ws.sharing = ws.active) },
     { id: 'app.shares', title: '管理分享链接', run: () => (ws.settings = 'shares') },
@@ -811,16 +838,24 @@ function registerBuiltinCommands() {
   }
 }
 
+// 手机上侧栏是抽屉，电脑上折叠/展开
+function toggleSidebar() {
+  if (matchMedia('(max-width: 768px)').matches) ws.sidebarOpen = !ws.sidebarOpen
+  else ws.sidebarCollapsed = !ws.sidebarCollapsed
+}
+
 // 需要在目录树中操作的命令：切回目录树，移动端打开侧栏
 function withSidebar(fn: () => unknown) {
   ws.searchOpen = false
   ws.sidebarOpen = true
+  ws.sidebarCollapsed = false
   void fn()
 }
 
 export function openSearch() {
   ws.searchOpen = true
   ws.sidebarOpen = true
+  ws.sidebarCollapsed = false
   // 已打开时重新聚焦并全选，便于直接输入新的搜索词
   void nextTick(() => {
     const input = document.querySelector<HTMLInputElement>('.rm-search-input')
