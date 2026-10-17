@@ -20,6 +20,9 @@ const SECTIONS: { id: SettingsSection; title: string; icon: IconName }[] = [
 
 // 编辑器内置的按键（不在命令注册表中）
 const EDITOR_KEYS = [
+  { title: '粗体', keys: 'Mod+B' },
+  { title: '斜体', keys: 'Mod+I' },
+  { title: '插入链接', keys: 'Mod+K' },
   { title: '撤销', keys: 'Mod+Z' },
   { title: '重做', keys: 'Mod+Shift+Z' },
   { title: '缩进 / 取消缩进', keys: 'Tab / Shift+Tab' },

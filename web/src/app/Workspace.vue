@@ -4,6 +4,8 @@ import { api } from './api'
 import { registerCommand } from './commands'
 import EditorPane from './EditorPane.vue'
 import Icon from './Icon.vue'
+import MobileToolbar from './MobileToolbar.vue'
+import MoveDialog from './MoveDialog.vue'
 import NoteBanner from './NoteBanner.vue'
 import QuickSwitcher from './QuickSwitcher.vue'
 import SettingsDialog from './SettingsDialog.vue'
@@ -65,9 +67,11 @@ onBeforeUnmount(() => {
       <TabBar />
       <NoteBanner />
       <EditorPane />
+      <MobileToolbar />
     </main>
     <QuickSwitcher v-if="ws.switcher !== null" />
     <SettingsDialog v-if="ws.settings" />
     <ShareDialog v-if="ws.sharing" :path="ws.sharing" @close="ws.sharing = null" />
+    <MoveDialog v-if="ws.moving" :path="ws.moving" @close="ws.moving = null" />
   </div>
 </template>

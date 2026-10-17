@@ -53,3 +53,15 @@ export function fuzzyMatch(query: string, target: string, titleStart: number): F
   if (lower.slice(titleStart) === query.trim().toLowerCase()) score += 1000
   return { score, positions: [...positions].sort((a, b) => a - b) }
 }
+
+/** 按命中与否把文本切成连续片段，用于高亮 */
+export function segments(text: string, hits: Set<number>) {
+  const out: { text: string; hit: boolean }[] = []
+  for (let i = 0; i < text.length; i++) {
+    const hit = hits.has(i)
+    const last = out[out.length - 1]
+    if (last?.hit === hit) last.text += text[i]
+    else out.push({ text: text[i], hit })
+  }
+  return out
+}

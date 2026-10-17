@@ -3,13 +3,14 @@
 import { Annotation, Transaction, type EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { nextTick, reactive, watch } from 'vue'
-import { createEditorState, pasteImages } from '../editor'
+import { createEditorState, insertImageFiles, pasteImages } from '../editor'
 import { handleShortcut, registerCommand } from './commands'
 import { api, ApiError, type Entry } from './api'
 import { drafts } from './drafts'
 import { connectEvents, type VaultEvent } from './events'
 import { basename, dirname, joinPath, NOTE_EXT, resolveAssetUrl } from './paths'
 import { loadSettings, settings } from './settings'
+import { trackVisualViewport } from './viewport'
 
 export type TabStatus = 'loading' | 'ready' | 'conflict' | 'deleted' | 'error'
 
@@ -52,6 +53,8 @@ export const ws = reactive({
   settings: null as SettingsSection | 'index' | null,
   // 分享当前笔记的对话框（笔记路径）
   sharing: null as string | null,
+  // 「移动到…」对话框（笔记或文件夹路径）
+  moving: null as string | null,
   // 最近打开的笔记，最新的在前
   recent: JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[],
   toasts: [] as Toast[],
@@ -114,6 +117,26 @@ function errorText(err: unknown): string {
 
 export function attachView(v: EditorView | null) {
   view = v
+}
+
+/** 当前显示的编辑器视图（手机工具条等需要直接操作编辑器） */
+export function editorView(): EditorView | null {
+  return view
+}
+
+/** 从相册/文件中选择图片插入到光标处 */
+export function insertImagesFromPicker() {
+  const v = view
+  const tab = activeTab()
+  if (!v || tab?.status !== 'ready') return
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.multiple = true
+  input.addEventListener('change', () => {
+    if (input.files?.length && view === v) insertImageFiles(v, [...input.files])
+  })
+  input.click()
 }
 
 export function editorStateOf(path: string): EditorState | undefined {
@@ -750,6 +773,10 @@ export async function startWorkspace() {
   })
   window.addEventListener('pagehide', () => void flushAll(true))
   window.addEventListener('keydown', handleShortcut)
+  // 软键盘弹出、编辑区变矮后，让光标保持可见
+  trackVisualViewport(() => {
+    if (view?.hasFocus) view.dispatch({ effects: EditorView.scrollIntoView(view.state.selection.main.head, { y: 'nearest', yMargin: 24 }) })
+  })
 }
 
 // 内置命令不依赖工作区状态，模块载入时注册，排在组件注册的命令（如退出登录）之前
@@ -769,7 +796,9 @@ function registerBuiltinCommands() {
     { id: 'folder.new', title: '新建文件夹', run: () => withSidebar(() => createFolder('')) },
     { id: 'note.save', title: '保存当前笔记', keys: ['Mod+S'], when: hasNote, run: () => void flush(ws.active!) },
     { id: 'note.rename', title: '重命名当前笔记', when: hasNote, run: () => withSidebar(() => (ws.renaming = ws.active)) },
+    { id: 'note.move', title: '移动当前笔记到…', when: hasNote, run: () => (ws.moving = ws.active) },
     { id: 'note.delete', title: '删除当前笔记', when: hasNote, run: () => void remove(ws.active!) },
+    { id: 'note.insertImage', title: '插入图片…', when: hasNote, run: insertImagesFromPicker },
     // 浏览器不允许网页覆盖 Ctrl+W
     { id: 'tab.close', title: '关闭当前标签页', when: hasNote, run: () => void closeTab(ws.active!) },
     { id: 'app.settings', title: '设置', keys: ['Mod+,'], run: () => (ws.settings = 'index') },

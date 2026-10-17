@@ -8,11 +8,12 @@ import { typoraExtensions } from '../markdown/extensions'
 import { renderedBlocks } from './blocks'
 import { codeBlockHighlight } from './codeblocks'
 import { editorFocus } from './focus'
+import { insertLink, toggleBold, toggleItalic } from './format'
 import { livePreview, resolveImageUrl } from './livepreview'
 import { tableEditing } from './table'
 import { markdownTheme } from './theme'
 
-export { pasteImages } from './paste'
+export { insertImageFiles, pasteImages } from './paste'
 
 // 在 lang-markdown 的语法集（CommonMark + GFM + 上下标 + emoji）上加 Typora 扩展。
 // 沿用其语言数据，markdownKeymap 中的命令据此识别 Markdown（isActiveAt 按语言数据判断）
@@ -41,6 +42,14 @@ export function createEditorState(opts: EditorStateOptions): EditorState {
     // 首屏包 gzip 从约 108 KB 增至约 180 KB，而 Live Preview 不需要 HTML 高亮
     rawmarkLanguage,
     Prec.high(keymap.of(markdownKeymap)),
+    // 与 Typora 一致的格式快捷键
+    Prec.high(
+      keymap.of([
+        { key: 'Mod-b', run: toggleBold, preventDefault: true },
+        { key: 'Mod-i', run: toggleItalic, preventDefault: true },
+        { key: 'Mod-k', run: insertLink, preventDefault: true },
+      ]),
+    ),
     markdownTheme,
     livePreview,
     codeBlockHighlight,

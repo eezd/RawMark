@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { availableCommands, formatKeys } from './commands'
-import { fuzzyMatch } from './fuzzy'
+import { fuzzyMatch, segments } from './fuzzy'
 import Icon from './Icon.vue'
 import { dirname, NOTE_EXT, noteTitle } from './paths'
 import { createNoteAt, openAt, ws } from './workspace'
@@ -37,18 +37,6 @@ function close() {
 function cancel() {
   close()
   previousFocus?.focus()
-}
-
-/** 按命中与否把文本切成连续片段 */
-function segments(text: string, hits: Set<number>) {
-  const out: { text: string; hit: boolean }[] = []
-  for (let i = 0; i < text.length; i++) {
-    const hit = hits.has(i)
-    const last = out[out.length - 1]
-    if (last?.hit === hit) last.text += text[i]
-    else out.push({ text: text[i], hit })
-  }
-  return out
 }
 
 function noteItems(q: string): Item[] {

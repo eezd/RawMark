@@ -15,7 +15,36 @@ const dropTarget = ref(false)
 const input = ref<HTMLInputElement>()
 const draft = ref('')
 
+// 长按打开菜单：Android 会触发 contextmenu，iOS Safari 不会，统一用触摸计时
+const LONG_PRESS_MS = 500
+let pressTimer: ReturnType<typeof setTimeout> | undefined
+let pressStart: { x: number; y: number } | null = null
+let longPressed = false
+
+function onTouchStart(e: TouchEvent) {
+  longPressed = false
+  pressStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+  pressTimer = setTimeout(() => {
+    longPressed = true
+    menuOpen.value = true
+  }, LONG_PRESS_MS)
+}
+
+function onTouchMove(e: TouchEvent) {
+  if (pressStart && Math.hypot(e.touches[0].clientX - pressStart.x, e.touches[0].clientY - pressStart.y) > 10) cancelPress()
+}
+
+function cancelPress() {
+  clearTimeout(pressTimer)
+  pressStart = null
+}
+
 function activate() {
+  // 长按后松手产生的点击不打开笔记
+  if (longPressed) {
+    longPressed = false
+    return
+  }
   if (props.node.dir) {
     if (isOpen.value) expanded.delete(props.node.path)
     else expanded.add(props.node.path)
@@ -41,7 +70,7 @@ function commitRename() {
   if (target && target !== props.node.path) void move(props.node.path, target)
 }
 
-function runMenu(action: 'note' | 'folder' | 'rename' | 'share' | 'delete') {
+function runMenu(action: 'note' | 'folder' | 'rename' | 'move' | 'share' | 'delete') {
   menuOpen.value = false
   const path = props.node.path
   if (action === 'note' || action === 'folder') {
@@ -49,6 +78,7 @@ function runMenu(action: 'note' | 'folder' | 'rename' | 'share' | 'delete') {
     void (action === 'note' ? createNote(path) : createFolder(path))
   } else if (action === 'rename') ws.renaming = path
   else if (action === 'share') ws.sharing = path
+  else if (action === 'move') ws.moving = path
   else void remove(path)
 }
 
@@ -89,6 +119,10 @@ function onDrop(e: DragEvent) {
       :draggable="!isRenaming"
       @click="activate"
       @contextmenu.prevent="menuOpen = true"
+      @touchstart.passive="onTouchStart"
+      @touchmove.passive="onTouchMove"
+      @touchend="cancelPress"
+      @touchcancel="cancelPress"
       @dragstart="onDragStart"
       @dragover="onDragOver"
       @dragleave="dropTarget = false"
@@ -115,6 +149,7 @@ function onDrop(e: DragEvent) {
           <button @click="runMenu('folder')"><Icon name="folderAdd" />新建文件夹</button>
         </template>
         <button @click="runMenu('rename')"><Icon name="edit" />重命名</button>
+        <button @click="runMenu('move')"><Icon name="folder" />移动到…</button>
         <button v-if="!node.dir" @click="runMenu('share')"><Icon name="link" />分享</button>
         <button class="danger" @click="runMenu('delete')"><Icon name="trash" />删除</button>
       </div>
