@@ -68,7 +68,10 @@ func (h *staticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if share {
 		hd.Set("X-Robots-Tag", "noindex")
 	}
-	if ct := mime.TypeByExtension(path.Ext(name)); ct != "" {
+	if path.Ext(name) == ".webmanifest" {
+		// Go 的 MIME 表未必包含此扩展名，不能让 ServeContent 对压缩后的数据嗅探类型。
+		hd.Set("Content-Type", "application/manifest+json")
+	} else if ct := mime.TypeByExtension(path.Ext(name)); ct != "" {
 		hd.Set("Content-Type", ct)
 	}
 	hd.Add("Vary", "Accept-Encoding")

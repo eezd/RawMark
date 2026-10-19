@@ -124,6 +124,9 @@ func (s *Server) Handler(static fs.FS) http.Handler {
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			h.Set("Cache-Control", "no-store")
+		}
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "same-origin")
 		h.Set("X-Frame-Options", "DENY")
@@ -394,7 +397,7 @@ func (s *Server) serveRaw(w http.ResponseWriter, r *http.Request, rel string) {
 	if ct := mime.TypeByExtension(path.Ext(info.Name())); ct != "" {
 		h.Set("Content-Type", ct)
 	}
-	h.Set("Cache-Control", "private, no-cache")
+	h.Set("Cache-Control", "no-store")
 	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
 }
 

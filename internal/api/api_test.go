@@ -1,6 +1,7 @@
 package api
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -136,6 +137,41 @@ func TestOpenAPICoversRoutes(t *testing.T) {
 	}
 	for key := range documented {
 		t.Errorf("openapi.json 中的接口不存在: %s", key)
+	}
+}
+
+func TestAPIResponsesAreNotCached(t *testing.T) {
+	f := newFixture(t)
+	f.write("笔记.md", "# 正文")
+	// 登录状态与目录曾在 Firefox 离线时命中 HTTP 缓存，误进入无法加载的工作区。
+	for _, path := range []string{"/api/v1/auth/state", "/api/v1/tree", "/api/v1/files/笔记.md", "/api/v1/raw/笔记.md"} {
+		res := f.do(f.admin, "GET", path, "", nil)
+		if res.StatusCode != http.StatusOK || res.Header.Get("Cache-Control") != "no-store" {
+			t.Errorf("%s：状态 %d，缓存策略 %q", path, res.StatusCode, res.Header.Get("Cache-Control"))
+		}
+	}
+}
+
+func TestCompressedManifestContentType(t *testing.T) {
+	body := strings.Repeat(" ", 300) + `{"name":"RawMark","display":"standalone"}`
+	handler := newStaticHandler(fstest.MapFS{"manifest.webmanifest": {Data: []byte(body)}})
+	req := httptest.NewRequest("GET", "/manifest.webmanifest", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	res := recorder.Result()
+	defer res.Body.Close()
+	if res.Header.Get("Content-Type") != "application/manifest+json" || res.Header.Get("Content-Encoding") != "gzip" {
+		t.Fatalf("清单响应头不正确：%v", res.Header)
+	}
+	zr, err := gzip.NewReader(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zr.Close()
+	var manifest map[string]string
+	if err := json.NewDecoder(zr).Decode(&manifest); err != nil || manifest["name"] != "RawMark" {
+		t.Fatalf("压缩清单无法解析：%v", err)
 	}
 }
 

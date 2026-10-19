@@ -72,7 +72,7 @@ async function request(
     headers['Content-Type'] = 'application/json'
     body = JSON.stringify(init.json)
   }
-  const res = await fetch(url, { method, headers, body, credentials: 'same-origin', keepalive: init.keepalive })
+  const res = await fetch(url, { method, headers, body, credentials: 'same-origin', cache: 'no-store', keepalive: init.keepalive })
   if (!res.ok) {
     let data: Record<string, unknown> = {}
     try {

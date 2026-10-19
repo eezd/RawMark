@@ -296,6 +296,12 @@ export async function flushAll(keepalive = false) {
   await Promise.all([...slots.keys()].map((p) => flush(p, keepalive)))
 }
 
+// 保存失败会留在标签页状态中，flushAll 完成并不意味着可以安全刷新。
+export function readyToReload(): boolean {
+  return opsInFlight === 0 && !ws.tabs.some((t) => t.dirty || t.status === 'loading') &&
+    [...slots.values()].every((s) => !s.uploads && !s.paused && !s.inflight)
+}
+
 // ---- 冲突处理 ----
 
 // 放弃本地修改，载入服务器版本
