@@ -2,6 +2,7 @@
 import { requestTokens } from '../highlight/client'
 import { renderMarkdown } from '../markdown/html'
 import { hydrate, renderMermaid } from '../markdown/render'
+import { applyAppearance, sanitizeAppearance } from '../themes/appearance'
 import '../themes/base.css'
 import './share.css'
 
@@ -22,12 +23,28 @@ function message(text: string) {
 async function load() {
   let res: Response
   try {
-    res = await fetch(api, { credentials: 'same-origin' })
+    res = await fetch(api, { credentials: 'same-origin', cache: 'no-store' })
   } catch {
     message('网络错误，请检查连接后刷新')
     return
   }
-  if (res.ok) render((await res.json()) as SharedNote)
+  if (res.ok) {
+    const note = (await res.json()) as SharedNote
+    let appearanceError = false
+    try {
+      const response = await fetch(api + '/appearance', { cache: 'no-store' })
+      if (!response.ok) throw new Error('读取外观失败')
+      const appearance = await response.json() as Record<string, unknown>
+      const rootStyle = document.documentElement.style
+      if (typeof appearance.fontSize === 'number') rootStyle.setProperty('--rm-font-size', appearance.fontSize + 'px')
+      if (typeof appearance.contentWidth === 'number') rootStyle.setProperty('--rm-content-width', appearance.contentWidth ? appearance.contentWidth + 'px' : 'none')
+      applyAppearance(sanitizeAppearance(appearance), typeof appearance.themeCSS === 'string' ? appearance.themeCSS : '')
+    } catch {
+      appearanceError = true
+    }
+    render(note)
+    if (appearanceError) root.prepend(Object.assign(document.createElement('p'), { className: 'rm-share-error', textContent: '外观加载失败，可刷新重试' }))
+  }
   else if (res.status === 401) askPassword()
   else if (res.status === 404) message('分享不存在、已过期或已被撤销')
   else message(`加载失败（${res.status}）`)
@@ -127,6 +144,7 @@ async function decorateCode(code: HTMLElement) {
   if (lang === 'mermaid') {
     const figure = document.createElement('div')
     figure.className = 'rm-share-mermaid'
+    figure.dataset.code = text
     try {
       figure.innerHTML = await renderMermaid(text)
       code.parentElement!.replaceWith(figure)
@@ -156,5 +174,12 @@ async function decorateCode(code: HTMLElement) {
   out.append(text.slice(at))
   code.replaceChildren(out)
 }
+
+window.addEventListener('rawmark-appearance', () => {
+  for (const el of root.querySelectorAll<HTMLElement>('.rm-share-mermaid')) {
+    const code = el.dataset.code
+    if (code !== undefined) void renderMermaid(code).then((svg) => { el.innerHTML = svg }).catch(() => { el.textContent = '图表渲染失败，请刷新重试' })
+  }
+})
 
 void load()

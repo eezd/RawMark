@@ -1510,6 +1510,164 @@
           }
         }
       }
+    },
+    "/themes": {
+      "get": {
+        "summary": "列出主题（含内置默认主题）",
+        "tags": [
+          "外观"
+        ],
+        "responses": {
+          "200": {
+            "description": "主题列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "themes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Theme"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/themes/{id}": {
+      "get": {
+        "summary": "读取主题 CSS",
+        "tags": [
+          "外观"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "主题信息与 CSS",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Theme"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "css": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "主题不存在或文件不完整"
+          }
+        }
+      }
+    },
+    "/public/shares/{token}/appearance": {
+      "get": {
+        "summary": "读取有效分享使用的外观配置",
+        "description": "仅返回明暗模式、字号、正文宽度、主题 CSS 和启用的 CSS 片段；密码分享需先解锁，不返回其他设置，不加载插件。",
+        "tags": [
+          "分享"
+        ],
+        "security": [
+          {}
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "公开的外观配置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "colorMode": {
+                      "type": "string",
+                      "enum": [
+                        "system",
+                        "light",
+                        "dark"
+                      ]
+                    },
+                    "fontSize": {
+                      "type": "integer"
+                    },
+                    "contentWidth": {
+                      "type": "integer"
+                    },
+                    "themeCSS": {
+                      "type": "string"
+                    },
+                    "cssSnippets": {
+                      "type": [
+                        "array",
+                        "null"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "css": {
+                            "type": "string"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "theme": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "需要访问密码"
+          },
+          "404": {
+            "description": "分享不存在、已过期或已撤销"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1670,6 +1828,25 @@
           "lastUsedAt": {
             "type": "integer",
             "description": "Unix 毫秒，0 为从未使用"
+          }
+        }
+      },
+      "Theme": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
           }
         }
       }

@@ -39,6 +39,8 @@ type Server struct {
 	settingsMu sync.Mutex
 	// OnSetup 在首次初始化完成后调用（用于删除启动码文件）
 	OnSetup func()
+	// ThemesDir 指向数据目录中的主题目录；为空时只有内置主题。
+	ThemesDir string
 }
 
 func New(v *vault.Vault, a *auth.Manager, st *store.Store, hub *events.Hub, index *search.Index) *Server {
@@ -89,6 +91,8 @@ func (s *Server) routes() []route {
 
 		{"GET /api/v1/settings", authed, s.getSettings},
 		{"PATCH /api/v1/settings", sessionOnly, s.patchSettings},
+		{"GET /api/v1/themes", authed, s.listThemes},
+		{"GET /api/v1/themes/{id}", authed, s.getTheme},
 		{"GET /api/v1/shares", sessionOnly, s.listShares},
 		{"POST /api/v1/shares", sessionOnly, s.createShare},
 		{"DELETE /api/v1/shares/{token}", sessionOnly, s.deleteShare},
@@ -97,6 +101,7 @@ func (s *Server) routes() []route {
 		{"DELETE /api/v1/tokens/{id}", sessionOnly, s.deleteToken},
 
 		{"GET /api/v1/public/shares/{token}", public, s.publicShare},
+		{"GET /api/v1/public/shares/{token}/appearance", public, s.publicAppearance},
 		{"POST /api/v1/public/shares/{token}/unlock", public, s.unlockShare},
 		{"GET /api/v1/public/shares/{token}/assets/{path...}", public, s.publicShareAsset},
 	}

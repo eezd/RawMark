@@ -223,6 +223,7 @@ export class MathWidget extends WidgetType {
 }
 
 const mermaidSeqs = new WeakMap<HTMLElement, number>()
+const mermaidListeners = new WeakMap<HTMLElement, () => void>()
 let mermaidSeq = 0
 
 /** Mermaid 图表，editOffset 含义同 MathWidget */
@@ -243,13 +244,27 @@ export class MermaidWidget extends WidgetType {
     else editOnMousedown(el, view, this.editOffset)
     el.textContent = '图表渲染中…'
     this.render(el, view)
+    const update = () => this.render(el, view)
+    mermaidListeners.set(el, update)
+    window.addEventListener('rawmark-appearance', update)
     return el
   }
   // 只复用预览元素：从渲染结果切到编辑时，编辑器会尝试用新组件更新旧元素（旧元素带点击编辑的监听）
   updateDOM(dom: HTMLElement, view: EditorView) {
     if (this.editOffset !== null || !dom.classList.contains('cm-rm-preview')) return false
     this.render(dom, view)
+    const old = mermaidListeners.get(dom)
+    if (old) window.removeEventListener('rawmark-appearance', old)
+    const update = () => this.render(dom, view)
+    mermaidListeners.set(dom, update)
+    window.addEventListener('rawmark-appearance', update)
     return true
+  }
+  destroy(dom: HTMLElement) {
+    const update = mermaidListeners.get(dom)
+    if (update) window.removeEventListener('rawmark-appearance', update)
+    mermaidListeners.delete(dom)
+    mermaidSeqs.delete(dom)
   }
   // 渲染是异步的，连续输入时只采用最后一次的结果，并保留旧图直到新图就绪，避免闪烁
   private render(el: HTMLElement, view: EditorView) {

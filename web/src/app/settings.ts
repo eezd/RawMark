@@ -2,6 +2,7 @@
 // 本地缓存上次的值，启动时先套用，避免页面先按默认值显示再跳变
 import { reactive } from 'vue'
 import { api } from './api'
+import { applyAppearance, appearancePaused, sanitizeAppearance, type Appearance } from '../themes/appearance'
 
 export const FONT_SIZES = [14, 15, 16, 17, 18, 20, 22]
 // 0 为全宽
@@ -15,7 +16,7 @@ export const CONTENT_WIDTHS = [
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
 const DEFAULTS = { fontSize: 16, contentWidth: 760, sidebarWidth: 260 }
-export type Settings = typeof DEFAULTS
+export type Settings = typeof DEFAULTS & Appearance
 
 const CACHE_KEY = 'rawmark.settings'
 
@@ -26,6 +27,7 @@ function sanitize(raw: Record<string, unknown>): Settings {
   const pick = <T>(v: unknown, allowed: T[], def: T) => (allowed.includes(v as T) ? (v as T) : def)
   return {
     fontSize: pick(raw.fontSize, FONT_SIZES, DEFAULTS.fontSize),
+    ...sanitizeAppearance(raw),
     contentWidth: pick(
       raw.contentWidth,
       CONTENT_WIDTHS.map((w) => w.value),
@@ -38,6 +40,25 @@ function sanitize(raw: Record<string, unknown>): Settings {
   }
 }
 
+let currentTheme = ''
+let currentCSS = ''
+let appearanceRequest = 0
+
+async function applySettingsAppearance() {
+  const request = ++appearanceRequest
+  const theme = settings.theme
+  if (appearancePaused || theme === 'default') {
+    currentTheme = theme
+    currentCSS = ''
+  } else if (theme !== currentTheme) {
+    const data = await api.theme(theme)
+    if (request !== appearanceRequest) return
+    currentCSS = data.css
+    currentTheme = theme
+  }
+  applyAppearance({ ...settings }, currentCSS)
+}
+
 function applied(next: Settings) {
   Object.assign(settings, next)
   localStorage.setItem(CACHE_KEY, JSON.stringify(settings))
@@ -48,13 +69,30 @@ function applied(next: Settings) {
 }
 
 applied({ ...settings })
+// 缓存只提前应用明暗模式；主题和片段等服务器确认后再应用。
+applyAppearance({ ...settings, theme: 'default', cssSnippets: [] }, '')
 
 export async function loadSettings() {
   applied(sanitize(await api.settings()))
+  await applySettingsAppearance()
+}
+
+export async function reloadTheme() {
+  currentTheme = ''
+  await applySettingsAppearance()
 }
 
 /** 修改设置：先在本地生效再保存，保存失败时由调用方提示并重新载入 */
 export async function updateSettings(patch: Partial<Settings>) {
   applied({ ...settings, ...patch })
-  await api.patchSettings(patch)
+  // 设置请求串行提交，防止快速切换和片段编辑的旧请求覆盖新值。
+  await saveSettings(patch)
+  await applySettingsAppearance()
+}
+
+let saveQueue: Promise<unknown> = Promise.resolve()
+function saveSettings(patch: Partial<Settings>) {
+  const pending = saveQueue.then(() => api.patchSettings(patch))
+  saveQueue = pending.catch(() => {})
+  return pending
 }

@@ -11,6 +11,7 @@ import { connectEvents, type VaultEvent } from './events'
 import { basename, dirname, joinPath, NOTE_EXT, resolveAssetUrl } from './paths'
 import { loadSettings, settings } from './settings'
 import { trackVisualViewport } from './viewport'
+import { appearancePaused } from '../themes/appearance'
 
 export type TabStatus = 'loading' | 'ready' | 'conflict' | 'deleted' | 'error'
 
@@ -53,7 +54,7 @@ export const ws = reactive({
   // 快速切换/命令面板的初始输入，null 为关闭；以 > 开头时列出命令
   switcher: null as string | null,
   // 打开的设置分组，null 为关闭；index 为从通用入口打开（手机上先显示分组列表，电脑上显示第一组）
-  settings: null as SettingsSection | 'index' | null,
+  settings: (appearancePaused ? 'appearance' : null) as SettingsSection | 'index' | null,
   // 分享当前笔记的对话框（笔记路径）
   sharing: null as string | null,
   // 「移动到…」对话框（笔记或文件夹路径）
@@ -798,6 +799,7 @@ export async function startWorkspace() {
     () => [settings.fontSize, settings.contentWidth, settings.sidebarWidth],
     () => view?.requestMeasure(),
   )
+  window.addEventListener('rawmark-appearance', () => requestAnimationFrame(() => view?.requestMeasure()))
   // 页面隐藏/关闭前尽力发出待保存的修改（部分浏览器关闭标签页时只触发 pagehide）
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void flushAll(true)

@@ -95,6 +95,7 @@ func run(addr string) error {
 	go cleanupSessions(ctx, st)
 
 	srv := api.New(v, am, st, hub, idx)
+	srv.ThemesDir = filepath.Join(dataDir, "themes")
 	srv.OnSetup = func() { os.Remove(codeFile) }
 	go srv.FollowMoves(ctx)
 	httpServer := &http.Server{

@@ -16,19 +16,18 @@ export async function renderMath(el: HTMLElement, tex: string, displayMode: bool
 let mermaidLoad: Promise<typeof import('mermaid').default> | undefined
 let mermaidSeq = 0
 function loadMermaid() {
-  mermaidLoad ??= import('mermaid').then(({ default: mermaid }) => {
-    const dark = matchMedia('(prefers-color-scheme: dark)').matches
-    // strict：图表中的 HTML 会被清理，点击事件等交互被禁用
-    const config: MermaidConfig = { startOnLoad: false, securityLevel: 'strict', theme: dark ? 'dark' : 'default' }
-    mermaid.initialize(config)
-    return mermaid
-  })
+  mermaidLoad ??= import('mermaid').then(({ default: mermaid }) => mermaid)
   return mermaidLoad
 }
 
 /** 渲染 Mermaid 图表，返回 SVG 标记；语法错误时抛出带说明的 Error */
-export async function renderMermaid(code: string): Promise<string> {
+async function renderDiagram(code: string): Promise<string> {
   const mermaid = await loadMermaid()
+  const mode = document.documentElement.dataset.rmColorMode
+  const dark = mode === 'dark' || (mode === undefined && matchMedia('(prefers-color-scheme: dark)').matches)
+  // 配置与渲染串行进行，避免切换模式时并发图表读到另一个模式的全局配置。
+  const config: MermaidConfig = { startOnLoad: false, securityLevel: 'strict', theme: dark ? 'dark' : 'default' }
+  mermaid.initialize(config)
   const id = `rm-mermaid-${++mermaidSeq}`
   try {
     return (await mermaid.render(id, code)).svg
@@ -37,6 +36,13 @@ export async function renderMermaid(code: string): Promise<string> {
     document.getElementById('d' + id)?.remove()
     throw err instanceof Error ? err : new Error(String(err))
   }
+}
+
+let renderQueue: Promise<unknown> = Promise.resolve()
+export function renderMermaid(code: string): Promise<string> {
+  const result = renderQueue.then(() => renderDiagram(code))
+  renderQueue = result.catch(() => {})
+  return result
 }
 
 let emojiLoad: Promise<Map<string, string>> | undefined

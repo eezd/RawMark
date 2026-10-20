@@ -3,6 +3,16 @@
  * 代码块与行内代码配色取自 vuejs.org（@vue/theme + Shiki github-dark）。
  */
 :root {
+  color-scheme: light;
+  --rm-sidebar-bg: #f9f9f9;
+  --rm-sidebar-width: 260px;
+  --rm-hover: rgba(0, 0, 0, 0.045);
+  --rm-active: rgba(66, 184, 131, 0.14);
+  --rm-danger: #e5484d;
+  --rm-warn-bg: #fff8e6;
+  --rm-warn-text: #8a5a00;
+  --rm-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+
   --rm-font-text: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', sans-serif;
   --rm-font-mono: ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, Monaco, 'Cascadia Mono', Consolas,
@@ -27,8 +37,30 @@
   --rm-highlight-bg: rgba(255, 213, 0, 0.35);
 }
 
+:root:where([data-rm-color-mode="dark"]) {
+  color-scheme: dark;
+  --rm-bg: #1a1a1a;
+  --rm-text: rgba(255, 255, 255, 0.87);
+  --rm-text-muted: rgba(235, 235, 235, 0.6);
+  --rm-divider: rgba(84, 84, 84, 0.48);
+  --rm-accent: #42d392;
+  --rm-accent-strong: #42b883;
+  --rm-inline-code-bg: #2f2f2f;
+  --rm-inline-code-text: #aac8e4;
+  --rm-code-bg: #242424;
+  --rm-highlight-bg: rgba(255, 213, 0, 0.28);
+
+  --rm-sidebar-bg: #161618;
+  --rm-hover: rgba(255, 255, 255, 0.06);
+  --rm-active: rgba(66, 211, 146, 0.16);
+  --rm-warn-bg: #2f2716;
+  --rm-warn-text: #f0c060;
+  --rm-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:where(:not([data-rm-color-mode])) {
+    color-scheme: dark;
     --rm-bg: #1a1a1a;
     --rm-text: rgba(255, 255, 255, 0.87);
     --rm-text-muted: rgba(235, 235, 235, 0.6);
@@ -39,6 +71,13 @@
     --rm-inline-code-text: #aac8e4;
     --rm-code-bg: #242424;
     --rm-highlight-bg: rgba(255, 213, 0, 0.28);
+
+    --rm-sidebar-bg: #161618;
+    --rm-hover: rgba(255, 255, 255, 0.06);
+    --rm-active: rgba(66, 211, 146, 0.16);
+    --rm-warn-bg: #2f2716;
+    --rm-warn-text: #f0c060;
+    --rm-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   }
 }
 

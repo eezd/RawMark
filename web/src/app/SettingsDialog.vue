@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api, ApiError } from './api'
 import { allCommands, formatKeys, runCommand } from './commands'
 import Icon, { type IconName } from './Icon.vue'
+import AppearanceSettings from './AppearanceSettings.vue'
 import { CONTENT_WIDTHS, FONT_SIZES, loadSettings, settings, updateSettings, type Settings } from './settings'
 import SharePanel from './SharePanel.vue'
 import TokensPanel from './TokensPanel.vue'
@@ -106,6 +107,7 @@ async function changePassword() {
         </div>
         <div class="rm-settings-content">
           <template v-if="section === 'appearance'">
+            <AppearanceSettings />
             <div class="rm-setting">
               <span class="rm-setting-label">字号</span>
               <select :value="settings.fontSize" aria-label="字号" @change="change({ fontSize: Number(($event.target as HTMLSelectElement).value) })">

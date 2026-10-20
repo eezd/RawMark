@@ -1,25 +1,4 @@
 /* 应用外壳样式，颜色与字体沿用 themes/base.css 中的 --rm-* 变量 */
-:root {
-  --rm-sidebar-bg: #f9f9f9;
-  --rm-sidebar-width: 260px;
-  --rm-hover: rgba(0, 0, 0, 0.045);
-  --rm-active: rgba(66, 184, 131, 0.14);
-  --rm-danger: #e5484d;
-  --rm-warn-bg: #fff8e6;
-  --rm-warn-text: #8a5a00;
-  --rm-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --rm-sidebar-bg: #161618;
-    --rm-hover: rgba(255, 255, 255, 0.06);
-    --rm-active: rgba(66, 211, 146, 0.16);
-    --rm-warn-bg: #2f2716;
-    --rm-warn-text: #f0c060;
-    --rm-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  }
-}
-
 html,
 body {
   height: 100%;
@@ -534,3 +513,14 @@ button {
   .rm-switcher-item { height: 44px; font-size: 15px; }
   .rm-trash-list li { flex-wrap: wrap; }
 }
+
+/* 主题与 CSS 编辑 */
+.rm-appearance-note { margin: 8px 20px 16px; font-size: 13px; color: var(--rm-text-muted); overflow-wrap: anywhere; }
+.rm-snippet-row { display: flex; align-items: center; gap: 8px; padding: 6px 20px; }
+.rm-snippet-row label { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.rm-snippet-row input { accent-color: var(--rm-accent); flex: none; }
+.rm-snippet-form { display: flex; flex-direction: column; gap: 12px; padding: 12px 20px; }
+.rm-snippet-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.rm-snippet-form input, .rm-snippet-form textarea { box-sizing: border-box; width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--rm-divider); border-radius: 6px; background: var(--rm-bg); color: var(--rm-text); font: inherit; }
+.rm-snippet-form textarea { font-family: var(--rm-font-mono); resize: vertical; }
+@media (pointer: coarse) { .rm-snippet-row .rm-btn, .rm-snippet-form .rm-btn { min-height: 44px; } .rm-snippet-form input, .rm-snippet-form textarea { font-size: 16px; } }

@@ -55,7 +55,9 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { idx.Close() })
-	srv := httptest.NewServer(New(v, am, st, events.NewHub(), idx).Handler(fstest.MapFS{}))
+	server := New(v, am, st, events.NewHub(), idx)
+	server.ThemesDir = filepath.Join(dir, "themes")
+	srv := httptest.NewServer(server.Handler(fstest.MapFS{}))
 	t.Cleanup(srv.Close)
 	f := &fixture{t: t, url: srv.URL, root: v.Root(), store: st, admin: newClient()}
 	if res := f.do(f.admin, "POST", "/api/v1/auth/login", `{"password":"password123"}`, nil); res.StatusCode != 200 {

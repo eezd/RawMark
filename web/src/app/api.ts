@@ -7,6 +7,12 @@ export interface Entry {
   mtime: number
 }
 
+export interface Theme {
+  id: string
+  name: string
+  version: string
+}
+
 export interface TrashItem {
   id: string
   path: string
@@ -97,6 +103,8 @@ export const api = {
   changePassword: (current: string, next: string) => request('POST', '/api/v1/auth/password', { json: { current, next } }),
 
   settings: () => json<Record<string, unknown>>(request('GET', '/api/v1/settings')),
+  themes: async () => (await json<{ themes: Theme[] }>(request('GET', '/api/v1/themes'))).themes,
+  theme: (id: string) => json<Theme & { css: string }>(request('GET', '/api/v1/themes/' + encodeURIComponent(id))),
   // 按顶层键合并，值为 null 的键被删除
   patchSettings: (patch: Record<string, unknown>) => json<Record<string, unknown>>(request('PATCH', '/api/v1/settings', { json: patch })),
 
