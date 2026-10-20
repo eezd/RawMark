@@ -338,7 +338,7 @@ func (v *Vault) Tree() ([]Entry, error) {
 // ---- 移动 / 重命名 ----
 
 // Move 移动或重命名笔记/文件夹。笔记的 .assets 目录随之移动；笔记改名时同步改写正文中指向自身图片目录的链接
-func (v *Vault) Move(from, to string) error {
+func (v *Vault) Move(from, to string) (err error) {
 	src, err := v.abs(from)
 	if err != nil {
 		return err
@@ -381,10 +381,25 @@ func (v *Vault) Move(from, to string) error {
 	if err := os.Rename(src, dst); err != nil {
 		return err
 	}
+	assetsMoved := false
+	defer func() {
+		if err == nil {
+			return
+		}
+		if assetsMoved {
+			if rollback := os.Rename(dstAssets, srcAssets); rollback != nil {
+				err = errors.Join(err, fmt.Errorf("回滚图片移动失败: %w", rollback))
+			}
+		}
+		if rollback := os.Rename(dst, src); rollback != nil {
+			err = errors.Join(err, fmt.Errorf("回滚笔记移动失败: %w", rollback))
+		}
+	}()
 	if srcAssets != "" {
 		if err := os.Rename(srcAssets, dstAssets); err != nil {
 			return fmt.Errorf("移动图片目录失败: %w", err)
 		}
+		assetsMoved = true
 		oldBase := strings.TrimSuffix(path.Base(from), NoteExt)
 		newBase := strings.TrimSuffix(path.Base(to), NoteExt)
 		if oldBase != newBase {
@@ -411,7 +426,7 @@ func newTrashID() string {
 var trashIDPattern = regexp.MustCompile(`^\d{8}T\d{6}\.\d{3}-[0-9a-f]{8}$`)
 
 // Delete 把笔记（连同 .assets）或文件夹移入回收站
-func (v *Vault) Delete(rel string) (TrashItem, error) {
+func (v *Vault) Delete(rel string) (item TrashItem, err error) {
 	p, err := v.abs(rel)
 	if err != nil {
 		return TrashItem{}, err
@@ -428,25 +443,53 @@ func (v *Vault) Delete(rel string) (TrashItem, error) {
 	if !info.IsDir() && !IsNote(rel) {
 		return TrashItem{}, ErrInvalidPath
 	}
-	item := TrashItem{ID: newTrashID(), Path: rel, Dir: info.IsDir(), DeletedAt: time.Now().UnixMilli()}
+	item = TrashItem{ID: newTrashID(), Path: rel, Dir: info.IsDir(), DeletedAt: time.Now().UnixMilli()}
+	if !item.Dir {
+		st, statErr := os.Stat(AssetsDir(p))
+		if statErr != nil && !errors.Is(statErr, fs.ErrNotExist) {
+			return TrashItem{}, statErr
+		}
+		if statErr == nil && st.IsDir() {
+			item.Assets = filepath.Base(AssetsDir(p))
+		}
+	}
 	dir := filepath.Join(v.trash, item.ID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return TrashItem{}, err
 	}
-	if err := os.Rename(p, filepath.Join(dir, filepath.Base(p))); err != nil {
-		os.Remove(dir)
-		return TrashItem{}, err
-	}
-	if !item.Dir {
-		if st, err := os.Stat(AssetsDir(p)); err == nil && st.IsDir() {
-			item.Assets = filepath.Base(AssetsDir(p))
-			if err := os.Rename(AssetsDir(p), filepath.Join(dir, item.Assets)); err != nil {
-				return TrashItem{}, fmt.Errorf("移动图片目录到回收站失败: %w", err)
+	noteMoved := false
+	defer func() {
+		if err == nil {
+			return
+		}
+		rollbackFailed := false
+		if noteMoved {
+			if rollback := os.Rename(filepath.Join(dir, filepath.Base(p)), p); rollback != nil {
+				err = errors.Join(err, fmt.Errorf("回滚回收站笔记失败: %w", rollback))
+				rollbackFailed = true
 			}
 		}
-	}
+		// 回滚失败时保留目录和元数据，避免继续删除仅存的恢复依据。
+		if !rollbackFailed {
+			if cleanup := os.RemoveAll(dir); cleanup != nil {
+				err = errors.Join(err, cleanup)
+			}
+		}
+	}()
 	meta, _ := json.Marshal(item)
-	return item, atomicWrite(filepath.Join(dir, "meta.json"), meta)
+	if err = atomicWrite(filepath.Join(dir, "meta.json"), meta); err != nil {
+		return item, err
+	}
+	if err = os.Rename(p, filepath.Join(dir, filepath.Base(p))); err != nil {
+		return item, err
+	}
+	noteMoved = true
+	if item.Assets != "" {
+		if err = os.Rename(AssetsDir(p), filepath.Join(dir, item.Assets)); err != nil {
+			return item, fmt.Errorf("移动图片目录到回收站失败: %w", err)
+		}
+	}
+	return item, nil
 }
 
 func (v *Vault) readTrashItem(id string) (TrashItem, error) {
@@ -487,8 +530,8 @@ func (v *Vault) TrashList() ([]TrashItem, error) {
 	return items, nil
 }
 
-func (v *Vault) Restore(id string) (TrashItem, error) {
-	item, err := v.readTrashItem(id)
+func (v *Vault) Restore(id string) (item TrashItem, err error) {
+	item, err = v.readTrashItem(id)
 	if err != nil {
 		return TrashItem{}, err
 	}
@@ -513,11 +556,38 @@ func (v *Vault) Restore(id string) (TrashItem, error) {
 	if err := os.Rename(filepath.Join(dir, filepath.Base(dst)), dst); err != nil {
 		return TrashItem{}, err
 	}
+	assetsMoved, cleaning := false, false
+	defer func() {
+		if err == nil {
+			return
+		}
+		if cleaning {
+			// 清理可能已删除元数据；先重建恢复依据，再撤回本次移动。
+			if rollback := os.MkdirAll(dir, 0o755); rollback != nil {
+				err = errors.Join(err, rollback)
+				return
+			}
+			meta, _ := json.Marshal(item)
+			if rollback := atomicWrite(filepath.Join(dir, "meta.json"), meta); rollback != nil {
+				err = errors.Join(err, rollback)
+			}
+		}
+		if assetsMoved {
+			if rollback := os.Rename(AssetsDir(dst), filepath.Join(dir, item.Assets)); rollback != nil {
+				err = errors.Join(err, fmt.Errorf("回滚恢复图片失败: %w", rollback))
+			}
+		}
+		if rollback := os.Rename(dst, filepath.Join(dir, filepath.Base(dst))); rollback != nil {
+			err = errors.Join(err, fmt.Errorf("回滚恢复笔记失败: %w", rollback))
+		}
+	}()
 	if item.Assets != "" {
 		if err := os.Rename(filepath.Join(dir, item.Assets), AssetsDir(dst)); err != nil {
-			return TrashItem{}, fmt.Errorf("恢复图片目录失败: %w", err)
+			return item, fmt.Errorf("恢复图片目录失败: %w", err)
 		}
+		assetsMoved = true
 	}
+	cleaning = true
 	return item, os.RemoveAll(dir)
 }
 
@@ -558,6 +628,9 @@ func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (stri
 	dir := AssetsDir(p)
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	if err := v.checkInside(filepath.Join(dir, name)); err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
@@ -592,4 +665,4 @@ func EscapeLinkPath(s string) string {
 	return linkEscaper.Replace(s)
 }
 
-var linkEscaper = strings.NewReplacer(" ", "%20", "(", "%28", ")", "%29", "<", "%3C", ">", "%3E")
+var linkEscaper = strings.NewReplacer("%", "%25", "#", "%23", "?", "%3F", " ", "%20", "(", "%28", ")", "%29", "<", "%3C", ">", "%3E")

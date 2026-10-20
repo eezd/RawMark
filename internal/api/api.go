@@ -4,6 +4,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -359,6 +360,9 @@ func (s *Server) move(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.MoveShares(body.From, body.To); err != nil {
+		if rollback := s.vault.Move(body.To, body.From); rollback != nil {
+			err = errors.Join(err, fmt.Errorf("回滚笔记移动失败: %w", rollback))
+		}
 		internalError(w, r, err)
 		return
 	}

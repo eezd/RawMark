@@ -31,6 +31,36 @@ type fixture struct {
 	admin *http.Client
 }
 
+func TestMoveRollsBackWhenShareUpdateFails(t *testing.T) {
+	dir := t.TempDir()
+	v, err := vault.Open(filepath.Join(dir, "vault"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.Write("from.md", []byte("原文"), vault.Precondition{}); err != nil {
+		t.Fatal(err)
+	}
+	st, err := store.Open(filepath.Join(dir, "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s := New(v, nil, st, nil, nil)
+	res := httptest.NewRecorder()
+	s.move(res, httptest.NewRequest("POST", "/api/v1/move", strings.NewReader(`{"from":"from.md","to":"to.md"}`)))
+	if res.Code != 500 {
+		t.Fatalf("数据库失败应返回错误: %d", res.Code)
+	}
+	if content, _, err := v.Read("from.md"); err != nil || string(content) != "原文" {
+		t.Fatalf("原笔记未恢复: %q %v", content, err)
+	}
+	if _, err := os.Stat(filepath.Join(v.Root(), "to.md")); !os.IsNotExist(err) {
+		t.Fatalf("失败后目标仍存在: %v", err)
+	}
+}
+
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	dir := t.TempDir()

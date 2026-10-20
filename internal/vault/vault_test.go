@@ -2,6 +2,7 @@ package vault
 
 import (
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,6 +42,92 @@ func TestSymlinkEscapeRejected(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(outside, "x.md")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("仓库外出现了文件")
+	}
+}
+
+func TestAssetSymlinkEscapeRejected(t *testing.T) {
+	v := newVault(t)
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(v.Root(), "n.assets")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.SaveAsset("n.md", "x.png", strings.NewReader("image"), 100); !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("资源目录越界应被拒绝: %v", err)
+	}
+	files, err := os.ReadDir(outside)
+	if err != nil || len(files) != 0 {
+		t.Fatalf("仓库外被写入: %v %v", files, err)
+	}
+}
+
+func TestMoveRollsBackWhenAssetDestinationIsTooLong(t *testing.T) {
+	v := newVault(t)
+	if _, err := v.Write("n.md", []byte("原文"), Precondition{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.SaveAsset("n.md", "x.png", strings.NewReader("image"), 100); err != nil {
+		t.Fatal(err)
+	}
+	// 笔记名可写入，但派生的 .assets 名超过文件系统的单段长度限制。
+	destination := strings.Repeat("a", 250) + ".md"
+	if err := v.Move("n.md", destination); err == nil {
+		t.Fatal("图片目录移动应失败")
+	}
+	if content, _, err := v.Read("n.md"); err != nil || string(content) != "原文" {
+		t.Fatalf("原笔记未恢复: %q %v", content, err)
+	}
+	if _, err := os.Stat(filepath.Join(v.Root(), "n.assets")); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := v.Read(destination); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("目标笔记应撤回: %v", err)
+	}
+}
+
+func TestRestoreRollsBackWhenAssetsAreMissing(t *testing.T) {
+	v := newVault(t)
+	if _, err := v.Write("n.md", []byte("原文"), Precondition{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.SaveAsset("n.md", "x.png", strings.NewReader("image"), 100); err != nil {
+		t.Fatal(err)
+	}
+	item, err := v.Delete("n.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(v.trash, item.ID, item.Assets)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.Restore(item.ID); err == nil {
+		t.Fatal("丢失图片目录时恢复应失败")
+	}
+	if _, _, err := v.Read("n.md"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("不应留下部分恢复的笔记: %v", err)
+	}
+	items, err := v.TrashList()
+	if err != nil || len(items) != 1 {
+		t.Fatalf("回收站恢复依据未保留: %v %v", items, err)
+	}
+}
+
+func TestAssetLinksEncodeReservedURLCharacters(t *testing.T) {
+	v := newVault(t)
+	link, err := v.SaveAsset("n#?%20.md", "x.png", strings.NewReader("image"), 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := url.PathUnescape(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file, _, err := v.OpenRaw(decoded)
+	if err != nil {
+		t.Fatalf("资源链接未指向实际文件: %s %v", link, err)
+	}
+	file.Close()
+	if strings.ContainsAny(link, "#?") || !strings.HasPrefix(link, "n%23%3F%2520.assets/") {
+		t.Fatalf("链接未正确转义: %s", link)
 	}
 }
 
