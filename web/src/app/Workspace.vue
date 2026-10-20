@@ -15,7 +15,7 @@ import { noteTitle } from './paths'
 import { SIDEBAR_WIDTH, settings, updateSettings } from './settings'
 import Sidebar from './Sidebar.vue'
 import TabBar from './TabBar.vue'
-import { activeTab, flushAll, startWorkspace, stopWorkspace, toast, ws } from './workspace'
+import { activeTab, flushAll, readyToReload, startWorkspace, stopWorkspace, toast, ws } from './workspace'
 
 const emit = defineEmits<{ logout: [] }>()
 const title = computed(() => (ws.active ? noteTitle(ws.active) : 'RawMark'))
@@ -43,6 +43,10 @@ function startResize(e: PointerEvent) {
 
 async function logout() {
   await flushAll()
+  if (!readyToReload()) {
+    toast('仍有未保存内容或正在处理粘贴、上传与文件操作，请完成后再退出')
+    return
+  }
   try {
     await api.logout()
   } catch {

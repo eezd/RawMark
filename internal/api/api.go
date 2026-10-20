@@ -85,6 +85,7 @@ func (s *Server) routes() []route {
 		{"POST /api/v1/move", authed, s.move},
 		{"POST /api/v1/folders", authed, s.mkdir},
 		{"POST /api/v1/assets", authed, s.uploadAsset},
+		{"POST /api/v1/assets/import", authed, s.importAsset},
 		{"GET /api/v1/raw/{path...}", authed, s.raw},
 		{"GET /api/v1/trash", authed, s.trashList},
 		{"POST /api/v1/trash/{id}/restore", authed, s.trashRestore},

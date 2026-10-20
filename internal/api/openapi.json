@@ -790,6 +790,111 @@
         }
       }
     },
+    "/assets/import": {
+      "post": {
+        "summary": "下载公网图片到笔记的 .assets 目录",
+        "tags": [
+          "图片"
+        ],
+        "description": "仅接受公网 HTTP/HTTPS 地址，实际连接及重定向均校验；不携带登录凭据或使用环境代理。重定向链最多 5 个请求、2 次下载尝试，单次超时 10 秒；仅超时、429 和 5xx 重试。支持 PNG/JPEG/GIF/WebP，按文件签名识别，最大 50 MB。",
+        "parameters": [
+          {
+            "name": "note",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "相对笔记所在目录的图片链接",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "link": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "来源地址或笔记路径无效，或目标不是公网",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "所属笔记不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "图片超过 50 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "不支持的图片类型",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "来源请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/raw/{path}": {
       "parameters": [
         {

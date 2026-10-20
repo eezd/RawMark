@@ -188,21 +188,23 @@ function buildState(path: string, doc: string): EditorState {
       }),
       pasteImages({
         upload: (file) => api.upload(ref.path, file),
-        replace: (text, replacement) => {
+        importImage: (url) => api.importImage(ref.path, url),
+        update: (change) => {
           const shown = view?.state.facet(notePath) === ref
           const state = shown ? view!.state : editorStates.get(ref.path)
-          if (!state) throw new Error('上传所属笔记的编辑状态不存在')
-          const at = state.doc.toString().indexOf(text)
-          if (at < 0) return // 用户已删除占位
-          const spec = { changes: { from: at, to: at + text.length, insert: replacement } }
+          if (!state) throw new Error('粘贴所属笔记的编辑状态不存在')
+          const spec = change(state)
+          if (!spec) return
           if (shown) view!.dispatch(spec)
           else {
-            editorStates.set(ref.path, state.update(spec).state)
-            scheduleSave(ref.path)
+            const transaction = state.update(spec)
+            editorStates.set(ref.path, transaction.state)
+            if (transaction.docChanged) scheduleSave(ref.path)
           }
         },
-        onError: (err) => toast('图片上传失败：' + errorText(err)),
+        onError: (err) => toast('粘贴或图片导入失败：' + (err instanceof Error ? err.message : errorText(err))),
         onPending: (d) => {
+          if (d === 1 && slot(ref.path).uploads === 0) toast('正在处理粘贴或图片导入…')
           slot(ref.path).uploads += d
         },
       }),
@@ -911,6 +913,9 @@ export async function startWorkspace() {
     if (document.visibilityState === 'hidden') void flushAll(true)
   })
   window.addEventListener('pagehide', () => void flushAll(true))
+  window.addEventListener('beforeunload', (event) => {
+    if (!readyToReload()) event.preventDefault()
+  })
   window.addEventListener('keydown', handleShortcut)
   // 软键盘弹出、编辑区变矮后，让光标保持可见
   trackVisualViewport(() => {

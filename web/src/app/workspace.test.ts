@@ -6,7 +6,7 @@ import { api, ApiError } from './api'
 import { drafts, type Draft } from './drafts'
 import { connectEvents } from './events'
 import { pluginEvents } from '../plugins/registry'
-import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, openNote, startWorkspace, stopWorkspace, ws } from './workspace'
+import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, openNote, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
 
 vi.mock('./events', () => ({ connectEvents: vi.fn(() => () => {}) }))
 
@@ -134,6 +134,32 @@ describe('保存与关闭', () => {
     expect(contents).toEqual(['请求发出时', '等待期间又输入'])
     expect(tab.dirty).toBe(false)
     await closeTab('race.md')
+  })
+
+  it('网页图片导入期间切换标签，转换内容仍保存到原笔记', async () => {
+    const v = await edit('网页.md')
+    vi.spyOn(drafts, 'put').mockImplementation(async (draft) => draft.path)
+    const contents = new Map<string, string>()
+    vi.spyOn(api, 'writeFile').mockImplementation(async (path, content) => { contents.set(path, content); return 'r2' })
+    let finish!: (link: string) => void
+    vi.spyOn(api, 'importImage').mockImplementation(() => new Promise<string>((resolve) => { finish = resolve }))
+    const data = new DataTransfer()
+    data.setData('text/plain', '网页标题')
+    data.setData('text/html', '<h1>网页标题</h1><img src="https://example.com/a.png">')
+    v.contentDOM.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+    expect(await closeTab('网页.md')).toBe(false)
+    await openNote('other.md')
+    storeViewState('网页.md', v.state)
+    v.setState(editorStateOf('other.md')!)
+    finish('网页.assets/hash.png')
+    await vi.waitFor(() => expect(editorStateOf('网页.md')!.doc.toString()).toContain('网页.assets/hash.png'))
+    await flush('网页.md')
+    expect(contents.get('网页.md')).toContain('# 网页标题')
+    expect(contents.get('网页.md')).toContain('网页.assets/hash.png')
+    expect(v.state.doc.toString()).toBe('原文')
+    await closeTab('网页.md')
+    await closeTab('other.md')
   })
 
   it('切换标签后上传结果仍写回原笔记，上传期间不能关闭', async () => {

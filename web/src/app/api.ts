@@ -159,6 +159,9 @@ export const api = {
     return (await json<{ link: string }>(request('POST', '/api/v1/assets?note=' + encodeURIComponent(note), { body: form }))).link
   },
 
+  importImage: async (note: string, url: string): Promise<string> =>
+    (await json<{ link: string }>(request('POST', '/api/v1/assets/import?note=' + encodeURIComponent(note), { json: { url } }))).link,
+
   shares: async (path?: string) =>
     (await json<{ shares: Share[] }>(request('GET', '/api/v1/shares' + (path ? '?path=' + encodeURIComponent(path) : '')))).shares,
   // expiresIn 为有效时长（秒），0 为永久
