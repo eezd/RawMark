@@ -65,6 +65,14 @@ describe('安全模式', () => {
 })
 
 describe('Typora 扩展', () => {
+  it('任务列表保留嵌套列表和后续段落，正确处理松散与紧凑列表', () => {
+    expect(normalize(renderMarkdown('- [ ] 父任务\n  - 子任务\n\n  后续说明\n'))).toBe(normalize(
+      '<ul><li><p><input type="checkbox" disabled="" /> 父任务</p><ul><li>子任务</li></ul><p>后续说明</p></li></ul>',
+    ))
+    expect(normalize(renderMarkdown('- [x] 已完成\n  - [ ] 子任务\n- [ ] 下一项\n'))).toBe(normalize(
+      '<ul><li><input type="checkbox" disabled="" checked="" /> 已完成\n<ul><li><input type="checkbox" disabled="" /> 子任务</li></ul></li><li><input type="checkbox" disabled="" /> 下一项</li></ul>',
+    ))
+  })
   it('高亮、上下标、脚注引用', () => {
     expect(renderMarkdown('==a== x^2^ H~2~O[^1]')).toBe('<p><mark>a</mark> x<sup>2</sup> H<sub>2</sub>O<sup class="footnote-ref"><a href="#fn-1">1</a></sup></p>\n')
   })

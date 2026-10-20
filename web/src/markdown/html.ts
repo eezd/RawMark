@@ -362,7 +362,7 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
   function blockChildren(node: SyntaxNode, withDefinitions = false): SyntaxNode[] {
     const out: SyntaxNode[] = []
     for (let ch = node.firstChild; ch; ch = ch.nextSibling) {
-      if (/Mark$/.test(ch.name) || ch.name === 'Task') continue
+      if (/Mark$/.test(ch.name)) continue
       if (ch.name !== 'LinkReference' || withDefinitions) out.push(ch)
     }
     return out
@@ -401,6 +401,12 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
     switch (name) {
       case 'Paragraph': {
         const body = inline(node, node.from, node.to).trim()
+        return tight ? body + '\n' : `<p>${body}</p>\n`
+      }
+      case 'Task': {
+        const marker = node.getChild('TaskMarker')!
+        const checked = text(marker.from + 1, marker.from + 2) !== ' ' ? ' checked=""' : ''
+        const body = `<input type="checkbox" disabled=""${checked} /> ${inline(node, marker.to, node.to).trim()}`
         return tight ? body + '\n' : `<p>${body}</p>\n`
       }
       case 'Blockquote':
@@ -467,18 +473,12 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
 
   function listItem(item: SyntaxNode, tight: boolean): string {
     const kids = blockChildren(item)
-    const task = item.getChild('Task')
-    if (task) {
-      const marker = task.getChild('TaskMarker')!
-      const checked = text(marker.from + 1, marker.from + 2) !== ' ' ? ' checked=""' : ''
-      const body = inline(task, marker.to, task.to).trim()
-      return `<li><input type="checkbox" disabled=""${checked} /> ${body}</li>\n`
-    }
     if (!kids.length) return '<li></li>\n'
     let body = ''
     for (const k of kids) body += block(k, tight)
-    const startsInline = tight && kids[0].name === 'Paragraph'
-    const endsInline = tight && kids[kids.length - 1].name === 'Paragraph'
+    const startsInline = tight && (kids[0].name === 'Paragraph' || kids[0].name === 'Task')
+    const last = kids[kids.length - 1].name
+    const endsInline = tight && (last === 'Paragraph' || last === 'Task')
     if (!startsInline) body = '\n' + body
     if (endsInline) body = body.replace(/\n$/, '')
     return `<li>${body}</li>\n`

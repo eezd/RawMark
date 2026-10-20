@@ -1,4 +1,4 @@
-// 订阅服务端的仓库变更事件；断线后指数退避重连，重连成功时触发全量同步
+// 订阅服务端的仓库变更事件；断线后指数退避重连，每次连接成功时触发全量同步
 
 export interface VaultEvent {
   type: 'tree' | 'changed' | 'deleted' | 'moved' | 'settings' | 'plugins'
@@ -12,16 +12,14 @@ export function connectEvents(handlers: { onEvents: (evs: VaultEvent[]) => void;
   let delay = 1000
   let timer: ReturnType<typeof setTimeout> | undefined
   let stopped = false
-  let connectedBefore = false
 
   const connect = () => {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     ws = new WebSocket(`${proto}//${location.host}/api/v1/events`)
     ws.onopen = () => {
       delay = 1000
-      // 首次连接前的状态由初始化加载，之后每次重连都可能错过事件
-      if (connectedBefore) handlers.onResync()
-      connectedBefore = true
+      // 初始化读取到首次订阅之间也存在空窗，每次建立连接都补同步。
+      handlers.onResync()
     }
     ws.onmessage = (e) => handlers.onEvents(JSON.parse(e.data))
     ws.onclose = () => {
