@@ -1,4 +1,4 @@
-// 未成功保存到服务器的内容暂存在 IndexedDB，刷新页面或断网都不会丢失
+// 未成功保存到服务器的内容暂存在 IndexedDB，供下次启动时恢复
 
 export interface Draft {
   path: string
@@ -21,10 +21,11 @@ function db(): Promise<IDBDatabase> {
 }
 
 async function tx<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  const store = (await db()).transaction('drafts', mode).objectStore('drafts')
+  const transaction = (await db()).transaction('drafts', mode)
   return new Promise((resolve, reject) => {
-    const req = fn(store)
-    req.onsuccess = () => resolve(req.result)
+    const req = fn(transaction.objectStore('drafts'))
+    transaction.oncomplete = () => resolve(req.result)
+    transaction.onabort = () => reject(transaction.error ?? new Error('本地草稿事务已中止'))
     req.onerror = () => reject(req.error)
   })
 }

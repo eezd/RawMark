@@ -188,6 +188,19 @@ function buildState(path: string, doc: string): EditorState {
       }),
       pasteImages({
         upload: (file) => api.upload(ref.path, file),
+        replace: (text, replacement) => {
+          const shown = view?.state.facet(notePath) === ref
+          const state = shown ? view!.state : editorStates.get(ref.path)
+          if (!state) throw new Error('上传所属笔记的编辑状态不存在')
+          const at = state.doc.toString().indexOf(text)
+          if (at < 0) return // 用户已删除占位
+          const spec = { changes: { from: at, to: at + text.length, insert: replacement } }
+          if (shown) view!.dispatch(spec)
+          else {
+            editorStates.set(ref.path, state.update(spec).state)
+            scheduleSave(ref.path)
+          }
+        },
         onError: (err) => toast('图片上传失败：' + errorText(err)),
         onPending: (d) => {
           slot(ref.path).uploads += d
@@ -357,19 +370,29 @@ export async function keepLocalVersion(path: string) {
   const tab = tabOf(path)
   const content = docOf(path)
   if (!tab || content === undefined) return
-  try {
-    const rev = await api.writeFile(path, content, tab.conflictRev ?? '')
-    const s = slot(path)
-    s.savedSeq = s.seq
-    Object.assign(tab, { rev, status: 'ready', dirty: false, conflictRev: undefined, saveError: undefined })
-    await drafts.delete(path)
-    if (!ws.entries.some((e) => e.path === path)) void refreshTree()
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 412) {
-      tab.conflictRev = typeof err.data.rev === 'string' ? err.data.rev : ''
-      toast('服务器上的版本又变化了，请再次选择')
-    } else toast('保存失败：' + errorText(err))
+  const s = slot(path)
+  if (s.inflight || s.uploads || s.paused) {
+    toast('笔记正在保存、上传或移动，请完成后再处理冲突')
+    return
   }
+  const seq = s.seq
+  s.inflight = (async () => {
+    try {
+      const rev = await api.writeFile(path, content, tab.conflictRev ?? '')
+      s.savedSeq = seq
+      Object.assign(tab, { rev, status: 'ready', dirty: s.seq !== seq, conflictRev: undefined, saveError: undefined })
+      if (s.seq === seq) await drafts.delete(path)
+      if (!ws.entries.some((e) => e.path === path)) void refreshTree()
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 412) {
+        tab.conflictRev = typeof err.data.rev === 'string' ? err.data.rev : ''
+        toast('服务器上的版本又变化了，请再次选择')
+      } else toast('保存失败：' + errorText(err))
+    }
+  })()
+  await s.inflight
+  s.inflight = undefined
+  if (tab.dirty && tab.status === 'ready') void flush(path)
 }
 
 // ---- 打开并聚焦（快速切换、搜索结果跳转） ----
@@ -435,18 +458,39 @@ export async function openNote(path: string) {
   }
 }
 
-export async function closeTab(path: string) {
+export async function closeTab(path: string): Promise<boolean> {
+  const busy = () => Boolean(slots.get(path)?.uploads || slots.get(path)?.paused)
+  if (busy()) {
+    toast('笔记正在上传或移动，完成后再关闭')
+    return false
+  }
   await flush(path)
   const i = ws.tabs.findIndex((t) => t.path === path)
-  if (i < 0) return
+  if (i < 0) return true
   const tab = ws.tabs[i]
-  if (tab.dirty && tab.status !== 'ready') {
-    // 冲突或已删除且有未保存修改：草稿保留在本地，下次打开时可恢复
+  if (busy()) {
+    toast('笔记正在上传或移动，完成后再关闭')
+    return false
+  }
+  if (tab.dirty) {
+    const seq = slot(path).seq
+    const content = docOf(path)
+    if (content === undefined) throw new Error('未保存笔记的编辑状态不存在')
+    try {
+      await drafts.put({ path, content, baseRev: tab.rev, updatedAt: Date.now() })
+    } catch (err) {
+      toast('本地草稿保存失败，已保留标签页：' + errorText(err))
+      return false
+    }
+    if (tabOf(path) !== tab || slot(path).seq !== seq || busy()) return false
     toast('未保存的修改已保留为本地草稿')
   }
-  ws.tabs.splice(i, 1)
+  const index = ws.tabs.indexOf(tab)
+  if (index < 0) return true
+  ws.tabs.splice(index, 1)
   forget(path)
-  if (ws.active === path) ws.active = ws.tabs[Math.min(i, ws.tabs.length - 1)]?.path ?? null
+  if (ws.active === path) ws.active = ws.tabs[Math.min(index, ws.tabs.length - 1)]?.path ?? null
+  return true
 }
 
 function forget(path: string) {
@@ -683,7 +727,9 @@ export async function remove(path: string) {
     await Promise.all(paths.map((p) => flush(p)))
     const snapshot = ws.entries
     ws.entries = ws.entries.filter((e) => remapPath(e.path, path, path) === null) // 去掉自身及其下所有条目
-    for (const p of paths) await closeTab(p)
+    for (const p of paths) {
+      if (!(await closeTab(p))) { ws.entries = snapshot; return }
+    }
     try {
       const item = await api.deleteFile(path)
       toast(`已删除“${basename(path).replace(/\.md$/, '')}”`, {

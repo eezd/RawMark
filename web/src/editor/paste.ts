@@ -4,6 +4,8 @@ import { EditorView } from '@codemirror/view'
 export interface PasteImagesOptions {
   // 上传文件，返回写入 Markdown 的链接
   upload: (file: File) => Promise<string>
+  // 按笔记身份修改占位，上传结束时该笔记可能已切到后台
+  replace: (text: string, replacement: string) => void
   onError: (err: unknown) => void
   // 上传开始/结束，供保存队列在上传期间暂缓保存（避免把临时的 blob: 地址写入文件）
   onPending: (delta: 1 | -1) => void
@@ -33,9 +35,9 @@ export function insertImageFiles(view: EditorView, files: File[], pos?: number):
     opts.onPending(1)
     opts
       .upload(file)
-      .then((link) => replaceUrl(view, urls[i], link))
+      .then((link) => opts.replace(urls[i], link))
       .catch((err) => {
-        removePlaceholder(view, urls[i])
+        opts.replace(`![](${urls[i]})`, '')
         opts.onError(err)
       })
       .finally(() => {
@@ -70,16 +72,4 @@ export function pasteImages(opts: PasteImagesOptions): Extension {
       },
     }),
   ]
-}
-
-// 占位可能已被用户编辑移动，按 blob 地址在当前文档中查找
-function replaceUrl(view: EditorView, url: string, link: string) {
-  const at = view.state.doc.toString().indexOf(url)
-  if (at >= 0) view.dispatch({ changes: { from: at, to: at + url.length, insert: link } })
-}
-
-function removePlaceholder(view: EditorView, url: string) {
-  const placeholder = `![](${url})`
-  const at = view.state.doc.toString().indexOf(placeholder)
-  if (at >= 0) view.dispatch({ changes: { from: at, to: at + placeholder.length, insert: '' } })
 }
