@@ -150,7 +150,7 @@ function onDrop(e: DragEvent) {
         </template>
         <button @click="runMenu('rename')"><Icon name="edit" />重命名</button>
         <button @click="runMenu('move')"><Icon name="folder" />移动到…</button>
-        <button v-if="!node.dir" @click="runMenu('share')"><Icon name="link" />分享</button>
+        <button @click="runMenu('share')"><Icon name="link" />分享</button>
         <button class="danger" @click="runMenu('delete')"><Icon name="trash" />删除</button>
       </div>
       <div v-if="menuOpen" class="rm-menu-backdrop" @click.stop="menuOpen = false" @contextmenu.prevent.stop="menuOpen = false" />

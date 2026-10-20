@@ -43,7 +43,7 @@ export interface Share {
   // 0 为永久
   expiresAt: number
   hasPassword: boolean
-  // 笔记是否仍存在
+  // 分享的文件或文件夹是否仍存在
   exists: boolean
 }
 

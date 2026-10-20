@@ -9,6 +9,10 @@
 }
 
 .rm-share-message { margin-top: 30vh; text-align: center; color: var(--rm-text-muted); }
+.rm-share-nav { margin-bottom: 16px; color: var(--rm-text-muted); }
+.rm-share-nav a, .rm-share-files a { color: var(--rm-accent-strong); }
+.rm-share-files { list-style: none; padding: 0; }
+.rm-share-files li { margin: 8px 0; }
 
 .rm-share-password { display: flex; flex-direction: column; gap: 12px; max-width: 300px; margin: 25vh auto 0; }
 .rm-share-password p { margin: 0; }

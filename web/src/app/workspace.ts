@@ -783,7 +783,7 @@ async function handleEvents(evs: VaultEvent[]) {
       // 自己保存产生的事件 rev 与本地一致；有本地修改时不覆盖，交由下次保存的冲突检测处理
       if (tab && tab.rev !== ev.rev) await syncOpenTab(tab)
     } else if (ev.type === 'moved') {
-      if (tabOf(ev.from!) && !tabOf(ev.path!)) remapOpenNotes(ev.from!, ev.path!)
+      if (affected(ev.from!).length && !affected(ev.path!).length) remapOpenNotes(ev.from!, ev.path!)
       remapRecent(ev.from!, ev.path!)
     } else if (ev.type === 'deleted') {
       const tab = tabOf(ev.path!)

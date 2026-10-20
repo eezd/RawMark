@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"mime"
 	"net/http"
 	"path"
 	"strings"
@@ -25,7 +26,7 @@ const shareCookieTTL = 30 * 24 * time.Hour
 type shareView struct {
 	store.Share
 	HasPassword bool `json:"hasPassword"`
-	// 笔记是否仍存在（被删除或在外部改名后为 false）
+	// 分享主体是否仍存在。
 	Exists bool `json:"exists"`
 }
 
@@ -62,8 +63,8 @@ func (s *Server) createShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, err := vault.CleanPath(body.Path)
-	if err != nil || !vault.IsNote(p) {
-		writeError(w, 400, "只能分享笔记")
+	if err != nil {
+		writeError(w, 400, "分享路径无效")
 		return
 	}
 	if _, err := s.vault.Stat(p); err != nil {
@@ -76,7 +77,7 @@ func (s *Server) createShare(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	sh := store.Share{
-		Token:        strings.TrimSuffix(path.Base(p), vault.NoteExt) + "-" + auth.NewShareToken(),
+		Token:        auth.NewShareToken(),
 		Path:         p,
 		PasswordHash: auth.HashSharePassword(body.Password),
 		CreatedAt:    now.UnixMilli(),
@@ -147,19 +148,10 @@ func (s *Server) loadShare(token string) (store.Share, bool, error) {
 	return sh, true, nil
 }
 
-// publicShare 返回笔记标题与当前内容（不含所在目录，避免泄露仓库结构）
+// publicShare 只公开主体本身或分享目录内的内容，不返回主体在仓库中的路径。
 func (s *Server) publicShare(w http.ResponseWriter, r *http.Request) {
 	sh, ok := s.openShare(w, r)
 	if !ok {
-		return
-	}
-	data, _, err := s.vault.Read(sh.Path)
-	if errors.Is(err, vault.ErrNotFound) {
-		writeError(w, 404, "分享的笔记已不存在")
-		return
-	}
-	if err != nil {
-		internalError(w, r, err)
 		return
 	}
 	info, err := s.vault.Stat(sh.Path)
@@ -167,10 +159,44 @@ func (s *Server) publicShare(w http.ResponseWriter, r *http.Request) {
 		vaultError(w, r, err)
 		return
 	}
+	p := sh.Path
+	if rel := r.URL.Query().Get("path"); rel != "" {
+		if !info.IsDir() {
+			writeError(w, 404, "文件不存在")
+			return
+		}
+		p, err = s.vault.ScopedPath(sh.Path, rel)
+		if err == nil {
+			info, err = s.vault.Stat(p)
+		}
+		if err != nil {
+			vaultError(w, r, err)
+			return
+		}
+	}
+	if info.IsDir() {
+		entries, err := s.vault.TreeAt(p)
+		if err != nil {
+			vaultError(w, r, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"title": path.Base(p), "dir": true, "entries": entries})
+		return
+	}
+	if !vault.IsNote(p) {
+		writeJSON(w, 200, map[string]any{"title": path.Base(p), "dir": false})
+		return
+	}
+	data, _, err := s.vault.Read(p)
+	if err != nil {
+		vaultError(w, r, err)
+		return
+	}
 	writeJSON(w, 200, map[string]any{
-		"title":     strings.TrimSuffix(path.Base(sh.Path), vault.NoteExt),
+		"title":     strings.TrimSuffix(path.Base(p), vault.NoteExt),
 		"content":   string(data),
 		"updatedAt": info.ModTime().UnixMilli(),
+		"dir":       false,
 	})
 }
 
@@ -223,18 +249,40 @@ func (s *Server) unlockShare(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
-// publicShareAsset 输出分享笔记中的图片：路径相对笔记所在目录，且只能是该笔记 .assets 目录内的文件
+// publicShareAsset 提供主体允许范围内的普通文件；单文件分享额外允许其 .assets。
 func (s *Server) publicShareAsset(w http.ResponseWriter, r *http.Request) {
 	sh, ok := s.openShare(w, r)
 	if !ok {
 		return
 	}
-	rel := path.Join(path.Dir(sh.Path), r.PathValue("path"))
-	if !strings.HasPrefix(rel, vault.AssetsDir(sh.Path)+"/") {
-		writeError(w, 404, "文件不存在")
+	info, err := s.vault.Stat(sh.Path)
+	if err != nil {
+		vaultError(w, r, err)
 		return
 	}
-	s.serveRaw(w, r, rel)
+	rel := r.PathValue("path")
+	var target string
+	if info.IsDir() {
+		target, err = s.vault.ScopedPath(sh.Path, rel)
+	} else if rel == "" {
+		target = sh.Path
+	} else {
+		assets := vault.AssetsDir(sh.Path)
+		prefix := path.Base(assets) + "/"
+		if !vault.IsNote(sh.Path) || !strings.HasPrefix(rel, prefix) {
+			writeError(w, 404, "文件不存在")
+			return
+		}
+		target, err = s.vault.ScopedPath(assets, strings.TrimPrefix(rel, prefix))
+	}
+	if err != nil {
+		vaultError(w, r, err)
+		return
+	}
+	if r.URL.Query().Get("download") == "1" {
+		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": path.Base(target)}))
+	}
+	s.serveRaw(w, r, target)
 }
 
 // FollowMoves 让分享跟随在外部（如 Typora）完成的改名与移动；经 API 的移动已在 move 接口中处理，

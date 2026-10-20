@@ -20,6 +20,28 @@ afterEach(() => {
 })
 
 describe('事件同步', () => {
+  it('目录移动映射整个已打开的子树，并把未保存输入写入新路径', async () => {
+    const tree = vi.spyOn(api, 'tree').mockResolvedValue([{ path: 'from/note.md', dir: false, size: 0, mtime: 0 }])
+    vi.spyOn(api, 'settings').mockResolvedValue({})
+    vi.spyOn(api, 'plugins').mockResolvedValue([])
+    vi.spyOn(drafts, 'all').mockResolvedValue([])
+    vi.spyOn(drafts, 'put').mockImplementation(async (draft) => draft.path)
+    const saved = new Map<string, string>()
+    vi.spyOn(api, 'writeFile').mockImplementation(async (path, content) => { saved.set(path, content); return 'r2' })
+    await startWorkspace()
+    const v = await edit('from/note.md')
+    v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: '尚未保存的输入' } })
+    tree.mockResolvedValue([{ path: 'to/note.md', dir: false, size: 0, mtime: 0 }])
+    vi.mocked(connectEvents).mock.lastCall![0].onEvents([{ type: 'moved', from: 'from', path: 'to' }, { type: 'tree' }])
+    await vi.waitFor(() => expect(ws.active).toBe('to/note.md'))
+    expect(editorStateOf('from/note.md')).toBeUndefined()
+    expect(editorStateOf('to/note.md')!.doc.toString()).toBe('尚未保存的输入')
+    await flush('to/note.md')
+    expect(saved.get('to/note.md')).toBe('尚未保存的输入')
+    expect(saved.has('from/note.md')).toBe(false)
+    await closeTab('to/note.md')
+  })
+
   it('正文同步后才通知插件，同步失败时不广播成功且不阻塞后续批次', async () => {
     const entries = [{ path: 'sync.md', dir: false, size: 0, mtime: 0 }]
     vi.spyOn(api, 'tree').mockResolvedValue(entries)

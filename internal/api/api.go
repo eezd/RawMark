@@ -355,16 +355,21 @@ func (s *Server) move(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &body) {
 		return
 	}
-	if err := s.vault.Move(body.From, body.To); err != nil {
+	rewritten, err := s.vault.Move(body.From, body.To)
+	if err != nil {
 		vaultError(w, r, err)
 		return
 	}
 	if err := s.store.MoveShares(body.From, body.To); err != nil {
-		if rollback := s.vault.Move(body.To, body.From); rollback != nil {
+		if _, rollback := s.vault.Move(body.To, body.From); rollback != nil {
 			err = errors.Join(err, fmt.Errorf("回滚笔记移动失败: %w", rollback))
 		}
 		internalError(w, r, err)
 		return
+	}
+	if rewritten {
+		// 原子改写替换了文件身份，监听器无法再从快照中识别这次移动。
+		s.hub.Broadcast(events.Event{Type: "moved", From: body.From, Path: body.To}, events.Event{Type: "tree"})
 	}
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }

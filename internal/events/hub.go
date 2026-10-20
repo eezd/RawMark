@@ -12,7 +12,7 @@ import (
 //	tree     目录结构变化（新增/删除/移动），客户端重新拉取目录树
 //	changed  笔记内容变化，Rev 为新版本
 //	deleted  笔记被删除
-//	moved    笔记被移动（From -> Path），内容版本不变
+//	moved    文件或目录被移动（From -> Path），目录事件包含其子项的路径映射
 //	settings 应用设置变化，客户端重新读取
 type Event struct {
 	Type string `json:"type"`

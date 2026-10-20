@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -26,6 +28,7 @@ type fileState struct {
 	size  int64
 	mtime int64
 	rev   string
+	info  os.FileInfo
 }
 
 type Watcher struct {
@@ -102,8 +105,17 @@ func (w *Watcher) rescan() {
 func notes(snap map[string]fileState) map[string]string {
 	out := make(map[string]string, len(snap))
 	for p, st := range snap {
-		if !st.dir {
-			out[p] = st.rev
+		if !st.dir && vault.IsNote(p) {
+			visible := true
+			for _, segment := range strings.Split(p, "/") {
+				if strings.HasSuffix(segment, vault.AssetsExt) {
+					visible = false
+					break
+				}
+			}
+			if visible {
+				out[p] = st.rev
+			}
 		}
 	}
 	return out
@@ -111,25 +123,27 @@ func notes(snap map[string]fileState) map[string]string {
 
 // scan 读取当前目录树；内容版本只对新出现或大小/修改时间变化的文件重新计算
 func (w *Watcher) scan() (map[string]fileState, error) {
-	entries, err := w.v.Tree()
+	entries, err := w.v.TreeAt("")
 	if err != nil {
 		return nil, err
 	}
 	next := make(map[string]fileState, len(entries))
 	dirs := map[string]bool{w.v.Root(): true}
 	for _, e := range entries {
-		st := fileState{dir: e.Dir, size: e.Size, mtime: e.ModTime}
+		st := fileState{dir: e.Dir, size: e.Size, mtime: e.Info.ModTime().UnixNano(), info: e.Info}
 		abs := filepath.Join(w.v.Root(), filepath.FromSlash(e.Path))
 		if e.Dir {
 			dirs[abs] = true
-		} else if old, ok := w.snap[e.Path]; ok && !old.dir && old.size == st.size && old.mtime == st.mtime {
-			st.rev = old.rev
-		} else {
-			data, err := os.ReadFile(abs)
-			if err != nil {
-				continue // 扫描期间被删除，下一轮会处理
+		} else if vault.IsNote(e.Path) {
+			if old, ok := w.snap[e.Path]; ok && !old.dir && old.size == st.size && old.mtime == st.mtime && os.SameFile(old.info, st.info) {
+				st.rev = old.rev
+			} else {
+				data, err := os.ReadFile(abs)
+				if err != nil {
+					continue // 扫描期间被删除，下一轮会处理
+				}
+				st.rev = vault.Rev(data)
 			}
-			st.rev = vault.Rev(data)
 		}
 		next[e.Path] = st
 	}
@@ -150,28 +164,36 @@ func (w *Watcher) scan() (map[string]fileState, error) {
 	return next, nil
 }
 
-// diff 比较两次快照：内容相同的"删除 + 新增"视为移动
+// diff 按文件系统身份识别移动，内容相同不代表同一个分享主体。
 func diff(prev, next map[string]fileState) []events.Event {
 	var evs []events.Event
 	structural := false
-	removed := map[string][]string{} // rev -> 被删除的路径（内容相同的文件可能有多个）
+	removed := map[string]fileState{}
 	for p, old := range prev {
 		if _, ok := next[p]; ok {
 			continue
 		}
 		structural = true
-		if !old.dir {
-			removed[old.rev] = append(removed[old.rev], p)
-		}
+		removed[p] = old
 	}
+	candidates := map[string]string{} // 新路径 -> 唯一的原路径
+	destinations := map[string]int{}
 	for p, cur := range next {
 		old, existed := prev[p]
 		switch {
 		case !existed:
 			structural = true
-			if froms := removed[cur.rev]; len(froms) > 0 && !cur.dir {
-				removed[cur.rev] = froms[1:]
-				evs = append(evs, events.Event{Type: "moved", From: froms[0], Path: p, Rev: cur.rev})
+			from := ""
+			matches := 0
+			for oldPath, old := range removed {
+				if os.SameFile(old.info, cur.info) {
+					from = oldPath
+					matches++
+				}
+			}
+			if matches == 1 {
+				candidates[p] = from
+				destinations[from]++
 			}
 		case old.dir != cur.dir:
 			structural = true
@@ -179,10 +201,29 @@ func diff(prev, next map[string]fileState) []events.Event {
 			evs = append(evs, events.Event{Type: "changed", Path: p, Rev: cur.rev})
 		}
 	}
-	for _, paths := range removed {
-		for _, p := range paths {
-			evs = append(evs, events.Event{Type: "deleted", Path: p})
+	var moves []events.Event
+	for to, from := range candidates {
+		if destinations[from] == 1 {
+			delete(removed, from)
+			moves = append(moves, events.Event{Type: "moved", From: from, Path: to, Rev: next[to].rev})
 		}
+	}
+	sort.Slice(moves, func(i, j int) bool { return len(moves[i].From) < len(moves[j].From) })
+	var emitted []events.Event
+	for _, move := range moves {
+		for _, parent := range emitted {
+			if strings.HasPrefix(move.From, parent.From+"/") {
+				move.From = parent.Path + strings.TrimPrefix(move.From, parent.From)
+			}
+		}
+		// 先应用父目录映射；子项另有改名时，从映射后的路径继续移动。
+		if move.From != move.Path {
+			emitted = append(emitted, move)
+		}
+	}
+	evs = append(emitted, evs...)
+	for p := range removed {
+		evs = append(evs, events.Event{Type: "deleted", Path: p})
 	}
 	if structural {
 		evs = append(evs, events.Event{Type: "tree"})

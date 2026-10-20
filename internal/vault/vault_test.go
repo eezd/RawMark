@@ -70,7 +70,7 @@ func TestMoveRollsBackWhenAssetDestinationIsTooLong(t *testing.T) {
 	}
 	// 笔记名可写入，但派生的 .assets 名超过文件系统的单段长度限制。
 	destination := strings.Repeat("a", 250) + ".md"
-	if err := v.Move("n.md", destination); err == nil {
+	if _, err := v.Move("n.md", destination); err == nil {
 		t.Fatal("图片目录移动应失败")
 	}
 	if content, _, err := v.Read("n.md"); err != nil || string(content) != "原文" {
@@ -170,8 +170,8 @@ func TestMoveCarriesAssetsAndRewritesLinks(t *testing.T) {
 	if !strings.HasPrefix(link, "笔记%20A.assets/") {
 		t.Fatalf("资源链接不符: %s", link)
 	}
-	if err := v.Move("dir/笔记 A.md", "other/B.md"); err != nil {
-		t.Fatal(err)
+	if rewritten, err := v.Move("dir/笔记 A.md", "other/B.md"); err != nil || !rewritten {
+		t.Fatalf("应报告正文改写: %v %v", rewritten, err)
 	}
 	data, _, err := v.Read("other/B.md")
 	if err != nil {
@@ -184,7 +184,7 @@ func TestMoveCarriesAssetsAndRewritesLinks(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(v.Root(), "other", "B.assets", strings.TrimPrefix(link, "笔记%20A.assets/"))); err != nil {
 		t.Fatal("图片目录未随笔记移动:", err)
 	}
-	if err := v.Move("other", "other/sub"); !errors.Is(err, ErrInvalidPath) {
+	if _, err := v.Move("other", "other/sub"); !errors.Is(err, ErrInvalidPath) {
 		t.Fatal("文件夹移入自身应被拒绝")
 	}
 }

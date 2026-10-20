@@ -1046,7 +1046,7 @@
         }
       },
       "post": {
-        "summary": "创建只读分享",
+        "summary": "创建文件或文件夹的只读分享",
         "tags": [
           "分享"
         ],
@@ -1063,7 +1063,8 @@
                 "type": "object",
                 "properties": {
                   "path": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "仓库内的文件或文件夹；文件夹递归公开当前所有普通文件和子目录，含后续新增或移入的内容"
                   },
                   "password": {
                     "type": "string",
@@ -1083,7 +1084,7 @@
         },
         "responses": {
           "200": {
-            "description": "新分享，token 为文件名（不含 .md）加连字符和随机字符，访问地址为 /s/{URL 编码后的 token}；文件移动或改名不改变已生成的链接",
+            "description": "新分享，token 为 128 位随机数的 URL 安全编码，访问地址为 /s/{token}；移动分享主体不改变链接",
             "content": {
               "application/json": {
                 "schema": {
@@ -1093,7 +1094,7 @@
             }
           },
           "400": {
-            "description": "不是笔记",
+            "description": "路径或参数无效",
             "content": {
               "application/json": {
                 "schema": {
@@ -1314,10 +1315,18 @@
           "schema": {
             "type": "string"
           }
+        },
+        {
+          "name": "path",
+          "in": "query",
+          "description": "文件夹分享中相对主体的子路径；省略时读取主体本身，不允许跳出分享范围",
+          "schema": {
+            "type": "string"
+          }
         }
       ],
       "get": {
-        "summary": "访客读取分享的笔记",
+        "summary": "访客读取分享主体或其目录中的当前内容",
         "tags": [
           "分享（公开）"
         ],
@@ -1326,7 +1335,7 @@
         ],
         "responses": {
           "200": {
-            "description": "笔记",
+            "description": "目录返回 dir=true 及递归 entries（路径相对此目录）；Markdown 返回 dir=false、content 与 updatedAt；其他文件返回 dir=false，内容经 assets 接口读取或下载",
             "content": {
               "application/json": {
                 "schema": {
@@ -1340,6 +1349,15 @@
                     },
                     "updatedAt": {
                       "type": "integer"
+                    },
+                    "dir": {
+                      "type": "boolean"
+                    },
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Entry"
+                      }
                     }
                   }
                 }
@@ -1365,7 +1383,7 @@
             }
           },
           "404": {
-            "description": "分享不存在、已过期或笔记已删除",
+            "description": "分享不存在、已过期、主体已删除或子路径不在分享范围内",
             "content": {
               "application/json": {
                 "schema": {
@@ -1472,14 +1490,25 @@
           "name": "path",
           "in": "path",
           "required": true,
-          "description": "相对笔记所在目录的图片路径，只能位于该笔记的 .assets 目录",
+          "description": "文件夹分享中相对主体的文件路径；单文件分享仅允许其 .assets 图片，空路径读取该文件本身",
           "schema": {
             "type": "string"
+          }
+        },
+        {
+          "name": "download",
+          "in": "query",
+          "description": "设为 1 时以附件下载；其他情况下以带沙箱 CSP 的原始文件返回",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "1"
+            ]
           }
         }
       ],
       "get": {
-        "summary": "访客读取分享笔记中的图片",
+        "summary": "访客读取或下载分享范围内的普通文件",
         "tags": [
           "分享（公开）"
         ],
@@ -2163,10 +2192,12 @@
         "type": "object",
         "properties": {
           "token": {
-            "type": "string"
+            "type": "string",
+            "description": "新分享使用完全随机的 URL 安全标识，不包含文件名称或目录"
           },
           "path": {
-            "type": "string"
+            "type": "string",
+            "description": "分享主体在仓库中的路径（只在登录后的管理接口返回）"
           },
           "createdAt": {
             "type": "integer"
@@ -2180,7 +2211,7 @@
           },
           "exists": {
             "type": "boolean",
-            "description": "笔记是否仍存在"
+            "description": "分享的文件或文件夹是否仍存在"
           }
         }
       },

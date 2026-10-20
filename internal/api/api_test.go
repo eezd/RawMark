@@ -37,6 +37,33 @@ type fixture struct {
 	admin *http.Client
 }
 
+func TestMoveBroadcastsWhenAssetRewriteReplacesFileIdentity(t *testing.T) {
+	f := newFixture(t)
+	f.write("from.md", "![](from.assets/x.png)")
+	if err := os.Mkdir(filepath.Join(f.root, "from.assets"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ch, cancel := f.hub.Subscribe()
+	defer cancel()
+	res := f.do(f.admin, "POST", "/api/v1/move", `{"from":"from.md","to":"to.md"}`, nil)
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("移动失败: %d", res.StatusCode)
+	}
+	select {
+	case msg := <-ch:
+		var batch []events.Event
+		if err := json.Unmarshal(msg, &batch); err != nil {
+			t.Fatal(err)
+		}
+		if len(batch) != 2 || batch[0].Type != "moved" || batch[0].From != "from.md" || batch[0].Path != "to.md" || batch[1].Type != "tree" {
+			t.Fatalf("移动事件不符: %s", msg)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("正文改写后未广播移动事件")
+	}
+}
+
 func TestMoveRollsBackWhenShareUpdateFails(t *testing.T) {
 	dir := t.TempDir()
 	v, err := vault.Open(filepath.Join(dir, "vault"))
@@ -352,7 +379,7 @@ func TestShareAccess(t *testing.T) {
 	}
 }
 
-func TestShareFilenameToken(t *testing.T) {
+func TestShareRandomToken(t *testing.T) {
 	f := newFixture(t)
 	name := "计划 #1? 50% +;\""
 	p := "目录/" + name + ".md"
@@ -363,10 +390,9 @@ func TestShareFilenameToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	sh := decode[shareView](t, f.do(f.admin, "POST", "/api/v1/shares", string(body), nil))
-	suffix, ok := strings.CutPrefix(sh.Token, name+"-")
-	random, err := base64.RawURLEncoding.DecodeString(suffix)
-	if !ok || err != nil || len(random) != 16 {
-		t.Fatal("分享应包含完整文件名和 128 位随机字符，不包含目录")
+	random, err := base64.RawURLEncoding.DecodeString(sh.Token)
+	if err != nil || len(random) != 16 {
+		t.Fatal("分享标识应为 128 位随机字符，不包含文件名称或目录")
 	}
 	other := decode[shareView](t, f.do(f.admin, "POST", "/api/v1/shares", string(body), nil))
 	if other.Token == sh.Token {
@@ -398,6 +424,97 @@ func TestShareFilenameToken(t *testing.T) {
 	}
 }
 
+func TestFolderShareTracksItsCurrentContentsAndSubject(t *testing.T) {
+	f := newFixture(t)
+	f.write("公开/子目录/文章.md", "第一版")
+	f.write("公开/子目录/文章.assets/图.png", "PNG")
+	f.write("公开/资料.txt", "资料")
+	f.write("公开/.私密.md", "不能公开")
+	f.write("公开/.git/config", "不能公开")
+	f.write("其他/私密.md", "不能公开")
+	if err := os.Symlink(filepath.Join(f.root, "其他"), filepath.Join(f.root, "公开", "别名")); err != nil {
+		t.Fatal(err)
+	}
+	folder := decode[shareView](t, f.do(f.admin, "POST", "/api/v1/shares", `{"path":"公开","password":"访问密码"}`, nil))
+	note := decode[shareView](t, f.do(f.admin, "POST", "/api/v1/shares", `{"path":"公开/子目录/文章.md"}`, nil))
+	base := "/api/v1/public/shares/" + folder.Token
+	noteBase := "/api/v1/public/shares/" + note.Token
+	guest := newClient()
+	if code := f.status(guest, "GET", base+"?path=子目录/文章.md", "", nil); code != 401 {
+		t.Fatalf("目录内的文章也必须解锁，得到 %d", code)
+	}
+	if code := f.status(guest, "POST", base+"/unlock", `{"password":"访问密码"}`, nil); code != 200 {
+		t.Fatal(code)
+	}
+	type directory struct {
+		Title   string
+		Dir     bool
+		Entries []vault.Entry
+	}
+	listed := decode[directory](t, f.do(guest, "GET", base, "", nil))
+	if listed.Title != "公开" || !listed.Dir || len(listed.Entries) != 5 {
+		t.Fatalf("应递归列出全部普通文件和子目录: %+v", listed)
+	}
+	for _, e := range listed.Entries {
+		if strings.Contains(e.Path, "公开/") || strings.Contains(e.Path, "私密") || strings.Contains(e.Path, "别名") || strings.Contains(e.Path, ".git") {
+			t.Fatalf("目录列表越界: %s", e.Path)
+		}
+	}
+	f.write("公开/子目录/文章.md", "最新正文")
+	article := decode[map[string]any](t, f.do(guest, "GET", base+"?path=子目录/文章.md", "", nil))
+	if article["content"] != "最新正文" || article["path"] != nil {
+		t.Fatalf("应提供当前正文且不暴露仓库路径: %v", article)
+	}
+	for _, rel := range []string{"../其他/私密.md", ".私密.md", ".git/config", "别名/私密.md"} {
+		if code := f.status(guest, "GET", base+"?path="+url.QueryEscape(rel), "", nil); code != 404 {
+			t.Fatalf("不允许读取 %s，得到 %d", rel, code)
+		}
+		if code := f.status(guest, "GET", base+"/assets/"+url.PathEscape(rel), "", nil); code != 404 {
+			t.Fatalf("资源接口不允许读取 %s，得到 %d", rel, code)
+		}
+	}
+	if code := f.status(guest, "GET", base+"/assets/子目录/文章.assets/图.png", "", nil); code != 200 {
+		t.Fatalf("目录中的图片不可读: %d", code)
+	}
+	res := f.do(guest, "GET", base+"/assets/资料.txt?download=1", "", nil)
+	content, err := io.ReadAll(res.Body)
+	if err != nil || res.StatusCode != 200 || string(content) != "资料" || !strings.HasPrefix(res.Header.Get("Content-Disposition"), "attachment;") {
+		t.Fatalf("普通文件下载失败: %d %v", res.StatusCode, err)
+	}
+	f.write("公开/新增.md", "新内容")
+	listed = decode[directory](t, f.do(guest, "GET", base, "", nil))
+	if len(listed.Entries) != 6 {
+		t.Fatal("新增文件应自动进入目录分享")
+	}
+	if code := f.status(f.admin, "POST", "/api/v1/move", `{"from":"公开","to":"移动后的目录"}`, nil); code != 200 {
+		t.Fatal(code)
+	}
+	listed = decode[directory](t, f.do(guest, "GET", base, "", nil))
+	if listed.Title != "移动后的目录" {
+		t.Fatal("目录主体移动后原分享应跟随")
+	}
+	if code := f.status(f.admin, "POST", "/api/v1/move", `{"from":"移动后的目录/子目录/文章.md","to":"其他/移出.md"}`, nil); code != 200 {
+		t.Fatal(code)
+	}
+	if code := f.status(guest, "GET", base+"?path=子目录/文章.md", "", nil); code != 404 {
+		t.Fatalf("移出的文章不能继续通过目录分享读取: %d", code)
+	}
+	article = decode[map[string]any](t, f.do(guest, "GET", noteBase, "", nil))
+	if article["content"] != "最新正文" || article["title"] != "移出" {
+		t.Fatal("单篇分享应跟随文章移出目录")
+	}
+	file := decode[shareView](t, f.do(f.admin, "POST", "/api/v1/shares", `{"path":"移动后的目录/资料.txt"}`, nil))
+	if code := f.status(guest, "GET", "/api/v1/public/shares/"+file.Token+"/assets/", "", nil); code != 200 {
+		t.Fatalf("应能分享普通文件: %d", code)
+	}
+	if code := f.status(f.admin, "DELETE", "/api/v1/shares/"+folder.Token, "", nil); code != 200 {
+		t.Fatal(code)
+	}
+	if code := f.status(guest, "GET", base+"/assets/资料.txt", "", nil); code != 404 {
+		t.Fatalf("撤销后资源也必须失效: %d", code)
+	}
+}
+
 func TestShareWithoutPasswordAndExpiry(t *testing.T) {
 	f := newFixture(t)
 	f.write("a.md", "公开")
@@ -414,7 +531,7 @@ func TestShareWithoutPasswordAndExpiry(t *testing.T) {
 	if code := f.status(newClient(), "GET", "/api/v1/public/shares/expired", "", nil); code != 404 {
 		t.Errorf("过期分享应为 404，得到 %d", code)
 	}
-	for _, body := range []string{`{"path":"a.assets/x.png"}`, `{"path":"../a.md"}`, `{"path":"a.md","expiresIn":-1}`} {
+	for _, body := range []string{`{"path":"../a.md"}`, `{"path":"a.md","expiresIn":-1}`} {
 		if code := f.status(f.admin, "POST", "/api/v1/shares", body, nil); code != 400 {
 			t.Errorf("%s 应为 400，得到 %d", body, code)
 		}

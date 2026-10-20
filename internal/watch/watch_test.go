@@ -1,48 +1,115 @@
 package watch
 
 import (
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
 )
 
 func TestDiff(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "d"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{"d/a.md", "b.md", "c.md", "c2.md"} {
+		if err := os.WriteFile(filepath.Join(root, p), []byte("相同内容"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	state := func(p, rev string) fileState {
+		info, err := os.Stat(filepath.Join(root, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return fileState{dir: info.IsDir(), rev: rev, info: info}
+	}
 	prev := map[string]fileState{
-		"d":      {dir: true},
-		"d/a.md": {rev: "r1"},
-		"b.md":   {rev: "r2"},
-		"c.md":   {rev: "same"},
-		"c2.md":  {rev: "same"},
+		"d":      state("d", ""),
+		"d/a.md": state("d/a.md", "r1"),
+		"b.md":   state("b.md", "r2"),
+		"c.md":   state("c.md", "same"),
+		"c2.md":  state("c2.md", "same"),
+	}
+	for from, to := range map[string]string{"d/a.md": "d/x.md", "c2.md": "e.md"} {
+		if err := os.Rename(filepath.Join(root, from), filepath.Join(root, to)); err != nil {
+			t.Fatal(err)
+		}
 	}
 	next := map[string]fileState{
-		"d":      {dir: true},
-		"d/x.md": {rev: "r1"},   // 由 d/a.md 移动而来
-		"b.md":   {rev: "r3"},   // 内容修改
-		"e.md":   {rev: "same"}, // c.md 与 c2.md 内容相同：其一视为移动到此，另一个为删除
+		"d":      state("d", ""),
+		"d/x.md": state("d/x.md", "r1"),
+		"b.md":   state("b.md", "r3"),
+		"e.md":   state("e.md", "same"),
 	}
 	var got []string
 	for _, e := range diff(prev, next) {
 		f := []string{e.Type}
 		if e.From != "" {
-			f = append(f, "c*")
-			if !strings.HasPrefix(e.From, "c") {
-				f[1] = e.From
-			}
+			f = append(f, e.From)
 		}
 		if e.Path != "" {
 			f = append(f, e.Path)
-			if e.Type == "deleted" && strings.HasPrefix(e.Path, "c") {
-				f[1] = "c*"
-			}
 		}
 		got = append(got, strings.Join(f, " "))
 	}
 	sort.Strings(got)
-	want := "changed b.md|deleted c*|moved c* e.md|moved d/a.md d/x.md|tree"
+	want := "changed b.md|deleted c.md|moved c2.md e.md|moved d/a.md d/x.md|tree"
 	if strings.Join(got, "|") != want {
 		t.Fatalf("事件不符:\n got %q\nwant %q", strings.Join(got, "|"), want)
 	}
 	if evs := diff(next, next); len(evs) != 0 {
 		t.Fatalf("快照相同不应产生事件: %v", evs)
+	}
+}
+
+func TestDirectoryMovesCoverChildrenAndEmptyDirectories(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "from", "empty"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "from", "a.md"), []byte("正文"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := func(dir string) map[string]fileState {
+		out := map[string]fileState{}
+		for _, rel := range []string{dir, dir + "/empty", dir + "/a.md"} {
+			info, err := os.Stat(filepath.Join(root, rel))
+			if err != nil {
+				t.Fatal(err)
+			}
+			out[rel] = fileState{dir: info.IsDir(), info: info, rev: "same"}
+		}
+		return out
+	}
+	prev := snapshot("from")
+	if err := os.Rename(filepath.Join(root, "from"), filepath.Join(root, "to")); err != nil {
+		t.Fatal(err)
+	}
+	events := diff(prev, snapshot("to"))
+	if len(events) != 2 || events[0].Type != "moved" || events[0].From != "from" || events[0].Path != "to" || events[1].Type != "tree" {
+		t.Fatalf("目录移动应只产生一次路径映射: %v", events)
+	}
+	next := snapshot("to")
+	if err := os.Rename(filepath.Join(root, "to", "a.md"), filepath.Join(root, "to", "b.md")); err != nil {
+		t.Fatal(err)
+	}
+	next["to/b.md"] = next["to/a.md"]
+	delete(next, "to/a.md")
+	events = diff(prev, next)
+	if len(events) != 3 || events[0].From != "from" || events[0].Path != "to" || events[1].From != "to/a.md" || events[1].Path != "to/b.md" || events[2].Type != "tree" {
+		t.Fatalf("同一批次内子项改名应接续父目录映射: %v", events)
+	}
+}
+
+func TestNotesExcludeResourceContents(t *testing.T) {
+	indexed := notes(map[string]fileState{
+		"笔记.md":           {rev: "r1"},
+		"笔记.assets/说明.md": {rev: "r2"},
+		"附件.txt":          {},
+	})
+	if len(indexed) != 1 || indexed["笔记.md"] != "r1" {
+		t.Fatalf("跟踪普通文件移动不能改变笔记索引范围: %v", indexed)
 	}
 }

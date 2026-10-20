@@ -8,13 +8,29 @@ import './share.css'
 
 interface SharedNote {
   title: string
+  dir: false
   content: string
   updatedAt: number
+}
+
+interface SharedDirectory {
+  title: string
+  dir: true
+  entries: { path: string; dir: boolean }[]
+}
+
+interface SharedFile {
+  title: string
+  dir: false
 }
 
 const root = document.getElementById('share')!
 const token = decodeURIComponent(location.pathname.split('/')[2] ?? '')
 const api = '/api/v1/public/shares/' + encodeURIComponent(token)
+const selectedPath = new URL(location.href).searchParams.get('path') ?? ''
+const encodePath = (path: string) => path.split('/').map(encodeURIComponent).join('/')
+const pageUrl = (path: string) => location.pathname + (path ? '?path=' + encodeURIComponent(path) : '')
+const downloadUrl = () => api + '/assets/' + encodePath(selectedPath) + '?download=1'
 
 function message(text: string) {
   root.replaceChildren(Object.assign(document.createElement('p'), { className: 'rm-share-message', textContent: text }))
@@ -23,13 +39,13 @@ function message(text: string) {
 async function load() {
   let res: Response
   try {
-    res = await fetch(api, { credentials: 'same-origin', cache: 'no-store' })
+    res = await fetch(api + (selectedPath ? '?path=' + encodeURIComponent(selectedPath) : ''), { credentials: 'same-origin', cache: 'no-store' })
   } catch {
     message('网络错误，请检查连接后刷新')
     return
   }
   if (res.ok) {
-    const note = (await res.json()) as SharedNote
+    const content = (await res.json()) as SharedNote | SharedDirectory | SharedFile
     let appearanceError = false
     try {
       const response = await fetch(api + '/appearance', { cache: 'no-store' })
@@ -42,11 +58,20 @@ async function load() {
     } catch {
       appearanceError = true
     }
-    render(note)
+    if (content.dir) renderDirectory(content)
+    else if ('content' in content) render(content)
+    else {
+      document.title = content.title
+      const link = Object.assign(document.createElement('a'), { href: downloadUrl(), download: content.title, textContent: '下载 ' + content.title })
+      root.replaceChildren(navigation(), link)
+    }
     if (appearanceError) root.prepend(Object.assign(document.createElement('p'), { className: 'rm-share-error', textContent: '外观加载失败，可刷新重试' }))
   }
   else if (res.status === 401) askPassword()
-  else if (res.status === 404) message('分享不存在、已过期或已被撤销')
+  else if (res.status === 404) {
+    message(selectedPath ? '此文件或文件夹已不存在，或不在分享范围内' : '分享不存在、已过期或已被撤销')
+    if (selectedPath) root.prepend(navigation())
+  }
   else message(`加载失败（${res.status}）`)
 }
 
@@ -83,6 +108,34 @@ function askPassword(error = '') {
 
 const dateFormat = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' })
 
+function navigation() {
+  const nav = document.createElement('nav')
+  nav.className = 'rm-share-nav'
+  nav.setAttribute('aria-label', '分享导航')
+  nav.append(Object.assign(document.createElement('a'), { href: pageUrl(''), textContent: '分享首页' }))
+  const parts = selectedPath.split('/').filter(Boolean)
+  for (let i = 0; i < parts.length; i++) {
+    nav.append(' / ', Object.assign(document.createElement('a'), { href: pageUrl(parts.slice(0, i + 1).join('/')), textContent: parts[i] }))
+  }
+  return nav
+}
+
+function renderDirectory(directory: SharedDirectory) {
+  document.title = directory.title
+  const heading = Object.assign(document.createElement('h1'), { textContent: directory.title })
+  const list = document.createElement('ul')
+  list.className = 'rm-share-files'
+  for (const entry of directory.entries) {
+    const li = document.createElement('li')
+    li.style.paddingLeft = (entry.path.split('/').length - 1) * 16 + 'px'
+    const path = selectedPath ? selectedPath + '/' + entry.path : entry.path
+    li.append(Object.assign(document.createElement('a'), { href: pageUrl(path), textContent: entry.path.split('/').at(-1) + (entry.dir ? '/' : '') }))
+    list.append(li)
+  }
+  root.replaceChildren(navigation(), heading, list)
+  if (!directory.entries.length) root.append(Object.assign(document.createElement('p'), { textContent: '此文件夹为空' }))
+}
+
 function render(note: SharedNote) {
   document.title = note.title
   const header = document.createElement('header')
@@ -95,9 +148,10 @@ function render(note: SharedNote) {
   article.className = 'rm-share-content'
   // 安全模式：原始 HTML 被转义，危险协议的链接被过滤
   article.innerHTML = renderMarkdown(note.content)
-  root.replaceChildren(header, article)
+  root.replaceChildren(...(selectedPath ? [navigation()] : []), header, article)
 
   resolveImages(article)
+  resolveLinks(article)
   buildToc(article)
   hydrate(article)
   for (const code of article.querySelectorAll<HTMLElement>('pre > code')) void decorateCode(code).catch((error) => {
@@ -106,14 +160,41 @@ function render(note: SharedNote) {
   })
 }
 
-// 相对地址的图片（笔记的 .assets）经分享接口读取；服务器只允许读取本篇的图片目录
+// 相对引用始终经当前分享读取，范围由服务器按分享主体校验。
+function resourceUrl(src: string): URL | null {
+  try {
+    const prefix = new URL(api + '/assets/', location.origin)
+    const target = new URL(src, new URL(encodePath(selectedPath), prefix))
+    return target.origin === prefix.origin && target.pathname.startsWith(prefix.pathname) ? target : null
+  } catch { return null }
+}
+
 function resolveImages(article: HTMLElement) {
   for (const img of article.querySelectorAll('img')) {
     const src = img.getAttribute('src') ?? ''
     if (src && !/^[a-z][a-z\d+.-]*:/i.test(src) && !src.startsWith('/') && !src.startsWith('#')) {
-      img.src = api + '/assets/' + src.replace(/^(\.\/)+/, '')
+      img.src = resourceUrl(src)?.href ?? '#'
     }
     img.loading = 'lazy'
+  }
+}
+
+function resolveLinks(article: HTMLElement) {
+  for (const link of article.querySelectorAll<HTMLAnchorElement>('a[href]')) {
+    const href = link.getAttribute('href')!
+    if (!href || /^[a-z][a-z\d+.-]*:/i.test(href) || href.startsWith('/') || href.startsWith('#')) continue
+    const target = resourceUrl(href)
+    if (!target) { link.href = '#'; continue }
+    if (selectedPath) {
+      try {
+        const path = decodeURIComponent(target.pathname.slice((api + '/assets/').length)).replace(/\/$/, '')
+        link.href = pageUrl(path) + target.hash
+      } catch { link.href = '#' }
+    } else {
+      target.searchParams.set('download', '1')
+      link.href = target.href
+      link.download = ''
+    }
   }
 }
 

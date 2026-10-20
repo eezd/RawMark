@@ -49,10 +49,11 @@ type Vault struct {
 }
 
 type Entry struct {
-	Path    string `json:"path"`
-	Dir     bool   `json:"dir"`
-	Size    int64  `json:"size"`
-	ModTime int64  `json:"mtime"` // 毫秒
+	Path    string      `json:"path"`
+	Dir     bool        `json:"dir"`
+	Size    int64       `json:"size"`
+	ModTime int64       `json:"mtime"` // 毫秒
+	Info    fs.FileInfo `json:"-"`
 }
 
 type TrashItem struct {
@@ -168,17 +169,14 @@ func (v *Vault) Read(rel string) ([]byte, string, error) {
 	return data, Rev(data), nil
 }
 
-// Stat 返回笔记的文件信息；不存在时返回 ErrNotFound
+// Stat 返回普通文件或目录的信息；不存在时返回 ErrNotFound
 func (v *Vault) Stat(rel string) (fs.FileInfo, error) {
-	if !IsNote(rel) {
-		return nil, ErrInvalidPath
-	}
 	p, err := v.abs(rel)
 	if err != nil {
 		return nil, err
 	}
 	info, err := os.Stat(p)
-	if errors.Is(err, fs.ErrNotExist) || (err == nil && !info.Mode().IsRegular()) {
+	if errors.Is(err, fs.ErrNotExist) || (err == nil && !info.Mode().IsRegular() && !info.IsDir()) {
 		return nil, ErrNotFound
 	}
 	return info, err
@@ -335,51 +333,130 @@ func (v *Vault) Tree() ([]Entry, error) {
 	return entries, err
 }
 
+// TreeAt 递归列出指定目录中的普通文件和子目录，路径相对此目录；空路径表示仓库根，不公开隐藏条目或符号链接。
+func (v *Vault) TreeAt(rel string) ([]Entry, error) {
+	root := v.root
+	if rel != "" {
+		var err error
+		root, err = v.abs(rel)
+		if err != nil {
+			return nil, err
+		}
+	}
+	entries := []Entry{}
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if p == root {
+			return nil
+		}
+		if strings.HasPrefix(d.Name(), ".") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && !info.Mode().IsRegular() {
+			return nil
+		}
+		name, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		entries = append(entries, Entry{Path: filepath.ToSlash(name), Dir: info.IsDir(), Size: info.Size(), ModTime: info.ModTime().UnixMilli(), Info: info})
+		return nil
+	})
+	return entries, err
+}
+
+// ScopedPath 校验公开访问的子路径，并阻止符号链接跳出已分享的目录。
+func (v *Vault) ScopedPath(root, rel string) (string, error) {
+	if _, err := CleanPath(rel); err != nil {
+		return "", ErrNotFound
+	}
+	base, err := v.abs(root)
+	if err != nil {
+		return "", err
+	}
+	base, err = filepath.EvalSymlinks(base)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	p := path.Join(root, rel)
+	full, err := v.abs(p)
+	if err != nil {
+		return "", err
+	}
+	full, err = filepath.EvalSymlinks(full)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	if full != filepath.Join(base, filepath.FromSlash(rel)) {
+		return "", ErrNotFound
+	}
+	return p, nil
+}
+
 // ---- 移动 / 重命名 ----
 
-// Move 移动或重命名笔记/文件夹。笔记的 .assets 目录随之移动；笔记改名时同步改写正文中指向自身图片目录的链接
-func (v *Vault) Move(from, to string) (err error) {
+// Move 移动或重命名笔记/文件夹，返回是否原子改写了正文（改变文件身份）。
+// 笔记的 .assets 目录随之移动；笔记改名时同步改写正文中指向自身图片目录的链接。
+func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 	src, err := v.abs(from)
 	if err != nil {
-		return err
+		return false, err
 	}
 	dst, err := v.abs(to)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if from == to || strings.HasPrefix(to, from+"/") {
-		return ErrInvalidPath
+		return false, ErrInvalidPath
 	}
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	info, err := os.Lstat(src)
 	if errors.Is(err, fs.ErrNotExist) {
-		return ErrNotFound
+		return false, ErrNotFound
 	}
 	if err != nil {
-		return err
+		return false, err
 	}
 	isNote := !info.IsDir()
 	if isNote && (!IsNote(from) || !IsNote(to)) {
-		return ErrInvalidPath
+		return false, ErrInvalidPath
 	}
 	if _, err := os.Lstat(dst); err == nil {
-		return ErrExists
+		return false, ErrExists
 	}
 	srcAssets, dstAssets := "", ""
 	if isNote {
 		if st, err := os.Stat(AssetsDir(src)); err == nil && st.IsDir() {
 			srcAssets, dstAssets = AssetsDir(src), AssetsDir(dst)
 			if _, err := os.Lstat(dstAssets); err == nil {
-				return ErrExists
+				return false, ErrExists
 			}
 		}
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return err
+		return false, err
 	}
 	if err := os.Rename(src, dst); err != nil {
-		return err
+		return false, err
 	}
 	assetsMoved := false
 	defer func() {
@@ -397,7 +474,7 @@ func (v *Vault) Move(from, to string) (err error) {
 	}()
 	if srcAssets != "" {
 		if err := os.Rename(srcAssets, dstAssets); err != nil {
-			return fmt.Errorf("移动图片目录失败: %w", err)
+			return false, fmt.Errorf("移动图片目录失败: %w", err)
 		}
 		assetsMoved = true
 		oldBase := strings.TrimSuffix(path.Base(from), NoteExt)
@@ -405,14 +482,14 @@ func (v *Vault) Move(from, to string) (err error) {
 		if oldBase != newBase {
 			data, err := os.ReadFile(dst)
 			if err != nil {
-				return err
+				return false, err
 			}
 			if out := RewriteAssetLinks(data, oldBase, newBase); !bytes.Equal(out, data) {
-				return atomicWrite(dst, out)
+				return true, atomicWrite(dst, out)
 			}
 		}
 	}
-	return nil
+	return false, nil
 }
 
 // ---- 回收站 ----
