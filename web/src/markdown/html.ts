@@ -58,9 +58,19 @@ export interface RenderOptions {
 const UNSAFE_PROTOCOL = /^\s*(javascript|vbscript|file|data):/i
 const SAFE_DATA_IMAGE = /^\s*data:image\/(png|gif|jpeg|webp);/i
 
+function safeHref(href: string): string {
+  // 协议由 ASCII 组成；属性实体会被浏览器解码，URL 解析还会忽略制表符和换行。
+  const protocol = href.replace(/&#(?:([0-9]{1,7})|[xX]([\da-fA-F]{1,6}));|&(colon|Tab|NewLine);/g, (entity, decimal, hex, named) => {
+    if (named) return named === 'colon' ? ':' : named === 'Tab' ? '\t' : '\n'
+    const code = decimal ? Number(decimal) : parseInt(hex, 16)
+    return code <= 127 ? String.fromCharCode(code) : entity
+  }).replace(/[\t\r\n]/g, '').replace(/^[\x00-\x20]+/, '')
+  return UNSAFE_PROTOCOL.test(protocol) && !SAFE_DATA_IMAGE.test(protocol) ? '#' : href
+}
+
 export function renderMarkdown(src: string, { parser = markdownParser, unsafe = false }: RenderOptions = {}): string {
   const tree = parser.parse(src)
-  const safeHref = (href: string) => (unsafe || !UNSAFE_PROTOCOL.test(href) || SAFE_DATA_IMAGE.test(href) ? href : '#')
+  const linkHref = (href: string) => unsafe ? href : safeHref(href)
   const rawHtml = (s: string) => (unsafe ? s : escapeHtml(s))
   const text = (from: number, to: number) => src.slice(from, to)
   const defs = new Map<string, LinkDefinition>()
@@ -296,13 +306,13 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
         if (!url) return escapeHtml(text(node.from, node.to))
         const raw = text(url.from, url.to)
         const href = /^[^@\s]+@[^@\s]+$/.test(raw) && !raw.includes(':') ? 'mailto:' + raw : raw
-        return `<a href="${escapeAttr(safeHref(normalizeUrl(href)))}">${escapeHtml(raw)}</a>`
+        return `<a href="${escapeAttr(linkHref(normalizeUrl(href)))}">${escapeHtml(raw)}</a>`
       }
       case 'URL': {
         // GFM 裸链接
         const raw = text(node.from, node.to)
         const href = raw.startsWith('www.') ? 'http://' + raw : raw.includes('@') && !raw.includes(':') ? 'mailto:' + raw : raw
-        return `<a href="${escapeAttr(safeHref(normalizeUrl(href)))}">${escapeHtml(raw)}</a>`
+        return `<a href="${escapeAttr(linkHref(normalizeUrl(href)))}">${escapeHtml(raw)}</a>`
       }
       case 'Link':
       case 'Image':
@@ -334,8 +344,8 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
       }
     }
     const title = def.title !== null ? ` title="${escapeAttr(def.title)}"` : ''
-    if (isImage) return `<img src="${escapeAttr(safeHref(def.href))}" alt="${escapeAttr(plainText(content))}"${title} />`
-    return `<a href="${escapeAttr(safeHref(def.href))}"${title}>${content}</a>`
+    if (isImage) return `<img src="${escapeAttr(linkHref(def.href))}" alt="${escapeAttr(plainText(content))}"${title} />`
+    return `<a href="${escapeAttr(linkHref(def.href))}"${title}>${content}</a>`
   }
 
   // ---- 块级 ----

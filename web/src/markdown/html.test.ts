@@ -54,6 +54,14 @@ describe('安全模式', () => {
       '<p><a href="#">a</a> <a href="#">javascript:x</a> <img src="data:image/png;base64,AA" alt="i" /></p>\n',
     )
   })
+  it('按浏览器解码后的协议过滤实体及控制字符', () => {
+    for (const href of ['javascript&#58;void(0)', 'java&#x73;cript:void(0)', 'javascript&colon;void(0)', 'java&Tab;script&colon;void(0)', '&#13;javascript:void(0)']) {
+      const root = document.createElement('div')
+      root.innerHTML = renderMarkdown(`[x](${href})`)
+      expect(root.querySelector('a')?.getAttribute('href')).toBe('#')
+    }
+    expect(renderMarkdown('[x](https://example.com/?a=1&amp;b=2)')).toContain('https://example.com/?a=1&amp;b=2')
+  })
 })
 
 describe('Typora 扩展', () => {

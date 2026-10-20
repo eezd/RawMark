@@ -2,6 +2,7 @@ package api
 
 import (
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,6 +16,8 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/coder/websocket"
+
 	"rawmark/internal/auth"
 	"rawmark/internal/events"
 	"rawmark/internal/search"
@@ -27,6 +30,7 @@ type fixture struct {
 	url   string
 	root  string
 	store *store.Store
+	hub   *events.Hub
 	// 已登录的客户端
 	admin *http.Client
 }
@@ -61,6 +65,48 @@ func TestMoveRollsBackWhenShareUpdateFails(t *testing.T) {
 	}
 }
 
+func TestEventsRejectRevokedCredentials(t *testing.T) {
+	for _, kind := range []string{"session", "token"} {
+		t.Run(kind, func(t *testing.T) {
+			f := newFixture(t)
+			client := newClient()
+			headers := http.Header{}
+			var tokenID string
+			if kind == "session" {
+				f.do(client, "POST", "/api/v1/auth/login", `{"password":"password123"}`, nil).Body.Close()
+			} else {
+				created := decode[struct {
+					Token string
+					Info  store.APIToken
+				}](t, f.do(f.admin, "POST", "/api/v1/tokens", `{"name":"events","scope":"read"}`, nil))
+				headers.Set("Authorization", "Bearer "+created.Token)
+				tokenID = created.Info.ID
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			conn, _, err := websocket.Dial(ctx, strings.Replace(f.url, "http://", "ws://", 1)+"/api/v1/events", &websocket.DialOptions{HTTPClient: client, HTTPHeader: headers})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer conn.CloseNow()
+			// 首条事件确认订阅已经建立，避免把握手和广播的时序当作鉴权结果。
+			f.hub.Broadcast(events.Event{Type: "tree"})
+			if _, _, err := conn.Read(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if kind == "session" {
+				f.do(client, "POST", "/api/v1/auth/logout", "", nil).Body.Close()
+			} else {
+				f.do(f.admin, "DELETE", "/api/v1/tokens/"+tokenID, "", nil).Body.Close()
+			}
+			f.hub.Broadcast(events.Event{Type: "changed", Path: "private.md", Rev: "new"})
+			if _, _, err := conn.Read(ctx); websocket.CloseStatus(err) != websocket.StatusPolicyViolation {
+				t.Fatalf("撤销后应关闭连接，不能继续推送: %v", err)
+			}
+		})
+	}
+}
+
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	dir := t.TempDir()
@@ -85,12 +131,13 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { idx.Close() })
-	server := New(v, am, st, events.NewHub(), idx)
+	hub := events.NewHub()
+	server := New(v, am, st, hub, idx)
 	server.ThemesDir = filepath.Join(dir, "themes")
 	server.PluginsDir = filepath.Join(dir, "plugins")
 	srv := httptest.NewServer(server.Handler(fstest.MapFS{}))
 	t.Cleanup(srv.Close)
-	f := &fixture{t: t, url: srv.URL, root: v.Root(), store: st, admin: newClient()}
+	f := &fixture{t: t, url: srv.URL, root: v.Root(), store: st, hub: hub, admin: newClient()}
 	if res := f.do(f.admin, "POST", "/api/v1/auth/login", `{"password":"password123"}`, nil); res.StatusCode != 200 {
 		t.Fatalf("登录失败: %d", res.StatusCode)
 	}

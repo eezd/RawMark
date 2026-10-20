@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/coder/websocket"
@@ -15,6 +17,29 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.CloseNow()
+	reauthorize := func() bool {
+		var valid bool
+		var err error
+		if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+			_, valid, err = s.auth.ValidateAPIToken(strings.TrimSpace(bearer))
+		} else {
+			var cookie *http.Cookie
+			cookie, err = r.Cookie(cookieName)
+			if err == nil {
+				valid, err = s.auth.Validate(cookie.Value)
+			}
+		}
+		if err != nil {
+			slog.Error("事件连接鉴权失败", "err", err)
+			conn.Close(websocket.StatusInternalError, "鉴权失败")
+			return false
+		}
+		if !valid {
+			conn.Close(websocket.StatusPolicyViolation, "登录凭据已失效")
+			return false
+		}
+		return true
+	}
 	// 客户端不发消息；CloseRead 负责处理控制帧并在连接断开时取消 ctx
 	ctx := conn.CloseRead(r.Context())
 	msgs, unsubscribe := s.hub.Subscribe()
@@ -32,10 +57,16 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 				conn.Close(websocket.StatusTryAgainLater, "too slow")
 				return
 			}
+			if !reauthorize() {
+				return
+			}
 			if err := writeWithTimeout(ctx, conn, msg); err != nil {
 				return
 			}
 		case <-ping.C:
+			if !reauthorize() {
+				return
+			}
 			pctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			err := conn.Ping(pctx)
 			cancel()
