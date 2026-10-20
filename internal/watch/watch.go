@@ -4,6 +4,9 @@ package watch
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -139,8 +142,11 @@ func (w *Watcher) scan() (map[string]fileState, error) {
 				st.rev = old.rev
 			} else {
 				data, err := os.ReadFile(abs)
-				if err != nil {
+				if errors.Is(err, fs.ErrNotExist) {
 					continue // 扫描期间被删除，下一轮会处理
+				}
+				if err != nil {
+					return nil, fmt.Errorf("读取笔记 %s 失败: %w", e.Path, err)
 				}
 				st.rev = vault.Rev(data)
 			}

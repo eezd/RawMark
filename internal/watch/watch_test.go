@@ -6,7 +6,64 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/fsnotify/fsnotify"
+
+	"rawmark/internal/events"
+	"rawmark/internal/vault"
 )
+
+func TestUnreadableNotePreservesSnapshot(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("权限回归需要以非 root 用户运行")
+	}
+	v, err := vault.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(v.Root(), "note.md")
+	if err := os.WriteFile(p, []byte("原文"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fw, err := fsnotify.NewWatcher()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fw.Close()
+	scans := 0
+	hub := events.NewHub()
+	w := &Watcher{v: v, fw: fw, hub: hub, snap: map[string]fileState{}, watched: map[string]bool{}, onScan: func(map[string]string) { scans++ }}
+	w.snap, err = w.scan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := w.snap["note.md"].rev
+	ch, cancel := hub.Subscribe()
+	defer cancel()
+	if err := os.WriteFile(p, []byte("修改后的较长正文"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(p, 0); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(p, 0o644)
+	w.rescan()
+	if w.snap["note.md"].rev != old || scans != 0 {
+		t.Fatal("读取失败不能提交不完整快照或更新索引")
+	}
+	select {
+	case msg := <-ch:
+		t.Fatalf("读取失败不能广播删除事件: %s", msg)
+	default:
+	}
+	if err := os.Chmod(p, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	w.rescan()
+	if w.snap["note.md"].rev == old || scans != 1 {
+		t.Fatal("恢复读取权限后应同步新版本")
+	}
+}
 
 func TestDiff(t *testing.T) {
 	root := t.TempDir()
