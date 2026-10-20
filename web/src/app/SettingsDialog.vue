@@ -5,7 +5,7 @@ import { allCommands, formatKeys, runCommand } from './commands'
 import Icon, { type IconName } from './Icon.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
 import PluginsPanel from './PluginsPanel.vue'
-import { CONTENT_WIDTHS, FONT_SIZES, loadSettings, settings, updateSettings, type Settings } from './settings'
+import { CONTENT_WIDTHS, FONT_SIZES, TAB_SIZES, loadSettings, settings, updateSettings, type Settings } from './settings'
 import SharePanel from './SharePanel.vue'
 import TokensPanel from './TokensPanel.vue'
 import TrashPanel from './TrashPanel.vue'
@@ -13,6 +13,7 @@ import { toast, ws, type SettingsSection } from './workspace'
 
 const SECTIONS: { id: SettingsSection; title: string; icon: IconName }[] = [
   { id: 'appearance', title: '外观', icon: 'palette' },
+  { id: 'editor', title: '编辑器', icon: 'edit' },
   { id: 'plugins', title: '插件', icon: 'command' },
   { id: 'account', title: '账户', icon: 'user' },
   { id: 'shortcuts', title: '快捷键', icon: 'command' },
@@ -132,6 +133,22 @@ async function changePassword() {
                 </button>
               </div>
             </div>
+            <p class="rm-share-note">设置保存在服务器上，所有设备共用。</p>
+          </template>
+
+          <template v-else-if="section === 'editor'">
+            <div class="rm-setting">
+              <label for="rm-spellcheck" class="rm-setting-label">拼写检查</label>
+              <input id="rm-spellcheck" type="checkbox" :checked="settings.spellcheck" @change="change({ spellcheck: ($event.target as HTMLInputElement).checked })" />
+            </div>
+            <p class="rm-share-note">使用浏览器的拼写检查，检查语言取决于浏览器设置。</p>
+            <div class="rm-setting">
+              <label for="rm-tab-size" class="rm-setting-label">制表符宽度</label>
+              <select id="rm-tab-size" :value="settings.tabSize" @change="change({ tabSize: Number(($event.target as HTMLSelectElement).value) })">
+                <option v-for="n in TAB_SIZES" :key="n" :value="n">{{ n }} 列</option>
+              </select>
+            </div>
+            <p class="rm-share-note">仅调整 Tab 字符的显示宽度，不改写正文。Tab 键仍按两个空格缩进。</p>
             <p class="rm-share-note">设置保存在服务器上，所有设备共用。</p>
           </template>
 

@@ -5,6 +5,7 @@ import { api } from './api'
 import { applyAppearance, appearancePaused, sanitizeAppearance, type Appearance } from '../themes/appearance'
 
 export const FONT_SIZES = [14, 15, 16, 17, 18, 20, 22]
+export const TAB_SIZES = [2, 4, 8]
 // 0 为全宽
 export const CONTENT_WIDTHS = [
   { label: '窄', value: 680 },
@@ -15,7 +16,7 @@ export const CONTENT_WIDTHS = [
 
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
-const DEFAULTS = { fontSize: 16, contentWidth: 760, sidebarWidth: 260 }
+const DEFAULTS = { fontSize: 16, contentWidth: 760, sidebarWidth: 260, spellcheck: false, tabSize: 4 }
 export type Settings = typeof DEFAULTS & Appearance
 
 const CACHE_KEY = 'rawmark.settings'
@@ -27,6 +28,8 @@ function sanitize(raw: Record<string, unknown>): Settings {
   const pick = <T>(v: unknown, allowed: T[], def: T) => (allowed.includes(v as T) ? (v as T) : def)
   return {
     fontSize: pick(raw.fontSize, FONT_SIZES, DEFAULTS.fontSize),
+    spellcheck: typeof raw.spellcheck === 'boolean' ? raw.spellcheck : DEFAULTS.spellcheck,
+    tabSize: pick(raw.tabSize, TAB_SIZES, DEFAULTS.tabSize),
     ...sanitizeAppearance(raw),
     contentWidth: pick(
       raw.contentWidth,

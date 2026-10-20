@@ -1,9 +1,9 @@
 // 工作区状态与操作：目录树、标签页、保存队列、冲突处理、实时同步。
 // 文件操作一律先更新界面再请求服务器，失败时回滚，保证"操作即时生效"。
-import { Annotation, Transaction, type EditorState } from '@codemirror/state'
+import { Annotation, EditorState, Transaction } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { nextTick, reactive, watch } from 'vue'
-import { createEditorState, insertImageFiles, pasteImages, languageCompartment, pluginCompartment, pluginEditorExtensions, pluginLanguage } from '../editor'
+import { createEditorState, insertImageFiles, pasteImages, languageCompartment, pluginCompartment, pluginEditorExtensions, pluginLanguage, preferencesCompartment } from '../editor'
 import { handleShortcut, registerCommand } from './commands'
 import { api, ApiError, type Entry } from './api'
 import { drafts } from './drafts'
@@ -30,7 +30,7 @@ export interface Tab {
   conflictRev?: string
 }
 
-export type SettingsSection = 'appearance' | 'account' | 'shortcuts' | 'shares' | 'tokens' | 'trash' | 'plugins'
+export type SettingsSection = 'appearance' | 'editor' | 'account' | 'shortcuts' | 'shares' | 'tokens' | 'trash' | 'plugins'
 
 export interface Toast {
   id: number
@@ -176,6 +176,8 @@ function buildState(path: string, doc: string): EditorState {
   noteRefs.set(path, ref)
   return createEditorState({
     doc,
+    spellcheck: settings.spellcheck,
+    tabSize: settings.tabSize,
     resolveImage: (src) => resolveAssetUrl(ref.path, src),
     onChange: (u) => {
       editorStates.set(ref.path, u.state)
@@ -943,6 +945,21 @@ export async function startWorkspace() {
   watch(
     () => [settings.fontSize, settings.contentWidth, settings.sidebarWidth],
     () => view?.requestMeasure(),
+  )
+  watch(
+    () => [settings.spellcheck, settings.tabSize],
+    () => {
+      const effects = preferencesCompartment.reconfigure([
+        EditorState.tabSize.of(settings.tabSize),
+        EditorView.contentAttributes.of({ spellcheck: String(settings.spellcheck) }),
+      ])
+      for (const [path, state] of editorStates) {
+        if (path === ws.active && view) {
+          view.dispatch({ effects })
+          editorStates.set(path, view.state)
+        } else editorStates.set(path, state.update({ effects }).state)
+      }
+    },
   )
   window.addEventListener('rawmark-appearance', () => requestAnimationFrame(() => view?.requestMeasure()))
   window.addEventListener('rawmark-plugin-notice', (event) => toast((event as CustomEvent<string>).detail))
