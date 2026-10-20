@@ -1,5 +1,7 @@
 import { EditorView, WidgetType } from '@codemirror/view'
-import { emojiFor, renderMath, renderMermaid } from '../markdown/render'
+import { emojiFor, renderMath } from '../markdown/render'
+import { mountContent } from '../plugins/mount'
+import type { OwnedRenderer } from '../plugins/registry'
 
 export class BulletWidget extends WidgetType {
   eq() {
@@ -222,74 +224,57 @@ export class MathWidget extends WidgetType {
   }
 }
 
-const mermaidSeqs = new WeakMap<HTMLElement, number>()
-const mermaidListeners = new WeakMap<HTMLElement, () => void>()
-let mermaidSeq = 0
+const rendererMounts = new WeakMap<HTMLElement, () => void>()
 
-/** Mermaid 图表，editOffset 含义同 MathWidget */
-export class MermaidWidget extends WidgetType {
+/** 通用代码块预览；editOffset 与公式组件使用相同的点击编辑约定。 */
+export class CodeRendererWidget extends WidgetType {
   constructor(
     readonly code: string,
     readonly editOffset: number | null,
-  ) {
-    super()
-  }
-  eq(other: MermaidWidget) {
-    return other.code === this.code && other.editOffset === this.editOffset
+    readonly language: string,
+    readonly path: string,
+    readonly renderer: OwnedRenderer,
+  ) { super() }
+  eq(other: CodeRendererWidget) {
+    return other.code === this.code && other.editOffset === this.editOffset && other.language === this.language && other.path === this.path && other.renderer === this.renderer
   }
   toDOM(view: EditorView) {
     const el = document.createElement('div')
-    el.className = 'cm-rm-mermaid'
+    el.className = this.language === 'mermaid' ? 'cm-rm-mermaid' : 'cm-rm-code-render'
     if (this.editOffset === null) el.classList.add('cm-rm-preview')
     else editOnMousedown(el, view, this.editOffset)
-    el.textContent = '图表渲染中…'
-    this.render(el, view)
-    const update = () => this.render(el, view)
-    mermaidListeners.set(el, update)
-    window.addEventListener('rawmark-appearance', update)
+    this.mount(el, view)
     return el
   }
-  // 只复用预览元素：从渲染结果切到编辑时，编辑器会尝试用新组件更新旧元素（旧元素带点击编辑的监听）
   updateDOM(dom: HTMLElement, view: EditorView) {
     if (this.editOffset !== null || !dom.classList.contains('cm-rm-preview')) return false
-    this.render(dom, view)
-    const old = mermaidListeners.get(dom)
-    if (old) window.removeEventListener('rawmark-appearance', old)
-    const update = () => this.render(dom, view)
-    mermaidListeners.set(dom, update)
-    window.addEventListener('rawmark-appearance', update)
+    dom.className = (this.language === 'mermaid' ? 'cm-rm-mermaid' : 'cm-rm-code-render') + ' cm-rm-preview'
+    this.destroy(dom)
+    this.mount(dom, view)
     return true
   }
   destroy(dom: HTMLElement) {
-    const update = mermaidListeners.get(dom)
-    if (update) window.removeEventListener('rawmark-appearance', update)
-    mermaidListeners.delete(dom)
-    mermaidSeqs.delete(dom)
+    rendererMounts.get(dom)?.()
+    rendererMounts.delete(dom)
   }
-  // 渲染是异步的，连续输入时只采用最后一次的结果，并保留旧图直到新图就绪，避免闪烁
-  private render(el: HTMLElement, view: EditorView) {
-    const seq = ++mermaidSeq
-    mermaidSeqs.set(el, seq)
-    if (!this.code.trim()) {
-      el.textContent = '空图表'
-      return
+  private mount(el: HTMLElement, view: EditorView) {
+    let stop = () => {}
+    const render = () => {
+      stop()
+      stop = mountContent(el, (context) => Promise.resolve(this.renderer.render({
+        ...context, source: this.code, language: this.language, path: this.path,
+        colorMode: document.documentElement.dataset.rmColorMode === 'dark' ? 'dark' : 'light',
+      })).then((cleanup) => { requestAnimationFrame(() => view.requestMeasure()); return cleanup }), (error) => {
+        showRenderError(el, error)
+        this.renderer.fail(error)
+        view.requestMeasure()
+      })
     }
-    renderMermaid(this.code).then(
-      (svg) => {
-        if (mermaidSeqs.get(el) !== seq) return
-        el.innerHTML = svg
-        view.requestMeasure()
-      },
-      (err) => {
-        if (mermaidSeqs.get(el) !== seq) return
-        showRenderError(el, err)
-        view.requestMeasure()
-      },
-    )
+    render()
+    window.addEventListener('rawmark-appearance', render)
+    rendererMounts.set(el, () => { window.removeEventListener('rawmark-appearance', render); stop() })
   }
-  get estimatedHeight() {
-    return 240
-  }
+  get estimatedHeight() { return 240 }
 }
 
 export class EmojiWidget extends WidgetType {

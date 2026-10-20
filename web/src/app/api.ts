@@ -13,6 +13,15 @@ export interface Theme {
   version: string
 }
 
+export interface InstalledPlugin {
+  id: string
+  name: string
+  version: string
+  apiVersion: 1
+  revision: string
+  enabled: boolean
+}
+
 export interface TrashItem {
   id: string
   path: string
@@ -105,6 +114,16 @@ export const api = {
   settings: () => json<Record<string, unknown>>(request('GET', '/api/v1/settings')),
   themes: async () => (await json<{ themes: Theme[] }>(request('GET', '/api/v1/themes'))).themes,
   theme: (id: string) => json<Theme & { css: string }>(request('GET', '/api/v1/themes/' + encodeURIComponent(id))),
+  plugins: async () => (await json<{ plugins: InstalledPlugin[] }>(request('GET', '/api/v1/plugins'))).plugins,
+  installPlugin: (file: File) => {
+    const body = new FormData()
+    body.append('file', file)
+    return json<InstalledPlugin>(request('POST', '/api/v1/plugins', { body }))
+  },
+  togglePlugin: (id: string, enabled: boolean) => json<InstalledPlugin>(request('PATCH', '/api/v1/plugins/' + encodeURIComponent(id), { json: { enabled } })),
+  uninstallPlugin: (id: string) => request('DELETE', '/api/v1/plugins/' + encodeURIComponent(id)),
+  pluginData: (id: string) => json<{ data: unknown }>(request('GET', '/api/v1/plugins/' + encodeURIComponent(id) + '/data')),
+  savePluginData: (id: string, data: unknown) => request('PUT', '/api/v1/plugins/' + encodeURIComponent(id) + '/data', { json: { data } }),
   // 按顶层键合并，值为 null 的键被删除
   patchSettings: (patch: Record<string, unknown>) => json<Record<string, unknown>>(request('PATCH', '/api/v1/settings', { json: patch })),
 

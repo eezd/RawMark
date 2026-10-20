@@ -3,7 +3,7 @@
 import { Annotation, Transaction, type EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { nextTick, reactive, watch } from 'vue'
-import { createEditorState, insertImageFiles, pasteImages } from '../editor'
+import { createEditorState, insertImageFiles, pasteImages, languageCompartment, pluginCompartment, pluginEditorExtensions, pluginLanguage } from '../editor'
 import { handleShortcut, registerCommand } from './commands'
 import { api, ApiError, type Entry } from './api'
 import { drafts } from './drafts'
@@ -12,6 +12,9 @@ import { basename, dirname, joinPath, NOTE_EXT, resolveAssetUrl } from './paths'
 import { loadSettings, settings } from './settings'
 import { trackVisualViewport } from './viewport'
 import { appearancePaused } from '../themes/appearance'
+import { notePath, pluginEvents, pluginRefresh, pluginsPaused, setPluginEditorHandlers } from '../plugins/registry'
+import { pluginEditorFailure, refreshPlugins, startPlugins, stopPlugins } from '../plugins/host'
+import type { PluginAPI } from '../plugin-api'
 
 export type TabStatus = 'loading' | 'ready' | 'conflict' | 'deleted' | 'error'
 
@@ -27,7 +30,7 @@ export interface Tab {
   conflictRev?: string
 }
 
-export type SettingsSection = 'appearance' | 'account' | 'shortcuts' | 'shares' | 'tokens' | 'trash'
+export type SettingsSection = 'appearance' | 'account' | 'shortcuts' | 'shares' | 'tokens' | 'trash' | 'plugins'
 
 export interface Toast {
   id: number
@@ -54,7 +57,7 @@ export const ws = reactive({
   // 快速切换/命令面板的初始输入，null 为关闭；以 > 开头时列出命令
   switcher: null as string | null,
   // 打开的设置分组，null 为关闭；index 为从通用入口打开（手机上先显示分组列表，电脑上显示第一组）
-  settings: (appearancePaused ? 'appearance' : null) as SettingsSection | 'index' | null,
+  settings: (pluginsPaused ? 'plugins' : appearancePaused ? 'appearance' : null) as SettingsSection | 'index' | null,
   // 分享当前笔记的对话框（笔记路径）
   sharing: null as string | null,
   // 「移动到…」对话框（笔记或文件夹路径）
@@ -179,6 +182,7 @@ function buildState(path: string, doc: string): EditorState {
       if (!u.transactions.some((tr) => tr.annotation(externalChange))) scheduleSave(ref.path)
     },
     extensions: [
+      notePath.of(ref),
       EditorView.updateListener.of((u) => {
         if (u.docChanged || u.selectionSet) editorListeners.forEach((fn) => fn())
       }),
@@ -191,6 +195,33 @@ function buildState(path: string, doc: string): EditorState {
       }),
     ],
   })
+}
+
+function reconfigurePluginStates() {
+  const effects = [languageCompartment.reconfigure(pluginLanguage()), pluginCompartment.reconfigure(pluginEditorExtensions()), pluginRefresh.of(null)]
+  // 先计算全部新状态，失败时让注册方撤回；不让后台标签保留已停用扩展。
+  const updates = [...editorStates].map(([path, state]) => {
+    const current = path === ws.active && view ? view.state : state
+    return { path, transaction: current.update({ effects }) }
+  })
+  for (const { path, transaction } of updates) {
+    if (path === ws.active && view) view.dispatch(transaction)
+    editorStates.set(path, transaction.state)
+  }
+}
+
+const pluginWrite: PluginAPI['vault']['write'] = async (path, content, options) => {
+  const tab = tabOf(path)
+  const saved = slots.get(path)
+  if ((tab && (tab.dirty || tab.status !== 'ready')) || saved?.inflight || saved?.uploads || saved?.paused || opsInFlight) throw new ApiError(409, '笔记有未保存修改或正在操作，请稍后重试')
+  if (!options || (!('create' in options && options.create === true) && !('ifMatch' in options && typeof options.ifMatch === 'string' && options.ifMatch.length > 0))) throw new ApiError(400, '写入必须指定非空版本号或明确新建')
+  const initialRevision = tab?.rev
+  const initialSequence = saved?.seq ?? 0
+  const rev = await api.writeFile(path, content, 'create' in options ? '' : options.ifMatch)
+  // 用户可能已完成下一次保存，或已收到更新版本；迟到响应不能退回正文与 rev。
+  if (tab && tabOf(path) === tab && tab.rev === initialRevision && (slots.get(path)?.seq ?? 0) === initialSequence && !tab.dirty && tab.status === 'ready' && !slots.get(path)?.inflight) { replaceDoc(path, content); tab.rev = rev }
+  await refreshTree()
+  return { rev }
 }
 
 // 用服务器内容替换文档：只替换首尾相同部分之间的差异，尽量保留光标位置；不进入撤销历史
@@ -449,6 +480,7 @@ function remapOpenNotes(from: string, to: string) {
     const ref = noteRefs.get(next)
     if (ref) ref.path = next
   }
+  reconfigurePluginStates()
 }
 
 function remapRecent(from: string, to: string) {
@@ -696,7 +728,11 @@ async function syncOpenTab(tab: Tab) {
 function handleEvents(evs: VaultEvent[]) {
   for (const ev of evs) {
     if (ev.type === 'tree') void refreshTree()
-    else if (ev.type === 'settings') void loadSettings().catch((err) => toast('同步设置失败：' + errorText(err)))
+    else if (ev.type === 'settings') {
+      void loadSettings().catch((err) => toast('同步设置失败：' + errorText(err)))
+      void refreshPlugins()
+    }
+    else if (ev.type === 'plugins') void refreshPlugins()
     else if (ev.type === 'changed') {
       const tab = tabOf(ev.path!)
       // 自己保存产生的事件 rev 与本地一致；有本地修改时不覆盖，交由下次保存的冲突检测处理
@@ -711,12 +747,16 @@ function handleEvents(evs: VaultEvent[]) {
         tab.conflictRev = ''
       }
     }
+    if (ev.type === 'changed' || ev.type === 'moved' || ev.type === 'deleted') pluginEvents.dispatchEvent(new CustomEvent(ev.type, { detail: ev.type === 'moved' ? { from: ev.from!, path: ev.path! } : ev.type === 'changed' ? { path: ev.path!, rev: ev.rev! } : { path: ev.path! } }))
   }
+  if (evs.some((event) => event.type === 'tree')) void resync().catch((err) => toast('插件同步失败：' + errorText(err)))
 }
 
 async function resync() {
   await refreshTree()
   await Promise.all(ws.tabs.map(syncOpenTab))
+  pluginEvents.dispatchEvent(new CustomEvent('resync'))
+  await refreshPlugins()
 }
 
 // ---- 启动 ----
@@ -766,6 +806,19 @@ export async function startWorkspace() {
   }
   ws.active = saved.active && tabOf(saved.active) ? saved.active : (ws.tabs[0]?.path ?? null)
   disconnect = connectEvents({ onEvents: handleEvents, onResync: () => void resync() })
+  setPluginEditorHandlers(reconfigurePluginStates, pluginEditorFailure)
+  startPlugins({
+    notice: toast,
+    openNote,
+    writeNote: pluginWrite,
+    getActiveNote: () => {
+      const tab = activeTab()
+      if (!tab) return null
+      const state = view && ws.active === tab.path ? view.state : editorStates.get(tab.path)
+      if (!state) return null
+      return { path: tab.path, content: state.doc.toString(), rev: tab.rev, dirty: tab.dirty }
+    },
+  })
   // 重新登录后工作区会再次启动，以下全局监听只注册一次
   if (listenersInstalled) return
   listenersInstalled = true
@@ -800,6 +853,7 @@ export async function startWorkspace() {
     () => view?.requestMeasure(),
   )
   window.addEventListener('rawmark-appearance', () => requestAnimationFrame(() => view?.requestMeasure()))
+  window.addEventListener('rawmark-plugin-notice', (event) => toast((event as CustomEvent<string>).detail))
   // 页面隐藏/关闭前尽力发出待保存的修改（部分浏览器关闭标签页时只触发 pagehide）
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void flushAll(true)
@@ -873,6 +927,7 @@ export function openSearch() {
 }
 
 export function stopWorkspace() {
+  stopPlugins()
   disconnect?.()
   disconnect = undefined
 }

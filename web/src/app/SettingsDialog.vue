@@ -4,6 +4,7 @@ import { api, ApiError } from './api'
 import { allCommands, formatKeys, runCommand } from './commands'
 import Icon, { type IconName } from './Icon.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
+import PluginsPanel from './PluginsPanel.vue'
 import { CONTENT_WIDTHS, FONT_SIZES, loadSettings, settings, updateSettings, type Settings } from './settings'
 import SharePanel from './SharePanel.vue'
 import TokensPanel from './TokensPanel.vue'
@@ -12,6 +13,7 @@ import { toast, ws, type SettingsSection } from './workspace'
 
 const SECTIONS: { id: SettingsSection; title: string; icon: IconName }[] = [
   { id: 'appearance', title: '外观', icon: 'palette' },
+  { id: 'plugins', title: '插件', icon: 'command' },
   { id: 'account', title: '账户', icon: 'user' },
   { id: 'shortcuts', title: '快捷键', icon: 'command' },
   { id: 'shares', title: '分享链接', icon: 'link' },
@@ -106,7 +108,8 @@ async function changePassword() {
           <button class="rm-icon-btn" title="关闭" @click="close"><Icon name="close" /></button>
         </div>
         <div class="rm-settings-content">
-          <template v-if="section === 'appearance'">
+          <PluginsPanel v-if="section === 'plugins'" />
+          <template v-else-if="section === 'appearance'">
             <AppearanceSettings />
             <div class="rm-setting">
               <span class="rm-setting-label">字号</span>

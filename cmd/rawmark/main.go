@@ -96,6 +96,7 @@ func run(addr string) error {
 
 	srv := api.New(v, am, st, hub, idx)
 	srv.ThemesDir = filepath.Join(dataDir, "themes")
+	srv.PluginsDir = filepath.Join(dataDir, "plugins")
 	srv.OnSetup = func() { os.Remove(codeFile) }
 	go srv.FollowMoves(ctx)
 	httpServer := &http.Server{

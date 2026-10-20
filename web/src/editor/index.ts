@@ -1,7 +1,7 @@
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo } from '@codemirror/commands'
 import { markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown'
 import { Language } from '@codemirror/language'
-import { EditorState, Prec, type Extension } from '@codemirror/state'
+import { Compartment, EditorState, Prec, type Extension } from '@codemirror/state'
 import { drawSelection, EditorView, keymap, type ViewUpdate } from '@codemirror/view'
 import type { MarkdownParser } from '@lezer/markdown'
 import { typoraExtensions } from '../markdown/extensions'
@@ -12,17 +12,21 @@ import { insertLink, toggleBold, toggleItalic } from './format'
 import { livePreview, resolveImageUrl } from './livepreview'
 import { tableEditing } from './table'
 import { markdownTheme } from './theme'
+import { editorExtensions, markdownSyntax, reportEditorFailure } from '../plugins/registry'
 
 export { insertImageFiles, pasteImages } from './paste'
 
 // 在 lang-markdown 的语法集（CommonMark + GFM + 上下标 + emoji）上加 Typora 扩展。
 // 沿用其语言数据，markdownKeymap 中的命令据此识别 Markdown（isActiveAt 按语言数据判断）
-const rawmarkLanguage = new Language(
+export const pluginCompartment = new Compartment()
+export const languageCompartment = new Compartment()
+export function pluginLanguage() { return new Language(
   markdownLanguage.data,
-  (markdownLanguage.parser as MarkdownParser).configure(typoraExtensions),
+  (markdownLanguage.parser as MarkdownParser).configure([typoraExtensions, ...[...markdownSyntax.values()].map((entry) => entry.value)]),
   [],
   'markdown',
-)
+) }
+export function pluginEditorExtensions(): Extension[] { return [...editorExtensions.values()].map((entry) => entry.value) }
 
 export interface EditorStateOptions {
   doc: string
@@ -40,7 +44,9 @@ export function createEditorState(opts: EditorStateOptions): EditorState {
     EditorView.lineWrapping,
     // 不用 lang-markdown 的 markdown()：它会静态引入 lang-html/css/javascript 用于嵌套 HTML 高亮，
     // 首屏包 gzip 从约 108 KB 增至约 180 KB，而 Live Preview 不需要 HTML 高亮
-    rawmarkLanguage,
+    languageCompartment.of(pluginLanguage()),
+    pluginCompartment.of(pluginEditorExtensions()),
+    EditorView.exceptionSink.of(reportEditorFailure),
     Prec.high(keymap.of(markdownKeymap)),
     // 与 Typora 一致的格式快捷键
     Prec.high(
@@ -71,5 +77,10 @@ export function createEditorState(opts: EditorStateOptions): EditorState {
 }
 
 export function createEditorView(parent: HTMLElement, state: EditorState): EditorView {
-  return new EditorView({ parent, state })
+  const view = new EditorView({ parent, state })
+  const dispatch = view.dispatch.bind(view)
+  view.dispatch = (...args: unknown[]) => {
+    try { Reflect.apply(dispatch, view, args) } catch (error) { reportEditorFailure(error) }
+  }
+  return view
 }

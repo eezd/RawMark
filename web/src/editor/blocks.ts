@@ -4,13 +4,14 @@ import { Decoration, EditorView, type DecorationSet } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
 import { codeContentRange, fenceLanguage } from './codeblocks'
 import { editorFocused, setEditorFocus } from './focus'
-import { MathWidget, MermaidWidget } from './widgets'
+import { MathWidget, CodeRendererWidget } from './widgets'
+import { codeRenderers, notePath, pluginRefresh } from '../plugins/registry'
 
 // 公式块与 Mermaid 图表：未编辑时整块替换为渲染结果；光标在块内时显示源码，并在下方实时预览。
 // 跨行的块级替换只能由 StateField 提供；与表格一样只处理顶层的块
 
 /** 返回块的源码内容及其相对块起点的偏移（点击渲染结果时光标落在内容开头） */
-function blockContent(state: EditorState, node: SyntaxNode): { text: string; offset: number } | null {
+function blockContent(state: EditorState, node: SyntaxNode): { text: string; offset: number; language?: string } | null {
   if (node.name === 'BlockMath') {
     const marks = node.getChildren('BlockMathMark')
     const from = state.doc.lineAt(node.from).to + 1
@@ -19,9 +20,11 @@ function blockContent(state: EditorState, node: SyntaxNode): { text: string; off
   }
   if (node.name === 'FencedCode') {
     const info = node.getChild('CodeInfo')
-    if (!info || fenceLanguage(state, info.from, info.to) !== 'mermaid') return null
+    if (!info) return null
+    const language = fenceLanguage(state, info.from, info.to).toLowerCase()
+    if (!codeRenderers.has(language)) return null
     const { from, to } = codeContentRange(state, node)
-    return { text: state.sliceDoc(from, to), offset: from - node.from }
+    return { text: state.sliceDoc(from, to), offset: from - node.from, language }
   }
   return null
 }
@@ -34,7 +37,7 @@ function buildBlocks(state: EditorState): DecorationSet {
     if (!content) continue
     const editing = sel.some((r) => r.from <= node.to && r.to >= node.from)
     const widget = (editOffset: number | null) =>
-      node.name === 'BlockMath' ? new MathWidget(content.text, true, editOffset) : new MermaidWidget(content.text, editOffset)
+      node.name === 'BlockMath' ? new MathWidget(content.text, true, editOffset) : new CodeRendererWidget(content.text, editOffset, content.language!, state.facet(notePath).path, codeRenderers.get(content.language!)!)
     if (editing) out.push(Decoration.widget({ widget: widget(null), block: true, side: 1 }).range(node.to))
     else out.push(Decoration.replace({ widget: widget(content.offset), block: true }).range(node.from, node.to))
   }
@@ -47,7 +50,7 @@ export const renderedBlocks = StateField.define<DecorationSet>({
     if (
       tr.docChanged ||
       tr.selection ||
-      tr.effects.some((e) => e.is(setEditorFocus)) ||
+      tr.effects.some((e) => e.is(setEditorFocus) || e.is(pluginRefresh)) ||
       syntaxTree(tr.startState) !== syntaxTree(tr.state)
     ) {
       return buildBlocks(tr.state)

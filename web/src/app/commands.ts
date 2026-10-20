@@ -23,11 +23,18 @@ export function registerCommand(cmd: Command): () => void {
 
 /** 全部已注册的命令（含当前不可用的），用于快捷键一览 */
 export function allCommands(): Command[] {
-  return [...commands.values()]
+  const all = [...commands.values()]
+  const plugins = all.filter((command) => command.id.startsWith('plugin:'))
+  // 动态启停不能改变快捷键优先级；同一插件内仍保留注册顺序。
+  plugins.sort((a, b) => {
+    const left = a.id.split(':')[1], right = b.id.split(':')[1]
+    return left < right ? -1 : left > right ? 1 : 0
+  })
+  return [...all.filter((command) => !command.id.startsWith('plugin:')), ...plugins]
 }
 
 export function availableCommands(): Command[] {
-  return [...commands.values()].filter((c) => c.when?.() ?? true)
+  return allCommands().filter((c) => c.when?.() ?? true)
 }
 
 export function runCommand(id: string) {

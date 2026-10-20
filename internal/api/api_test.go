@@ -57,6 +57,7 @@ func newFixture(t *testing.T) *fixture {
 	t.Cleanup(func() { idx.Close() })
 	server := New(v, am, st, events.NewHub(), idx)
 	server.ThemesDir = filepath.Join(dir, "themes")
+	server.PluginsDir = filepath.Join(dir, "plugins")
 	srv := httptest.NewServer(server.Handler(fstest.MapFS{}))
 	t.Cleanup(srv.Close)
 	f := &fixture{t: t, url: srv.URL, root: v.Root(), store: st, admin: newClient()}

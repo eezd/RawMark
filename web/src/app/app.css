@@ -524,3 +524,14 @@ button {
 .rm-snippet-form input, .rm-snippet-form textarea { box-sizing: border-box; width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--rm-divider); border-radius: 6px; background: var(--rm-bg); color: var(--rm-text); font: inherit; }
 .rm-snippet-form textarea { font-family: var(--rm-font-mono); resize: vertical; }
 @media (pointer: coarse) { .rm-snippet-row .rm-btn, .rm-snippet-form .rm-btn { min-height: 44px; } .rm-snippet-form input, .rm-snippet-form textarea { font-size: 16px; } }
+
+.rm-plugin-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--rm-divider); }
+.rm-plugin-row label { display: flex; align-items: center; flex: 1; min-width: 0; gap: 8px; overflow-wrap: anywhere; }
+.rm-plugin-row small { display: block; color: var(--rm-text-muted); font-size: 12px; }
+.rm-plugin-row p { width: 100%; font-size: 13px; }
+.rm-plugin-row input { accent-color: var(--rm-accent); flex: none; }
+.rm-plugin-view { padding: 16px; min-width: 0; overflow: auto; overflow-wrap: anywhere; }
+.rm-sidebar-inner > .rm-plugin-view { flex: 1; }
+.rm-plugin-tabs { display: flex; flex: none; gap: 4px; padding: 8px; overflow-x: auto; }
+.rm-plugin-tabs .on { background: var(--rm-active); color: var(--rm-accent-strong); }
+@media (pointer: coarse) { .rm-plugin-row .rm-btn, .rm-plugin-tabs .rm-btn { min-height: 44px; } }

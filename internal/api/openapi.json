@@ -1668,6 +1668,384 @@
           }
         }
       }
+    },
+    "/plugins": {
+      "get": {
+        "summary": "列出已安装插件及启用状态",
+        "tags": [
+          "插件"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plugins": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Plugin"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "需要登录会话"
+          },
+          "400": {
+            "description": "请求或插件包无效"
+          },
+          "403": {
+            "description": "不接受 API 令牌"
+          }
+        }
+      },
+      "post": {
+        "summary": "安装 ZIP 插件；安装后默认停用，同 id 拒绝覆盖",
+        "tags": [
+          "插件"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plugin"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "需要登录会话"
+          },
+          "400": {
+            "description": "请求或插件包无效"
+          },
+          "403": {
+            "description": "不接受 API 令牌"
+          },
+          "409": {
+            "description": "同名插件已安装"
+          },
+          "413": {
+            "description": "ZIP 超过 10 MiB"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/plugins/{id}": {
+      "patch": {
+        "summary": "修改全设备插件启用偏好",
+        "tags": [
+          "插件"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plugin"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "需要登录会话"
+          },
+          "400": {
+            "description": "请求或插件包无效"
+          },
+          "403": {
+            "description": "不接受 API 令牌"
+          },
+          "404": {
+            "description": "插件或指定版本的资源不存在"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "enabled"
+                ],
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "停用并卸载插件包，保留插件私有数据",
+        "tags": [
+          "插件"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "需要登录会话"
+          },
+          "400": {
+            "description": "请求或插件包无效"
+          },
+          "403": {
+            "description": "不接受 API 令牌"
+          },
+          "404": {
+            "description": "插件或指定版本的资源不存在"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/plugins/{id}/data": {
+      "get": {
+        "summary": "读取插件私有 JSON，无数据时为 null",
+        "tags": [
+          "插件"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "需要登录会话"
+          },
+          "400": {
+            "description": "请求或插件包无效"
+          },
+          "403": {
+            "description": "不接受 API 令牌"
+          },
+          "404": {
+            "description": "插件或指定版本的资源不存在"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "put": {
+        "summary": "替换插件私有 JSON，最多 1 MiB",
+        "tags": [
+          "插件"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "需要登录会话"
+          },
+          "400": {
+            "description": "请求或插件包无效"
+          },
+          "403": {
+            "description": "不接受 API 令牌"
+          },
+          "404": {
+            "description": "插件或指定版本的资源不存在"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "data"
+                ],
+                "properties": {
+                  "data": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/plugins/{id}/assets/{revision}/{path}": {
+      "get": {
+        "summary": "鉴权读取指定安装版本的包内资源",
+        "tags": [
+          "插件"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "需要登录会话"
+          },
+          "400": {
+            "description": "请求或插件包无效"
+          },
+          "403": {
+            "description": "不接受 API 令牌"
+          },
+          "404": {
+            "description": "插件或指定版本的资源不存在"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1847,6 +2225,38 @@
           },
           "version": {
             "type": "string"
+          }
+        }
+      },
+      "Plugin": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "version",
+          "apiVersion",
+          "revision",
+          "enabled"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "apiVersion": {
+            "type": "integer",
+            "const": 1
+          },
+          "enabled": {
+            "type": "boolean"
           }
         }
       }

@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Icon from './Icon.vue'
 import { basename } from './paths'
 import { tree } from './tree'
 import TreeNode from './TreeNode.vue'
 import SearchPanel from './SearchPanel.vue'
 import { createFolder, createNote, move, openSearch, ws } from './workspace'
+import { sidebarViews } from '../plugins/registry'
+import PluginMount from './PluginMount.vue'
 
 const emit = defineEmits<{ logout: [] }>()
 const rootDrop = ref(false)
+const selectedView = ref('')
+const currentView = computed(() => sidebarViews.get(selectedView.value))
+watch(() => ws.searchOpen, () => { selectedView.value = '' })
 
 function onRootDragOver(e: DragEvent) {
   if (!e.dataTransfer?.types.includes('application/x-rawmark-path')) return
@@ -35,7 +40,12 @@ function onRootDrop(e: DragEvent) {
       <button class="rm-icon-btn" title="新建笔记" @click="createNote('')"><Icon name="noteAdd" /></button>
       <button class="rm-icon-btn" title="新建文件夹" @click="createFolder('')"><Icon name="folderAdd" /></button>
     </div>
-    <SearchPanel v-if="ws.searchOpen" />
+    <nav v-if="sidebarViews.size" class="rm-plugin-tabs" aria-label="侧栏视图">
+      <button class="rm-btn" :class="{ on: !currentView }" @click="selectedView = ''">文件</button>
+      <button v-for="[id, pluginView] in sidebarViews" :key="id" class="rm-btn" :class="{ on: selectedView === id }" @click="selectedView = id">{{ pluginView.title }}</button>
+    </nav>
+    <PluginMount v-if="currentView" :key="selectedView" :view="currentView" />
+    <SearchPanel v-else-if="ws.searchOpen" />
     <div v-else class="rm-tree" :class="{ drop: rootDrop }" @dragover="onRootDragOver" @dragleave="rootDrop = false" @drop="onRootDrop">
       <ul class="rm-tree-list">
         <TreeNode v-for="node in tree" :key="node.path" :node="node" :depth="0" />
