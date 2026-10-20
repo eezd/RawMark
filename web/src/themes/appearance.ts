@@ -13,6 +13,11 @@ export interface Appearance {
 
 export const appearancePaused = new URLSearchParams(location.search).has('reset-appearance')
 
+export function fixedThemeMode(theme: string): 'light' | 'dark' | undefined {
+  if (theme === 'white') return 'light'
+  if (theme === 'black') return 'dark'
+}
+
 export function sanitizeAppearance(raw: Record<string, unknown>): Appearance {
   return {
     colorMode: raw.colorMode === 'light' || raw.colorMode === 'dark' ? raw.colorMode : 'system',
@@ -40,7 +45,7 @@ function style(id: string, css: string) {
 }
 
 function render() {
-  const mode = appearancePaused ? 'system' : current.colorMode
+  const mode = appearancePaused ? 'system' : fixedThemeMode(current.theme) ?? current.colorMode
   const dark = mode === 'system' ? darkMode.matches : mode === 'dark'
   const signature = JSON.stringify([dark, appearancePaused ? '' : [current.theme, themeCSS, current.cssSnippets]])
   if (signature === rendered) return

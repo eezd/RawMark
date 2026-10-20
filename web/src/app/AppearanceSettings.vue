@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { api, ApiError, type Theme } from './api'
-import { appearancePaused, type CssSnippet } from '../themes/appearance'
+import { appearancePaused, fixedThemeMode, type CssSnippet } from '../themes/appearance'
 import { loadSettings, reloadTheme, settings, updateSettings, type Settings } from './settings'
 import { toast } from './workspace'
 
@@ -11,6 +11,7 @@ const busy = ref(false)
 const editing = ref<string | null>(null)
 const draft = ref({ name: '', css: '' })
 const missingTheme = computed(() => !themes.value.some((theme) => theme.id === settings.theme))
+const fixedMode = computed(() => fixedThemeMode(settings.theme))
 
 async function refreshThemes() {
   error.value = ''
@@ -74,7 +75,7 @@ async function reset() {
   <p v-if="appearancePaused" class="rm-appearance-note">已临时停用主题和 CSS。可恢复默认外观后重新打开页面。</p>
   <div class="rm-setting">
     <label for="rm-color-mode" class="rm-setting-label">明暗模式</label>
-    <select id="rm-color-mode" :value="settings.colorMode" :disabled="busy" @change="change({ colorMode: ($event.target as HTMLSelectElement).value as Settings['colorMode'] })">
+    <select id="rm-color-mode" :value="fixedMode ?? settings.colorMode" :disabled="busy || !!fixedMode" @change="change({ colorMode: ($event.target as HTMLSelectElement).value as Settings['colorMode'] })">
       <option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option>
     </select>
   </div>
@@ -87,7 +88,8 @@ async function reset() {
     <button class="rm-btn" :disabled="busy" @click="refreshThemes">刷新列表</button>
   </div>
   <p v-if="error" class="rm-appearance-note rm-auth-error">{{ error }}</p>
-  <p class="rm-appearance-note">主题从服务器数据目录的 themes 文件夹读取；主题和已启用的 CSS 也会应用到分享页。</p>
+  <p v-if="fixedMode" class="rm-appearance-note">白色、黑色主题固定使用对应明暗模式；切换回默认或自定义主题后使用原来的明暗设置。</p>
+  <p class="rm-appearance-note">可选择内置主题，或从服务器数据目录的 themes 文件夹添加主题；主题和已启用的 CSS 也会应用到分享页。</p>
   <div class="rm-setting"><span class="rm-setting-label">CSS 片段</span><button class="rm-btn" :disabled="busy" @click="edit()">新建片段</button></div>
   <div v-for="snippet in settings.cssSnippets" :key="snippet.id" class="rm-snippet-row">
     <label><input type="checkbox" :checked="snippet.enabled" :disabled="busy" @change="toggle(snippet)" />{{ snippet.name }}</label>

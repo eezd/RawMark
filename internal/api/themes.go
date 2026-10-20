@@ -1,6 +1,7 @@
 package api
 
 import (
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,29 @@ type themeManifest struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
 	Version string `json:"version"`
+}
+
+//go:embed themes/white.css
+var whiteThemeCSS string
+
+//go:embed themes/black.css
+var blackThemeCSS string
+
+var builtinThemes = []struct {
+	themeManifest
+	css string
+}{
+	{themeManifest{"white", "白色", "1"}, whiteThemeCSS},
+	{themeManifest{"black", "黑色", "1"}, blackThemeCSS},
+}
+
+func builtinTheme(id string) (themeManifest, string, bool) {
+	for _, theme := range builtinThemes {
+		if theme.ID == id {
+			return theme.themeManifest, theme.css, true
+		}
+	}
+	return themeManifest{}, "", false
 }
 
 func readThemeFile(root *os.Root, name string, limit int64) ([]byte, error) {
@@ -43,6 +67,9 @@ func readThemeFile(root *os.Root, name string, limit int64) ([]byte, error) {
 }
 
 func (s *Server) readTheme(id string) (themeManifest, string, error) {
+	if manifest, css, ok := builtinTheme(id); ok {
+		return manifest, css, nil
+	}
 	var manifest themeManifest
 	if !themeIDPattern.MatchString(id) || id == "default" || s.ThemesDir == "" {
 		return manifest, "", fs.ErrNotExist
@@ -73,6 +100,9 @@ func (s *Server) readTheme(id string) (themeManifest, string, error) {
 
 func (s *Server) listThemes(w http.ResponseWriter, r *http.Request) {
 	themes := []themeManifest{{ID: "default", Name: "默认", Version: "1"}}
+	for _, theme := range builtinThemes {
+		themes = append(themes, theme.themeManifest)
+	}
 	if s.ThemesDir != "" {
 		entries, err := os.ReadDir(s.ThemesDir)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -80,6 +110,9 @@ func (s *Server) listThemes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, entry := range entries {
+			if _, _, ok := builtinTheme(entry.Name()); ok {
+				continue
+			}
 			if !entry.IsDir() || !themeIDPattern.MatchString(entry.Name()) || entry.Name() == "default" {
 				continue
 			}

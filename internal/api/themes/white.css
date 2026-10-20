@@ -1,0 +1,22 @@
+:root {
+  color-scheme: light;
+  --rm-bg: #ffffff;
+  --rm-sidebar-bg: #f6f7f9;
+  --rm-text: #202124;
+  --rm-text-muted: #656b75;
+  --rm-divider: #e3e6eb;
+  --rm-accent: #2563eb;
+  --rm-accent-strong: #1d4ed8;
+  --rm-selection: rgba(37, 99, 235, 0.18);
+  --rm-hover: rgba(32, 33, 36, 0.045);
+  --rm-active: rgba(37, 99, 235, 0.10);
+  --rm-danger: #c42b3a;
+  --rm-warn-bg: #fff8e6;
+  --rm-warn-text: #855600;
+  --rm-shadow: 0 12px 36px rgba(24, 31, 44, 0.12);
+  --rm-inline-code-bg: #f0f2f5;
+  --rm-inline-code-text: #40536d;
+  --rm-code-bg: #292d3e;
+  --rm-code-text: #e1e4e8;
+  --rm-highlight-bg: #fff0a8;
+}
