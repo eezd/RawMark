@@ -3,11 +3,13 @@ package api
 import (
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -347,6 +349,52 @@ func TestShareAccess(t *testing.T) {
 	}
 	if code := f.status(newClient(), "GET", "/api/v1/shares", "", nil); code != 401 {
 		t.Errorf("未登录不能管理分享，得到 %d", code)
+	}
+}
+
+func TestShareFilenameToken(t *testing.T) {
+	f := newFixture(t)
+	name := "计划 #1? 50% +;\""
+	p := "目录/" + name + ".md"
+	f.write(p, "正文")
+	f.write("目录/"+name+".assets/图.png", "PNG")
+	body, err := json.Marshal(map[string]string{"path": p, "password": "访问密码"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sh := decode[shareView](t, f.do(f.admin, "POST", "/api/v1/shares", string(body), nil))
+	suffix, ok := strings.CutPrefix(sh.Token, name+"-")
+	random, err := base64.RawURLEncoding.DecodeString(suffix)
+	if !ok || err != nil || len(random) != 16 {
+		t.Fatal("分享应包含完整文件名和 128 位随机字符，不包含目录")
+	}
+	other := decode[shareView](t, f.do(f.admin, "POST", "/api/v1/shares", string(body), nil))
+	if other.Token == sh.Token {
+		t.Fatal("同一笔记的分享链接不能重复")
+	}
+	base := "/api/v1/public/shares/" + url.PathEscape(sh.Token)
+	guest := newClient()
+	if code := f.status(guest, "GET", base, "", nil); code != 401 {
+		t.Fatalf("未解锁应拒绝访问，得到 %d", code)
+	}
+	if code := f.status(guest, "POST", base+"/unlock", `{"password":"访问密码"}`, nil); code != 200 {
+		t.Fatalf("解锁失败：%d", code)
+	}
+	if code := f.status(guest, "GET", base, "", nil); code != 200 {
+		t.Fatalf("带保留字符的链接应可读取正文，得到 %d", code)
+	}
+	asset := base + "/assets/" + url.PathEscape(name+".assets") + "/图.png"
+	if code := f.status(guest, "GET", asset, "", nil); code != 200 {
+		t.Fatalf("解锁凭据应覆盖图片路径，得到 %d", code)
+	}
+	if code := f.status(guest, "GET", "/api/v1/public/shares/"+url.PathEscape(other.Token), "", nil); code != 401 {
+		t.Fatalf("凭据不能解锁另一分享，得到 %d", code)
+	}
+	if code := f.status(f.admin, "DELETE", "/api/v1/shares/"+url.PathEscape(sh.Token), "", nil); code != 200 {
+		t.Fatalf("撤销带保留字符的链接失败：%d", code)
+	}
+	if code := f.status(guest, "GET", base, "", nil); code != 404 {
+		t.Fatalf("撤销后应返回 404，得到 %d", code)
 	}
 }
 

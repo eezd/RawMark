@@ -76,7 +76,7 @@ func (s *Server) createShare(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	sh := store.Share{
-		Token:        auth.NewShareToken(),
+		Token:        strings.TrimSuffix(path.Base(p), vault.NoteExt) + "-" + auth.NewShareToken(),
 		Path:         p,
 		PasswordHash: auth.HashSharePassword(body.Password),
 		CreatedAt:    now.UnixMilli(),
@@ -212,9 +212,9 @@ func (s *Server) unlockShare(w http.ResponseWriter, r *http.Request) {
 		ttl = time.Until(time.UnixMilli(sh.ExpiresAt))
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     shareCookieName,
-		Value:    value,
-		Path:     "/api/v1/public/shares/" + sh.Token,
+		Name:  shareCookieName,
+		Value: value,
+		// 默认 Path 为 /unlock 所在目录，避免非 ASCII 文件名违反 Cookie Path 格式。
 		MaxAge:   int(ttl / time.Second),
 		HttpOnly: true,
 		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",

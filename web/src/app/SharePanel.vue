@@ -22,7 +22,7 @@ const busy = ref(false)
 const failed = ref(false)
 const fmt = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
 
-const linkOf = (s: Share) => `${location.origin}/s/${s.token}`
+const linkOf = (s: Share) => `${location.origin}/s/${encodeURIComponent(s.token)}`
 const expired = (s: Share) => s.expiresAt !== 0 && s.expiresAt <= Date.now()
 
 function errorText(err: unknown) {

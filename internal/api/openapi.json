@@ -1083,7 +1083,7 @@
         },
         "responses": {
           "200": {
-            "description": "新分享，访问地址为 /s/{token}",
+            "description": "新分享，token 为文件名（不含 .md）加连字符和随机字符，访问地址为 /s/{URL 编码后的 token}；文件移动或改名不改变已生成的链接",
             "content": {
               "application/json": {
                 "schema": {
