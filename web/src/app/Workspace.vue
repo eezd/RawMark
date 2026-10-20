@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted } from 'vue'
-import { api } from './api'
+import { api, ApiError } from './api'
 import { registerCommand } from './commands'
 import EditorPane from './EditorPane.vue'
 import Icon from './Icon.vue'
@@ -79,7 +79,7 @@ function onTouchMove(e: TouchEvent) {
 
 const unregisterLogout = registerCommand({ id: 'app.logout', title: '退出登录', run: () => void logout() })
 
-onMounted(() => void startWorkspace())
+onMounted(() => void startWorkspace().catch((err) => toast('工作区初始化失败，请重新加载：' + (err instanceof ApiError ? err.message : '网络或本地存储错误'))))
 onBeforeUnmount(() => {
   unregisterLogout()
   stopWorkspace()

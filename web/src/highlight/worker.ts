@@ -18,9 +18,9 @@ const langLoads = new Map<string, Promise<boolean>>()
 function ensureLanguage(hl: HighlighterCore, lang: string): Promise<boolean> {
   let load = langLoads.get(lang)
   if (!load) {
-    const importer = bundledLanguages[lang as keyof typeof bundledLanguages]
+    const importer = Object.hasOwn(bundledLanguages, lang) ? bundledLanguages[lang as keyof typeof bundledLanguages] : undefined
     load = importer
-      ? importer().then((mod) => hl.loadLanguage(mod.default)).then(() => true)
+      ? importer().then((mod) => hl.loadLanguage(mod.default)).then(() => true).catch((error) => { langLoads.delete(lang); throw error })
       : Promise.resolve(false)
     langLoads.set(lang, load)
   }
@@ -41,6 +41,11 @@ async function highlight(req: HighlightRequest): Promise<TokenRun | null> {
 }
 
 self.addEventListener('message', async (e: MessageEvent<HighlightRequest>) => {
-  const res: HighlightResponse = { id: e.data.id, tokens: await highlight(e.data) }
-  ;(self as unknown as Worker).postMessage(res)
+  let res: HighlightResponse
+  try {
+    res = { id: e.data.id, tokens: await highlight(e.data) }
+  } catch (cause) {
+    res = { id: e.data.id, error: new Error('代码高亮失败', { cause }) }
+  }
+  self.postMessage(res)
 })

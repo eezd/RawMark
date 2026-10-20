@@ -4,7 +4,7 @@ import { allCommands, registerCommand } from '../app/commands'
 import type { AsyncCleanup, JSONValue, PluginAPI, PluginView, PluginWorkspace, VaultEvents } from '../plugin-api'
 import { editorExtensions, markdownSyntax, pluginEvents, pluginsPaused, registerCodeRenderer, registerEntry, settingTabs, sidebarViews } from './registry'
 
-export const pluginState = reactive({ installed: [] as InstalledPlugin[], status: {} as Record<string, { phase: string; error: string }>, error: '' })
+export const pluginState = reactive({ installed: [] as InstalledPlugin[], status: {} as Record<string, { phase: string; error: string; cause?: unknown; cleanupErrors?: unknown[] }>, error: '', errorCause: undefined as unknown })
 interface Adapter extends PluginWorkspace {
   notice(message: string): void
   writeNote: PluginAPI['vault']['write']
@@ -15,6 +15,7 @@ interface Instance {
   stopped: boolean
   cleanups: Set<() => void>
   pending: Promise<unknown>[]
+  cleanupErrors: unknown[]
 }
 const instances = new Map<string, Instance>()
 const faults = new Map<string, string>()
@@ -24,9 +25,14 @@ let session = 0
 let request = 0
 let loading = false
 
-function status(id: string, phase: string, error = '') { pluginState.status[id] = { phase, error } }
+function status(id: string, phase: string, error = '', cause?: unknown) { pluginState.status[id] = { phase, error, cause, cleanupErrors: pluginState.status[id]?.cleanupErrors } }
 function assertActive(instance: Instance) {
   if (instance.stopped || !running) throw new Error('插件已停止，不能继续调用 SDK')
+}
+
+function cleanupFailure(instance: Instance, cause: unknown) {
+  instance.cleanupErrors.push(cause)
+  adapter.notice(`插件“${instance.info.name}”清理失败`)
 }
 
 function track(instance: Instance, cleanup: AsyncCleanup): () => void {
@@ -37,9 +43,9 @@ function track(instance: Instance, cleanup: AsyncCleanup): () => void {
     done = true
     instance.cleanups.delete(remove)
     try {
-      const pending = Promise.resolve(cleanup()).catch(() => adapter.notice(`插件“${instance.info.name}”清理失败`))
+      const pending = Promise.resolve(cleanup()).catch((cause) => cleanupFailure(instance, cause))
       instance.pending.push(pending)
-    } catch { adapter.notice(`插件“${instance.info.name}”清理失败`) }
+    } catch (cause) { cleanupFailure(instance, cause) }
   }
   instance.cleanups.add(remove)
   return remove
@@ -60,11 +66,11 @@ async function stop(instance: Instance) {
   if (!finished) adapter.notice(`插件“${instance.info.name}”清理超过 5 秒`)
 }
 
-function fail(instance: Instance, phase: string) {
+function fail(instance: Instance, phase: string, cause: unknown) {
   if (instance.stopped) return
   const message = `${phase}失败，已在当前页面停用；可在插件设置中重试`
   faults.set(instance.info.id, instance.info.revision)
-  status(instance.info.id, 'error', message)
+  status(instance.info.id, 'error', message, cause)
   adapter.notice(`插件“${instance.info.name}”：${message}`)
   void stop(instance)
 }
@@ -77,7 +83,7 @@ function localID(instance: Instance, id: string) {
 function addView(instance: Instance, map: typeof sidebarViews, view: PluginView) {
   assertActive(instance)
   if (!view.title.trim() || typeof view.mount !== 'function') throw new Error('插件视图必须提供标题与挂载函数')
-  return track(instance, registerEntry(map, localID(instance, view.id), { ...view, owner: instance.info.id, fail: () => fail(instance, '视图') }))
+  return track(instance, registerEntry(map, localID(instance, view.id), { ...view, owner: instance.info.id, fail: (cause) => fail(instance, '视图', cause) }))
 }
 
 async function createAPI(instance: Instance): Promise<PluginAPI> {
@@ -96,11 +102,11 @@ async function createAPI(instance: Instance): Promise<PluginAPI> {
       return track(instance, registerCommand({ ...command, id: commandID,
         when: () => {
           if (instance.stopped) return false
-          try { return command.when?.() ?? true } catch { fail(instance, '命令条件'); return false }
+          try { return command.when?.() ?? true } catch (cause) { fail(instance, '命令条件', cause); return false }
         },
         run: () => {
           if (instance.stopped) return
-          try { void Promise.resolve(command.run()).catch(() => fail(instance, '命令')) } catch { fail(instance, '命令') }
+          try { void Promise.resolve(command.run()).catch((cause) => fail(instance, '命令', cause)) } catch (cause) { fail(instance, '命令', cause) }
         },
       }))
     },
@@ -115,7 +121,7 @@ async function createAPI(instance: Instance): Promise<PluginAPI> {
     registerCodeBlockRenderer(language, render) {
       check()
       if (typeof render !== 'function') throw new Error('代码块渲染器必须为函数')
-      return track(instance, registerCodeRenderer(language, { owner: id, render, fail: () => fail(instance, '代码块渲染') }))
+      return track(instance, registerCodeRenderer(language, { owner: id, render, fail: (cause) => fail(instance, '代码块渲染', cause) }))
     },
     addSidebarView: (view) => addView(instance, sidebarViews, view),
     addSettingTab: (view) => addView(instance, settingTabs, view),
@@ -132,7 +138,7 @@ async function createAPI(instance: Instance): Promise<PluginAPI> {
         if (!['changed', 'moved', 'deleted', 'resync'].includes(event)) throw new Error('仓库事件类型无效')
         const listener = (e: Event) => {
           if (instance.stopped) return
-          try { void Promise.resolve(callback(event === 'resync' ? undefined : (e as CustomEvent).detail)).catch(() => fail(instance, '仓库事件')) } catch { fail(instance, '仓库事件') }
+          try { void Promise.resolve(callback(event === 'resync' ? undefined : (e as CustomEvent).detail)).catch((cause) => fail(instance, '仓库事件', cause)) } catch (cause) { fail(instance, '仓库事件', cause) }
         }
         pluginEvents.addEventListener(event, listener)
         return track(instance, () => pluginEvents.removeEventListener(event, listener))
@@ -171,15 +177,15 @@ async function activate(instance: Instance) {
     if (cleanup !== undefined && typeof cleanup !== 'function') throw new Error('激活返回值必须为清理函数')
     if (cleanup) {
       if (instance.stopped) {
-        try { await cleanup() } catch { adapter.notice(`插件“${instance.info.name}”迟到的清理失败`) }
+        try { await cleanup() } catch (cause) { cleanupFailure(instance, cause) }
       } else track(instance, cleanup as AsyncCleanup)
     }
   })()
   try {
     await Promise.race([pending, interrupted])
     if (!instance.stopped) status(instance.info.id, 'active')
-  } catch {
-    fail(instance, '激活')
+  } catch (cause) {
+    fail(instance, '激活', cause)
   } finally {
     clearTimeout(timer!)
     signal.removeEventListener('abort', onAbort)
@@ -194,9 +200,10 @@ async function pump() {
     while (running && currentSession === session && !pluginState.error) {
       const next = pluginState.installed.find((p) => p.enabled && !instances.has(p.id) && faults.get(p.id) !== p.revision)
       if (!next) break
-      const instance: Instance = { info: { ...next }, controller: new AbortController(), stopped: false, cleanups: new Set(), pending: [] }
+      const instance: Instance = { info: { ...next }, controller: new AbortController(), stopped: false, cleanups: new Set(), pending: [], cleanupErrors: [] }
       instances.set(next.id, instance)
       status(next.id, 'loading')
+      pluginState.status[next.id]!.cleanupErrors = instance.cleanupErrors
       await activate(instance)
     }
   } finally { loading = false; if (running && currentSession !== session) void pump() }
@@ -211,6 +218,7 @@ export async function refreshPlugins() {
     if (!running || currentSession !== session || sequence !== request) return
     pluginState.installed = installed
     pluginState.error = ''
+    pluginState.errorCause = undefined
     for (const instance of instances.values()) {
       if (!installed.some((p) => p.id === instance.info.id && p.revision === instance.info.revision && p.enabled)) void stop(instance)
     }
@@ -219,9 +227,10 @@ export async function refreshPlugins() {
       else if (pluginsPaused) status(p.id, 'paused')
     }
     void pump()
-  } catch {
+  } catch (cause) {
     if (!running || currentSession !== session || sequence !== request) return
     pluginState.error = '读取插件列表失败，请检查连接后重试'
+    pluginState.errorCause = cause
     adapter.notice(pluginState.error)
     for (const instance of instances.values()) {
       status(instance.info.id, 'paused')
@@ -258,7 +267,7 @@ export function pluginEditorFailure(error: unknown) {
   queueMicrotask(() => {
     for (const owner of owners) {
       const instance = instances.get(owner)
-      if (instance) fail(instance, '编辑器扩展')
+      if (instance) fail(instance, '编辑器扩展', error)
     }
   })
 }

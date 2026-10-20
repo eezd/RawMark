@@ -100,7 +100,10 @@ function render(note: SharedNote) {
   resolveImages(article)
   buildToc(article)
   hydrate(article)
-  for (const code of article.querySelectorAll<HTMLElement>('pre > code')) void decorateCode(code)
+  for (const code of article.querySelectorAll<HTMLElement>('pre > code')) void decorateCode(code).catch((error) => {
+    code.title = '代码高亮失败，已保留源码'
+    console.error('分享页代码高亮失败', error)
+  })
 }
 
 // 相对地址的图片（笔记的 .assets）经分享接口读取；服务器只允许读取本篇的图片目录

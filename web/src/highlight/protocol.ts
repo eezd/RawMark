@@ -9,8 +9,5 @@ export interface HighlightRequest {
 // 扁平数组：[offset, length, color, fontStyle, offset, length, ...]，避免大量小对象跨线程拷贝
 export type TokenRun = (number | string)[]
 
-export interface HighlightResponse {
-  id: number
-  // 语言不受支持时为 null，调用方按纯文本显示
-  tokens: TokenRun | null
-}
+// 语言不受支持时 tokens 为 null；实际失败必须与纯文本结果区分。
+export type HighlightResponse = { id: number; tokens: TokenRun | null } | { id: number; error: Error }

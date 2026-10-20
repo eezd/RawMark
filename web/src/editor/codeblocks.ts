@@ -154,7 +154,11 @@ const codeHighlighter = ViewPlugin.fromClass(
           effects.push(setBlockTokens.of({ from: block.from, to: block.to, decorations: tokensToDecorations(block, cached) }))
         } else {
           // 结果到达后再走一次 sync，届时命中缓存；期间文档若已变化，键不同则自然重算
-          requestTokens(block.lang, block.code).then(() => this.schedule())
+          requestTokens(block.lang, block.code).then(() => this.schedule()).catch((error) => {
+            // 本次内容失败后不随每次光标移动重试，修改代码或语言后重新请求。
+            if (!this.destroyed) this.applied.set(block.from, key)
+            console.error('代码高亮失败', error)
+          })
         }
       }
       if (effects.length) this.view.dispatch({ effects })

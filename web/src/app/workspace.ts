@@ -382,7 +382,7 @@ export async function keepLocalVersion(path: string) {
       s.savedSeq = seq
       Object.assign(tab, { rev, status: 'ready', dirty: s.seq !== seq, conflictRev: undefined, saveError: undefined })
       if (s.seq === seq) await drafts.delete(path)
-      if (!ws.entries.some((e) => e.path === path)) void refreshTree()
+      if (!ws.entries.some((e) => e.path === path)) void refreshTree().catch((err) => toast('刷新目录失败：' + errorText(err)))
     } catch (err) {
       if (err instanceof ApiError && err.status === 412) {
         tab.conflictRev = typeof err.data.rev === 'string' ? err.data.rev : ''
@@ -544,11 +544,11 @@ let treeTimer: ReturnType<typeof setTimeout> | undefined
 let treeFetching = false
 let treeAgain = false
 let localTreeEdits = 0
-const treeWaiters: (() => void)[] = []
+const treeWaiters: { resolve: () => void; reject: (reason: unknown) => void }[] = []
 
 export function refreshTree(): Promise<void> {
-  return new Promise((resolve) => {
-    treeWaiters.push(resolve)
+  return new Promise((resolve, reject) => {
+    treeWaiters.push({ resolve, reject })
     scheduleTreeRefresh()
   })
 }
@@ -566,23 +566,23 @@ async function fetchTree() {
   treeFetching = true
   treeAgain = false
   const edits = localTreeEdits
-  let entries: Entry[] | null = null
+  let entries: Entry[]
   try {
     entries = await api.tree()
   } catch (err) {
-    toast('刷新目录失败：' + errorText(err))
+    treeFetching = false
+    for (const waiter of treeWaiters.splice(0)) waiter.reject(err)
+    return
   }
   treeFetching = false
-  if (entries && (treeAgain || edits !== localTreeEdits || opsInFlight > 0)) {
+  if (treeAgain || edits !== localTreeEdits || opsInFlight > 0) {
     // 有操作进行中时由 withOp 在全部结束后重新调度
     if (opsInFlight === 0) scheduleTreeRefresh()
     return
   }
-  if (entries) {
-    ws.entries = entries
-    markMissingTabsDeleted()
-  }
-  for (const resolve of treeWaiters.splice(0)) resolve()
+  ws.entries = entries
+  markMissingTabsDeleted()
+  for (const waiter of treeWaiters.splice(0)) waiter.resolve()
 }
 
 function markMissingTabsDeleted() {
@@ -716,7 +716,7 @@ export async function move(from: string, to: string) {
       } else await syncOpenTab(tab)
     }))
   })
-  void refreshTree()
+  void refreshTree().catch((err) => toast('刷新目录失败：' + errorText(err)))
 }
 
 export async function remove(path: string) {
@@ -767,14 +767,13 @@ async function syncOpenTab(tab: Tab) {
     if (err instanceof ApiError && err.status === 404) {
       tab.status = 'deleted'
       tab.conflictRev = ''
-    }
+    } else throw err
   }
 }
 
-function handleEvents(evs: VaultEvent[]) {
+async function handleEvents(evs: VaultEvent[]) {
   for (const ev of evs) {
-    if (ev.type === 'tree') void refreshTree()
-    else if (ev.type === 'settings') {
+    if (ev.type === 'settings') {
       void loadSettings().catch((err) => toast('同步设置失败：' + errorText(err)))
       void refreshPlugins()
     }
@@ -782,7 +781,7 @@ function handleEvents(evs: VaultEvent[]) {
     else if (ev.type === 'changed') {
       const tab = tabOf(ev.path!)
       // 自己保存产生的事件 rev 与本地一致；有本地修改时不覆盖，交由下次保存的冲突检测处理
-      if (tab && tab.rev !== ev.rev) void syncOpenTab(tab)
+      if (tab && tab.rev !== ev.rev) await syncOpenTab(tab)
     } else if (ev.type === 'moved') {
       if (tabOf(ev.from!) && !tabOf(ev.path!)) remapOpenNotes(ev.from!, ev.path!)
       remapRecent(ev.from!, ev.path!)
@@ -795,7 +794,7 @@ function handleEvents(evs: VaultEvent[]) {
     }
     if (ev.type === 'changed' || ev.type === 'moved' || ev.type === 'deleted') pluginEvents.dispatchEvent(new CustomEvent(ev.type, { detail: ev.type === 'moved' ? { from: ev.from!, path: ev.path! } : ev.type === 'changed' ? { path: ev.path!, rev: ev.rev! } : { path: ev.path! } }))
   }
-  if (evs.some((event) => event.type === 'tree')) void resync().catch((err) => toast('插件同步失败：' + errorText(err)))
+  if (evs.some((event) => event.type === 'tree')) await resync()
 }
 
 async function resync() {
@@ -851,7 +850,14 @@ export async function startWorkspace() {
     toast('恢复本地草稿失败：' + errorText(err))
   }
   ws.active = saved.active && tabOf(saved.active) ? saved.active : (ws.tabs[0]?.path ?? null)
-  disconnect = connectEvents({ onEvents: handleEvents, onResync: () => void resync() })
+  let eventQueue = Promise.resolve()
+  let stopped = false
+  const enqueue = (work: () => Promise<void>) => {
+    // 同步读取是异步的，后续批次不能越过前一批次的移动和正文更新。
+    eventQueue = eventQueue.then(() => { if (!stopped) return work() }).catch((err) => toast('同步失败：' + errorText(err)))
+  }
+  const stopEvents = connectEvents({ onEvents: (events) => enqueue(() => handleEvents(events)), onResync: () => enqueue(resync) })
+  disconnect = () => { stopped = true; stopEvents() }
   setPluginEditorHandlers(reconfigurePluginStates, pluginEditorFailure)
   startPlugins({
     notice: toast,

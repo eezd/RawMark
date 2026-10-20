@@ -4,14 +4,65 @@ import { EditorView } from '@codemirror/view'
 import { insertImageFiles } from '../editor/paste'
 import { api, ApiError } from './api'
 import { drafts, type Draft } from './drafts'
-import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, openNote, ws } from './workspace'
+import { connectEvents } from './events'
+import { pluginEvents } from '../plugins/registry'
+import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, openNote, startWorkspace, stopWorkspace, ws } from './workspace'
+
+vi.mock('./events', () => ({ connectEvents: vi.fn(() => () => {}) }))
 
 let view: EditorView | undefined
 afterEach(() => {
+  stopWorkspace()
   attachView(null)
   view?.destroy()
   view = undefined
   vi.restoreAllMocks()
+})
+
+describe('事件同步', () => {
+  it('正文同步后才通知插件，同步失败时不广播成功且不阻塞后续批次', async () => {
+    const entries = [{ path: 'sync.md', dir: false, size: 0, mtime: 0 }]
+    vi.spyOn(api, 'tree').mockResolvedValue(entries)
+    vi.spyOn(api, 'settings').mockResolvedValue({})
+    vi.spyOn(api, 'plugins').mockResolvedValue([])
+    vi.spyOn(drafts, 'all').mockResolvedValue([])
+    vi.spyOn(drafts, 'delete').mockResolvedValue(undefined)
+    const read = vi.spyOn(api, 'readFile').mockResolvedValue({ content: '旧正文', rev: 'r1' })
+    await startWorkspace()
+    await openNote('sync.md')
+    const handlers = vi.mocked(connectEvents).mock.lastCall![0]
+    const observed: string[] = []
+    let resyncs = 0
+    const changed = () => observed.push(editorStateOf('sync.md')!.doc.toString())
+    const resync = () => { resyncs++ }
+    pluginEvents.addEventListener('changed', changed)
+    pluginEvents.addEventListener('resync', resync)
+    try {
+      let finish!: (value: { content: string; rev: string }) => void
+      read.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+      handlers.onEvents([{ type: 'changed', path: 'sync.md', rev: 'r2' }])
+      await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+      expect(observed).toEqual([])
+      finish({ content: '新正文', rev: 'r2' })
+      await vi.waitFor(() => expect(observed).toEqual(['新正文']))
+      read.mockRejectedValueOnce(new ApiError(500, '正文读取失败'))
+      handlers.onEvents([{ type: 'changed', path: 'sync.md', rev: 'r3' }])
+      await vi.waitFor(() => expect(ws.toasts.some((toast) => toast.text.includes('正文读取失败'))).toBe(true))
+      expect(observed).toEqual(['新正文'])
+      vi.mocked(api.tree).mockRejectedValueOnce(new ApiError(500, '目录读取失败'))
+      handlers.onResync()
+      await vi.waitFor(() => expect(ws.toasts.some((toast) => toast.text.includes('目录读取失败'))).toBe(true))
+      expect(resyncs).toBe(0)
+      read.mockResolvedValue({ content: '恢复后的正文', rev: 'r3' })
+      handlers.onResync()
+      await vi.waitFor(() => expect(resyncs).toBe(1))
+      expect(editorStateOf('sync.md')!.doc.toString()).toBe('恢复后的正文')
+    } finally {
+      pluginEvents.removeEventListener('changed', changed)
+      pluginEvents.removeEventListener('resync', resync)
+      await closeTab('sync.md')
+    }
+  })
 })
 
 async function edit(path: string) {
