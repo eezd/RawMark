@@ -20,6 +20,7 @@ function editor(importImage: (url: string) => Promise<string> = async () => { th
   let pending = 0
   const errors: unknown[] = []
   view = new EditorView({ parent: document.body, state: EditorState.create({ doc: '', extensions: [history(), pasteImages({
+    canPaste: () => true,
     upload: async () => { throw new Error('此用例不上传文件') },
     importImage,
     update: (change) => { const spec = change(view!.state); if (spec) view!.dispatch(spec) },

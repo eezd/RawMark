@@ -3,6 +3,8 @@ import { Facet, StateEffect, StateField, type EditorState, type Extension, type 
 import { EditorView } from '@codemirror/view'
 
 export interface PasteImagesOptions {
+  // 文件移动期间不能开始异步粘贴或上传，避免响应中的资源链接属于旧路径。
+  canPaste: () => boolean
   // 上传文件，返回写入 Markdown 的链接
   upload: (file: File) => Promise<string>
   importImage: (url: string) => Promise<string>
@@ -74,12 +76,13 @@ function insertHTML(view: EditorView, html: string, text: string, opts: PasteIma
 
 /**
  * 插入图片文件（粘贴、拖入、从相册选择共用）：先用 blob: 地址插入占位，立即显示；上传完成后替换为正式链接。
- * 返回是否有图片被插入；编辑器未配置上传（pasteImages）时不处理
+ * 返回是否已处理图片插入（包括因操作冲突被拒绝）；未配置上传时不处理
  */
 export function insertImageFiles(view: EditorView, files: File[], pos?: number): boolean {
   const opts = view.state.facet(uploadOptions)
   const images = files.filter((f) => f.type.startsWith('image/'))
   if (!opts || !images.length) return false
+  if (!opts.canPaste()) return true
   const urls = images.map((f) => URL.createObjectURL(f))
   const text = urls.map((u) => `![](${u})`).join('\n')
   const range = view.state.selection.main
@@ -121,7 +124,7 @@ export function pasteImages(opts: PasteImagesOptions): Extension {
         if (view.state.readOnly || plain) return false
         const html = e.clipboardData?.getData('text/html')
         if (html) {
-          insertHTML(view, html, e.clipboardData!.getData('text/plain'), opts)
+          if (opts.canPaste()) insertHTML(view, html, e.clipboardData!.getData('text/plain'), opts)
           e.preventDefault()
           return true
         }

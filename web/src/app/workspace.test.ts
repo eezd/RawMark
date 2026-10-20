@@ -1,16 +1,17 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditorView } from '@codemirror/view'
 import { insertImageFiles } from '../editor/paste'
 import { api, ApiError } from './api'
 import { drafts, type Draft } from './drafts'
 import { connectEvents } from './events'
 import { pluginEvents } from '../plugins/registry'
-import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, openNote, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
+import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, move, openNote, refreshTree, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
 
 vi.mock('./events', () => ({ connectEvents: vi.fn(() => () => {}) }))
 
 let view: EditorView | undefined
+beforeEach(() => { vi.spyOn(drafts, 'move').mockResolvedValue(undefined) })
 afterEach(() => {
   stopWorkspace()
   attachView(null)
@@ -34,6 +35,7 @@ describe('事件同步', () => {
     tree.mockResolvedValue([{ path: 'to/note.md', dir: false, size: 0, mtime: 0 }])
     vi.mocked(connectEvents).mock.lastCall![0].onEvents([{ type: 'moved', from: 'from', path: 'to' }, { type: 'tree' }])
     await vi.waitFor(() => expect(ws.active).toBe('to/note.md'))
+    expect(drafts.move).toHaveBeenCalledWith('from', 'to')
     expect(editorStateOf('from/note.md')).toBeUndefined()
     expect(editorStateOf('to/note.md')!.doc.toString()).toBe('尚未保存的输入')
     await flush('to/note.md')
@@ -182,5 +184,67 @@ describe('保存与关闭', () => {
     expect(v.state.doc.toString()).toBe('原文')
     await closeTab('image.md')
     await closeTab('other.md')
+  })
+
+  it('图片上传期间不能移动笔记或其父目录', async () => {
+    const v = await edit('upload/note.md')
+    vi.spyOn(api, 'tree').mockResolvedValue([{ path: 'upload/note.md', dir: false, size: 0, mtime: 0 }])
+    vi.spyOn(drafts, 'put').mockImplementation(async (draft) => draft.path)
+    vi.spyOn(api, 'writeFile').mockResolvedValue('r2')
+    const moving = vi.spyOn(api, 'move').mockResolvedValue(new Response())
+    let finish!: (link: string) => void
+    vi.spyOn(api, 'upload').mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:pending-move')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    insertImageFiles(v, [new File(['image'], 'image.png', { type: 'image/png' })])
+    await move('upload/note.md', 'renamed.md')
+    await move('upload', 'renamed-folder')
+    expect(moving).not.toHaveBeenCalled()
+    expect(ws.active).toBe('upload/note.md')
+    await refreshTree()
+    finish('note.assets/hash.png')
+    await vi.waitFor(() => expect(v.state.doc.toString()).toContain('note.assets/hash.png'))
+    await closeTab('upload/note.md')
+  })
+
+  it('移动期间拒绝新的图片和网页粘贴，保留原选区内容', async () => {
+    const v = await edit('moving.md')
+    v.dispatch({ selection: { anchor: 0, head: v.state.doc.length } })
+    let finish!: (response: Response) => void
+    vi.spyOn(api, 'move').mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    vi.spyOn(api, 'tree').mockResolvedValue([{ path: 'moved.md', dir: false, size: 0, mtime: 0 }])
+    const upload = vi.spyOn(api, 'upload')
+    const importing = vi.spyOn(api, 'importImage')
+    const moving = move('moving.md', 'moved.md')
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+    expect(insertImageFiles(v, [new File(['image'], 'image.png', { type: 'image/png' })])).toBe(true)
+    const data = new DataTransfer()
+    data.setData('text/html', '<h1>不应插入</h1>')
+    data.setData('text/plain', '不应插入')
+    v.contentDOM.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    expect(v.state.doc.toString()).toBe('原文')
+    expect(v.state.selection.main.from).toBe(0)
+    expect(v.state.selection.main.to).toBe(2)
+    expect(upload).not.toHaveBeenCalled()
+    expect(importing).not.toHaveBeenCalled()
+    finish(new Response())
+    await moving
+    await refreshTree()
+    await closeTab('moved.md')
+  })
+
+  it('草稿迁移失败时不移动文件，服务端失败时恢复草稿路径', async () => {
+    await edit('draft-move.md')
+    vi.spyOn(api, 'tree').mockResolvedValue([{ path: 'draft-move.md', dir: false, size: 0, mtime: 0 }])
+    const moving = vi.spyOn(api, 'move').mockRejectedValue(new ApiError(500, '移动失败'))
+    vi.mocked(drafts.move).mockRejectedValueOnce(new Error('草稿不可写'))
+    await move('draft-move.md', 'draft-moved.md')
+    expect(moving).not.toHaveBeenCalled()
+    expect(ws.active).toBe('draft-move.md')
+    await move('draft-move.md', 'draft-moved.md')
+    expect(ws.active).toBe('draft-move.md')
+    expect(drafts.move).toHaveBeenLastCalledWith('draft-moved.md', 'draft-move.md')
+    await refreshTree()
+    await closeTab('draft-move.md')
   })
 })

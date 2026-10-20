@@ -187,6 +187,11 @@ function buildState(path: string, doc: string): EditorState {
         if (u.docChanged || u.selectionSet) editorListeners.forEach((fn) => fn())
       }),
       pasteImages({
+        canPaste: () => {
+          if (!slot(ref.path).paused) return true
+          toast('笔记正在移动，请完成后再粘贴或上传图片')
+          return false
+        },
         upload: (file) => api.upload(ref.path, file),
         importImage: (url) => api.importImage(ref.path, url),
         update: (change) => {
@@ -688,21 +693,43 @@ export async function move(from: string, to: string) {
     return
   }
   await withOp(async () => {
+    const busy = () => affected(from).some((p) => slots.get(p)?.uploads || slots.get(p)?.paused)
+    if (busy()) {
+      toast('笔记正在处理粘贴、上传或移动，请完成后再移动')
+      return
+    }
     // 先保存待保存的修改，确保移动的是最新内容；移动期间暂停保存，避免写到旧路径
     await Promise.all(affected(from).map((p) => flush(p)))
+    // 等待保存时仍可能开始粘贴，须在取得移动占用前再次检查。
+    if (busy()) {
+      toast('笔记正在处理粘贴、上传或移动，请完成后再移动')
+      return
+    }
     const paused = affected(from).map(slot)
     paused.forEach((s) => s.paused++)
     const snapshot = ws.entries
-    ws.entries = ws.entries.map((e) => ({ ...e, path: remapPath(e.path, from, to) ?? e.path }))
-    remapOpenNotes(from, to)
-    remapRecent(from, to)
+    let draftsMoved = false
+    let remapped = false
     try {
+      // 先确认持久草稿能够迁移；失败时服务器与界面均保留原路径。
+      await drafts.move(from, to)
+      draftsMoved = true
+      remapped = true
+      ws.entries = ws.entries.map((e) => ({ ...e, path: remapPath(e.path, from, to) ?? e.path }))
+      remapOpenNotes(from, to)
+      remapRecent(from, to)
       await api.move(from, to)
     } catch (err) {
-      ws.entries = snapshot
-      remapOpenNotes(to, from)
-      remapRecent(to, from)
-      toast('移动失败：' + errorText(err))
+      if (remapped) {
+        ws.entries = snapshot
+        remapOpenNotes(to, from)
+        remapRecent(to, from)
+      }
+      if (draftsMoved) {
+        try { await drafts.move(to, from) }
+        catch (cause) { toast('恢复原路径草稿失败：' + (cause instanceof Error ? cause.message : errorText(cause))) }
+      }
+      toast('移动失败：' + (err instanceof Error ? err.message : errorText(err)))
       return
     } finally {
       paused.forEach((s) => s.paused--)
@@ -785,8 +812,19 @@ async function handleEvents(evs: VaultEvent[]) {
       // 自己保存产生的事件 rev 与本地一致；有本地修改时不覆盖，交由下次保存的冲突检测处理
       if (tab && tab.rev !== ev.rev) await syncOpenTab(tab)
     } else if (ev.type === 'moved') {
-      if (affected(ev.from!).length && !affected(ev.path!).length) remapOpenNotes(ev.from!, ev.path!)
-      remapRecent(ev.from!, ev.path!)
+      const paused = affected(ev.from!).map(slot)
+      paused.forEach((s) => s.paused++)
+      try {
+        // 已发出的保存仍可能写入旧键，先等其草稿事务结束。
+        await Promise.all(paused.map((s) => s.inflight))
+        try { await drafts.move(ev.from!, ev.path!) }
+        catch (cause) {
+          // 外部文件已移动，草稿失败不能阻止编辑器跟随；保留原记录并明确提示。
+          toast('迁移本地草稿失败，原路径草稿已保留：' + (cause instanceof Error ? cause.message : errorText(cause)))
+        }
+        if (affected(ev.from!).length && !affected(ev.path!).length) remapOpenNotes(ev.from!, ev.path!)
+        remapRecent(ev.from!, ev.path!)
+      } finally { paused.forEach((s) => s.paused--) }
     } else if (ev.type === 'deleted') {
       const tab = tabOf(ev.path!)
       if (tab && tab.status === 'ready' && opsInFlight === 0) {
