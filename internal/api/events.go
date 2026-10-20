@@ -12,6 +12,9 @@ import (
 
 // events 通过 WebSocket 推送仓库变更。websocket.Accept 默认校验 Origin 与 Host 一致
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
+	// 先订阅再完成握手，避免连接建立后首条变更落在订阅空窗中。
+	msgs, unsubscribe := s.hub.Subscribe()
+	defer unsubscribe()
 	conn, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		return
@@ -42,8 +45,6 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	}
 	// 客户端不发消息；CloseRead 负责处理控制帧并在连接断开时取消 ctx
 	ctx := conn.CloseRead(r.Context())
-	msgs, unsubscribe := s.hub.Subscribe()
-	defer unsubscribe()
 	// 定期 ping，避免反向代理因空闲断开连接
 	ping := time.NewTicker(30 * time.Second)
 	defer ping.Stop()
