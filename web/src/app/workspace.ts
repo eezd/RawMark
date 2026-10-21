@@ -30,7 +30,7 @@ export interface Tab {
   conflictRev?: string
 }
 
-export type SettingsSection = 'appearance' | 'editor' | 'account' | 'shortcuts' | 'shares' | 'tokens' | 'trash' | 'plugins'
+export type SettingsSection = 'appearance' | 'editor' | 'account' | 'shortcuts' | 'shares' | 'tokens' | 'trash' | 'plugins' | 'about'
 
 export interface Toast {
   id: number

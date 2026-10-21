@@ -22,8 +22,13 @@ export default defineConfig({
           version.update(readFileSync(new URL('./public/' + name, import.meta.url)))
           files.push(name)
         }
+        const buildVersion = version.digest('hex').slice(0, 16)
+        const entry = bundle['index.html']
+        if (!entry || entry.type !== 'asset' || typeof entry.source !== 'string') throw new Error('缺少应用入口 HTML，无法写入构建版本')
+        // 入口与离线外壳使用同一构建标识，旧页面仍显示其自身的版本。
+        entry.source = entry.source.replace('</head>', `<meta name="rawmark-version" content="${buildVersion}" />\n  </head>`)
         const source = readFileSync(new URL('./src/service-worker.js', import.meta.url), 'utf8')
-          .replace('__VERSION__', version.digest('hex').slice(0, 16))
+          .replace('__VERSION__', buildVersion)
           .replace('__PRECACHE__', JSON.stringify(files.map((name) => '/' + name)))
         this.emitFile({ type: 'asset', fileName: 'sw.js', source })
       },

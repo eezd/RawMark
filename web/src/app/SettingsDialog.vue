@@ -20,7 +20,11 @@ const SECTIONS: { id: SettingsSection; title: string; icon: IconName }[] = [
   { id: 'shares', title: '分享链接', icon: 'link' },
   { id: 'tokens', title: 'API 令牌', icon: 'key' },
   { id: 'trash', title: '回收站', icon: 'trash' },
+  { id: 'about', title: '关于', icon: 'info' },
 ]
+
+const buildVersion = import.meta.env.DEV ? '开发版' : document.querySelector<HTMLMetaElement>('meta[name="rawmark-version"]')?.content
+if (!buildVersion) throw new Error('缺少应用构建版本信息')
 
 // 编辑器内置的按键（不在命令注册表中）
 const EDITOR_KEYS = [
@@ -177,6 +181,19 @@ async function changePassword() {
           <SharePanel v-else-if="section === 'shares'" :path="null" />
           <TokensPanel v-else-if="section === 'tokens'" />
           <TrashPanel v-else-if="section === 'trash'" />
+          <template v-else-if="section === 'about'">
+            <div class="rm-setting"><h3>RawMark</h3></div>
+            <p class="rm-share-note">纯 Markdown 笔记编辑器，文件即真源。</p>
+            <div class="rm-setting">
+              <span class="rm-setting-label">构建版本</span>
+              <code>{{ buildVersion }}</code>
+            </div>
+            <div class="rm-setting">
+              <span class="rm-setting-label">API 文档</span>
+              <a class="rm-btn" href="/api/v1/openapi.json" target="_blank" rel="noopener">查看 OpenAPI 文档</a>
+            </div>
+            <p class="rm-share-note">在「API 令牌」中创建令牌后，可通过 REST API 读取或写入笔记。</p>
+          </template>
         </div>
       </section>
     </div>
