@@ -544,3 +544,5 @@ button {
 .rm-shortcut-bindings { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .rm-shortcut-chip { display: inline-flex; align-items: center; gap: 3px; padding-left: 6px; border: 1px solid var(--rm-divider); border-radius: 5px; }
 .rm-shortcut-bindings input { width: 130px; padding: 8px; color: var(--rm-text); background: var(--rm-bg); border: 1px solid var(--rm-accent); }
+
+.rm-context-menu { position: fixed; right: auto; width: max-content; }

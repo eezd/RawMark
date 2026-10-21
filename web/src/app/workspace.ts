@@ -68,6 +68,7 @@ export const ws = reactive({
   importing: null as string | null,
   // 图片预览与管理，独立于笔记标签和草稿
   image: null as string | null,
+  images: null as string | null,
   // 电脑上侧栏折叠
   sidebarCollapsed: layout.sidebarCollapsed ?? false,
   // 大纲面板（电脑上在右侧常驻，手机上为浮层）
@@ -755,6 +756,7 @@ export async function move(from: string, to: string) {
       remapOpenNotes(from, to)
       remapRecent(from, to)
       if (ws.image) ws.image = remapPath(ws.image, from, to) ?? ws.image
+      if (ws.images) ws.images = remapPath(ws.images, from, to) ?? ws.images
       await api.move(from, to)
     } catch (err) {
       if (remapped) {
@@ -762,6 +764,7 @@ export async function move(from: string, to: string) {
         remapOpenNotes(to, from)
         remapRecent(to, from)
         if (ws.image) ws.image = remapPath(ws.image, to, from) ?? ws.image
+        if (ws.images) ws.images = remapPath(ws.images, to, from) ?? ws.images
       }
       if (draftsMoved) {
         try { await drafts.move(to, from) }
@@ -865,6 +868,7 @@ async function handleEvents(evs: VaultEvent[]) {
       if (tab && tab.rev !== ev.rev) await syncOpenTab(tab)
     } else if (ev.type === 'moved') {
       if (ws.image) ws.image = remapPath(ws.image, ev.from!, ev.path!) ?? ws.image
+      if (ws.images) ws.images = remapPath(ws.images, ev.from!, ev.path!) ?? ws.images
       const paused = affected(ev.from!).map(slot)
       paused.forEach((s) => s.paused++)
       try {
@@ -1061,6 +1065,7 @@ function registerBuiltinCommands() {
     { id: 'view.outline', title: '显示/隐藏大纲', keys: ['Mod+Shift+O'], when: hasNote, run: () => (ws.outlineOpen = !ws.outlineOpen) },
     { id: 'app.trash', title: '打开回收站', run: () => (ws.settings = 'trash') },
     { id: 'note.share', title: '分享当前笔记', when: hasNote, run: () => (ws.sharing = ws.active) },
+    { id: 'app.images', title: '管理根目录图片', run: () => (ws.images = '') },
     { id: 'app.shares', title: '管理分享链接', run: () => (ws.settings = 'shares') },
     { id: 'app.tokens', title: 'API 令牌', run: () => (ws.settings = 'tokens') },
   ]) {
@@ -1096,6 +1101,7 @@ export function openSearch() {
 
 export function stopWorkspace() {
   ws.image = null
+  ws.images = null
   stopPlugins()
   disconnect?.()
   disconnect = undefined

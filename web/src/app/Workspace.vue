@@ -7,6 +7,7 @@ import Icon from './Icon.vue'
 import MobileToolbar from './MobileToolbar.vue'
 import MoveDialog from './MoveDialog.vue'
 import ImportDialog from './ImportDialog.vue'
+import ImageGallery from './ImageGallery.vue'
 import ImageDialog from './ImageDialog.vue'
 import NoteBanner from './NoteBanner.vue'
 import OutlinePanel from './OutlinePanel.vue'
@@ -123,6 +124,7 @@ onBeforeUnmount(() => {
     <SettingsDialog v-if="ws.settings" />
     <ShareDialog v-if="ws.sharing" :path="ws.sharing" @close="ws.sharing = null" />
     <ImportDialog v-if="ws.importing !== null" :dir="ws.importing" @close="ws.importing = null" />
+    <ImageGallery v-if="ws.images !== null" :dir="ws.images" />
     <ImageDialog v-if="ws.image" :path="ws.image" />
     <MoveDialog v-if="ws.moving" :path="ws.moving" @close="ws.moving = null" />
   </div>

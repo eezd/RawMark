@@ -11,6 +11,12 @@ import PluginMount from './PluginMount.vue'
 
 const emit = defineEmits<{ logout: [] }>()
 const rootDrop = ref(false)
+const rootMenu = ref<{ x: number; y: number } | null>(null)
+function rootContext(event: MouseEvent) {
+  if (event.target instanceof Element && event.target.closest('.rm-tree-row')) return
+  event.preventDefault()
+  rootMenu.value = { x: Math.max(4, Math.min(event.clientX, innerWidth - 170)), y: Math.max(4, Math.min(event.clientY, innerHeight - 50)) }
+}
 const selectedView = ref('')
 const currentView = computed(() => sidebarViews.get(selectedView.value))
 watch(() => ws.searchOpen, () => { selectedView.value = '' })
@@ -47,12 +53,16 @@ function onRootDrop(e: DragEvent) {
     </nav>
     <PluginMount v-if="currentView" :key="selectedView" :view="currentView" />
     <SearchPanel v-else-if="ws.searchOpen" />
-    <div v-else class="rm-tree" :class="{ drop: rootDrop }" @dragover="onRootDragOver" @dragleave="rootDrop = false" @drop="onRootDrop">
+    <div v-else class="rm-tree" @contextmenu="rootContext" :class="{ drop: rootDrop }" @dragover="onRootDragOver" @dragleave="rootDrop = false" @drop="onRootDrop">
       <ul class="rm-tree-list">
         <TreeNode v-for="node in tree" :key="node.path" :node="node" :depth="0" />
       </ul>
       <p v-if="!tree.length" class="rm-tree-empty">还没有笔记</p>
     </div>
+    <template v-if="rootMenu">
+      <div class="rm-menu-backdrop" @click="rootMenu = null" @contextmenu.prevent="rootMenu = null" />
+      <div class="rm-menu rm-context-menu" :style="{ left: rootMenu.x + 'px', top: rootMenu.y + 'px' }"><button @click="ws.images = ''; rootMenu = null"><Icon name="image" />图片管理</button></div>
+    </template>
     <div class="rm-sidebar-foot">
       <button class="rm-foot-btn" title="设置（Ctrl+,）" @click="ws.settings = 'index'"><Icon name="settings" />设置</button>
       <button class="rm-foot-btn" @click="emit('logout')"><Icon name="logout" />退出</button>

@@ -1,6 +1,6 @@
 import { computed, reactive, watch } from 'vue'
 import type { Entry } from './api'
-import { basename, dirname } from './paths'
+import { basename, dirname, hiddenAssetPath } from './paths'
 import { ws } from './workspace'
 
 export interface TreeNode {
@@ -29,7 +29,7 @@ function build(entries: Entry[]): TreeNode[] {
   return root
 }
 
-export const tree = computed(() => build(ws.entries))
+export const tree = computed(() => build(ws.entries.filter((entry) => !hiddenAssetPath(entry.path))))
 
 const EXPANDED_KEY = 'rawmark.expanded'
 export const expanded = reactive(new Set<string>(JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? '[]') as string[]))

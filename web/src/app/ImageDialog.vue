@@ -105,6 +105,7 @@ async function trash() {
         <p v-if="error" class="rm-auth-error" role="alert">{{ error }}</p>
         <div class="rm-image-actions">
           <input ref="picker" type="file" :accept="extension" hidden :disabled="busy" @change="replace" />
+          <button class="rm-btn" :disabled="busy || !entry" @click="ws.moving = path">移动到…</button>
           <button class="rm-btn rm-btn-danger" :disabled="busy || !entry" @click="trash">移入回收站</button>
           <button class="rm-btn rm-btn-primary" :disabled="busy || !entry" @click="picker?.click()">{{ busy ? '处理中…' : '替换图片' }}</button>
         </div>

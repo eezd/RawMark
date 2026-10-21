@@ -46,3 +46,16 @@ export function resolveAssetUrl(notePath: string, src: string): string {
   }
   return '/api/v1/raw/' + encodePath(parts.join('/'))
 }
+
+// 导航隐藏普通共享附件与笔记附件，不改变这些目录的读写契约。
+export function hiddenAssetPath(path: string): boolean {
+  return path.split('/').some((part) => part === 'assets' || part.endsWith('.assets'))
+}
+
+export function imageInFolder(path: string, dir: string): boolean {
+  if (!isImage(path) || (dir && !path.startsWith(dir + '/'))) return false
+  const relative = dir ? path.slice(dir.length + 1) : path
+  if (!relative.includes('/')) return true
+  const first = relative.split('/')[0]
+  return first === 'assets' || first.endsWith('.assets')
+}
