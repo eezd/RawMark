@@ -4,6 +4,20 @@
 
 ## 部署
 
+本机部署沿用 `/srv/AlphaPulse/deploy` 的目录约定，端口按 `/docker/main/.env` 的工具类分配为 `RAWMARK_PORT=20080`：
+
+```sh
+cd deploy
+install -d -m 750 -o 65532 -g 65532 data
+docker compose --env-file /docker/main/.env up -d --build --wait
+```
+
+持久化数据位于 `deploy/data/`，与 `.dev-data/` 独立。首次初始化的启动码位于 `deploy/data/setup-code.txt`。
+宿主机 Nginx 配置为 `deploy/nginx/raw.134333.xyz.conf`，复用现有通配证书及 WebSocket 升级映射；安装到 `/etc/nginx/conf.d/134333.xyz/` 后，先执行 `nginx -t` 再重载。
+域名 `raw.134333.xyz` 在 DNSPod 设置 CNAME 指向 `cdn.134333.xyz`（与 AlphaPulse 一致），Cloudflare 中对应的源站 A 记录指向部署服务器，访问地址为 `https://raw.134333.xyz`。修改端口时需同步端口登记和 Nginx 上游。
+
+其他服务器也可直接构建并运行：
+
 ```sh
 mkdir -p ~/rawmark-data
 docker build -t rawmark .

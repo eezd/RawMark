@@ -8,3 +8,4 @@ web/dist/
 
 # 本地开发数据
 .dev-data/
+deploy/data/

@@ -3,3 +3,5 @@ web/node_modules
 web/dist
 CONTEXT.md
 docs
+.dev-data
+deploy/data
