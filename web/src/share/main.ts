@@ -24,13 +24,30 @@ interface SharedFile {
   dir: false
 }
 
+interface SharedCollection {
+  collection: true
+  title: string
+  items: { id: number; title: string; exists: boolean; dir: boolean }[]
+}
+
 const root = document.getElementById('share')!
 const token = decodeURIComponent(location.pathname.split('/')[2] ?? '')
 const api = '/api/v1/public/shares/' + encodeURIComponent(token)
+const selectedItem = new URL(location.href).searchParams.get('item')
 const selectedPath = new URL(location.href).searchParams.get('path') ?? ''
 const encodePath = (path: string) => path.split('/').map(encodeURIComponent).join('/')
-const pageUrl = (path: string) => location.pathname + (path ? '?path=' + encodeURIComponent(path) : '')
-const downloadUrl = () => api + '/assets/' + encodePath(selectedPath) + '?download=1'
+function pageUrl(path: string, item: string | null = selectedItem) {
+  const query = new URLSearchParams()
+  if (item !== null) query.set('item', item)
+  if (path) query.set('path', path)
+  return location.pathname + (query.size ? '?' + query : '')
+}
+function downloadUrl() {
+  const url = new URL(api + '/assets/' + encodePath(selectedPath), location.origin)
+  url.searchParams.set('download', '1')
+  if (selectedItem !== null) url.searchParams.set('item', selectedItem)
+  return url.href
+}
 
 function message(text: string) {
   root.replaceChildren(Object.assign(document.createElement('p'), { className: 'rm-share-message', textContent: text }))
@@ -39,13 +56,16 @@ function message(text: string) {
 async function load() {
   let res: Response
   try {
-    res = await fetch(api + (selectedPath ? '?path=' + encodeURIComponent(selectedPath) : ''), { credentials: 'same-origin', cache: 'no-store' })
+    const query = new URLSearchParams()
+    if (selectedPath) query.set('path', selectedPath)
+    if (selectedItem !== null) query.set('item', selectedItem)
+    res = await fetch(api + (query.size ? '?' + query : ''), { credentials: 'same-origin', cache: 'no-store' })
   } catch {
     message('网络错误，请检查连接后刷新')
     return
   }
   if (res.ok) {
-    const content = (await res.json()) as SharedNote | SharedDirectory | SharedFile
+    const content = (await res.json()) as SharedNote | SharedDirectory | SharedFile | SharedCollection
     let appearanceError = false
     try {
       const response = await fetch(api + '/appearance', { cache: 'no-store' })
@@ -58,7 +78,8 @@ async function load() {
     } catch {
       appearanceError = true
     }
-    if (content.dir) renderDirectory(content)
+    if ('collection' in content) renderCollection(content)
+    else if (content.dir) renderDirectory(content)
     else if ('content' in content) render(content)
     else {
       document.title = content.title
@@ -69,8 +90,8 @@ async function load() {
   }
   else if (res.status === 401) askPassword()
   else if (res.status === 404) {
-    message(selectedPath ? '此文件或文件夹已不存在，或不在分享范围内' : '分享不存在、已过期或已被撤销')
-    if (selectedPath) root.prepend(navigation())
+    message(selectedPath || selectedItem !== null ? '此文件或文件夹已不存在，或不在分享范围内' : '分享不存在、已过期或已被撤销')
+    if (selectedPath || selectedItem !== null) root.prepend(navigation())
   }
   else message(`加载失败（${res.status}）`)
 }
@@ -112,12 +133,28 @@ function navigation() {
   const nav = document.createElement('nav')
   nav.className = 'rm-share-nav'
   nav.setAttribute('aria-label', '分享导航')
-  nav.append(Object.assign(document.createElement('a'), { href: pageUrl(''), textContent: '分享首页' }))
+  nav.append(Object.assign(document.createElement('a'), { href: pageUrl('', null), textContent: '分享首页' }))
+  if (selectedItem !== null) nav.append(' / ', Object.assign(document.createElement('a'), { href: pageUrl(''), textContent: '主体首页' }))
   const parts = selectedPath.split('/').filter(Boolean)
   for (let i = 0; i < parts.length; i++) {
     nav.append(' / ', Object.assign(document.createElement('a'), { href: pageUrl(parts.slice(0, i + 1).join('/')), textContent: parts[i] }))
   }
   return nav
+}
+
+function renderCollection(collection: SharedCollection) {
+  document.title = collection.title
+  const heading = Object.assign(document.createElement('h1'), { textContent: collection.title })
+  const list = document.createElement('ul')
+  list.className = 'rm-share-files'
+  for (const item of collection.items) {
+    const row = document.createElement('li')
+    row.append(item.exists
+      ? Object.assign(document.createElement('a'), { href: pageUrl('', String(item.id)), textContent: item.title + (item.dir ? '/' : '') })
+      : Object.assign(document.createElement('span'), { textContent: item.title + '（已不可用）' }))
+    list.append(row)
+  }
+  root.replaceChildren(heading, list)
 }
 
 function renderDirectory(directory: SharedDirectory) {
@@ -148,7 +185,7 @@ function render(note: SharedNote) {
   article.className = 'rm-share-content'
   // 安全模式：原始 HTML 被转义，危险协议的链接被过滤
   article.innerHTML = renderMarkdown(note.content)
-  root.replaceChildren(...(selectedPath ? [navigation()] : []), header, article)
+  root.replaceChildren(...(selectedPath || selectedItem !== null ? [navigation()] : []), header, article)
 
   resolveImages(article)
   resolveLinks(article)
@@ -165,6 +202,7 @@ function resourceUrl(src: string): URL | null {
   try {
     const prefix = new URL(api + '/assets/', location.origin)
     const target = new URL(src, new URL(encodePath(selectedPath), prefix))
+    if (selectedItem !== null) target.searchParams.set('item', selectedItem)
     return target.origin === prefix.origin && target.pathname.startsWith(prefix.pathname) ? target : null
   } catch { return null }
 }

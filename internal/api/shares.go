@@ -8,6 +8,8 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,16 +25,29 @@ const shareCookieName = "rawmark_share"
 // 设有密码的永久分享，访客凭据的有效期
 const shareCookieTTL = 30 * 24 * time.Hour
 
-type shareView struct {
-	store.Share
-	HasPassword bool `json:"hasPassword"`
-	// 分享主体是否仍存在。
+type shareItemView struct {
+	store.ShareItem
 	Exists bool `json:"exists"`
 }
+type shareView struct {
+	store.Share
+	Items       []shareItemView `json:"items"`
+	HasPassword bool            `json:"hasPassword"`
+	Exists      bool            `json:"exists"`
+}
 
-func (s *Server) viewOf(sh store.Share) shareView {
-	_, err := s.vault.Stat(sh.Path)
-	return shareView{Share: sh, HasPassword: sh.PasswordHash != "", Exists: err == nil}
+func (s *Server) viewOf(sh store.Share) (shareView, error) {
+	view := shareView{Share: sh, HasPassword: sh.PasswordHash != "", Items: []shareItemView{}}
+	for _, item := range sh.Items {
+		_, err := s.vault.Stat(item.Path)
+		if err != nil && !errors.Is(err, vault.ErrNotFound) {
+			return view, err
+		}
+		exists := err == nil
+		view.Exists = view.Exists || exists
+		view.Items = append(view.Items, shareItemView{ShareItem: item, Exists: exists})
+	}
+	return view, nil
 }
 
 // listShares 列出全部分享；带 ?path= 时只列出该笔记的
@@ -45,8 +60,19 @@ func (s *Server) listShares(w http.ResponseWriter, r *http.Request) {
 	filter := r.URL.Query().Get("path")
 	out := []shareView{}
 	for _, sh := range all {
-		if filter == "" || sh.Path == filter {
-			out = append(out, s.viewOf(sh))
+		matches := filter == ""
+		for _, item := range sh.Items {
+			if item.Path == filter {
+				matches = true
+			}
+		}
+		if matches {
+			view, err := s.viewOf(sh)
+			if err != nil {
+				vaultError(w, r, err)
+				return
+			}
+			out = append(out, view)
 		}
 	}
 	writeJSON(w, 200, map[string]any{"shares": out})
@@ -55,6 +81,7 @@ func (s *Server) listShares(w http.ResponseWriter, r *http.Request) {
 func (s *Server) createShare(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Path     string
+		Paths    []string
 		Password string
 		// 有效时长（秒），0 为永久
 		ExpiresIn int64
@@ -62,14 +89,41 @@ func (s *Server) createShare(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &body) {
 		return
 	}
-	p, err := vault.CleanPath(body.Path)
-	if err != nil {
-		writeError(w, 400, "分享路径无效")
+	if body.Path != "" && len(body.Paths) != 0 {
+		writeError(w, 400, "path 和 paths 不能同时指定")
 		return
 	}
-	if _, err := s.vault.Stat(p); err != nil {
-		vaultError(w, r, err)
+	paths := body.Paths
+	if body.Path != "" {
+		paths = []string{body.Path}
+	}
+	if len(paths) == 0 {
+		writeError(w, 400, "请选择分享主体")
 		return
+	}
+	sort.Strings(paths)
+	roots := map[string]bool{}
+	items := []store.ShareItem{}
+	for _, p := range paths {
+		if _, err := vault.CleanPath(p); err != nil {
+			writeError(w, 400, "分享路径无效")
+			return
+		}
+		if _, err := s.vault.Stat(p); err != nil {
+			vaultError(w, r, err)
+			return
+		}
+		covered := roots[p]
+		for parent := path.Dir(p); parent != "."; parent = path.Dir(parent) {
+			if roots[parent] {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			roots[p] = true
+			items = append(items, store.ShareItem{ID: len(items), Path: p})
+		}
 	}
 	if body.ExpiresIn < 0 {
 		writeError(w, 400, "有效期无效")
@@ -78,7 +132,7 @@ func (s *Server) createShare(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	sh := store.Share{
 		Token:        auth.NewShareToken(),
-		Path:         p,
+		Items:        items,
 		PasswordHash: auth.HashSharePassword(body.Password),
 		CreatedAt:    now.UnixMilli(),
 	}
@@ -89,7 +143,15 @@ func (s *Server) createShare(w http.ResponseWriter, r *http.Request) {
 		internalError(w, r, err)
 		return
 	}
-	writeJSON(w, 200, s.viewOf(sh))
+	if len(sh.Items) == 1 {
+		sh.Path = sh.Items[0].Path
+	}
+	view, err := s.viewOf(sh)
+	if err != nil {
+		vaultError(w, r, err)
+		return
+	}
+	writeJSON(w, 200, view)
 }
 
 func (s *Server) deleteShare(w http.ResponseWriter, r *http.Request) {
@@ -154,18 +216,39 @@ func (s *Server) publicShare(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	info, err := s.vault.Stat(sh.Path)
+	if len(sh.Items) > 1 && r.URL.Query().Get("item") == "" {
+		if r.URL.Query().Get("path") != "" {
+			writeError(w, 400, "请选择分享主体")
+			return
+		}
+		items := []map[string]any{}
+		for _, item := range sh.Items {
+			info, err := s.vault.Stat(item.Path)
+			if err != nil && !errors.Is(err, vault.ErrNotFound) {
+				vaultError(w, r, err)
+				return
+			}
+			items = append(items, map[string]any{"id": item.ID, "title": path.Base(item.Path), "exists": err == nil, "dir": err == nil && info.IsDir()})
+		}
+		writeJSON(w, 200, map[string]any{"title": "分享的文件", "collection": true, "items": items})
+		return
+	}
+	subject, ok := shareSubject(w, r, sh)
+	if !ok {
+		return
+	}
+	info, err := s.vault.Stat(subject)
 	if err != nil {
 		vaultError(w, r, err)
 		return
 	}
-	p := sh.Path
+	p := subject
 	if rel := r.URL.Query().Get("path"); rel != "" {
 		if !info.IsDir() {
 			writeError(w, 404, "文件不存在")
 			return
 		}
-		p, err = s.vault.ScopedPath(sh.Path, rel)
+		p, err = s.vault.ScopedPath(subject, rel)
 		if err == nil {
 			info, err = s.vault.Stat(p)
 		}
@@ -255,7 +338,11 @@ func (s *Server) publicShareAsset(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	info, err := s.vault.Stat(sh.Path)
+	subject, ok := shareSubject(w, r, sh)
+	if !ok {
+		return
+	}
+	info, err := s.vault.Stat(subject)
 	if err != nil {
 		vaultError(w, r, err)
 		return
@@ -263,13 +350,13 @@ func (s *Server) publicShareAsset(w http.ResponseWriter, r *http.Request) {
 	rel := r.PathValue("path")
 	var target string
 	if info.IsDir() {
-		target, err = s.vault.ScopedPath(sh.Path, rel)
+		target, err = s.vault.ScopedPath(subject, rel)
 	} else if rel == "" {
-		target = sh.Path
+		target = subject
 	} else {
-		assets := vault.AssetsDir(sh.Path)
+		assets := vault.AssetsDir(subject)
 		prefix := path.Base(assets) + "/"
-		if !vault.IsNote(sh.Path) || !strings.HasPrefix(rel, prefix) {
+		if !vault.IsNote(subject) || !strings.HasPrefix(rel, prefix) {
 			writeError(w, 404, "文件不存在")
 			return
 		}
@@ -283,6 +370,23 @@ func (s *Server) publicShareAsset(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": path.Base(target)}))
 	}
 	s.serveRaw(w, r, target)
+}
+
+func shareSubject(w http.ResponseWriter, r *http.Request, sh store.Share) (string, bool) {
+	raw := r.URL.Query().Get("item")
+	if raw == "" && len(sh.Items) == 1 {
+		return sh.Items[0].Path, true
+	}
+	id, err := strconv.Atoi(raw)
+	if err == nil {
+		for _, item := range sh.Items {
+			if item.ID == id {
+				return item.Path, true
+			}
+		}
+	}
+	writeError(w, 404, "分享主体不存在")
+	return "", false
 }
 
 // FollowMoves 让分享跟随在外部（如 Typora）完成的改名与移动；经 API 的移动已在 move 接口中处理，

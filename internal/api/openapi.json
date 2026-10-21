@@ -1175,10 +1175,38 @@
                   "expiresIn": {
                     "type": "integer",
                     "description": "有效时长（秒），0 为永久"
+                  },
+                  "paths": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "与 path 二选一；重叠路径只保留外层目录"
                   }
                 },
-                "required": [
-                  "path"
+                "required": [],
+                "oneOf": [
+                  {
+                    "required": [
+                      "path"
+                    ],
+                    "not": {
+                      "required": [
+                        "paths"
+                      ]
+                    }
+                  },
+                  {
+                    "required": [
+                      "paths"
+                    ],
+                    "not": {
+                      "required": [
+                        "path"
+                      ]
+                    }
+                  }
                 ]
               }
             }
@@ -1215,7 +1243,8 @@
               }
             }
           }
-        }
+        },
+        "description": "创建一个随机只读链接。path 创建单主体分享；paths 创建集合。内容实时读取，主体移动后跟随，部分主体删除不影响其余项。"
       }
     },
     "/shares/{token}": {
@@ -1494,7 +1523,18 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "item",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "集合分享的稳定成员标识；单主体分享可省略。子路径及附件始终限制在该主体原有范围内。"
+          }
+        ],
+        "description": "单主体沿用原响应。集合首页未指定 item 时返回 collection=true 及 items（仅含 id、title、dir、exists，不暴露仓库父路径）；指定 item 后读取该主体，path 为其内部相对路径。"
       }
     },
     "/public/shares/{token}/unlock": {
@@ -1639,7 +1679,17 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "item",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "集合分享的稳定成员标识；单主体分享可省略。子路径及附件始终限制在该主体原有范围内。"
+          }
+        ]
       }
     },
     "/themes": {
@@ -2503,7 +2553,7 @@
           },
           "path": {
             "type": "string",
-            "description": "分享主体在仓库中的路径（只在登录后的管理接口返回）"
+            "description": "单主体分享的路径；集合分享不返回此字段"
           },
           "createdAt": {
             "type": "integer"
@@ -2518,8 +2568,35 @@
           "exists": {
             "type": "boolean",
             "description": "分享的文件或文件夹是否仍存在"
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "path",
+                "exists"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "稳定的分享成员标识"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "exists": {
+                  "type": "boolean"
+                }
+              }
+            }
           }
-        }
+        },
+        "required": [
+          "items"
+        ]
       },
       "APIToken": {
         "type": "object",

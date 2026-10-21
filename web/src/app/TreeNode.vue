@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import Icon from './Icon.vue'
 import { basename, inAssetDir, isImage, joinPath } from './paths'
 import { contextSelection, expanded, selectedPaths, selectPath, type TreeNode } from './tree'
+import { minimalPaths } from './selection'
 import { batchFiles, exportFiles } from './batch'
 import { createFolder, createNote, move, openNote, renameTarget, ws } from './workspace'
 
@@ -86,7 +87,7 @@ function runMenu(action: 'note' | 'folder' | 'import' | 'images' | 'rename' | 'm
   } else if (action === 'import') ws.importing = path
   else if (action === 'images') ws.images = path
   else if (action === 'rename') ws.renaming = path
-  else if (action === 'share') ws.sharing = path
+  else if (action === 'share') ws.sharing = minimalPaths(selectedPaths)
   else if (action === 'move') ws.moving = [...selectedPaths]
   else if (action === 'export') void exportFiles([...selectedPaths])
   else void batchFiles('delete', [...selectedPaths])
@@ -171,7 +172,7 @@ function onDrop(e: DragEvent) {
         <button v-if="image && selectedPaths.size === 1" @click="menuOpen = false; ws.image = node.path"><Icon name="image" />预览 / 替换图片</button>
         <button v-if="!assetDir && selectedPaths.size === 1" @click="runMenu('rename')"><Icon name="edit" />重命名</button>
         <button v-if="!assetDir" @click="runMenu('move')"><Icon name="folder" />移动到…</button>
-        <button v-if="!image && selectedPaths.size === 1" @click="runMenu('share')"><Icon name="link" />分享</button>
+        <button @click="runMenu('share')"><Icon name="link" />分享</button>
         <button @click="runMenu('export')"><Icon name="note" />导出 Markdown</button>
         <button v-if="!assetDir" class="danger" @click="runMenu('delete')"><Icon name="trash" />删除</button>
       </div>

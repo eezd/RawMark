@@ -6,7 +6,7 @@ import Icon from './Icon.vue'
 import { toast } from './workspace'
 
 // path 为空时列出全部分享，否则管理此文件或文件夹的分享。
-const props = defineProps<{ path: string | null }>()
+const props = defineProps<{ path: string | string[] | null }>()
 
 const EXPIRY_OPTIONS = [
   { label: '永久有效', seconds: 0 },
@@ -31,7 +31,9 @@ function errorText(err: unknown) {
 
 async function load() {
   try {
-    shares.value = await api.shares(props.path ?? undefined)
+    const selected = props.path
+    const all = await api.shares(typeof selected === 'string' ? selected : undefined)
+    shares.value = Array.isArray(selected) ? all.filter((share) => share.items.length === selected.length && share.items.every((item) => selected.includes(item.path))) : all
   } catch {
     failed.value = true
   }
@@ -77,20 +79,21 @@ onMounted(load)
       </select>
       <button class="rm-btn rm-btn-primary" type="submit" :disabled="busy">创建链接</button>
     </form>
-    <p class="rm-share-note">分享只读并显示最新内容。分享文件夹会公开其中所有文件和子目录，包括以后新增或移入的内容；移出的内容不再公开。分享主体移动后链接保持有效。</p>
+    <p class="rm-share-note">分享只读并显示最新内容。分享文件夹会公开其中所有文件和子目录，包括以后新增或移入的内容；移出的内容不再公开。分享主体移动后链接保持有效。多选生成一个集合链接，部分主体删除不影响其他项。</p>
     <p v-if="failed" class="rm-tree-empty">读取分享失败</p>
     <p v-else-if="shares && !shares.length" class="rm-tree-empty">{{ path ? '还没有分享链接' : '还没有分享任何文件或文件夹' }}</p>
     <ul v-else class="rm-trash-list">
       <li v-for="s in shares ?? []" :key="s.token">
         <Icon name="link" />
         <div class="rm-trash-info">
-          <span v-if="!path" class="rm-trash-path">{{ s.path }}</span>
+          <span v-if="!path" class="rm-trash-path">{{ s.items.map((item) => item.path).join('、') }}</span>
           <span class="rm-share-link" :class="{ 'rm-trash-path': path }">{{ linkOf(s) }}</span>
           <span class="rm-trash-time">
             {{ fmt.format(s.createdAt) }} 创建
             <template v-if="s.hasPassword"> · 有密码</template>
             <template v-if="expired(s)"> · <span class="rm-share-bad">已过期</span></template>
             <template v-else-if="s.expiresAt"> · {{ fmt.format(s.expiresAt) }} 到期</template>
+            <template v-if="s.exists && s.items.some((item) => !item.exists)"> · <span class="rm-share-bad">部分主体已不存在</span></template>
             <template v-if="!s.exists"> · <span class="rm-share-bad">文件或文件夹不存在</span></template>
           </span>
         </div>

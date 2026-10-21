@@ -44,8 +44,9 @@ export interface SearchResult {
 }
 
 export interface Share {
+  items: { id: number; path: string; exists: boolean }[]
   token: string
-  path: string
+  path?: string
   createdAt: number
   // 0 为永久
   expiresAt: number
@@ -188,8 +189,8 @@ export const api = {
   shares: async (path?: string) =>
     (await json<{ shares: Share[] }>(request('GET', '/api/v1/shares' + (path ? '?path=' + encodeURIComponent(path) : '')))).shares,
   // expiresIn 为有效时长（秒），0 为永久
-  createShare: (path: string, password: string, expiresIn: number) =>
-    json<Share>(request('POST', '/api/v1/shares', { json: { path, password, expiresIn } })),
+  createShare: (path: string | string[], password: string, expiresIn: number) =>
+    json<Share>(request('POST', '/api/v1/shares', { json: { ...(typeof path === 'string' ? { path } : { paths: path }), password, expiresIn } })),
   deleteShare: (token: string) => request('DELETE', '/api/v1/shares/' + encodeURIComponent(token)),
 
   tokens: async () => (await json<{ tokens: ApiToken[] }>(request('GET', '/api/v1/tokens'))).tokens,

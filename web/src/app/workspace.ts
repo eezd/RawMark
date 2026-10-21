@@ -61,7 +61,7 @@ export const ws = reactive({
   // 打开的设置分组，null 为关闭；index 为从通用入口打开（手机上先显示分组列表，电脑上显示第一组）
   settings: (pluginsPaused ? 'plugins' : appearancePaused ? 'appearance' : null) as SettingsSection | 'index' | null,
   // 分享当前笔记的对话框（笔记路径）
-  sharing: null as string | null,
+  sharing: null as string | string[] | null,
   // 「移动到…」对话框（笔记或文件夹路径）
   moving: null as string | string[] | null,
   // 导入目标目录，空字符串为根目录

@@ -52,7 +52,7 @@ type access int
 
 const (
 	public access = iota
-	// 登录会话或 API 令牌（只读令牌只能用 GET）
+	// 登录会话或 API 令牌（只读令牌可用 GET 和只读导出接口）
 	authed
 	// 只允许登录会话：管理分享与 API 令牌，避免令牌给自己扩权
 	sessionOnly
