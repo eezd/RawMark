@@ -1,5 +1,8 @@
 // 命令注册表：命令面板列出的操作与全局快捷键都来自这里；插件也通过 registerCommand 添加命令
 import { shallowReactive } from 'vue'
+import { settings } from './settings'
+import { matchKeys, physicalKeys } from '../keys'
+export { formatKeys, matchKeys } from '../keys'
 
 export interface Command {
   id: string
@@ -42,30 +45,20 @@ export function runCommand(id: string) {
   if (cmd && (cmd.when?.() ?? true)) cmd.run()
 }
 
-const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
-
-export function matchKeys(e: KeyboardEvent, keys: string): boolean {
-  const parts = keys.split('+')
-  const key = parts.pop()!.toLowerCase()
-  return (
-    e.key.toLowerCase() === key &&
-    (isMac ? e.metaKey : e.ctrlKey) === parts.includes('Mod') &&
-    e.shiftKey === parts.includes('Shift') &&
-    e.altKey === parts.includes('Alt')
-  )
+export function commandKeys(command: Command): string[] {
+  return settings.shortcuts[command.id] ?? command.keys ?? []
 }
 
-export function formatKeys(keys: string): string {
-  const parts = keys.split('+')
-  if (isMac) return parts.map((p) => ({ Mod: '⌘', Shift: '⇧', Alt: '⌥' })[p] ?? p).join('')
-  return parts.map((p) => (p === 'Mod' ? 'Ctrl' : p)).join('+')
+export function shortcutConflict(id: string, keys: string[]): Command | undefined {
+  return allCommands().find((command) => command.id !== id && commandKeys(command).some((existing) => keys.some((key) => physicalKeys(existing) === physicalKeys(key))))
 }
 
 /** 全局快捷键分发；编辑器等已处理的按键（defaultPrevented）和输入法组字中的按键不处理 */
 export function handleShortcut(e: KeyboardEvent) {
-  if (e.defaultPrevented || e.isComposing) return
+  if (e.defaultPrevented || e.isComposing || e.getModifierState('AltGraph') || (e.target instanceof Element && e.target.closest('[data-shortcut-recorder]'))) return
   for (const cmd of availableCommands()) {
-    if (cmd.keys?.some((k) => matchKeys(e, k))) {
+    if (cmd.id.startsWith('editor.') && !(e.target instanceof Element && e.target.closest('.cm-content'))) continue
+    if (commandKeys(cmd).some((k) => matchKeys(e, k))) {
       e.preventDefault()
       cmd.run()
       return

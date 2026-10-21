@@ -538,3 +538,9 @@ button {
 
 .rm-font-input input { width: 80px; padding: 7px; border: 1px solid var(--rm-divider); border-radius: 6px; background: var(--rm-bg); color: var(--rm-text); }
 .rm-tab-menu { right: auto; width: max-content; max-width: calc(100vw - 8px); }
+
+.rm-shortcut-settings { padding: 12px 20px; }
+.rm-shortcut-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--rm-divider); align-items: center; font-size: 13px; }
+.rm-shortcut-bindings { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rm-shortcut-chip { display: inline-flex; align-items: center; gap: 3px; padding-left: 6px; border: 1px solid var(--rm-divider); border-radius: 5px; }
+.rm-shortcut-bindings input { width: 130px; padding: 8px; color: var(--rm-text); background: var(--rm-bg); border: 1px solid var(--rm-accent); }

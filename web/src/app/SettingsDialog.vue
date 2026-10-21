@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api, ApiError } from './api'
-import { allCommands, formatKeys, runCommand } from './commands'
+import { runCommand } from './commands'
 import Icon, { type IconName } from './Icon.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
 import PluginsPanel from './PluginsPanel.vue'
 import { installApp, installPrompt } from './pwa'
 import { CONTENT_WIDTHS, TAB_SIZES, loadSettings, settings, updateSettings, type Settings } from './settings'
+import ShortcutSettings from './ShortcutSettings.vue'
 import SharePanel from './SharePanel.vue'
 import TokensPanel from './TokensPanel.vue'
 import TrashPanel from './TrashPanel.vue'
@@ -27,27 +28,10 @@ const SECTIONS: { id: SettingsSection; title: string; icon: IconName }[] = [
 const buildVersion = import.meta.env.DEV ? '开发版' : document.querySelector<HTMLMetaElement>('meta[name="rawmark-version"]')?.content
 if (!buildVersion) throw new Error('缺少应用构建版本信息')
 
-// 编辑器内置的按键（不在命令注册表中）
-const EDITOR_KEYS = [
-  { title: '粗体', keys: 'Mod+B' },
-  { title: '斜体', keys: 'Mod+I' },
-  { title: '插入链接', keys: 'Mod+K' },
-  { title: '撤销', keys: 'Mod+Z' },
-  { title: '重做', keys: 'Mod+Shift+Z' },
-  { title: '缩进 / 取消缩进', keys: 'Tab / Shift+Tab' },
-  { title: '全选（代码块内先选中整个代码块）', keys: 'Mod+A' },
-]
-
 const section = computed(() => (ws.settings === 'index' ? 'appearance' : ws.settings!))
 // 手机上一次只显示分组列表或分组内容
 const showList = ref(ws.settings === 'index')
 const current = computed(() => SECTIONS.find((s) => s.id === section.value)!)
-const shortcuts = computed(() => [
-  ...allCommands()
-    .filter((c) => c.keys?.length)
-    .map((c) => ({ title: c.title, keys: c.keys!.map(formatKeys).join(' / ') })),
-  ...EDITOR_KEYS.map((k) => ({ title: k.title, keys: k.keys.split(' / ').map(formatKeys).join(' / ') })),
-])
 
 function open(id: SettingsSection) {
   ws.settings = id
@@ -181,12 +165,7 @@ async function changePassword() {
             </div>
           </template>
 
-          <table v-else-if="section === 'shortcuts'" class="rm-shortcuts">
-            <tr v-for="s in shortcuts" :key="s.title">
-              <td>{{ s.title }}</td>
-              <td><kbd>{{ s.keys }}</kbd></td>
-            </tr>
-          </table>
+          <ShortcutSettings v-else-if="section === 'shortcuts'" />
 
           <SharePanel v-else-if="section === 'shares'" :path="null" />
           <TokensPanel v-else-if="section === 'tokens'" />

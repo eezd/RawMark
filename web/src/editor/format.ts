@@ -70,7 +70,8 @@ function kindOf(prefix: string): PrefixKind | null {
 function editPrefixes({ state, dispatch }: FormatTarget, next: (kinds: (PrefixKind | null)[], index: number) => string): boolean {
   const lineNumbers = new Set<number>()
   for (const r of state.selection.ranges) {
-    for (let l = state.doc.lineAt(r.from).number, end = state.doc.lineAt(r.to).number; l <= end; l++) lineNumbers.add(l)
+    const to = r.to > r.from && state.doc.lineAt(r.to).from === r.to ? r.to - 1 : r.to
+    for (let l = state.doc.lineAt(r.from).number, end = state.doc.lineAt(to).number; l <= end; l++) lineNumbers.add(l)
   }
   const lines = [...lineNumbers].sort((a, b) => a - b).map((l) => state.doc.line(l))
   const matches = lines.map((line) => LINE_PREFIX.exec(line.text)!)
@@ -109,6 +110,21 @@ export const cycleHeading: FormatCommand = (target) => {
   const level = kindOf(first) === 'heading' ? first.length - 1 : 0
   const prefix = level >= 3 ? '' : '#'.repeat(level + 1) + ' '
   return editPrefixes(target, () => prefix)
+}
+
+/** 全部选中行已是指定标题时恢复正文，否则设置为指定级别。 */
+export function toggleHeading(level: number): FormatCommand {
+  return (target) => {
+    const prefix = '#'.repeat(level) + ' '
+    const ranges = target.state.selection.ranges
+    const lines = new Set<number>()
+    for (const range of ranges) {
+      const end = range.to > range.from && target.state.doc.lineAt(range.to).from === range.to ? range.to - 1 : range.to
+      for (let n = target.state.doc.lineAt(range.from).number; n <= target.state.doc.lineAt(end).number; n++) lines.add(n)
+    }
+    const remove = [...lines].every((n) => LINE_PREFIX.exec(target.state.doc.line(n).text)![2] === prefix)
+    return editPrefixes(target, () => remove ? '' : prefix)
+  }
 }
 
 /** 插入链接：选中文字作为链接文字，光标放到地址处；没有选中时光标放在文字处 */

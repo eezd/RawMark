@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 import { api, type InstalledPlugin } from '../app/api'
-import { allCommands, registerCommand } from '../app/commands'
+import { allCommands, registerCommand, shortcutConflict } from '../app/commands'
 import type { AsyncCleanup, JSONValue, PluginAPI, PluginView, PluginWorkspace, VaultEvents } from '../plugin-api'
 import { editorExtensions, markdownSyntax, pluginEvents, pluginsPaused, registerCodeRenderer, registerEntry, settingTabs, sidebarViews } from './registry'
 
@@ -98,7 +98,7 @@ async function createAPI(instance: Instance): Promise<PluginAPI> {
       check()
       const commandID = localID(instance, command.id)
       if (!command.title.trim() || typeof command.run !== 'function' || allCommands().some((c) => c.id === commandID)) throw new Error('命令无效或重复注册')
-      if (command.keys?.some((key) => allCommands().some((c) => c.keys?.some((existing) => existing.toLowerCase() === key.toLowerCase())))) adapter.notice(`插件“${name}”部分快捷键与其他命令冲突，请调整`)
+      if (shortcutConflict(commandID, command.keys ?? [])) adapter.notice(`插件“${name}”部分快捷键与其他命令冲突，请调整`)
       return track(instance, registerCommand({ ...command, id: commandID,
         when: () => {
           if (instance.stopped) return false

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { availableCommands, formatKeys } from './commands'
+import { availableCommands, commandKeys, formatKeys } from './commands'
 import { fuzzyMatch, segments } from './fuzzy'
 import Icon from './Icon.vue'
 import { dirname, NOTE_EXT, noteTitle } from './paths'
@@ -116,7 +116,7 @@ function commandItems(q: string): Item[] {
     key: c.id,
     icon: 'command',
     title: c.title,
-    detail: c.keys ? formatKeys(c.keys[0]) : '',
+    detail: commandKeys(c).length ? formatKeys(commandKeys(c)[0]) : '',
     titleHits: new Set(m!.positions),
     detailHits: new Set(),
     run: () => {

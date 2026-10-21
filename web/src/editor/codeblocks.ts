@@ -1,6 +1,6 @@
 import { syntaxTree } from '@codemirror/language'
-import { Prec, StateEffect, StateField, type EditorState, type Range } from '@codemirror/state'
-import { Decoration, EditorView, keymap, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
+import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state'
+import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
 import { cachedTokens, requestTokens, type TokenRun } from '../highlight/client'
 
@@ -80,7 +80,7 @@ export function fencedCodeAt(state: EditorState, pos: number): SyntaxNode | null
 }
 
 // Ctrl/Cmd+A：光标在代码块内时先选中整块代码，已选中整块时交给默认的全选
-function selectCodeBlock(view: EditorView): boolean {
+export function selectCodeBlock(view: EditorView): boolean {
   const { state } = view
   const main = state.selection.main
   const node = fencedCodeAt(state, main.head)
@@ -169,5 +169,4 @@ const codeHighlighter = ViewPlugin.fromClass(
 export const codeBlockHighlight = [
   codeTokenField,
   codeHighlighter,
-  Prec.high(keymap.of([{ key: 'Mod-a', run: selectCodeBlock }])),
 ]

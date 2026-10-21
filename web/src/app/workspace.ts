@@ -3,6 +3,7 @@
 import { Annotation, EditorState, Transaction } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { nextTick, reactive, watch } from 'vue'
+import { editorCommands } from '../editor/shortcuts'
 import { refreshImages } from '../editor/livepreview'
 import { createEditorState, insertImageFiles, pasteImages, languageCompartment, pluginCompartment, pluginEditorExtensions, pluginLanguage, preferencesCompartment } from '../editor'
 import { handleShortcut, registerCommand } from './commands'
@@ -181,6 +182,7 @@ function buildState(path: string, doc: string): EditorState {
   noteRefs.set(path, ref)
   return createEditorState({
     doc,
+    shortcuts: [],
     spellcheck: settings.spellcheck,
     tabSize: settings.tabSize,
     resolveImage: (src) => {
@@ -1021,7 +1023,7 @@ export async function startWorkspace() {
   window.addEventListener('beforeunload', (event) => {
     if (!readyToReload()) event.preventDefault()
   })
-  window.addEventListener('keydown', handleShortcut)
+  window.addEventListener('keydown', handleShortcut, true)
   // 软键盘弹出、编辑区变矮后，让光标保持可见
   trackVisualViewport(() => {
     if (view?.hasFocus) view.dispatch({ effects: EditorView.scrollIntoView(view.state.selection.main.head, { y: 'nearest', yMargin: 24 }) })
@@ -1032,6 +1034,10 @@ export async function startWorkspace() {
 registerBuiltinCommands()
 
 function registerBuiltinCommands() {
+  for (const command of editorCommands) registerCommand({ ...command,
+    when: () => ws.settings === null && ws.active !== null && !!view,
+    run: () => { if (view) { command.run(view); view.focus() } },
+  })
   const hasNote = () => ws.active !== null
   const toggleSwitcher = (initial: string) => {
     ws.switcher = ws.switcher === null ? initial : null

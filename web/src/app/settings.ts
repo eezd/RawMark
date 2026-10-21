@@ -2,6 +2,7 @@
 // 本地缓存上次的值，启动时先套用，避免页面先按默认值显示再跳变
 import { reactive } from 'vue'
 import { api } from './api'
+import { normalizeKeys } from '../keys'
 import { applyAppearance, appearancePaused, sanitizeAppearance, type Appearance } from '../themes/appearance'
 
 export const TAB_SIZES = [2, 4, 8]
@@ -16,7 +17,7 @@ export const CONTENT_WIDTHS = [
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
 const DEFAULTS = { fontSize: 16, contentWidth: 760, sidebarWidth: 260, spellcheck: false, tabSize: 4 }
-export type Settings = typeof DEFAULTS & Appearance
+export type Settings = typeof DEFAULTS & Appearance & { shortcuts: Record<string, string[]> }
 
 const CACHE_KEY = 'rawmark.settings'
 
@@ -27,6 +28,7 @@ function sanitize(raw: Record<string, unknown>): Settings {
   const pick = <T>(v: unknown, allowed: T[], def: T) => (allowed.includes(v as T) ? (v as T) : def)
   return {
     fontSize: typeof raw.fontSize === 'number' && Number.isFinite(raw.fontSize) && raw.fontSize > 0 ? raw.fontSize : DEFAULTS.fontSize,
+    shortcuts: sanitizeShortcuts(raw.shortcuts),
     spellcheck: typeof raw.spellcheck === 'boolean' ? raw.spellcheck : DEFAULTS.spellcheck,
     tabSize: pick(raw.tabSize, TAB_SIZES, DEFAULTS.tabSize),
     ...sanitizeAppearance(raw),
@@ -40,6 +42,17 @@ function sanitize(raw: Record<string, unknown>): Settings {
         ? (raw.sidebarWidth as number)
         : DEFAULTS.sidebarWidth,
   }
+}
+
+function sanitizeShortcuts(raw: unknown): Record<string, string[]> {
+  if (raw === undefined) return {}
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('快捷键设置格式无效')
+  const out: Record<string, string[]> = {}
+  for (const [id, keys] of Object.entries(raw)) {
+    if (!Array.isArray(keys) || keys.some((key) => typeof key !== 'string')) throw new Error('快捷键设置格式无效')
+    out[id] = keys.map(normalizeKeys)
+  }
+  return out
 }
 
 let currentTheme = ''

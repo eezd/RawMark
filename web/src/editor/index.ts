@@ -1,14 +1,14 @@
-import { defaultKeymap, history, historyKeymap, indentWithTab, redo } from '@codemirror/commands'
+import { defaultKeymap, history, selectAll } from '@codemirror/commands'
 import { markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown'
 import { Language } from '@codemirror/language'
 import { Compartment, EditorState, Prec, type Extension } from '@codemirror/state'
-import { drawSelection, EditorView, keymap, type ViewUpdate } from '@codemirror/view'
+import { drawSelection, EditorView, keymap, type KeyBinding, type ViewUpdate } from '@codemirror/view'
 import type { MarkdownParser } from '@lezer/markdown'
 import { typoraExtensions } from '../markdown/extensions'
 import { renderedBlocks } from './blocks'
 import { codeBlockHighlight } from './codeblocks'
 import { editorFocus } from './focus'
-import { insertLink, toggleBold, toggleItalic } from './format'
+import { defaultEditorKeys } from './shortcuts'
 import { livePreview, resolveImageUrl } from './livepreview'
 import { tableEditing } from './table'
 import { markdownTheme } from './theme'
@@ -33,6 +33,7 @@ export interface EditorStateOptions {
   doc: string
   spellcheck?: boolean
   tabSize?: number
+  shortcuts?: KeyBinding[]
   resolveImage?: (src: string) => string
   // 文档变化回调，仅对挂载在视图上的状态触发；未激活标签页的状态由调用方直接更新
   onChange?: (update: ViewUpdate) => void
@@ -51,23 +52,15 @@ export function createEditorState(opts: EditorStateOptions): EditorState {
     pluginCompartment.of(pluginEditorExtensions()),
     EditorView.exceptionSink.of(reportEditorFailure),
     Prec.high(keymap.of(markdownKeymap)),
-    // 与 Typora 一致的格式快捷键
-    Prec.high(
-      keymap.of([
-        { key: 'Mod-b', run: toggleBold, preventDefault: true },
-        { key: 'Mod-i', run: toggleItalic, preventDefault: true },
-        { key: 'Mod-k', run: insertLink, preventDefault: true },
-      ]),
-    ),
+    Prec.high(keymap.of(opts.shortcuts ?? defaultEditorKeys)),
     markdownTheme,
     livePreview,
     codeBlockHighlight,
     editorFocus,
     tableEditing,
     renderedBlocks,
-    // CodeMirror 只在 Linux/Mac 上把 Ctrl/Cmd+Shift+Z 绑定为重做，Windows 上会退化成撤销；
-    // 与 Typora、VS Code 保持一致，所有平台都支持
-    keymap.of([indentWithTab, { key: 'Mod-Shift-z', run: redo, preventDefault: true }, ...defaultKeymap, ...historyKeymap]),
+    // 可配置操作不再通过 CM 的默认绑定重复注册。
+    keymap.of(defaultKeymap.filter((binding) => binding.run !== selectAll)),
     preferencesCompartment.of([
       EditorState.tabSize.of(opts.tabSize ?? 4),
       EditorView.contentAttributes.of({ spellcheck: String(opts.spellcheck ?? false) }),
