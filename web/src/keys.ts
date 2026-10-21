@@ -10,7 +10,8 @@ export function normalizeKeys(value: string): string {
 }
 
 export function physicalKeys(value: string): string {
-  return normalizeKeys(value.replace(/\bMod\b/g, isMac ? 'Meta' : 'Ctrl'))
+  const parts = normalizeKeys(value).split('+').map((part) => part === 'Mod' ? isMac ? 'Meta' : 'Ctrl' : part)
+  return normalizeKeys([...new Set(parts)].join('+'))
 }
 
 export function matchKeys(event: KeyboardEvent, value: string): boolean {
@@ -26,8 +27,9 @@ export function matchKeys(event: KeyboardEvent, value: string): boolean {
 export function recordedKeys(event: KeyboardEvent): string | null {
   if (['Control', 'Meta', 'Alt', 'Shift', 'AltGraph', 'Dead', 'Process', 'Unidentified'].includes(event.key) || event.isComposing) return null
   const parts: string[] = []
-  if (event.ctrlKey) parts.push(isMac ? 'Ctrl' : 'Mod')
-  if (event.metaKey) parts.push(isMac ? 'Mod' : 'Meta')
+  // 同时按下两种修饰键时保留物理组合，避免同步后 Mod 与另一键重合。
+  if (event.ctrlKey) parts.push(isMac || event.metaKey ? 'Ctrl' : 'Mod')
+  if (event.metaKey) parts.push(!isMac || event.ctrlKey ? 'Meta' : 'Mod')
   if (event.altKey) parts.push('Alt')
   if (event.shiftKey) parts.push('Shift')
   const key = /^Digit[0-9]$/.test(event.code) ? event.code.slice(5) : event.key === ' ' ? 'Space' : event.key === '+' ? 'Plus' : event.key

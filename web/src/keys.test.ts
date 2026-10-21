@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { matchKeys, recordedKeys } from './keys'
 
 describe('快捷键匹配与录入', () => {
@@ -12,5 +12,21 @@ describe('快捷键匹配与录入', () => {
   it('不会把单独的修饰键录成快捷键', () => {
     expect(recordedKeys(new KeyboardEvent('keydown', { key: 'Control', ctrlKey: true }))).toBeNull()
     expect(recordedKeys(new KeyboardEvent('keydown', { key: '+', ctrlKey: true, shiftKey: true }))).toContain('Plus')
+  })
+  it.each(['MacIntel', 'Win32'])('%s 录入双修饰键后可跨平台匹配，已有 Mod 组合也不会抛错', async (platform) => {
+    vi.stubGlobal('navigator', { platform })
+    vi.resetModules()
+    try {
+      const keys = await import('./keys')
+      const event = new KeyboardEvent('keydown', { key: 'b', code: 'KeyB', ctrlKey: true, metaKey: true })
+      expect(keys.recordedKeys(event)).toBe('Ctrl+Meta+B')
+      expect(keys.matchKeys(event, 'Ctrl+Meta+B')).toBe(true)
+      const alias = platform === 'MacIntel' ? 'Mod+Meta+B' : 'Mod+Ctrl+B'
+      expect(keys.physicalKeys(alias)).toBe(platform === 'MacIntel' ? 'Meta+B' : 'Ctrl+B')
+      expect(keys.matchKeys(new KeyboardEvent('keydown', { key: 'F1' }), alias)).toBe(false)
+    } finally {
+      vi.unstubAllGlobals()
+      vi.resetModules()
+    }
   })
 })
