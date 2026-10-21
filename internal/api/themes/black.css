@@ -1,30 +1,30 @@
 :root {
   color-scheme: dark;
-  --rm-bg: #0b0b0c;
-  --rm-sidebar-bg: #111113;
+  --rm-bg: #1e2022;
+  --rm-sidebar-bg: #191b1d;
   --rm-text: #e6e8eb;
   --rm-text-muted: #9b9fa8;
   --rm-divider: #2b2d33;
-  --rm-accent: #8eafff;
-  --rm-accent-strong: #b3c9ff;
-  --rm-selection: rgba(142, 175, 255, 0.25);
+  --rm-accent: #42b983;
+  --rm-accent-strong: #72cda5;
+  --rm-selection: rgba(66, 185, 131, 0.28);
   --rm-hover: rgba(230, 232, 235, 0.065);
-  --rm-active: rgba(142, 175, 255, 0.14);
+  --rm-active: rgba(66, 185, 131, 0.16);
   --rm-danger: #ff8291;
   --rm-warn-bg: #2c2413;
   --rm-warn-text: #e8c477;
   --rm-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
   --rm-inline-code-bg: #202127;
-  --rm-inline-code-text: #c3d5f5;
-  --rm-code-bg: #18191e;
-  --rm-code-text: #e1e4e8;
+  --rm-inline-code-text: #f19a58;
+  --rm-code-bg: #263238;
+  --rm-code-text: #abb2bf;
   --rm-highlight-bg: rgba(232, 196, 119, 0.25);
 }
 
-/* 浅蓝按钮使用深色文字，保持选中状态与操作按钮的对比度。 */
+/* 绿色按钮使用深色文字，保持按钮的文字对比度。 */
 .rm-btn-primary,
 .rm-btn-primary:hover,
 .rm-segmented button.on,
 .rm-share-password button {
-  color: #0b0b0c;
+  color: #101b16;
 }

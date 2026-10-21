@@ -51,20 +51,20 @@
 .rm-share-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rm-share-time { flex: none; }
 
-.rm-share-content h1 { font-size: 2em; line-height: 1.3; margin: 0.9em 0 0.4em; }
-.rm-share-content h2 { font-size: 1.6em; line-height: 1.35; margin: 0.9em 0 0.4em; }
-.rm-share-content h3 { font-size: 1.3em; line-height: 1.4; margin: 0.8em 0 0.4em; }
-.rm-share-content h4 { font-size: 1.15em; margin: 0.8em 0 0.4em; }
+.rm-share-content h1 { font-size: 2.2em; line-height: 1.3; margin: 0.9em 0 0.4em; }
+.rm-share-content h2 { font-size: 1.75em; line-height: 1.225; padding-bottom: 0.5em; border-bottom: 1px solid var(--rm-divider); margin: 0.9em 0 0.4em; }
+.rm-share-content h3 { font-size: 1.4em; line-height: 1.43; margin: 0.8em 0 0.4em; }
+.rm-share-content h4 { font-size: 1.2em; margin: 0.8em 0 0.4em; }
 .rm-share-content h5,
 .rm-share-content h6 { font-size: 1em; margin: 0.8em 0 0.4em; }
-.rm-share-content h6 { color: var(--rm-text-muted); }
+
 .rm-share-content p { margin: 0.6em 0; }
 .rm-share-content a { color: var(--rm-accent-strong); text-decoration: none; }
 .rm-share-content a:hover { text-decoration: underline; }
 .rm-share-content img { max-width: 100%; border-radius: 4px; }
 .rm-share-content mark { background: var(--rm-highlight-bg); color: inherit; padding: 0 2px; border-radius: 2px; }
 .rm-share-content hr { border: 0; border-top: 1px solid var(--rm-divider); margin: 1.5em 0; }
-.rm-share-content blockquote { margin: 0.8em 0; padding-left: 16px; border-left: 3px solid var(--rm-divider); color: var(--rm-text-muted); }
+.rm-share-content blockquote { margin: 0.8em 0; padding: 5px 15px; border-left: 4px solid #42b983; background: rgba(66, 185, 131, 0.1); }
 .rm-share-content ul,
 .rm-share-content ol { padding-left: 1.6em; }
 .rm-share-content li > input[type='checkbox'] { margin: 0 0.4em 0 -1.4em; accent-color: var(--rm-accent); vertical-align: -0.1em; }

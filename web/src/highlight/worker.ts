@@ -1,13 +1,13 @@
 import { createHighlighterCore, type HighlighterCore } from 'shiki/core'
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 import { bundledLanguages } from 'shiki/langs'
-import githubDark from 'shiki/themes/github-dark.mjs'
+import { codeTheme } from './theme'
 import type { HighlightRequest, HighlightResponse, TokenRun } from './protocol'
 
-const THEME = 'github-dark'
+const THEME = codeTheme.name
 
 const highlighterReady: Promise<HighlighterCore> = createHighlighterCore({
-  themes: [githubDark],
+  themes: [codeTheme],
   langs: [],
   engine: createJavaScriptRegexEngine({ forgiving: true }),
 })
