@@ -16,11 +16,8 @@ func newManager(t *testing.T) (*Manager, *time.Time) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	m, err := New(st)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := m.Setup(m.SetupCode(), "password123"); err != nil {
+	m := New(st)
+	if err := m.Setup("password123"); err != nil {
 		t.Fatal(err)
 	}
 	clock := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)

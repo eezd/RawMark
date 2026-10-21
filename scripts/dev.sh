@@ -82,10 +82,6 @@ for _ in $(seq 1 120); do
 done
 curl -fs "http://127.0.0.1:$API_PORT/api/v1/health" >/dev/null 2>&1 || fail "后端 60 秒内未就绪，请查看上方 [server] 日志"
 
-if [[ -f "$RAWMARK_DATA/setup-code.txt" ]]; then
-  echo "==> 首次使用：启动码在 $RAWMARK_DATA/setup-code.txt"
-fi
-
 echo "==> 启动前端 http://localhost:$WEB_PORT"
 (cd web && exec npx vite "${VITE_ARGS[@]}") 2>&1 | prefix web &
 

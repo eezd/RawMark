@@ -40,7 +40,6 @@ const (
 
 var (
 	ErrAlreadySetUp   = errors.New("已完成初始化")
-	ErrBadSetupCode   = errors.New("启动码错误")
 	ErrWeakPassword   = fmt.Errorf("密码至少 %d 位", MinPasswordLen)
 	ErrBadCredentials = errors.New("密码错误")
 	ErrRateLimited    = errors.New("尝试次数过多，请稍后再试")
@@ -48,33 +47,15 @@ var (
 )
 
 type Manager struct {
-	store *store.Store
-	// 首次初始化需要的一次性启动码，仅打印在服务日志中，防止部署后被他人抢先设置密码
-	setupCode string
-
+	store    *store.Store
 	mu       sync.Mutex
 	failures map[string][]time.Time
 	blocked  map[string]time.Time // 来源 -> 解封时间
 	now      func() time.Time
 }
 
-func New(s *store.Store) (*Manager, error) {
-	m := &Manager{store: s, failures: map[string][]time.Time{}, blocked: map[string]time.Time{}, now: time.Now}
-	ok, err := m.IsSetUp()
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		m.setupCode = randomCode()
-	}
-	return m, nil
-}
-
-// SetupCode 返回启动码；已初始化时为空
-func (m *Manager) SetupCode() string {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.setupCode
+func New(s *store.Store) *Manager {
+	return &Manager{store: s, failures: map[string][]time.Time{}, blocked: map[string]time.Time{}, now: time.Now}
 }
 
 func (m *Manager) IsSetUp() (bool, error) {
@@ -82,14 +63,16 @@ func (m *Manager) IsSetUp() (bool, error) {
 	return ok, err
 }
 
-func (m *Manager) Setup(code, password string) error {
-	expected := m.SetupCode()
-	if expected == "" {
+func (m *Manager) Setup(password string) error {
+	// 已初始化时提前拒绝，避免公开接口重复计算密码哈希；并发首次写入仍由数据库保证原子性。
+	setUp, err := m.IsSetUp()
+	if err != nil {
+		return err
+	}
+	if setUp {
 		return ErrAlreadySetUp
 	}
-	if subtle.ConstantTimeCompare([]byte(strings.ToUpper(strings.TrimSpace(code))), []byte(expected)) != 1 {
-		return ErrBadSetupCode
-	}
+
 	if len([]rune(password)) < MinPasswordLen {
 		return ErrWeakPassword
 	}
@@ -100,9 +83,6 @@ func (m *Manager) Setup(code, password string) error {
 	if !ok {
 		return ErrAlreadySetUp
 	}
-	m.mu.Lock()
-	m.setupCode = ""
-	m.mu.Unlock()
 	return nil
 }
 
@@ -348,7 +328,7 @@ func hashToken(token string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// randomCode 生成形如 ABCD-EFGH 的启动码，去掉易混淆字符
+// randomCode 生成形如 ABCD-EFGH 的 API 令牌标识，去掉易混淆字符
 func randomCode() string {
 	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	b := make([]byte, 8)

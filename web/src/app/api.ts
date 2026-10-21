@@ -112,7 +112,7 @@ const json = async <T>(p: Promise<Response>): Promise<T> => (await p).json()
 
 export const api = {
   authState: () => json<{ setUp: boolean; authenticated: boolean }>(request('GET', '/api/v1/auth/state')),
-  setup: (code: string, password: string) => request('POST', '/api/v1/auth/setup', { json: { code, password } }),
+  setup: (password: string) => request('POST', '/api/v1/auth/setup', { json: { password } }),
   login: (password: string) => request('POST', '/api/v1/auth/login', { json: { password } }),
   logout: () => request('POST', '/api/v1/auth/logout'),
 

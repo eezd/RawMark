@@ -98,7 +98,7 @@
     },
     "/auth/setup": {
       "post": {
-        "summary": "首次设置登录密码（需服务器数据目录中的启动码）",
+        "summary": "首次设置登录密码",
         "tags": [
           "登录"
         ],
@@ -112,15 +112,11 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "code": {
-                    "type": "string"
-                  },
                   "password": {
                     "type": "string"
                   }
                 },
                 "required": [
-                  "code",
                   "password"
                 ]
               }
@@ -139,7 +135,7 @@
             }
           },
           "400": {
-            "description": "启动码错误或密码过短",
+            "description": "密码过短",
             "content": {
               "application/json": {
                 "schema": {
@@ -158,7 +154,8 @@
               }
             }
           }
-        }
+        },
+        "description": "仅未初始化实例可设置密码；首次成功后自动登录，已初始化时返回 409。"
       }
     },
     "/auth/login": {

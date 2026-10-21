@@ -38,8 +38,6 @@ type Server struct {
 	index *search.Index
 	// 串行化设置的"读取-合并-写入"
 	settingsMu sync.Mutex
-	// OnSetup 在首次初始化完成后调用（用于删除启动码文件）
-	OnSetup func()
 	// ThemesDir 指向数据目录中的主题目录；为空时只有内置主题。
 	ThemesDir  string
 	PluginsDir string
@@ -228,21 +226,18 @@ func (s *Server) authState(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Code, Password string }
+	var body struct{ Password string }
 	if !readJSON(w, r, &body) {
 		return
 	}
-	switch err := s.auth.Setup(body.Code, body.Password); {
-	case errors.Is(err, auth.ErrBadSetupCode), errors.Is(err, auth.ErrWeakPassword):
+	switch err := s.auth.Setup(body.Password); {
+	case errors.Is(err, auth.ErrWeakPassword):
 		writeError(w, 400, err.Error())
 	case errors.Is(err, auth.ErrAlreadySetUp):
 		writeError(w, 409, err.Error())
 	case err != nil:
 		internalError(w, r, err)
 	default:
-		if s.OnSetup != nil {
-			s.OnSetup()
-		}
 		s.startSession(w, r, body.Password)
 	}
 }

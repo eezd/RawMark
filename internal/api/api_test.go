@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -148,11 +149,8 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	am, err := auth.New(st)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := am.Setup(am.SetupCode(), "password123"); err != nil {
+	am := auth.New(st)
+	if err := am.Setup("password123"); err != nil {
 		t.Fatal(err)
 	}
 	idx, err := search.Open(filepath.Join(dir, "index.db"), v)
@@ -643,5 +641,99 @@ func TestChangePassword(t *testing.T) {
 	}
 	if code := f.status(newClient(), "POST", "/api/v1/auth/login", `{"password":"new-password"}`, nil); code != 200 {
 		t.Errorf("新密码登录，得到 %d", code)
+	}
+}
+
+func TestSetupWithoutCode(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "setup.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	server := New(nil, auth.New(st), st, nil, nil)
+	srv := httptest.NewServer(server.Handler(fstest.MapFS{}))
+	t.Cleanup(srv.Close)
+	f := &fixture{t: t, url: srv.URL}
+	owner := newClient()
+	before := decode[struct{ SetUp, Authenticated bool }](t, f.do(owner, "GET", "/api/v1/auth/state", "", nil))
+	if before.SetUp || before.Authenticated {
+		t.Fatal("新实例不应已初始化或登录")
+	}
+	if status := f.status(owner, "POST", "/api/v1/auth/setup", `{"password":"short"}`, nil); status != 400 {
+		t.Fatalf("弱密码应被拒绝: %d", status)
+	}
+	if status := f.status(owner, "POST", "/api/v1/auth/setup", `{"password":"password123"}`, nil); status != 200 {
+		t.Fatalf("无需启动码即可初始化: %d", status)
+	}
+	after := decode[struct{ SetUp, Authenticated bool }](t, f.do(owner, "GET", "/api/v1/auth/state", "", nil))
+	if !after.SetUp || !after.Authenticated {
+		t.Fatal("初始化后应自动登录")
+	}
+	if status := f.status(newClient(), "POST", "/api/v1/auth/setup", `{"password":"replacement"}`, nil); status != 409 {
+		t.Fatalf("重复初始化必须拒绝: %d", status)
+	}
+	// 新建 Manager 模拟重启，不能重新开放密码设置。
+	reopened := auth.New(st)
+	if err := reopened.Setup("replacement"); !errors.Is(err, auth.ErrAlreadySetUp) {
+		t.Fatalf("重启后不能覆盖密码: %v", err)
+	}
+	if _, err := reopened.Login("test", "password123"); err != nil {
+		t.Fatal("原密码应仍然有效", err)
+	}
+}
+
+func TestConcurrentSetupCannotOverwritePassword(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "setup.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	manager := auth.New(st)
+	server := New(nil, manager, st, nil, nil)
+	srv := httptest.NewServer(server.Handler(fstest.MapFS{}))
+	t.Cleanup(srv.Close)
+	passwords := []string{"password-one", "password-two"}
+	type outcome struct {
+		index, status int
+		err           error
+	}
+	results := make(chan outcome, 2)
+	for index, password := range passwords {
+		go func() {
+			res, err := newClient().Post(srv.URL+"/api/v1/auth/setup", "application/json", strings.NewReader(`{"password":"`+password+`"}`))
+			if err != nil {
+				results <- outcome{index: index, err: err}
+				return
+			}
+			res.Body.Close()
+			results <- outcome{index: index, status: res.StatusCode}
+		}()
+	}
+	winner, conflicts := -1, 0
+	for range passwords {
+		result := <-results
+		if result.err != nil {
+			t.Fatal(result.err)
+		}
+		switch result.status {
+		case 200:
+			if winner >= 0 {
+				t.Fatal("初始化成功不止一次")
+			}
+			winner = result.index
+		case 409:
+			conflicts++
+		default:
+			t.Fatalf("初始化状态不符: %d", result.status)
+		}
+	}
+	if winner < 0 || conflicts != 1 {
+		t.Fatal("必须只有一个初始化请求成功")
+	}
+	if _, err := manager.Login("test", passwords[winner]); err != nil {
+		t.Fatal("成功请求的密码未保存", err)
+	}
+	if _, err := manager.Login("test", passwords[1-winner]); !errors.Is(err, auth.ErrBadCredentials) {
+		t.Fatal("失败请求不应修改密码", err)
 	}
 }

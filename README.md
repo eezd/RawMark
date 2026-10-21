@@ -12,7 +12,7 @@ install -d -m 750 -o 65532 -g 65532 data
 docker compose --env-file /docker/main/.env up -d --build --wait
 ```
 
-持久化数据位于 `deploy/data/`，与 `.dev-data/` 独立。首次初始化的启动码位于 `deploy/data/setup-code.txt`。
+持久化数据位于 `deploy/data/`，与 `.dev-data/` 独立。首次打开网页时直接设置登录密码。
 宿主机 Nginx 配置为 `deploy/nginx/raw.134333.xyz.conf`，复用现有通配证书及 WebSocket 升级映射；安装到 `/etc/nginx/conf.d/134333.xyz/` 后，先执行 `nginx -t` 再重载。
 域名 `raw.134333.xyz` 在 DNSPod 设置 CNAME 指向 `cdn.134333.xyz`（与 AlphaPulse 一致）；还需在 Cloudflare for SaaS 的 `unino.top` 区域添加该自定义域名，并等待域名与托管证书均为 `active`。仅设置 CNAME 或旧区域中的 A 记录不足以完成 CDN 接入。访问地址为 `https://raw.134333.xyz`。修改端口时需同步端口登记和 Nginx 上游。
 
@@ -29,7 +29,7 @@ docker run -d --name rawmark \
   rawmark
 ```
 
-- 首次打开需要输入启动码，位于数据目录的 `setup-code.txt`（如 `~/rawmark-data/setup-code.txt`），设置密码后自动删除。
+- 首次打开直接设置登录密码，之后凭密码登录；请在将新实例开放给他人访问前完成初始化。
 - 笔记以普通 `.md` 文件保存在 `数据目录/vault/`，图片按 Typora 习惯存放在同级的 `笔记名.assets/`，可直接用 Typora 等编辑器打开；外部修改会实时同步到网页。
 - `--user` 让容器以宿主机用户身份读写数据目录；不指定时容器以 UID 65532 运行，需要该用户对目录有写权限。
 - 请通过 HTTPS 反向代理（Caddy、Nginx 等）访问，并转发 WebSocket（`/api/v1/events`）。
@@ -52,7 +52,7 @@ scripts/dev.sh          # 后端 go run -tags dev + 前端 Vite 热更新，Ctrl
 scripts/dev.sh --host   # 前端监听所有网卡，手机访问 http://<电脑 IP>:5173
 ```
 
-浏览器打开 http://localhost:5173 ，启动码在 `.dev-data/setup-code.txt`。端口与数据目录可用 `API_PORT`、`WEB_PORT`、`RAWMARK_DATA` 覆盖，详见 `scripts/dev.sh --help`。
+浏览器打开 http://localhost:5173 ，首次使用直接设置登录密码。端口与数据目录可用 `API_PORT`、`WEB_PORT`、`RAWMARK_DATA` 覆盖，详见 `scripts/dev.sh --help`。
 
 检查：
 

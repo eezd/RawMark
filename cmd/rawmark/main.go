@@ -62,21 +62,7 @@ func run(addr string) error {
 		return err
 	}
 	defer st.Close()
-	am, err := auth.New(st)
-	if err != nil {
-		return err
-	}
-
-	// 启动码写入数据目录下的文件而非日志：只有能访问服务器的人才能完成首次初始化
-	codeFile := filepath.Join(dataDir, "setup-code.txt")
-	if code := am.SetupCode(); code != "" {
-		if err := os.WriteFile(codeFile, []byte(code+"\n"), 0o600); err != nil {
-			return fmt.Errorf("写入启动码失败: %w", err)
-		}
-		slog.Warn("尚未初始化：请在浏览器中打开 RawMark，输入启动码完成设置", "启动码文件", codeFile)
-	} else {
-		os.Remove(codeFile)
-	}
+	am := auth.New(st)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -97,7 +83,6 @@ func run(addr string) error {
 	srv := api.New(v, am, st, hub, idx)
 	srv.ThemesDir = filepath.Join(dataDir, "themes")
 	srv.PluginsDir = filepath.Join(dataDir, "plugins")
-	srv.OnSetup = func() { os.Remove(codeFile) }
 	go srv.FollowMoves(ctx)
 	httpServer := &http.Server{
 		Addr:              addr,

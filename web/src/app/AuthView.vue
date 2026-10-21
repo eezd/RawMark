@@ -5,7 +5,6 @@ import { api, ApiError } from './api'
 const props = defineProps<{ mode: 'setup' | 'login' }>()
 const emit = defineEmits<{ done: [] }>()
 
-const code = ref('')
 const password = ref('')
 const confirm = ref('')
 const error = ref('')
@@ -20,7 +19,7 @@ async function submit() {
   }
   busy.value = true
   try {
-    if (isSetup.value) await api.setup(code.value, password.value)
+    if (isSetup.value) await api.setup(password.value)
     else await api.login(password.value)
     emit('done')
   } catch (err) {
@@ -36,12 +35,8 @@ async function submit() {
     <form class="rm-auth-card" @submit.prevent="submit">
       <h1>RawMark</h1>
       <p v-if="isSetup" class="rm-auth-hint">
-        首次使用，请设置登录密码。启动码位于服务器数据目录的 <code>setup-code.txt</code> 中。
+        首次使用，请设置登录密码。
       </p>
-      <label v-if="isSetup">
-        <span>启动码</span>
-        <input v-model="code" autocomplete="one-time-code" autocapitalize="characters" placeholder="XXXX-XXXX" required />
-      </label>
       <label>
         <span>密码</span>
         <input
