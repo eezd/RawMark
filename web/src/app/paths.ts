@@ -2,6 +2,14 @@ import { encodePath } from './api'
 
 export const NOTE_EXT = '.md'
 
+export function isImage(path: string): boolean {
+  return /\.(png|jpe?g|gif|webp|svg|avif|apng|bmp|ico|tiff?)$/i.test(path)
+}
+
+export function inAssetDir(path: string): boolean {
+  return path.split('/').some((part) => part.endsWith('.assets'))
+}
+
 export function dirname(path: string): string {
   const i = path.lastIndexOf('/')
   return i < 0 ? '' : path.slice(0, i)

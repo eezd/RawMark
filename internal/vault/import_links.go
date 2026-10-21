@@ -146,9 +146,7 @@ func (v *Vault) importLinks(ctx context.Context, note string, content []byte, to
 			if !info.Mode().IsRegular() {
 				continue
 			}
-			switch strings.ToLower(path.Ext(rel)) {
-			case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif", ".apng", ".bmp", ".ico", ".tif", ".tiff":
-			default:
+			if !IsImage(rel) {
 				continue
 			}
 			replacement, found := replacements[rel]

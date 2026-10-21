@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { fuzzyMatch, segments } from './fuzzy'
 import Icon from './Icon.vue'
-import { basename, dirname, joinPath, noteTitle } from './paths'
+import { basename, dirname, inAssetDir, joinPath, noteTitle } from './paths'
 import { move, ws } from './workspace'
 
 // 「移动到…」：选择目标文件夹（手机上没有拖放，电脑上也比拖放快）
@@ -20,7 +20,7 @@ const title = computed(() => (isDir.value ? basename(props.path) : noteTitle(pro
 const targets = computed(() => {
   const here = dirname(props.path)
   const inside = (d: string) => isDir.value && (d === props.path || d.startsWith(props.path + '/'))
-  const dirs = ws.entries.filter((e) => e.dir && e.path !== here && !inside(e.path)).map((e) => e.path)
+  const dirs = ws.entries.filter((e) => e.dir && !inAssetDir(e.path) && e.path !== here && !inside(e.path)).map((e) => e.path)
   return here === '' ? dirs : ['', ...dirs]
 })
 

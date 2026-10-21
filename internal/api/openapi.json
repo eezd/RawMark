@@ -398,7 +398,7 @@
     },
     "/tree": {
       "get": {
-        "summary": "全部笔记与文件夹（不含 .assets 图片目录与隐藏文件）",
+        "summary": "全部笔记、图片与文件夹（含 .assets，不含隐藏条目或符号链接）",
         "tags": [
           "笔记"
         ],
@@ -583,7 +583,7 @@
         }
       },
       "delete": {
-        "summary": "把笔记或文件夹移入回收站（连同 .assets）",
+        "summary": "把笔记、图片或文件夹移入回收站（笔记连同 .assets）",
         "tags": [
           "笔记"
         ],
@@ -613,11 +613,11 @@
     },
     "/move": {
       "post": {
-        "summary": "移动或重命名笔记/文件夹",
+        "summary": "移动或重命名笔记、图片或文件夹",
         "tags": [
           "笔记"
         ],
-        "description": "笔记的 .assets 目录随之移动，改名时同步改写正文中指向自身图片目录的链接；分享链接随之更新。不改写其他笔记指向它的链接。",
+        "description": "笔记的 .assets 目录随之移动，改名时改写本篇图片目录链接；图片移动或改名保持扩展名，并更新仓库笔记中的本地引用。分享链接随主体更新。不改写其他笔记指向笔记或文件夹的链接。",
         "requestBody": {
           "required": true,
           "content": {
@@ -2270,6 +2270,59 @@
           },
           "413": {
             "description": "超过上传、解压、文件数量或单文件大小限制"
+          }
+        }
+      }
+    },
+    "/assets/{path}": {
+      "put": {
+        "summary": "原位替换已有图片，保留路径和引用",
+        "tags": [
+          "图片"
+        ],
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "description": "仓库中的图片路径",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "multipart file 字段的扩展名须与目标图片一致；不创建新文件，最大 50 MB。旧图片不会进入回收站。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "替换成功"
+          },
+          "400": {
+            "description": "非法路径、空文件或扩展名不一致"
+          },
+          "404": {
+            "description": "目标图片不存在"
+          },
+          "413": {
+            "description": "超过 50 MB"
           }
         }
       }

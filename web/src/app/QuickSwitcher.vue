@@ -41,7 +41,7 @@ function cancel() {
 
 function noteItems(q: string): Item[] {
   const recentRank = new Map(ws.recent.map((p, i) => [p, i]))
-  const notes = ws.entries.filter((e) => !e.dir)
+  const notes = ws.entries.filter((e) => !e.dir && e.path.endsWith(NOTE_EXT))
   const toItem = (path: string, positions: number[] = []): Item => {
     const dir = dirname(path)
     const offset = dir ? dir.length + 1 : 0

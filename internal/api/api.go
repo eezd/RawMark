@@ -4,7 +4,6 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -85,6 +84,7 @@ func (s *Server) routes() []route {
 		{"POST /api/v1/import", authed, s.importNotes},
 		{"POST /api/v1/assets", authed, s.uploadAsset},
 		{"POST /api/v1/assets/import", authed, s.importAsset},
+		{"PUT /api/v1/assets/{path...}", authed, s.replaceImage},
 		{"GET /api/v1/raw/{path...}", authed, s.raw},
 		{"GET /api/v1/trash", authed, s.trashList},
 		{"POST /api/v1/trash/{id}/restore", authed, s.trashRestore},
@@ -352,16 +352,11 @@ func (s *Server) move(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &body) {
 		return
 	}
-	rewritten, err := s.vault.Move(body.From, body.To)
+	rewritten, err := s.vault.Move(body.From, body.To, func() error {
+		return s.store.MoveShares(body.From, body.To)
+	})
 	if err != nil {
 		vaultError(w, r, err)
-		return
-	}
-	if err := s.store.MoveShares(body.From, body.To); err != nil {
-		if _, rollback := s.vault.Move(body.To, body.From); rollback != nil {
-			err = errors.Join(err, fmt.Errorf("回滚笔记移动失败: %w", rollback))
-		}
-		internalError(w, r, err)
 		return
 	}
 	if rewritten {
@@ -398,6 +393,32 @@ func (s *Server) uploadAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]string{"link": link})
+}
+
+// replaceImage 仅替换已存在的图片；路径与引用保持不变。
+func (s *Server) replaceImage(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxAssetBytes+1<<20)
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeError(w, 413, "图片不能超过 50 MB")
+		} else {
+			writeError(w, 400, "无法读取上传文件")
+		}
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, 400, "缺少上传文件")
+		return
+	}
+	defer file.Close()
+	if err := s.vault.ReplaceImage(r.PathValue("path"), header.Filename, file, maxAssetBytes); err != nil {
+		vaultError(w, r, err)
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
 // raw 输出仓库内任意非隐藏文件（主要是图片）。以沙箱 CSP 返回，防止 SVG/HTML 中的脚本在本站执行

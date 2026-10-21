@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import Icon from './Icon.vue'
-import { basename, joinPath } from './paths'
+import { basename, inAssetDir, isImage, joinPath } from './paths'
 import { expanded, type TreeNode } from './tree'
 import { createFolder, createNote, move, openNote, remove, renameTarget, ws } from './workspace'
 
 const props = defineProps<{ node: TreeNode; depth: number }>()
 
+const image = computed(() => !props.node.dir && isImage(props.node.path))
+const assetDir = computed(() => props.node.dir && inAssetDir(props.node.path))
 const isOpen = computed(() => expanded.has(props.node.path))
-const isActive = computed(() => ws.active === props.node.path)
+const isActive = computed(() => (image.value ? ws.image : ws.active) === props.node.path)
 const isRenaming = computed(() => ws.renaming === props.node.path)
 const menuOpen = ref(false)
 const dropTarget = ref(false)
@@ -48,7 +50,8 @@ function activate() {
   if (props.node.dir) {
     if (isOpen.value) expanded.delete(props.node.path)
     else expanded.add(props.node.path)
-  } else void openNote(props.node.path)
+  } else if (image.value) ws.image = props.node.path
+  else void openNote(props.node.path)
 }
 
 watch(
@@ -94,7 +97,7 @@ function onDragStart(e: DragEvent) {
 }
 
 function onDragOver(e: DragEvent) {
-  if (!props.node.dir || !e.dataTransfer?.types.includes('application/x-rawmark-path')) return
+  if (!props.node.dir || assetDir.value || !e.dataTransfer?.types.includes('application/x-rawmark-path')) return
   e.preventDefault()
   e.stopPropagation()
   dropTarget.value = true
@@ -103,7 +106,7 @@ function onDragOver(e: DragEvent) {
 function onDrop(e: DragEvent) {
   dropTarget.value = false
   const src = e.dataTransfer?.getData('application/x-rawmark-path')
-  if (!props.node.dir || !src) return
+  if (!props.node.dir || assetDir.value || !src) return
   e.preventDefault()
   e.stopPropagation()
   const to = joinPath(props.node.path, basename(src))
@@ -117,7 +120,7 @@ function onDrop(e: DragEvent) {
       class="rm-tree-row"
       :class="{ active: isActive, drop: dropTarget, 'menu-open': menuOpen }"
       :style="{ paddingLeft: depth * 14 + 8 + 'px' }"
-      :draggable="!isRenaming"
+      :draggable="!isRenaming && !assetDir"
       @click="activate"
       @contextmenu.prevent="menuOpen = true"
       @touchstart.passive="onTouchStart"
@@ -140,20 +143,22 @@ function onDrop(e: DragEvent) {
         @keydown.esc.prevent="cancelRename"
         @blur="commitRename"
       />
-      <span v-else class="rm-tree-name">{{ node.dir ? node.name : node.name.replace(/\.md$/, '') }}</span>
+      <Icon v-if="image" name="image" :size="14" />
+      <span v-if="!isRenaming" class="rm-tree-name">{{ node.dir ? node.name : node.name.replace(/\.md$/, '') }}</span>
       <button class="rm-icon-btn rm-tree-more" title="更多操作" @click.stop="menuOpen = !menuOpen">
         <Icon name="more" />
       </button>
       <div v-if="menuOpen" class="rm-menu" @click.stop>
-        <template v-if="node.dir">
+        <template v-if="node.dir && !assetDir">
           <button @click="runMenu('note')"><Icon name="noteAdd" />新建笔记</button>
           <button @click="runMenu('folder')"><Icon name="folderAdd" />新建文件夹</button>
           <button @click="runMenu('import')"><Icon name="import" />导入</button>
         </template>
-        <button @click="runMenu('rename')"><Icon name="edit" />重命名</button>
-        <button @click="runMenu('move')"><Icon name="folder" />移动到…</button>
-        <button @click="runMenu('share')"><Icon name="link" />分享</button>
-        <button class="danger" @click="runMenu('delete')"><Icon name="trash" />删除</button>
+        <button v-if="image" @click="menuOpen = false; ws.image = node.path"><Icon name="image" />预览 / 替换图片</button>
+        <button v-if="!assetDir" @click="runMenu('rename')"><Icon name="edit" />重命名</button>
+        <button v-if="!assetDir" @click="runMenu('move')"><Icon name="folder" />移动到…</button>
+        <button v-if="!image" @click="runMenu('share')"><Icon name="link" />分享</button>
+        <button v-if="!assetDir" class="danger" @click="runMenu('delete')"><Icon name="trash" />删除</button>
       </div>
       <div v-if="menuOpen" class="rm-menu-backdrop" @click.stop="menuOpen = false" @contextmenu.prevent.stop="menuOpen = false" />
     </div>

@@ -3,12 +3,13 @@
 import { Annotation, EditorState, Transaction } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { nextTick, reactive, watch } from 'vue'
+import { refreshImages } from '../editor/livepreview'
 import { createEditorState, insertImageFiles, pasteImages, languageCompartment, pluginCompartment, pluginEditorExtensions, pluginLanguage, preferencesCompartment } from '../editor'
 import { handleShortcut, registerCommand } from './commands'
-import { api, ApiError, type Entry } from './api'
+import { api, ApiError, encodePath, type Entry } from './api'
 import { drafts } from './drafts'
 import { connectEvents, type VaultEvent } from './events'
-import { basename, dirname, joinPath, NOTE_EXT, resolveAssetUrl } from './paths'
+import { basename, dirname, joinPath, isImage, NOTE_EXT, resolveAssetUrl } from './paths'
 import { loadSettings, settings } from './settings'
 import { trackVisualViewport } from './viewport'
 import { appearancePaused } from '../themes/appearance'
@@ -64,6 +65,8 @@ export const ws = reactive({
   moving: null as string | null,
   // 导入目标目录，空字符串为根目录
   importing: null as string | null,
+  // 图片预览与管理，独立于笔记标签和草稿
+  image: null as string | null,
   // 电脑上侧栏折叠
   sidebarCollapsed: layout.sidebarCollapsed ?? false,
   // 大纲面板（电脑上在右侧常驻，手机上为浮层）
@@ -180,7 +183,11 @@ function buildState(path: string, doc: string): EditorState {
     doc,
     spellcheck: settings.spellcheck,
     tabSize: settings.tabSize,
-    resolveImage: (src) => resolveAssetUrl(ref.path, src),
+    resolveImage: (src) => {
+      const url = resolveAssetUrl(ref.path, src)
+      const entry = ws.entries.find((e) => url === '/api/v1/raw/' + encodePath(e.path))
+      return entry ? imageUrl(entry.path) : url
+    },
     onChange: (u) => {
       editorStates.set(ref.path, u.state)
       if (!u.transactions.some((tr) => tr.annotation(externalChange))) scheduleSave(ref.path)
@@ -591,7 +598,11 @@ async function fetchTree() {
     if (opsInFlight === 0) scheduleTreeRefresh()
     return
   }
+  const oldImages = new Map(ws.entries.filter((e) => !e.dir && isImage(e.path)).map((e) => [e.path, e]))
+  const nextPaths = new Set(entries.map((e) => e.path))
+  const imagesChanged = entries.some((e) => !e.dir && isImage(e.path) && (e.mtime !== oldImages.get(e.path)?.mtime || e.size !== oldImages.get(e.path)?.size)) || [...oldImages.keys()].some((p) => !nextPaths.has(p))
   ws.entries = entries
+  if (imagesChanged) view?.dispatch({ effects: refreshImages.of(null) })
   markMissingTabsDeleted()
   for (const waiter of treeWaiters.splice(0)) waiter.resolve()
 }
@@ -697,7 +708,7 @@ export function renameTarget(path: string, name: string): string | null {
   name = name.trim().replace(/\//g, '')
   if (!name || name.startsWith('.')) return null
   const entry = ws.entries.find((e) => e.path === path)
-  if (entry && !entry.dir && !name.endsWith(NOTE_EXT)) name += NOTE_EXT
+  if (entry && !entry.dir && path.endsWith(NOTE_EXT) && !name.endsWith(NOTE_EXT)) name += NOTE_EXT
   return joinPath(dirname(path), name)
 }
 
@@ -709,19 +720,26 @@ export async function move(from: string, to: string) {
     return
   }
   await withOp(async () => {
-    const busy = () => affected(from).some((p) => slots.get(p)?.uploads || slots.get(p)?.paused)
+    // 图片改名会更新仓库中的引用，先保存已打开笔记，沿用版本冲突保护。
+    const imageMove = isImage(from) && ws.entries.some((e) => e.path === from && !e.dir)
+    const impacted = () => imageMove ? ws.tabs.map((t) => t.path) : affected(from)
+    const busy = () => impacted().some((p) => slots.get(p)?.uploads || slots.get(p)?.paused)
     if (busy()) {
       toast('笔记正在处理粘贴、上传或移动，请完成后再移动')
       return
     }
     // 先保存待保存的修改，确保移动的是最新内容；移动期间暂停保存，避免写到旧路径
-    await Promise.all(affected(from).map((p) => flush(p)))
+    await Promise.all(impacted().map((p) => flush(p)))
     // 等待保存时仍可能开始粘贴，须在取得移动占用前再次检查。
     if (busy()) {
       toast('笔记正在处理粘贴、上传或移动，请完成后再移动')
       return
     }
-    const paused = affected(from).map(slot)
+    if (imageMove && ws.tabs.some((t) => t.dirty || t.status !== 'ready')) {
+      toast('请先保存笔记并解决冲突，再修改图片名称或位置')
+      return
+    }
+    const paused = impacted().map(slot)
     paused.forEach((s) => s.paused++)
     const snapshot = ws.entries
     let draftsMoved = false
@@ -734,12 +752,14 @@ export async function move(from: string, to: string) {
       ws.entries = ws.entries.map((e) => ({ ...e, path: remapPath(e.path, from, to) ?? e.path }))
       remapOpenNotes(from, to)
       remapRecent(from, to)
+      if (ws.image) ws.image = remapPath(ws.image, from, to) ?? ws.image
       await api.move(from, to)
     } catch (err) {
       if (remapped) {
         ws.entries = snapshot
         remapOpenNotes(to, from)
         remapRecent(to, from)
+        if (ws.image) ws.image = remapPath(ws.image, to, from) ?? ws.image
       }
       if (draftsMoved) {
         try { await drafts.move(to, from) }
@@ -751,7 +771,7 @@ export async function move(from: string, to: string) {
       paused.forEach((s) => s.paused--)
     }
     // 笔记改名时服务器会改写正文中的图片链接，版本随之变化，需要重新同步
-    await Promise.all(affected(to).map(async (p) => {
+    await Promise.all((imageMove ? ws.tabs.map((t) => t.path) : affected(to)).map(async (p) => {
       const tab = tabOf(p)
       if (!tab) return
       if (tab.dirty) {
@@ -777,6 +797,7 @@ export async function remove(path: string) {
     }
     try {
       const item = await api.deleteFile(path)
+      if (ws.image && remapPath(ws.image, path, path) !== null) ws.image = null
       toast(`已删除“${basename(path).replace(/\.md$/, '')}”`, {
         label: '撤销',
         run: () => void restore(item.id),
@@ -792,10 +813,23 @@ export async function restore(id: string) {
   try {
     const item = await api.restore(id)
     await refreshTree()
-    if (!item.dir) void openNote(item.path)
+    if (!item.dir && item.path.endsWith(NOTE_EXT)) void openNote(item.path)
+    else if (!item.dir && isImage(item.path)) ws.image = item.path
   } catch (err) {
     toast('恢复失败：' + errorText(err))
   }
+}
+
+// 版本只用于刷新浏览器图片，不改变 Markdown 中保存的相对路径。
+export function imageUrl(path: string): string {
+  const entry = ws.entries.find((e) => e.path === path)
+  return '/api/v1/raw/' + encodePath(path) + (entry ? `?v=${entry.mtime}-${entry.size}` : '')
+}
+
+export async function replaceImage(path: string, file: File) {
+  await withOp(() => api.replaceImage(path, file))
+  try { await refreshTree() }
+  catch (err) { toast('图片已替换，但刷新目录失败：' + errorText(err)) }
 }
 
 // ---- 实时同步 ----
@@ -828,6 +862,7 @@ async function handleEvents(evs: VaultEvent[]) {
       // 自己保存产生的事件 rev 与本地一致；有本地修改时不覆盖，交由下次保存的冲突检测处理
       if (tab && tab.rev !== ev.rev) await syncOpenTab(tab)
     } else if (ev.type === 'moved') {
+      if (ws.image) ws.image = remapPath(ws.image, ev.from!, ev.path!) ?? ws.image
       const paused = affected(ev.from!).map(slot)
       paused.forEach((s) => s.paused++)
       try {
@@ -842,6 +877,7 @@ async function handleEvents(evs: VaultEvent[]) {
         remapRecent(ev.from!, ev.path!)
       } finally { paused.forEach((s) => s.paused--) }
     } else if (ev.type === 'deleted') {
+      if (ws.image === ev.path && opsInFlight === 0) ws.image = null
       const tab = tabOf(ev.path!)
       if (tab && tab.status === 'ready' && opsInFlight === 0) {
         tab.status = 'deleted'
@@ -1053,6 +1089,7 @@ export function openSearch() {
 }
 
 export function stopWorkspace() {
+  ws.image = null
   stopPlugins()
   disconnect?.()
   disconnect = undefined

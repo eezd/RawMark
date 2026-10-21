@@ -174,6 +174,12 @@ export const api = {
     return (await json<{ link: string }>(request('POST', '/api/v1/assets?note=' + encodeURIComponent(note), { body: form }))).link
   },
 
+  replaceImage: (path: string, file: File) => {
+    const body = new FormData()
+    body.append('file', file)
+    return request('PUT', '/api/v1/assets/' + encodePath(path), { body })
+  },
+
   importImage: async (note: string, url: string): Promise<string> =>
     (await json<{ link: string }>(request('POST', '/api/v1/assets/import?note=' + encodeURIComponent(note), { json: { url } }))).link,
 

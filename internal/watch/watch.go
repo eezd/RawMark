@@ -203,6 +203,11 @@ func diff(prev, next map[string]fileState) []events.Event {
 			}
 		case old.dir != cur.dir:
 			structural = true
+		case !cur.dir && cur.rev == "" && (old.size != cur.size || old.mtime != cur.mtime || !os.SameFile(old.info, cur.info)):
+			// 图片没有正文版本号；替换后仍需刷新列表元数据与预览。
+			if vault.IsImage(p) {
+				structural = true
+			}
 		case !cur.dir && old.rev != cur.rev:
 			evs = append(evs, events.Event{Type: "changed", Path: p, Rev: cur.rev})
 		}

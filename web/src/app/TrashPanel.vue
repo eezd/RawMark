@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { api, type TrashItem } from './api'
 import Icon from './Icon.vue'
+import { isImage } from './paths'
 import { restore, toast } from './workspace'
 
 const items = ref<TrashItem[] | null>(null)
@@ -41,7 +42,7 @@ onMounted(load)
     <p v-else-if="items && !items.length" class="rm-tree-empty">回收站是空的</p>
     <ul v-else class="rm-trash-list">
       <li v-for="item in items ?? []" :key="item.id">
-        <Icon :name="item.dir ? 'folder' : 'note'" />
+        <Icon :name="item.dir ? 'folder' : isImage(item.path) ? 'image' : 'note'" />
         <div class="rm-trash-info">
           <span class="rm-trash-path">{{ item.path.replace(/\.md$/, '') }}</span>
           <span class="rm-trash-time">{{ fmt.format(item.deletedAt) }}</span>

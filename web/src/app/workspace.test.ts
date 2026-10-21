@@ -6,7 +6,7 @@ import { api, ApiError } from './api'
 import { drafts, type Draft } from './drafts'
 import { connectEvents } from './events'
 import { pluginEvents } from '../plugins/registry'
-import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, importNotes, move, readyToReload, openNote, refreshTree, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
+import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, importNotes, move, readyToReload, openNote, refreshTree, replaceImage, restore, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
 
 vi.mock('./events', () => ({ connectEvents: vi.fn(() => () => {}) }))
 
@@ -273,5 +273,36 @@ describe('导入', () => {
     vi.spyOn(api, 'importNotes').mockRejectedValue(new ApiError(409, '目标已存在'))
     await expect(importNotes('', '导入', [])).rejects.toMatchObject({ status: 409, message: '目标已存在' })
     expect(readyToReload()).toBe(true)
+  })
+})
+
+
+describe('图片管理', () => {
+  it('替换期间阻止刷新，完成后更新列表；刷新失败不伪装成替换失败', async () => {
+    ws.tabs = []
+    let finish!: (value: Response) => void
+    vi.spyOn(api, 'replaceImage').mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    vi.spyOn(api, 'tree').mockResolvedValue([{ path: 'assets/a.png', dir: false, size: 2, mtime: 2 }])
+    const replacing = replaceImage('assets/a.png', new File(['image'], 'a.png'))
+    expect(readyToReload()).toBe(false)
+    finish(new Response())
+    await replacing
+    expect(ws.entries.find((e) => e.path === 'assets/a.png')?.mtime).toBe(2)
+    expect(readyToReload()).toBe(true)
+    vi.mocked(api.replaceImage).mockResolvedValueOnce(new Response())
+    vi.mocked(api.tree).mockRejectedValueOnce(new ApiError(500, '读取失败'))
+    await replaceImage('assets/a.png', new File(['image'], 'a.png'))
+    expect(ws.toasts.some((t) => t.text.includes('图片已替换，但刷新目录失败'))).toBe(true)
+  })
+
+  it('恢复图片只打开预览，不创建 Markdown 标签', async () => {
+    ws.tabs = []
+    ws.active = null
+    vi.spyOn(api, 'restore').mockResolvedValue({ id: 'trash-image', path: 'assets/a.png', dir: false, deletedAt: 1 })
+    vi.spyOn(api, 'tree').mockResolvedValue([{ path: 'assets/a.png', dir: false, size: 2, mtime: 2 }])
+    await restore('trash-image')
+    expect(ws.image).toBe('assets/a.png')
+    expect(ws.tabs).toEqual([])
+    expect(ws.active).toBeNull()
   })
 })

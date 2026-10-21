@@ -1,5 +1,5 @@
 import { syntaxTree } from '@codemirror/language'
-import { Facet, type EditorState, type Range } from '@codemirror/state'
+import { StateEffect, Facet, type EditorState, type Range } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
 import { codeContentRange, fenceLanguage, fencedCodeAt } from './codeblocks'
@@ -20,6 +20,9 @@ import {
 export const resolveImageUrl = Facet.define<(src: string) => string, (src: string) => string>({
   combine: (values) => values[0] ?? ((src) => src),
 })
+
+// 图片文件原位替换时重建预览，不改变正文、选区或撤销历史。
+export const refreshImages = StateEffect.define<null>()
 
 const hidden = Decoration.replace({})
 const inlineCode = Decoration.mark({ class: 'cm-rm-inline-code' })
@@ -328,6 +331,7 @@ const livePreviewPlugin = ViewPlugin.fromClass(
       }
       if (
         this.stale ||
+        u.transactions.some((tr) => tr.effects.some((effect) => effect.is(refreshImages))) ||
         u.docChanged ||
         u.viewportChanged ||
         u.selectionSet ||

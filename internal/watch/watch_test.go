@@ -170,3 +170,21 @@ func TestNotesExcludeResourceContents(t *testing.T) {
 		t.Fatalf("跟踪普通文件移动不能改变笔记索引范围: %v", indexed)
 	}
 }
+
+func TestImageReplacementRefreshesTree(t *testing.T) {
+	root := t.TempDir()
+	p := filepath.Join(root, "a.png")
+	if err := os.WriteFile(p, []byte("image"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := fileState{info: info, size: 5, mtime: 1}
+	updated := fileState{info: info, size: 5, mtime: 2}
+	evs := diff(map[string]fileState{"a.png": old}, map[string]fileState{"a.png": updated})
+	if len(evs) != 1 || evs[0].Type != "tree" {
+		t.Fatalf("同路径同大小替换须刷新预览：%v", evs)
+	}
+}

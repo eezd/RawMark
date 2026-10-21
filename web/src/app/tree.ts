@@ -37,7 +37,7 @@ watch(expanded, () => localStorage.setItem(EXPANDED_KEY, JSON.stringify([...expa
 
 // 打开或新建笔记时展开其所在的各级目录
 watch(
-  () => [ws.active, ws.renaming],
+  () => [ws.active, ws.renaming, ws.image],
   (paths) => {
     for (const p of paths) {
       for (let d = p ? dirname(p) : ''; d; d = dirname(d)) expanded.add(d)

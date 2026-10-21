@@ -144,11 +144,6 @@ func (v *Vault) checkInside(p string) error {
 	}
 }
 
-func (v *Vault) rel(abs string) string {
-	r, _ := filepath.Rel(v.root, abs)
-	return filepath.ToSlash(r)
-}
-
 // ---- 读写 ----
 
 func (v *Vault) Read(rel string) ([]byte, string, error) {
@@ -295,42 +290,32 @@ func (v *Vault) OpenRaw(rel string) (*os.File, fs.FileInfo, error) {
 
 // ---- 列表 ----
 
-// skipName 判断目录树中不展示的条目：隐藏文件/目录（含临时文件）与 .assets 图片目录
-func skipName(name string, dir bool) bool {
-	return strings.HasPrefix(name, ".") || (dir && strings.HasSuffix(name, AssetsExt))
+// IsImage 判断当前支持管理的图片扩展名，不用于验证文件内容。
+func IsImage(p string) bool {
+	switch strings.ToLower(path.Ext(p)) {
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif", ".apng", ".bmp", ".ico", ".tif", ".tiff":
+		return true
+	default:
+		return false
+	}
 }
 
-// Tree 列出所有文件夹与 .md 笔记
+// Tree 列出文件夹、笔记和图片，沿用 TreeAt 的隐藏路径与符号链接边界。
 func (v *Vault) Tree() ([]Entry, error) {
-	entries := []Entry{}
-	err := filepath.WalkDir(v.root, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	entries, err := v.TreeAt("")
+	if err != nil {
+		return nil, err
+	}
+	visible := []Entry{}
+	for _, e := range entries {
+		if e.Dir {
+			e.Size = 0
 		}
-		if p == v.root {
-			return nil
+		if e.Dir || IsImage(e.Path) || (IsNote(e.Path) && !strings.Contains(e.Path, AssetsExt+"/")) {
+			visible = append(visible, e)
 		}
-		if skipName(d.Name(), d.IsDir()) {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !d.IsDir() && !IsNote(d.Name()) {
-			return nil
-		}
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-		e := Entry{Path: v.rel(p), Dir: d.IsDir(), ModTime: info.ModTime().UnixMilli()}
-		if !e.Dir {
-			e.Size = info.Size()
-		}
-		entries = append(entries, e)
-		return nil
-	})
-	return entries, err
+	}
+	return visible, nil
 }
 
 // TreeAt 递归列出指定目录中的普通文件和子目录，路径相对此目录；空路径表示仓库根，不公开隐藏条目或符号链接。
@@ -413,9 +398,10 @@ func (v *Vault) ScopedPath(root, rel string) (string, error) {
 
 // ---- 移动 / 重命名 ----
 
-// Move 移动或重命名笔记/文件夹，返回是否原子改写了正文（改变文件身份）。
+// Move 移动或重命名笔记、图片或文件夹，返回是否原子改写了移动主体（改变文件身份）。
 // 笔记的 .assets 目录随之移动；笔记改名时同步改写正文中指向自身图片目录的链接。
-func (v *Vault) Move(from, to string) (rewritten bool, err error) {
+// commit 用于提交关联元数据；失败时在释放写锁前恢复文件及原始正文，nil 表示无关联元数据。
+func (v *Vault) Move(from, to string, commit func() error) (rewritten bool, err error) {
 	src, err := v.abs(from)
 	if err != nil {
 		return false, err
@@ -436,8 +422,10 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	isNote := !info.IsDir()
-	if isNote && (!IsNote(from) || !IsNote(to)) {
+	isNote := !info.IsDir() && IsNote(from)
+	isImage := !info.IsDir() && IsImage(from)
+	validTarget := (isNote && IsNote(to)) || (isImage && strings.EqualFold(path.Ext(from), path.Ext(to)))
+	if !info.IsDir() && (!info.Mode().IsRegular() || !validTarget) {
 		return false, ErrInvalidPath
 	}
 	if _, err := os.Lstat(dst); err == nil {
@@ -452,6 +440,14 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 			}
 		}
 	}
+	// 图片改名影响引用它的笔记：先读取全部待改正文，失败时不能先移动图片。
+	var links []imageLinkChange
+	if isImage {
+		links, err = v.imageLinkChanges(from, to)
+		if err != nil {
+			return false, err
+		}
+	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return false, err
 	}
@@ -459,9 +455,21 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 		return false, err
 	}
 	assetsMoved := false
+	writtenLinks := 0
+	var originalNote []byte
 	defer func() {
 		if err == nil {
 			return
+		}
+		if rewritten {
+			if rollback := atomicWrite(dst, originalNote); rollback != nil {
+				err = errors.Join(err, fmt.Errorf("回滚笔记正文失败: %w", rollback))
+			}
+		}
+		for _, change := range links[:writtenLinks] {
+			if rollback := atomicWrite(change.path, change.before); rollback != nil {
+				err = errors.Join(err, fmt.Errorf("回滚图片引用失败: %w", rollback))
+			}
 		}
 		if assetsMoved {
 			if rollback := os.Rename(dstAssets, srcAssets); rollback != nil {
@@ -472,6 +480,12 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 			err = errors.Join(err, fmt.Errorf("回滚笔记移动失败: %w", rollback))
 		}
 	}()
+	for _, change := range links {
+		if err = atomicWrite(change.path, change.after); err != nil {
+			return false, err
+		}
+		writtenLinks++
+	}
 	if srcAssets != "" {
 		if err := os.Rename(srcAssets, dstAssets); err != nil {
 			return false, fmt.Errorf("移动图片目录失败: %w", err)
@@ -485,11 +499,18 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 				return false, err
 			}
 			if out := RewriteAssetLinks(data, oldBase, newBase); !bytes.Equal(out, data) {
-				return true, atomicWrite(dst, out)
+				if err = atomicWrite(dst, out); err != nil {
+					return false, err
+				}
+				originalNote = data
+				rewritten = true
 			}
 		}
 	}
-	return false, nil
+	if commit != nil {
+		err = commit()
+	}
+	return rewritten, err
 }
 
 // ---- 回收站 ----
@@ -502,7 +523,7 @@ func newTrashID() string {
 
 var trashIDPattern = regexp.MustCompile(`^\d{8}T\d{6}\.\d{3}-[0-9a-f]{8}$`)
 
-// Delete 把笔记（连同 .assets）或文件夹移入回收站
+// Delete 把笔记（连同 .assets）、图片或文件夹移入回收站
 func (v *Vault) Delete(rel string) (item TrashItem, err error) {
 	p, err := v.abs(rel)
 	if err != nil {
@@ -517,11 +538,11 @@ func (v *Vault) Delete(rel string) (item TrashItem, err error) {
 	if err != nil {
 		return TrashItem{}, err
 	}
-	if !info.IsDir() && !IsNote(rel) {
+	if !info.IsDir() && (!info.Mode().IsRegular() || (!IsNote(rel) && !IsImage(rel))) {
 		return TrashItem{}, ErrInvalidPath
 	}
 	item = TrashItem{ID: newTrashID(), Path: rel, Dir: info.IsDir(), DeletedAt: time.Now().UnixMilli()}
-	if !item.Dir {
+	if !item.Dir && IsNote(rel) {
 		st, statErr := os.Stat(AssetsDir(p))
 		if statErr != nil && !errors.Is(statErr, fs.ErrNotExist) {
 			return TrashItem{}, statErr
@@ -700,21 +721,35 @@ func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (stri
 	dir := AssetsDir(p)
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if err := v.checkInside(filepath.Join(dir, name)); err != nil {
+	if err := v.checkInside(dir); err != nil {
 		return "", err
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	target := filepath.Join(dir, name)
-	if _, err := os.Stat(target); errors.Is(err, fs.ErrNotExist) {
-		if err := atomicWrite(target, data); err != nil {
+	// 管理界面允许替换图片，哈希名称不再保证内容未变；不能把旧内容上传误判为重复。
+	base := strings.TrimSuffix(name, path.Ext(name))
+	for i := 0; ; i++ {
+		candidate := name
+		if i > 0 {
+			candidate = fmt.Sprintf("%s-%d%s", base, i, path.Ext(name))
+		}
+		target := filepath.Join(dir, candidate)
+		if err := v.checkInside(target); err != nil {
 			return "", err
 		}
-	} else if err != nil {
-		return "", err
+		existing, err := os.ReadFile(target)
+		if errors.Is(err, fs.ErrNotExist) {
+			if err := atomicWrite(target, data); err != nil {
+				return "", err
+			}
+		} else if err != nil {
+			return "", err
+		} else if !bytes.Equal(existing, data) {
+			continue
+		}
+		return EscapeLinkPath(path.Base(AssetsDir(note))) + "/" + candidate, nil
 	}
-	return EscapeLinkPath(path.Base(AssetsDir(note))) + "/" + name, nil
 }
 
 func assetName(data []byte, origName string) string {
