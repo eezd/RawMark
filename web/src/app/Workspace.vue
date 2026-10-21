@@ -18,7 +18,7 @@ import { noteTitle } from './paths'
 import { SIDEBAR_WIDTH, settings, updateSettings } from './settings'
 import Sidebar from './Sidebar.vue'
 import TabBar from './TabBar.vue'
-import { activeTab, flushAll, readyToReload, startWorkspace, stopWorkspace, toast, ws } from './workspace'
+import { activeTab, flushAll, readyToReload, startWorkspace, stopWorkspace, toast, toggleSourceMode, ws } from './workspace'
 
 const emit = defineEmits<{ logout: [] }>()
 const title = computed(() => (ws.active ? noteTitle(ws.active) : 'RawMark'))
@@ -110,6 +110,7 @@ onBeforeUnmount(() => {
         <button class="rm-icon-btn" title="目录" @click="ws.sidebarOpen = true"><Icon name="menu" :size="20" /></button>
         <button class="rm-mobile-title" title="切换笔记" @click="ws.switcher = ''">{{ title }}</button>
         <span class="rm-save-state" :class="{ on: saving }" />
+        <button v-if="ws.active" class="rm-icon-btn" :title="ws.sourceMode ? '关闭源码编辑' : '开启源码编辑'" :aria-pressed="ws.sourceMode" @mousedown.prevent @click="toggleSourceMode"><Icon name="source" :size="20" /></button>
         <button v-if="ws.active" class="rm-icon-btn" title="大纲" @click="ws.outlineOpen = !ws.outlineOpen"><Icon name="outline" :size="20" /></button>
         <button class="rm-icon-btn" title="快速打开" @click="ws.switcher = ''"><Icon name="search" :size="20" /></button>
         <button class="rm-icon-btn" title="命令" @click="ws.switcher = '>'"><Icon name="command" :size="20" /></button>

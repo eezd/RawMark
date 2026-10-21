@@ -5,7 +5,7 @@ import { EditorView } from '@codemirror/view'
 import { nextTick, reactive, watch } from 'vue'
 import { editorCommands } from '../editor/shortcuts'
 import { refreshImages } from '../editor/livepreview'
-import { createEditorState, insertImageFiles, pasteImages, languageCompartment, pluginCompartment, pluginEditorExtensions, pluginLanguage, preferencesCompartment } from '../editor'
+import { createEditorState, insertImageFiles, pasteImages, languageCompartment, pluginCompartment, pluginEditorExtensions, pluginLanguage, preferencesCompartment, previewCompartment, previewExtensions } from '../editor'
 import { handleShortcut, registerCommand } from './commands'
 import { api, ApiError, encodePath, type Entry } from './api'
 import { drafts } from './drafts'
@@ -73,6 +73,7 @@ export const ws = reactive({
   sidebarCollapsed: layout.sidebarCollapsed ?? false,
   // 大纲面板（电脑上在右侧常驻，手机上为浮层）
   outlineOpen: layout.outlineOpen ?? false,
+  sourceMode: false,
   // 最近打开的笔记，最新的在前
   recent: JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[],
   toasts: [] as Toast[],
@@ -149,6 +150,17 @@ export function editorView(): EditorView | null {
   return view
 }
 
+export function toggleSourceMode() {
+  ws.sourceMode = !ws.sourceMode
+  const effects = previewCompartment.reconfigure(previewExtensions(ws.sourceMode))
+  for (const [path, state] of editorStates) {
+    if (path === ws.active && view) {
+      view.dispatch({ effects })
+      editorStates.set(path, view.state)
+    } else editorStates.set(path, state.update({ effects }).state)
+  }
+}
+
 /** 从相册/文件中选择图片插入到光标处 */
 export function insertImagesFromPicker() {
   const v = view
@@ -186,6 +198,7 @@ function buildState(path: string, doc: string): EditorState {
     shortcuts: [],
     spellcheck: settings.spellcheck,
     tabSize: settings.tabSize,
+    sourceMode: ws.sourceMode,
     resolveImage: (src) => {
       const url = resolveAssetUrl(ref.path, src)
       const entry = ws.entries.find((e) => url === '/api/v1/raw/' + encodePath(e.path))
@@ -1068,6 +1081,7 @@ function registerBuiltinCommands() {
     { id: 'app.settings', title: '设置', keys: ['Mod+,'], run: () => (ws.settings = 'index') },
     { id: 'view.sidebar', title: '显示/隐藏侧栏', keys: ['Mod+\\'], run: toggleSidebar },
     { id: 'view.outline', title: '显示/隐藏大纲', keys: ['Mod+Shift+O'], when: hasNote, run: () => (ws.outlineOpen = !ws.outlineOpen) },
+    { id: 'view.source', title: '开启/关闭源码编辑', when: hasNote, run: toggleSourceMode },
     { id: 'app.trash', title: '打开回收站', run: () => (ws.settings = 'trash') },
     { id: 'note.share', title: '分享当前笔记', when: hasNote, run: () => (ws.sharing = ws.active) },
     { id: 'app.images', title: '管理根目录图片', run: () => (ws.images = '') },

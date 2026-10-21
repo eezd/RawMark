@@ -107,6 +107,7 @@ body {
   padding: 32px 24px 40vh;
   caret-color: #ff0000;
 }
+.cm-editor .cm-content.cm-rm-source { font-family: var(--rm-font-mono); }
 .cm-editor .cm-cursor {
   border-left: 2px solid #ff0000;
 }

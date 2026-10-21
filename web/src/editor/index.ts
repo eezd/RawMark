@@ -21,6 +21,10 @@ export { insertImageFiles, pasteImages } from './paste'
 export const pluginCompartment = new Compartment()
 export const languageCompartment = new Compartment()
 export const preferencesCompartment = new Compartment()
+export const previewCompartment = new Compartment()
+export function previewExtensions(sourceMode: boolean): Extension {
+  return sourceMode ? EditorView.contentAttributes.of({ class: 'cm-rm-source' }) : [livePreview, tableEditing, renderedBlocks]
+}
 export function pluginLanguage() { return new Language(
   markdownLanguage.data,
   (markdownLanguage.parser as MarkdownParser).configure([typoraExtensions, ...[...markdownSyntax.values()].map((entry) => entry.value)]),
@@ -33,6 +37,7 @@ export interface EditorStateOptions {
   doc: string
   spellcheck?: boolean
   tabSize?: number
+  sourceMode?: boolean
   shortcuts?: KeyBinding[]
   resolveImage?: (src: string) => string
   // 文档变化回调，仅对挂载在视图上的状态触发；未激活标签页的状态由调用方直接更新
@@ -54,11 +59,9 @@ export function createEditorState(opts: EditorStateOptions): EditorState {
     Prec.high(keymap.of(markdownKeymap)),
     Prec.high(keymap.of(opts.shortcuts ?? defaultEditorKeys)),
     markdownTheme,
-    livePreview,
     codeBlockHighlight,
     editorFocus,
-    tableEditing,
-    renderedBlocks,
+    previewCompartment.of(previewExtensions(opts.sourceMode ?? false)),
     // 可配置操作不再通过 CM 的默认绑定重复注册。
     keymap.of(defaultKeymap.filter((binding) => binding.run !== selectAll)),
     preferencesCompartment.of([

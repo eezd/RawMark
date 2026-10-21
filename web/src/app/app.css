@@ -55,6 +55,7 @@ button {
   flex: none;
 }
 .rm-icon-btn:hover { background: var(--rm-hover); color: var(--rm-text); }
+.rm-icon-btn[aria-pressed="true"] { background: var(--rm-active); color: var(--rm-accent-strong); }
 
 .rm-splash,
 .rm-empty {
@@ -284,8 +285,8 @@ button {
 }
 .rm-tabs.empty { display: none; }
 .rm-tabs-side,
-.rm-tabs-outline { flex: none; align-self: center; margin-bottom: 4px; }
-.rm-tabs-outline { margin-left: auto; position: sticky; right: 0; background: var(--rm-bg); }
+.rm-tabs-actions { flex: none; align-self: center; margin-bottom: 4px; }
+.rm-tabs-actions { display: flex; margin-left: auto; position: sticky; right: 0; background: var(--rm-bg); }
 .rm-tabs-outline.on { color: var(--rm-accent-strong); }
 .rm-tab.dragging { opacity: 0.5; }
 .rm-tab.drop-before { box-shadow: inset 2px 0 0 var(--rm-accent); }
