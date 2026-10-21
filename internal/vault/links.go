@@ -16,6 +16,14 @@ func RewriteAssetLinks(content []byte, oldBase, newBase string) []byte {
 	refDef := regexp.MustCompile(`^( {0,3}\[[^\]]+\]:\s*<?)` + target)
 	repl := []byte("${1}${2}" + strings.ReplaceAll(EscapeLinkPath(newBase+AssetsExt), "$", "$$") + "/")
 
+	return transformMarkdownLines(content, refDef, func(line []byte) []byte {
+		line = refDef.ReplaceAll(line, repl)
+		return transformOutsideCode(line, func(text []byte) []byte { return inline.ReplaceAll(text, repl) })
+	})
+}
+
+// transformMarkdownLines 复用链接改写的容器与代码块识别，避免导入时修改代码示例。
+func transformMarkdownLines(content []byte, refDef *regexp.Regexp, transform func([]byte) []byte) []byte {
 	lines := bytes.SplitAfter(content, []byte("\n"))
 	var fence []byte // 当前所在围栏代码块的围栏字符串，nil 表示不在代码块中
 	var containers []linkContainer
@@ -111,8 +119,7 @@ func RewriteAssetLinks(content []byte, oldBase, newBase string) []byte {
 			continue
 		}
 		paragraph = !paragraphBoundary.Match(trimmed) && !refDef.Match(trimmed)
-		line = refDef.ReplaceAll(line, repl)
-		lines[i] = replaceOutsideCode(line, inline, repl)
+		lines[i] = transform(line)
 	}
 	return bytes.Join(lines, nil)
 }
@@ -161,8 +168,8 @@ func fenceOpen(line []byte) []byte {
 	return rest[:n]
 }
 
-// replaceOutsideCode 只在行内代码 `…` 之外的片段上做替换
-func replaceOutsideCode(line []byte, re *regexp.Regexp, repl []byte) []byte {
+// transformOutsideCode 只在行内代码 `…` 之外的片段上做转换。
+func transformOutsideCode(line []byte, transform func([]byte) []byte) []byte {
 	var out []byte
 	for len(line) > 0 {
 		start := bytes.IndexByte(line, '`')
@@ -178,9 +185,9 @@ func replaceOutsideCode(line []byte, re *regexp.Regexp, repl []byte) []byte {
 			break
 		}
 		codeEnd := start + n + end + n
-		out = append(out, re.ReplaceAll(line[:start], repl)...)
+		out = append(out, transform(line[:start])...)
 		out = append(out, line[start:codeEnd]...)
 		line = line[codeEnd:]
 	}
-	return append(out, re.ReplaceAll(line, repl)...)
+	return append(out, transform(line)...)
 }

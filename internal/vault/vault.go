@@ -696,12 +696,7 @@ func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (stri
 	if int64(len(data)) > limit {
 		return "", ErrTooLarge
 	}
-	ext := strings.ToLower(filepath.Ext(origName))
-	if !extPattern.MatchString(ext) {
-		ext = sniffExt(data)
-	}
-	sum := sha256.Sum256(data)
-	name := hex.EncodeToString(sum[:8]) + ext
+	name := assetName(data, origName)
 	dir := AssetsDir(p)
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -720,6 +715,15 @@ func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (stri
 		return "", err
 	}
 	return EscapeLinkPath(path.Base(AssetsDir(note))) + "/" + name, nil
+}
+
+func assetName(data []byte, origName string) string {
+	ext := strings.ToLower(filepath.Ext(origName))
+	if !extPattern.MatchString(ext) {
+		ext = sniffExt(data)
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:8]) + ext
 }
 
 func sniffExt(data []byte) string {

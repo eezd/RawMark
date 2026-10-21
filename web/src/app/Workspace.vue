@@ -6,6 +6,7 @@ import EditorPane from './EditorPane.vue'
 import Icon from './Icon.vue'
 import MobileToolbar from './MobileToolbar.vue'
 import MoveDialog from './MoveDialog.vue'
+import ImportDialog from './ImportDialog.vue'
 import NoteBanner from './NoteBanner.vue'
 import OutlinePanel from './OutlinePanel.vue'
 import QuickSwitcher from './QuickSwitcher.vue'
@@ -120,6 +121,7 @@ onBeforeUnmount(() => {
     <QuickSwitcher v-if="ws.switcher !== null" />
     <SettingsDialog v-if="ws.settings" />
     <ShareDialog v-if="ws.sharing" :path="ws.sharing" @close="ws.sharing = null" />
+    <ImportDialog v-if="ws.importing !== null" :dir="ws.importing" @close="ws.importing = null" />
     <MoveDialog v-if="ws.moving" :path="ws.moving" @close="ws.moving = null" />
   </div>
 </template>

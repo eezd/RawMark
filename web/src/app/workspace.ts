@@ -62,6 +62,8 @@ export const ws = reactive({
   sharing: null as string | null,
   // 「移动到…」对话框（笔记或文件夹路径）
   moving: null as string | null,
+  // 导入目标目录，空字符串为根目录
+  importing: null as string | null,
   // 电脑上侧栏折叠
   sidebarCollapsed: layout.sidebarCollapsed ?? false,
   // 大纲面板（电脑上在右侧常驻，手机上为浮层）
@@ -662,6 +664,18 @@ async function createNoteFile(path: string): Promise<boolean> {
       return false
     }
   })
+}
+
+export async function importNotes(dir: string, folder: string, files: File[]) {
+  // refreshTree 必须等 withOp 结束，否则会等待自身释放操作计数。
+  const result = await withOp(() => api.importNotes(dir, folder, files))
+  ws.searchOpen = false
+  try {
+    await refreshTree()
+  } catch (err) {
+    toast('导入已完成，目录刷新失败：' + errorText(err))
+  }
+  return result
 }
 
 export async function createFolder(dir: string) {

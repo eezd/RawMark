@@ -70,13 +70,14 @@ function commitRename() {
   if (target && target !== props.node.path) void move(props.node.path, target)
 }
 
-function runMenu(action: 'note' | 'folder' | 'rename' | 'move' | 'share' | 'delete') {
+function runMenu(action: 'note' | 'folder' | 'import' | 'rename' | 'move' | 'share' | 'delete') {
   menuOpen.value = false
   const path = props.node.path
   if (action === 'note' || action === 'folder') {
     expanded.add(path)
     void (action === 'note' ? createNote(path) : createFolder(path))
-  } else if (action === 'rename') ws.renaming = path
+  } else if (action === 'import') ws.importing = path
+  else if (action === 'rename') ws.renaming = path
   else if (action === 'share') ws.sharing = path
   else if (action === 'move') ws.moving = path
   else void remove(path)
@@ -147,6 +148,7 @@ function onDrop(e: DragEvent) {
         <template v-if="node.dir">
           <button @click="runMenu('note')"><Icon name="noteAdd" />新建笔记</button>
           <button @click="runMenu('folder')"><Icon name="folderAdd" />新建文件夹</button>
+          <button @click="runMenu('import')"><Icon name="import" />导入</button>
         </template>
         <button @click="runMenu('rename')"><Icon name="edit" />重命名</button>
         <button @click="runMenu('move')"><Icon name="folder" />移动到…</button>

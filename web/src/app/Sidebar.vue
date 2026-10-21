@@ -39,6 +39,7 @@ function onRootDrop(e: DragEvent) {
       </button>
       <button class="rm-icon-btn" title="新建笔记" @click="createNote('')"><Icon name="noteAdd" /></button>
       <button class="rm-icon-btn" title="新建文件夹" @click="createFolder('')"><Icon name="folderAdd" /></button>
+      <button class="rm-icon-btn" title="导入" @click="ws.importing = ''"><Icon name="import" /></button>
     </div>
     <nav v-if="sidebarViews.size" class="rm-plugin-tabs" aria-label="侧栏视图">
       <button class="rm-btn" :class="{ on: !currentView }" @click="selectedView = ''">文件</button>

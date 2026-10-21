@@ -84,6 +84,7 @@ func (s *Server) routes() []route {
 		{"DELETE /api/v1/files/{path...}", authed, s.deleteFile},
 		{"POST /api/v1/move", authed, s.move},
 		{"POST /api/v1/folders", authed, s.mkdir},
+		{"POST /api/v1/import", authed, s.importNotes},
 		{"POST /api/v1/assets", authed, s.uploadAsset},
 		{"POST /api/v1/assets/import", authed, s.importAsset},
 		{"GET /api/v1/raw/{path...}", authed, s.raw},
@@ -492,7 +493,7 @@ func vaultError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.As(err, &conflict):
 		writeJSON(w, 412, map[string]string{"error": err.Error(), "rev": conflict.Rev})
-	case errors.Is(err, vault.ErrInvalidPath):
+	case errors.Is(err, vault.ErrInvalidPath), errors.Is(err, vault.ErrInvalidImport):
 		writeError(w, 400, err.Error())
 	case errors.Is(err, vault.ErrNotFound):
 		writeError(w, 404, err.Error())

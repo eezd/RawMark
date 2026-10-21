@@ -2180,6 +2180,102 @@
           }
         ]
       }
+    },
+    "/import": {
+      "post": {
+        "summary": "导入 Markdown 文件或 ZIP 知识库",
+        "tags": [
+          "文件"
+        ],
+        "description": "多选 .md 或单个 ZIP，总上传不超过 100 MB；ZIP 必须指定新建文件夹名称。目标目录必须存在，冲突不覆盖。解压及整理后上限 512 MiB、10,000 项，单篇笔记 20 MiB、附件 50 MiB。Markdown 与 ZIP 文件名须为 UTF-8。ZIP 层级保留，本地图片生成笔记独立附件，原附件保留；外部链接不下载，缺失本地目标以警告返回。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "files"
+                ],
+                "properties": {
+                  "dir": {
+                    "type": "string",
+                    "description": "目标目录，空字符串为根目录"
+                  },
+                  "folder": {
+                    "type": "string",
+                    "description": "ZIP 的新建文件夹名称；普通 Markdown 留空"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "导入成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "paths",
+                    "notes",
+                    "assets",
+                    "warnings"
+                  ],
+                  "properties": {
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "notes": {
+                      "type": "integer"
+                    },
+                    "assets": {
+                      "type": "integer",
+                      "description": "附件文件总数，包含原始附件和独立副本"
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "格式、路径或编码无效"
+          },
+          "401": {
+            "description": "未登录或令牌无效"
+          },
+          "403": {
+            "description": "只读令牌不能导入"
+          },
+          "404": {
+            "description": "目标目录不存在"
+          },
+          "409": {
+            "description": "目标已存在，不覆盖"
+          },
+          "413": {
+            "description": "超过上传、解压、文件数量或单文件大小限制"
+          }
+        }
+      }
     }
   },
   "components": {

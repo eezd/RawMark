@@ -7,6 +7,13 @@ export interface Entry {
   mtime: number
 }
 
+export interface ImportResult {
+  paths: string[]
+  notes: number
+  assets: number
+  warnings: string[]
+}
+
 export interface Theme {
   id: string
   name: string
@@ -126,6 +133,14 @@ export const api = {
   savePluginData: (id: string, data: unknown) => request('PUT', '/api/v1/plugins/' + encodeURIComponent(id) + '/data', { json: { data } }),
   // 按顶层键合并，值为 null 的键被删除
   patchSettings: (patch: Record<string, unknown>) => json<Record<string, unknown>>(request('PATCH', '/api/v1/settings', { json: patch })),
+
+  importNotes: (dir: string, folder: string, files: File[]) => {
+    const body = new FormData()
+    body.append('dir', dir)
+    body.append('folder', folder)
+    for (const file of files) body.append('files', file)
+    return json<ImportResult>(request('POST', '/api/v1/import', { body }))
+  },
 
   tree: async () => (await json<{ entries: Entry[] }>(request('GET', '/api/v1/tree'))).entries,
   search: async (q: string) => (await json<{ results: SearchResult[] }>(request('GET', '/api/v1/search?q=' + encodeURIComponent(q)))).results,

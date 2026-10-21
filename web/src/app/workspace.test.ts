@@ -6,7 +6,7 @@ import { api, ApiError } from './api'
 import { drafts, type Draft } from './drafts'
 import { connectEvents } from './events'
 import { pluginEvents } from '../plugins/registry'
-import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, move, openNote, refreshTree, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
+import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, importNotes, move, readyToReload, openNote, refreshTree, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
 
 vi.mock('./events', () => ({ connectEvents: vi.fn(() => () => {}) }))
 
@@ -246,5 +246,32 @@ describe('保存与关闭', () => {
     expect(drafts.move).toHaveBeenLastCalledWith('draft-moved.md', 'draft-move.md')
     await refreshTree()
     await closeTab('draft-move.md')
+  })
+})
+
+describe('导入', () => {
+  it('上传期间阻止刷新，成功后刷新目录，并保留真实的成功结果', async () => {
+    ws.tabs = []
+    const result = { paths: ['导入'], notes: 1, assets: 0, warnings: [] }
+    let finish!: (value: typeof result) => void
+    vi.spyOn(api, 'importNotes').mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    vi.spyOn(api, 'tree').mockResolvedValue([{ path: '导入', dir: true, size: 0, mtime: 0 }])
+    const importing = importNotes('', '导入', [new File(['正文'], 'test.md')])
+    expect(readyToReload()).toBe(false)
+    finish(result)
+    expect(await importing).toEqual(result)
+    expect(ws.entries.some((e) => e.path === '导入')).toBe(true)
+    expect(readyToReload()).toBe(true)
+    vi.mocked(api.importNotes).mockResolvedValueOnce(result)
+    vi.mocked(api.tree).mockRejectedValueOnce(new ApiError(500, '目录读取失败'))
+    expect(await importNotes('', '导入', [])).toEqual(result)
+    expect(ws.toasts.some((t) => t.text.includes('导入已完成，目录刷新失败'))).toBe(true)
+  })
+
+  it('失败保留错误并释放操作占用', async () => {
+    ws.tabs = []
+    vi.spyOn(api, 'importNotes').mockRejectedValue(new ApiError(409, '目标已存在'))
+    await expect(importNotes('', '导入', [])).rejects.toMatchObject({ status: 409, message: '目标已存在' })
+    expect(readyToReload()).toBe(true)
   })
 })
