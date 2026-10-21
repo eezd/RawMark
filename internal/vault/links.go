@@ -44,6 +44,14 @@ func RewriteAssetLinks(content []byte, oldBase, newBase string) []byte {
 			matched++
 		}
 		if matched < len(containers) {
+			rest := bytes.TrimLeft(body, " ")
+			if marker := listMarker.Find(rest); len(body)-len(rest) <= 3 && marker != nil {
+				mark := bytes.TrimRight(marker, " ")
+				// 同级列表的新条目结束上一项段落，不受“只能以 1 打断段落”的限制。
+				if mark[len(mark)-1] == containers[matched].marker {
+					paragraph = false
+				}
+			}
 			containers = containers[:matched]
 			fence = nil // 容器结束时，其内部未闭合的代码块也结束。
 			// 段落允许省略引用或列表前缀的续行，不能把其缩进误认成代码。
@@ -81,7 +89,7 @@ func RewriteAssetLinks(content []byte, oldBase, newBase string) []byte {
 					padding = 1
 				}
 				width := indent + len(mark) + padding
-				containers = append(containers, linkContainer{indent: width})
+				containers = append(containers, linkContainer{indent: width, marker: mark[len(mark)-1]})
 				body = body[min(width, len(body)):]
 			} else {
 				break
@@ -112,6 +120,7 @@ func RewriteAssetLinks(content []byte, oldBase, newBase string) []byte {
 type linkContainer struct {
 	quote  bool
 	indent int
+	marker byte
 }
 
 var listMarker = regexp.MustCompile(`^(?:[-+*]|[0-9]{1,9}[.)])(?: +|$)`)
