@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
+import { commandTitle } from './commands'
 import Icon from './Icon.vue'
 import { noteTitle } from './paths'
 import { closeTab, ws } from './workspace'
@@ -71,7 +72,7 @@ function closeRight(path: string) {
 
 <template>
   <nav class="rm-tabs" :class="{ empty: !ws.tabs.length && !ws.sidebarCollapsed }" role="tablist">
-    <button v-if="ws.sidebarCollapsed" class="rm-icon-btn rm-tabs-side" title="显示侧栏（Ctrl+\）" @click="ws.sidebarCollapsed = false">
+    <button v-if="ws.sidebarCollapsed" class="rm-icon-btn rm-tabs-side" :title="commandTitle('view.sidebar')" @click="ws.sidebarCollapsed = false">
       <Icon name="menu" />
     </button>
     <div
@@ -102,7 +103,7 @@ function closeRight(path: string) {
         <Icon name="close" :size="12" />
       </button>
     </div>
-    <button v-if="ws.active" class="rm-icon-btn rm-tabs-outline" :class="{ on: ws.outlineOpen }" title="大纲（Ctrl+Shift+O）" @click="ws.outlineOpen = !ws.outlineOpen">
+    <button v-if="ws.active" class="rm-icon-btn rm-tabs-outline" :class="{ on: ws.outlineOpen }" :title="commandTitle('view.outline')" @click="ws.outlineOpen = !ws.outlineOpen">
       <Icon name="outline" />
     </button>
     <template v-if="menu">

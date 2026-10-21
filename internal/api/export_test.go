@@ -71,3 +71,17 @@ func TestExportRejectsMissingAssetsAndSymlinks(t *testing.T) {
 		t.Fatalf("应拒绝符号链接：%d", response.StatusCode)
 	}
 }
+
+func TestReadTokenMayExportButCannotWrite(t *testing.T) {
+	f := newFixture(t)
+	f.write("文章.md", "原文")
+	token := decode[struct{ Token string }](t, f.do(f.admin, "POST", "/api/v1/tokens", `{"name":"只读导出","scope":"read"}`, nil))
+	headers := map[string]string{"Authorization": "Bearer " + token.Token}
+	guest := newClient()
+	if code := f.status(guest, "POST", "/api/v1/export", `{"paths":["文章.md"]}`, headers); code != 200 {
+		t.Fatalf("只读导出被拒绝：%d", code)
+	}
+	if code := f.status(guest, "POST", "/api/v1/move", `{"from":"文章.md","to":"其他.md"}`, headers); code != 403 {
+		t.Fatalf("只读令牌获得写权限：%d", code)
+	}
+}

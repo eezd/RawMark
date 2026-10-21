@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import Icon from './Icon.vue'
 import { basename } from './paths'
+import { commandTitle } from './commands'
 import { tree } from './tree'
 import TreeNode from './TreeNode.vue'
 import SearchPanel from './SearchPanel.vue'
@@ -40,7 +41,7 @@ function onRootDrop(e: DragEvent) {
   <div class="rm-sidebar-inner">
     <div class="rm-sidebar-head">
       <span class="rm-brand">RawMark</span>
-      <button class="rm-icon-btn" :class="{ on: ws.searchOpen }" title="搜索（Ctrl+Shift+F）" @click="ws.searchOpen ? (ws.searchOpen = false) : openSearch()">
+      <button class="rm-icon-btn" :class="{ on: ws.searchOpen }" :title="commandTitle('app.search')" @click="ws.searchOpen ? (ws.searchOpen = false) : openSearch()">
         <Icon name="search" />
       </button>
       <button class="rm-icon-btn" title="新建笔记" @click="createNote('')"><Icon name="noteAdd" /></button>
@@ -64,7 +65,7 @@ function onRootDrop(e: DragEvent) {
       <div class="rm-menu rm-context-menu" :style="{ left: rootMenu.x + 'px', top: rootMenu.y + 'px' }"><button @click="ws.images = ''; rootMenu = null"><Icon name="image" />图片管理</button></div>
     </template>
     <div class="rm-sidebar-foot">
-      <button class="rm-foot-btn" title="设置（Ctrl+,）" @click="ws.settings = 'index'"><Icon name="settings" />设置</button>
+      <button class="rm-foot-btn" :title="commandTitle('app.settings')" @click="ws.settings = 'index'"><Icon name="settings" />设置</button>
       <button class="rm-foot-btn" @click="emit('logout')"><Icon name="logout" />退出</button>
     </div>
   </div>

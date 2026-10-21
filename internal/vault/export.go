@@ -63,6 +63,9 @@ func (v *Vault) Export(ctx context.Context, paths []string) (result *os.File, na
 		}
 		var linkError error
 		transformMarkdownLines(content, importRef, func(line []byte) []byte {
+			if linkError != nil {
+				return line
+			}
 			return transformOutsideCode(line, func(text []byte) []byte {
 				for _, span := range importLinkSpans(text) {
 					target := string(text[span.start:span.end])

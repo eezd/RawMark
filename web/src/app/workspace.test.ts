@@ -6,7 +6,7 @@ import { api, ApiError } from './api'
 import { drafts, type Draft } from './drafts'
 import { connectEvents } from './events'
 import { pluginEvents } from '../plugins/registry'
-import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, importNotes, move, readyToReload, openNote, refreshTree, replaceImage, restore, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
+import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, importNotes, move, remove, readyToReload, openNote, refreshTree, replaceImage, restore, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
 
 vi.mock('./events', () => ({ connectEvents: vi.fn(() => () => {}) }))
 
@@ -304,5 +304,24 @@ describe('图片管理', () => {
     expect(ws.image).toBe('assets/a.png')
     expect(ws.tabs).toEqual([])
     expect(ws.active).toBeNull()
+  })
+})
+
+describe('文件操作的保存前提', () => {
+  it.each(['move', 'delete'] as const)('%s 保存失败时返回失败并保留原文档', async (action) => {
+    const path = `保存失败-${action}.md`
+    const v = await edit(path)
+    vi.spyOn(drafts, 'put').mockImplementation(async (draft) => draft.path)
+    const saving = vi.spyOn(api, 'writeFile').mockRejectedValue(new ApiError(403, '禁止写入'))
+    vi.spyOn(api, 'tree').mockResolvedValue([{ path, dir: false, size: 0, mtime: 0 }])
+    v.dispatch({ changes: { from: 0, insert: '未保存' } })
+    const result = action === 'move' ? await move(path, '目标.md') : await remove(path)
+    expect(result.ok).toBe(false)
+    expect(ws.active).toBe(path)
+    expect(editorStateOf(path)?.doc.toString()).toBe('未保存原文')
+    saving.mockResolvedValue('r2')
+    await flush(path)
+    await refreshTree()
+    await closeTab(path)
   })
 })

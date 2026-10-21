@@ -1,7 +1,7 @@
 // 命令注册表：命令面板列出的操作与全局快捷键都来自这里；插件也通过 registerCommand 添加命令
 import { shallowReactive } from 'vue'
 import { settings } from './settings'
-import { matchKeys, physicalKeys } from '../keys'
+import { formatKeys, matchKeys, physicalKeys } from '../keys'
 export { formatKeys, matchKeys } from '../keys'
 
 export interface Command {
@@ -49,6 +49,13 @@ export function commandKeys(command: Command): string[] {
   return settings.shortcuts[command.id] ?? command.keys ?? []
 }
 
+export function commandTitle(id: string): string {
+  const command = commands.get(id)
+  if (!command) throw new Error('命令不存在：' + id)
+  const keys = commandKeys(command)
+  return command.title + (keys.length ? `（${keys.map(formatKeys).join(' / ')}）` : '')
+}
+
 export function shortcutConflict(id: string, keys: string[]): Command | undefined {
   return allCommands().find((command) => command.id !== id && commandKeys(command).some((existing) => keys.some((key) => physicalKeys(existing) === physicalKeys(key))))
 }
@@ -60,6 +67,8 @@ export function handleShortcut(e: KeyboardEvent) {
     if (cmd.id.startsWith('editor.') && !(e.target instanceof Element && e.target.closest('.cm-content'))) continue
     if (commandKeys(cmd).some((k) => matchKeys(e, k))) {
       e.preventDefault()
+      // 捕获阶段已执行命令，不再让编辑器或弹窗重复处理同一次按键。
+      e.stopPropagation()
       cmd.run()
       return
     }
