@@ -16,21 +16,25 @@ func RewriteAssetLinks(content []byte, oldBase, newBase string) []byte {
 	refDef := regexp.MustCompile(`^( {0,3}\[[^\]]+\]:\s*<?)` + target)
 	repl := []byte("${1}${2}" + strings.ReplaceAll(EscapeLinkPath(newBase+AssetsExt), "$", "$$") + "/")
 
-	return transformMarkdownLines(content, refDef, func(line []byte) []byte {
+	return transformMarkdownLines(content, refDef, func(line, _ []byte, _ int) []byte {
 		line = refDef.ReplaceAll(line, repl)
-		return transformOutsideCode(line, func(text []byte) []byte { return inline.ReplaceAll(text, repl) })
+		return transformOutsideCode(line, func(text []byte, _ int) []byte { return inline.ReplaceAll(text, repl) })
 	})
 }
 
 // transformMarkdownLines 复用链接改写的容器与代码块识别，避免导入时修改代码示例。
-func transformMarkdownLines(content []byte, refDef *regexp.Regexp, transform func([]byte) []byte) []byte {
+func transformMarkdownLines(content []byte, refDef *regexp.Regexp, transform func(line, body []byte, offset int) []byte) []byte {
 	lines := bytes.SplitAfter(content, []byte("\n"))
 	var fence []byte // 当前所在围栏代码块的围栏字符串，nil 表示不在代码块中
 	var containers []linkContainer
 	paragraph := false
+	lineOffset := 0
 	for i, line := range lines {
+		offset := lineOffset
+		lineOffset += len(line)
 		// 分类时展开制表符，替换仍作用于原始字节，不重新序列化 Markdown。
 		body := bytes.TrimRight(expandLinkTabs(line), "\r\n")
+		width := len(body)
 		matched := 0
 		for _, container := range containers {
 			indent := len(body) - len(bytes.TrimLeft(body, " "))
@@ -119,7 +123,17 @@ func transformMarkdownLines(content []byte, refDef *regexp.Regexp, transform fun
 			continue
 		}
 		paragraph = !paragraphBoundary.Match(trimmed) && !refDef.Match(trimmed)
-		lines[i] = transform(line)
+		// 将剥离容器时的展开列数映射回原始字节，保留制表符和正文位置。
+		start, column := 0, 0
+		for column < width-len(body) {
+			if line[start] == '\t' {
+				column += 4 - column%4
+			} else {
+				column++
+			}
+			start++
+		}
+		lines[i] = transform(line, line[start:], offset)
 	}
 	return bytes.Join(lines, nil)
 }
@@ -169,8 +183,9 @@ func fenceOpen(line []byte) []byte {
 }
 
 // transformOutsideCode 只在行内代码 `…` 之外的片段上做转换。
-func transformOutsideCode(line []byte, transform func([]byte) []byte) []byte {
+func transformOutsideCode(line []byte, transform func(text []byte, offset int) []byte) []byte {
 	var out []byte
+	offset := 0
 	for len(line) > 0 {
 		start := bytes.IndexByte(line, '`')
 		if start < 0 {
@@ -185,9 +200,10 @@ func transformOutsideCode(line []byte, transform func([]byte) []byte) []byte {
 			break
 		}
 		codeEnd := start + n + end + n
-		out = append(out, transform(line[:start])...)
+		out = append(out, transform(line[:start], offset)...)
 		out = append(out, line[start:codeEnd]...)
 		line = line[codeEnd:]
+		offset += codeEnd
 	}
-	return append(out, transform(line)...)
+	return append(out, transform(line, offset)...)
 }

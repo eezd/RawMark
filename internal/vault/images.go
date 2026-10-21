@@ -11,7 +11,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -86,40 +85,36 @@ func rewriteImageLinks(content []byte, note, from, to string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	transform := func(text []byte) []byte {
-		spans := importLinkSpans(text)
-		sort.Slice(spans, func(i, j int) bool { return spans[i].start < spans[j].start })
-		var out []byte
-		last := 0
-		for _, span := range spans {
-			if span.start < last {
-				continue
-			}
-			target := string(text[span.start:span.end])
-			if span.html {
-				target = html.UnescapeString(target)
-			} else {
-				target = markdownEscape.ReplaceAllString(target, "$1")
-			}
-			u, err := url.Parse(target)
-			if err != nil || u.IsAbs() || u.Host != "" || strings.HasPrefix(target, "/") || u.Path == "" || path.Clean(path.Join(path.Dir(note), u.Path)) != from {
-				continue
-			}
-			replacement := EscapeLinkPath(filepath.ToSlash(rel))
-			if u.RawQuery != "" {
-				replacement += "?" + u.RawQuery
-			}
-			if u.Fragment != "" {
-				replacement += "#" + u.EscapedFragment()
-			}
-			if span.html {
-				replacement = html.EscapeString(replacement)
-			}
-			out = append(out, text[last:span.start]...)
-			out = append(out, replacement...)
-			last = span.end
+	spans := importLinkSpans(content)
+	var out []byte
+	last := 0
+	for _, span := range spans {
+		if span.start < last {
+			continue
 		}
-		return append(out, text[last:]...)
+		target := string(content[span.start:span.end])
+		if span.html {
+			target = html.UnescapeString(target)
+		} else {
+			target = markdownEscape.ReplaceAllString(target, "$1")
+		}
+		u, err := url.Parse(target)
+		if err != nil || u.IsAbs() || u.Host != "" || strings.HasPrefix(target, "/") || u.Path == "" || path.Clean(path.Join(path.Dir(note), u.Path)) != from {
+			continue
+		}
+		replacement := EscapeLinkPath(filepath.ToSlash(rel))
+		if u.RawQuery != "" {
+			replacement += "?" + u.RawQuery
+		}
+		if u.Fragment != "" {
+			replacement += "#" + u.EscapedFragment()
+		}
+		if span.html {
+			replacement = html.EscapeString(replacement)
+		}
+		out = append(out, content[last:span.start]...)
+		out = append(out, replacement...)
+		last = span.end
 	}
-	return transformMarkdownLines(content, importRef, func(line []byte) []byte { return transformOutsideCode(line, transform) }), nil
+	return append(out, content[last:]...), nil
 }

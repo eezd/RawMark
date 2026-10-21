@@ -89,6 +89,33 @@ func TestImportZipAssetsAndMove(t *testing.T) {
 	}
 }
 
+func TestImportPreservesContainersAndOnlyRewritesActualLinks(t *testing.T) {
+	v := newVault(t)
+	content := "> ![图片][pic]\r\n>\r\n> [pic]: assets/image.png \"[示例](private.png)\"\r\n\n![跨行](\nassets/image.png\n)\n\n普通文字 ](private.png)\n\n[^1]: missing.png\n\n`![代码](assets/image.png)`\n"
+	source := importZip(t,
+		zipEntry{name: "文章.md", content: content},
+		zipEntry{name: "assets/image.png", content: "image"},
+		zipEntry{name: "private.png", content: "private"},
+	)
+	result, err := v.Import(context.Background(), "", "导入", []ImportFile{source})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Notes != 1 || result.Assets != 3 || len(result.Warnings) != 0 {
+		t.Fatalf("仅真实图片应生成附件副本，脚注正文不应产生缺失警告：%+v", result)
+	}
+	body, _, err := v.Read("导入/文章.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	link := EscapeLinkPath("文章.assets") + "/" + assetName([]byte("image"), "x.png")
+	want := strings.Replace(content, "[pic]: assets/image.png", "[pic]: "+link, 1)
+	want = strings.Replace(want, "![跨行](\nassets/image.png", "![跨行](\n"+link, 1)
+	if string(body) != want {
+		t.Fatalf("应只改写真实链接并保留原文格式：\n%s\n期望：\n%s", body, want)
+	}
+}
+
 func TestImportRejectsInvalidWithoutPublishing(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

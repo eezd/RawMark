@@ -61,49 +61,34 @@ func (v *Vault) Export(ctx context.Context, paths []string) (result *os.File, na
 		if e != nil {
 			return nil, "", e
 		}
-		var linkError error
-		transformMarkdownLines(content, importRef, func(line []byte) []byte {
-			if linkError != nil {
-				return line
+		for _, span := range importLinkSpans(content) {
+			target := string(content[span.start:span.end])
+			if span.html {
+				target = html.UnescapeString(target)
+			} else {
+				target = markdownEscape.ReplaceAllString(target, "$1")
 			}
-			return transformOutsideCode(line, func(text []byte) []byte {
-				for _, span := range importLinkSpans(text) {
-					target := string(text[span.start:span.end])
-					if span.html {
-						target = html.UnescapeString(target)
-					} else {
-						target = markdownEscape.ReplaceAllString(target, "$1")
-					}
-					u, e := url.Parse(target)
-					if e != nil {
-						linkError = fmt.Errorf("%w：附件地址无效 %s", ErrInvalidPath, target)
-						break
-					}
-					if u.IsAbs() || u.Host != "" || strings.HasPrefix(target, "/") || u.Path == "" {
-						continue
-					}
-					rel := path.Clean(path.Join(path.Dir(note), u.Path))
-					if IsNote(rel) {
-						continue
-					}
-					if e = v.exportPath(rel); e != nil {
-						linkError = fmt.Errorf("附件 %s：%w", rel, e)
-						break
-					}
-					info, e := v.Stat(rel)
-					if e != nil {
-						linkError = fmt.Errorf("附件 %s：%w", rel, e)
-						break
-					}
-					if !info.IsDir() {
-						files[rel] = false
-					}
-				}
-				return text
-			})
-		})
-		if linkError != nil {
-			return nil, "", linkError
+			u, e := url.Parse(target)
+			if e != nil {
+				return nil, "", fmt.Errorf("%w：附件地址无效 %s", ErrInvalidPath, target)
+			}
+			if u.IsAbs() || u.Host != "" || strings.HasPrefix(target, "/") || u.Path == "" {
+				continue
+			}
+			rel := path.Clean(path.Join(path.Dir(note), u.Path))
+			if IsNote(rel) {
+				continue
+			}
+			if e = v.exportPath(rel); e != nil {
+				return nil, "", fmt.Errorf("附件 %s：%w", rel, e)
+			}
+			info, e := v.Stat(rel)
+			if e != nil {
+				return nil, "", fmt.Errorf("附件 %s：%w", rel, e)
+			}
+			if !info.IsDir() {
+				files[rel] = false
+			}
 		}
 	}
 	tmp, e := os.CreateTemp("", "rawmark-export-*")

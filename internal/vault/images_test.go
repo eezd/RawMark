@@ -53,6 +53,29 @@ func TestImageMoveUpdatesLocalReferences(t *testing.T) {
 	f.Close()
 }
 
+func TestImageMovePreservesMultilineMarkdownAndIgnoresLiteralPaths(t *testing.T) {
+	v := newVault(t)
+	if err := os.WriteFile(filepath.Join(v.Root(), "old.png"), []byte("image"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	content := "> ![图片][pic]\r\n>\r\n> [pic]: old.png \"[示例](old.png)\"\r\n\n![跨行](\nold.png\n)\n\n普通文字 ](old.png)\n\n[^1]: old.png\n\n`![代码](old.png)`\n\n> ```md\n> ![代码块](old.png)\n> ```\n"
+	if _, err := v.Write("文章.md", []byte(content), Precondition{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.Move("old.png", "new.png", nil); err != nil {
+		t.Fatal(err)
+	}
+	body, _, err := v.Read("文章.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := strings.Replace(content, "[pic]: old.png", "[pic]: new.png", 1)
+	want = strings.Replace(want, "![跨行](\nold.png", "![跨行](\nnew.png", 1)
+	if string(body) != want {
+		t.Fatalf("应只改写真正的图片引用：\n%s\n期望：\n%s", body, want)
+	}
+}
+
 func TestReplaceImagePreservesPathAndUploadContents(t *testing.T) {
 	v := newVault(t)
 	link, err := v.SaveAsset("a.md", "old.png", strings.NewReader("original"), 100)
