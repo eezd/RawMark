@@ -63,7 +63,7 @@ export const ws = reactive({
   // 分享当前笔记的对话框（笔记路径）
   sharing: null as string | null,
   // 「移动到…」对话框（笔记或文件夹路径）
-  moving: null as string | null,
+  moving: null as string | string[] | null,
   // 导入目标目录，空字符串为根目录
   importing: null as string | null,
   // 图片预览与管理，独立于笔记标签和草稿
@@ -715,32 +715,34 @@ export function renameTarget(path: string, name: string): string | null {
   return joinPath(dirname(path), name)
 }
 
-export async function move(from: string, to: string) {
-  if (from === to) return
-  if (creating.has(from) && !(await creating.get(from))) return
+export type FileResult = { ok: true } | { ok: false; error: string }
+function operationFailed(error: string): FileResult {
+  toast(error)
+  return { ok: false, error }
+}
+
+export async function move(from: string, to: string): Promise<FileResult> {
+  if (from === to) return { ok: true }
+  if (creating.has(from) && !(await creating.get(from))) return operationFailed('笔记尚未创建成功')
   if (ws.entries.some((e) => e.path === to)) {
-    toast(`“${basename(to)}”已存在`)
-    return
+    return operationFailed(`“${basename(to)}”已存在`)
   }
-  await withOp(async () => {
+  const result = await withOp<FileResult>(async () => {
     // 图片改名会更新仓库中的引用，先保存已打开笔记，沿用版本冲突保护。
     const imageMove = isImage(from) && ws.entries.some((e) => e.path === from && !e.dir)
     const impacted = () => imageMove ? ws.tabs.map((t) => t.path) : affected(from)
     const busy = () => impacted().some((p) => slots.get(p)?.uploads || slots.get(p)?.paused)
     if (busy()) {
-      toast('笔记正在处理粘贴、上传或移动，请完成后再移动')
-      return
+      return operationFailed('笔记正在处理粘贴、上传或移动，请完成后再移动')
     }
     // 先保存待保存的修改，确保移动的是最新内容；移动期间暂停保存，避免写到旧路径
     await Promise.all(impacted().map((p) => flush(p)))
     // 等待保存时仍可能开始粘贴，须在取得移动占用前再次检查。
     if (busy()) {
-      toast('笔记正在处理粘贴、上传或移动，请完成后再移动')
-      return
+      return operationFailed('笔记正在处理粘贴、上传或移动，请完成后再移动')
     }
-    if (imageMove && ws.tabs.some((t) => t.dirty || t.status !== 'ready')) {
-      toast('请先保存笔记并解决冲突，再修改图片名称或位置')
-      return
+    if (impacted().some((p) => { const tab = tabOf(p); return tab && (tab.dirty || tab.status !== 'ready') })) {
+      return operationFailed('请先保存笔记并解决冲突，再移动文件')
     }
     const paused = impacted().map(slot)
     paused.forEach((s) => s.paused++)
@@ -770,8 +772,7 @@ export async function move(from: string, to: string) {
         try { await drafts.move(to, from) }
         catch (cause) { toast('恢复原路径草稿失败：' + (cause instanceof Error ? cause.message : errorText(cause))) }
       }
-      toast('移动失败：' + (err instanceof Error ? err.message : errorText(err)))
-      return
+      return operationFailed('移动失败：' + (err instanceof Error ? err.message : errorText(err)))
     } finally {
       paused.forEach((s) => s.paused--)
     }
@@ -784,21 +785,24 @@ export async function move(from: string, to: string) {
         const { rev } = await api.readFile(p)
         if (rev !== tab.rev) Object.assign(tab, { status: 'conflict', conflictRev: rev })
       } else await syncOpenTab(tab)
-    }))
+    })).catch((err) => toast('文件已移动，但同步笔记失败：' + errorText(err)))
+    return { ok: true }
   })
   void refreshTree().catch((err) => toast('刷新目录失败：' + errorText(err)))
+  return result
 }
 
-export async function remove(path: string) {
+export async function remove(path: string): Promise<FileResult> {
   const entry = ws.entries.find((e) => e.path === path)
-  if (!entry) return
-  await withOp(async () => {
+  if (!entry) return operationFailed('文件已不存在')
+  return withOp<FileResult>(async () => {
     const paths = affected(path)
     await Promise.all(paths.map((p) => flush(p)))
+    if (paths.some((p) => { const tab = tabOf(p); return tab && (tab.dirty || tab.status !== 'ready') })) return operationFailed('请先保存笔记并解决冲突，再删除文件')
     const snapshot = ws.entries
     ws.entries = ws.entries.filter((e) => remapPath(e.path, path, path) === null) // 去掉自身及其下所有条目
     for (const p of paths) {
-      if (!(await closeTab(p))) { ws.entries = snapshot; return }
+      if (!(await closeTab(p))) { ws.entries = snapshot; return operationFailed('关闭笔记失败，未删除文件') }
     }
     try {
       const item = await api.deleteFile(path)
@@ -807,9 +811,10 @@ export async function remove(path: string) {
         label: '撤销',
         run: () => void restore(item.id),
       })
+      return { ok: true }
     } catch (err) {
       ws.entries = snapshot
-      toast('删除失败：' + errorText(err))
+      return operationFailed('删除失败：' + errorText(err))
     }
   })
 }

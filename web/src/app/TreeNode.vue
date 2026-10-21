@@ -2,8 +2,9 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import Icon from './Icon.vue'
 import { basename, inAssetDir, isImage, joinPath } from './paths'
-import { expanded, type TreeNode } from './tree'
-import { createFolder, createNote, move, openNote, remove, renameTarget, ws } from './workspace'
+import { contextSelection, expanded, selectedPaths, selectPath, type TreeNode } from './tree'
+import { batchFiles, exportFiles } from './batch'
+import { createFolder, createNote, move, openNote, renameTarget, ws } from './workspace'
 
 const props = defineProps<{ node: TreeNode; depth: number }>()
 
@@ -28,6 +29,7 @@ function onTouchStart(e: TouchEvent) {
   pressStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }
   pressTimer = setTimeout(() => {
     longPressed = true
+    contextSelection(props.node.path)
     menuOpen.value = true
   }, LONG_PRESS_MS)
 }
@@ -41,12 +43,14 @@ function cancelPress() {
   pressStart = null
 }
 
-function activate() {
+function activate(event: MouseEvent) {
   // 长按后松手产生的点击不打开笔记
   if (longPressed) {
     longPressed = false
     return
   }
+  selectPath(props.node.path, event)
+  if (event.ctrlKey || event.metaKey || event.shiftKey) return
   if (props.node.dir) {
     if (isOpen.value) expanded.delete(props.node.path)
     else expanded.add(props.node.path)
@@ -73,7 +77,7 @@ function commitRename() {
   if (target && target !== props.node.path) void move(props.node.path, target)
 }
 
-function runMenu(action: 'note' | 'folder' | 'import' | 'images' | 'rename' | 'move' | 'share' | 'delete') {
+function runMenu(action: 'note' | 'folder' | 'import' | 'images' | 'rename' | 'move' | 'share' | 'delete' | 'export') {
   menuOpen.value = false
   const path = props.node.path
   if (action === 'note' || action === 'folder') {
@@ -83,8 +87,14 @@ function runMenu(action: 'note' | 'folder' | 'import' | 'images' | 'rename' | 'm
   else if (action === 'images') ws.images = path
   else if (action === 'rename') ws.renaming = path
   else if (action === 'share') ws.sharing = path
-  else if (action === 'move') ws.moving = path
-  else void remove(path)
+  else if (action === 'move') ws.moving = [...selectedPaths]
+  else if (action === 'export') void exportFiles([...selectedPaths])
+  else void batchFiles('delete', [...selectedPaths])
+}
+
+function showMenu() {
+  contextSelection(props.node.path)
+  menuOpen.value = true
 }
 
 function cancelRename() {
@@ -119,11 +129,13 @@ function onDrop(e: DragEvent) {
   <li class="rm-tree-item">
     <div
       class="rm-tree-row"
-      :class="{ active: isActive, drop: dropTarget, 'menu-open': menuOpen }"
+      :class="{ active: isActive, selected: selectedPaths.has(node.path), drop: dropTarget, 'menu-open': menuOpen }"
       :style="{ paddingLeft: depth * 14 + 8 + 'px' }"
       :draggable="!isRenaming && !assetDir"
+      role="treeitem"
+      :aria-selected="selectedPaths.has(node.path)"
       @click="activate"
-      @contextmenu.prevent="menuOpen = true"
+      @contextmenu.prevent.stop="showMenu"
       @touchstart.passive="onTouchStart"
       @touchmove.passive="onTouchMove"
       @touchend="cancelPress"
@@ -146,20 +158,21 @@ function onDrop(e: DragEvent) {
       />
       <Icon v-if="image" name="image" :size="14" />
       <span v-if="!isRenaming" class="rm-tree-name">{{ node.dir ? node.name : node.name.replace(/\.md$/, '') }}</span>
-      <button class="rm-icon-btn rm-tree-more" title="更多操作" @click.stop="menuOpen = !menuOpen">
+      <button class="rm-icon-btn rm-tree-more" title="更多操作" @click.stop="menuOpen ? (menuOpen = false) : showMenu()">
         <Icon name="more" />
       </button>
       <div v-if="menuOpen" class="rm-menu" @click.stop>
-        <template v-if="node.dir && !assetDir">
+        <template v-if="node.dir && !assetDir && selectedPaths.size === 1">
           <button @click="runMenu('note')"><Icon name="noteAdd" />新建笔记</button>
           <button @click="runMenu('folder')"><Icon name="folderAdd" />新建文件夹</button>
           <button @click="runMenu('images')"><Icon name="image" />图片管理</button>
           <button @click="runMenu('import')"><Icon name="import" />导入</button>
         </template>
-        <button v-if="image" @click="menuOpen = false; ws.image = node.path"><Icon name="image" />预览 / 替换图片</button>
-        <button v-if="!assetDir" @click="runMenu('rename')"><Icon name="edit" />重命名</button>
+        <button v-if="image && selectedPaths.size === 1" @click="menuOpen = false; ws.image = node.path"><Icon name="image" />预览 / 替换图片</button>
+        <button v-if="!assetDir && selectedPaths.size === 1" @click="runMenu('rename')"><Icon name="edit" />重命名</button>
         <button v-if="!assetDir" @click="runMenu('move')"><Icon name="folder" />移动到…</button>
-        <button v-if="!image" @click="runMenu('share')"><Icon name="link" />分享</button>
+        <button v-if="!image && selectedPaths.size === 1" @click="runMenu('share')"><Icon name="link" />分享</button>
+        <button @click="runMenu('export')"><Icon name="note" />导出 Markdown</button>
         <button v-if="!assetDir" class="danger" @click="runMenu('delete')"><Icon name="trash" />删除</button>
       </div>
       <div v-if="menuOpen" class="rm-menu-backdrop" @click.stop="menuOpen = false" @contextmenu.prevent.stop="menuOpen = false" />

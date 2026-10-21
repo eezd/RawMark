@@ -142,6 +142,8 @@ export const api = {
     return json<ImportResult>(request('POST', '/api/v1/import', { body }))
   },
 
+  exportFiles: (paths: string[]) => request('POST', '/api/v1/export', { json: { paths } }),
+
   tree: async () => (await json<{ entries: Entry[] }>(request('GET', '/api/v1/tree'))).entries,
   search: async (q: string) => (await json<{ results: SearchResult[] }>(request('GET', '/api/v1/search?q=' + encodeURIComponent(q)))).results,
 

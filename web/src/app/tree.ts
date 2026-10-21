@@ -1,6 +1,7 @@
 import { computed, reactive, watch } from 'vue'
 import type { Entry } from './api'
 import { basename, dirname, hiddenAssetPath } from './paths'
+import { rangePaths } from './selection'
 import { ws } from './workspace'
 
 export interface TreeNode {
@@ -44,3 +45,35 @@ watch(
     }
   },
 )
+
+export const selectedPaths = reactive(new Set<string>())
+let anchor: string | null = null
+export const visiblePaths = computed(() => {
+  const paths: string[] = []
+  const visit = (nodes: TreeNode[]) => { for (const node of nodes) { paths.push(node.path); if (expanded.has(node.path)) visit(node.children) } }
+  visit(tree.value)
+  return paths
+})
+watch(visiblePaths, (paths) => {
+  const visible = new Set(paths)
+  for (const path of selectedPaths) if (!visible.has(path)) selectedPaths.delete(path)
+  if (anchor && !visible.has(anchor)) anchor = null
+})
+
+export function selectPath(path: string, event?: Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>) {
+  const additive = event?.ctrlKey || event?.metaKey
+  if (event?.shiftKey) {
+    const range = rangePaths(visiblePaths.value, anchor, path)
+    if (!additive) selectedPaths.clear()
+    range.forEach((item) => selectedPaths.add(item))
+    return
+  }
+  if (!additive) selectedPaths.clear()
+  if (additive && selectedPaths.has(path)) selectedPaths.delete(path)
+  else selectedPaths.add(path)
+  anchor = path
+}
+
+export function contextSelection(path: string) {
+  if (!selectedPaths.has(path)) selectPath(path)
+}

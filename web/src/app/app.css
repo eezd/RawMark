@@ -546,3 +546,5 @@ button {
 .rm-shortcut-bindings input { width: 130px; padding: 8px; color: var(--rm-text); background: var(--rm-bg); border: 1px solid var(--rm-accent); }
 
 .rm-context-menu { position: fixed; right: auto; width: max-content; }
+
+.rm-tree-row.selected { background: var(--rm-active); box-shadow: inset 2px 0 var(--rm-accent); }

@@ -3,7 +3,7 @@
   "info": {
     "title": "RawMark API",
     "version": "1",
-    "description": "RawMark 的 REST API。自动化调用请在「API 令牌」中创建令牌，以 `Authorization: Bearer <token>` 访问；只读令牌只能使用 GET。分享与令牌的管理接口只接受登录会话。所有错误响应均为 `{\"error\": \"说明\"}`。"
+    "description": "RawMark 的 REST API。自动化调用请在「API 令牌」中创建令牌，以 `Authorization: Bearer <token>` 访问；只读令牌可使用 GET 和 POST /export（只读导出）。分享与令牌的管理接口只接受登录会话。所有错误响应均为 `{\"error\": \"说明\"}`。"
   },
   "servers": [
     {
@@ -2323,6 +2323,61 @@
           },
           "413": {
             "description": "超过 50 MB"
+          }
+        }
+      }
+    },
+    "/export": {
+      "post": {
+        "summary": "导出原始 Markdown 和本地附件",
+        "description": "接收非空路径列表；单篇无附件返回 .md，目录、多选或含附件返回 ZIP。ZIP 保留仓库相对路径；不下载外部资源，不跟随其他未选中笔记。缺失附件或非法路径返回错误。此 POST 接口不修改数据，只读令牌可调用。",
+        "tags": [
+          "文件"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "paths"
+                ],
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "原始 Markdown 或 ZIP 附件",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "路径无效"
+          },
+          "404": {
+            "description": "文件或附件不存在"
           }
         }
       }

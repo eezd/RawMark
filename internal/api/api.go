@@ -76,6 +76,7 @@ func (s *Server) routes() []route {
 		{"POST /api/v1/auth/password", sessionOnly, s.changePassword},
 
 		{"GET /api/v1/tree", authed, s.tree},
+		{"POST /api/v1/export", authed, s.export},
 		{"GET /api/v1/files/{path...}", authed, s.readFile},
 		{"PUT /api/v1/files/{path...}", authed, s.writeFile},
 		{"DELETE /api/v1/files/{path...}", authed, s.deleteFile},
@@ -182,7 +183,7 @@ func (s *Server) requireAuth(next http.Handler, allowToken bool) http.Handler {
 				writeError(w, 401, "API 令牌无效")
 				return
 			}
-			if scope != "write" && r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if scope != "write" && r.Method != http.MethodGet && r.Method != http.MethodHead && !(r.Method == http.MethodPost && r.URL.Path == "/api/v1/export") {
 				writeError(w, 403, "只读令牌不能修改数据")
 				return
 			}

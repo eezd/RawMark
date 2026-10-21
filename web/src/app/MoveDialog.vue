@@ -1,27 +1,27 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { batchFiles } from './batch'
+import { minimalPaths } from './selection'
 import { fuzzyMatch, segments } from './fuzzy'
 import Icon from './Icon.vue'
 import { basename, dirname, inAssetDir, joinPath, noteTitle } from './paths'
 import { move, ws } from './workspace'
 
 // 「移动到…」：选择目标文件夹（手机上没有拖放，电脑上也比拖放快）
-const props = defineProps<{ path: string }>()
+const props = defineProps<{ path: string | string[] }>()
 const emit = defineEmits<{ close: [] }>()
 
 const input = ref<HTMLInputElement>()
 const list = ref<HTMLElement>()
 const query = ref('')
 const selected = ref(0)
-const isDir = computed(() => ws.entries.some((e) => e.path === props.path && e.dir))
-const title = computed(() => (isDir.value ? basename(props.path) : noteTitle(props.path)))
+const paths = computed(() => minimalPaths(typeof props.path === 'string' ? [props.path] : props.path))
+const title = computed(() => paths.value.length > 1 ? `${paths.value.length} 项` : noteTitle(paths.value[0]))
 
-// 可选的目标：根目录与所有文件夹；排除当前所在的文件夹，移动文件夹时还要排除它自己及其子文件夹
 const targets = computed(() => {
-  const here = dirname(props.path)
-  const inside = (d: string) => isDir.value && (d === props.path || d.startsWith(props.path + '/'))
-  const dirs = ws.entries.filter((e) => e.dir && !inAssetDir(e.path) && e.path !== here && !inside(e.path)).map((e) => e.path)
-  return here === '' ? dirs : ['', ...dirs]
+  const inside = (dir: string) => paths.value.some((path) => ws.entries.some((entry) => entry.path === path && entry.dir) && (dir === path || dir.startsWith(path + '/')))
+  return ['', ...ws.entries.filter((entry) => entry.dir && !inAssetDir(entry.path)).map((entry) => entry.path)]
+    .filter((dir) => !inside(dir) && !paths.value.every((path) => dirname(path) === dir))
 })
 
 const items = computed(() => {
@@ -42,7 +42,8 @@ function choose(i: number) {
   const target = items.value[i]
   if (!target) return
   emit('close')
-  void move(props.path, joinPath(target.path, basename(props.path)))
+  if (paths.value.length === 1) void move(paths.value[0], joinPath(target.path, basename(paths.value[0])))
+  else void batchFiles('move', paths.value, target.path)
 }
 
 function onKeydown(e: KeyboardEvent) {
