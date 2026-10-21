@@ -535,3 +535,6 @@ button {
 .rm-plugin-tabs { display: flex; flex: none; gap: 4px; padding: 8px; overflow-x: auto; }
 .rm-plugin-tabs .on { background: var(--rm-active); color: var(--rm-accent-strong); }
 @media (pointer: coarse) { .rm-plugin-row .rm-btn, .rm-plugin-tabs .rm-btn { min-height: 44px; } }
+
+.rm-font-input input { width: 80px; padding: 7px; border: 1px solid var(--rm-divider); border-radius: 6px; background: var(--rm-bg); color: var(--rm-text); }
+.rm-tab-menu { right: auto; width: max-content; max-width: calc(100vw - 8px); }

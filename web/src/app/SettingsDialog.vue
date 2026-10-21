@@ -6,7 +6,7 @@ import Icon, { type IconName } from './Icon.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
 import PluginsPanel from './PluginsPanel.vue'
 import { installApp, installPrompt } from './pwa'
-import { CONTENT_WIDTHS, FONT_SIZES, TAB_SIZES, loadSettings, settings, updateSettings, type Settings } from './settings'
+import { CONTENT_WIDTHS, TAB_SIZES, loadSettings, settings, updateSettings, type Settings } from './settings'
 import SharePanel from './SharePanel.vue'
 import TokensPanel from './TokensPanel.vue'
 import TrashPanel from './TrashPanel.vue'
@@ -73,6 +73,17 @@ async function change(patch: Partial<Settings>) {
   }
 }
 
+function changeFont(event: Event) {
+  const input = event.target as HTMLInputElement
+  const value = input.valueAsNumber
+  if (!Number.isFinite(value) || value <= 0) {
+    toast('字号必须为正数')
+    input.value = String(settings.fontSize)
+    return
+  }
+  if (value !== settings.fontSize) void change({ fontSize: value })
+}
+
 // ---- 修改登录密码 ----
 const pw = ref({ current: '', next: '', confirm: '' })
 const pwError = ref('')
@@ -119,9 +130,7 @@ async function changePassword() {
             <AppearanceSettings />
             <div class="rm-setting">
               <span class="rm-setting-label">字号</span>
-              <select :value="settings.fontSize" aria-label="字号" @change="change({ fontSize: Number(($event.target as HTMLSelectElement).value) })">
-                <option v-for="n in FONT_SIZES" :key="n" :value="n">{{ n }} px</option>
-              </select>
+              <label class="rm-font-input"><input type="number" step="any" :value="settings.fontSize" aria-label="字号" @blur="changeFont" @keydown.enter="($event.target as HTMLInputElement).blur()" /> px</label>
             </div>
             <div class="rm-setting">
               <span class="rm-setting-label">正文宽度</span>

@@ -4,7 +4,6 @@ import { reactive } from 'vue'
 import { api } from './api'
 import { applyAppearance, appearancePaused, sanitizeAppearance, type Appearance } from '../themes/appearance'
 
-export const FONT_SIZES = [14, 15, 16, 17, 18, 20, 22]
 export const TAB_SIZES = [2, 4, 8]
 // 0 为全宽
 export const CONTENT_WIDTHS = [
@@ -27,7 +26,7 @@ export const settings = reactive<Settings>(sanitize(JSON.parse(localStorage.getI
 function sanitize(raw: Record<string, unknown>): Settings {
   const pick = <T>(v: unknown, allowed: T[], def: T) => (allowed.includes(v as T) ? (v as T) : def)
   return {
-    fontSize: pick(raw.fontSize, FONT_SIZES, DEFAULTS.fontSize),
+    fontSize: typeof raw.fontSize === 'number' && Number.isFinite(raw.fontSize) && raw.fontSize > 0 ? raw.fontSize : DEFAULTS.fontSize,
     spellcheck: typeof raw.spellcheck === 'boolean' ? raw.spellcheck : DEFAULTS.spellcheck,
     tabSize: pick(raw.tabSize, TAB_SIZES, DEFAULTS.tabSize),
     ...sanitizeAppearance(raw),

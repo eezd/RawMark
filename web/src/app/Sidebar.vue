@@ -54,7 +54,6 @@ function onRootDrop(e: DragEvent) {
       <p v-if="!tree.length" class="rm-tree-empty">还没有笔记</p>
     </div>
     <div class="rm-sidebar-foot">
-      <button class="rm-foot-btn" title="命令面板（F1）" @click="ws.switcher = '>'"><Icon name="command" />命令</button>
       <button class="rm-foot-btn" title="设置（Ctrl+,）" @click="ws.settings = 'index'"><Icon name="settings" />设置</button>
       <button class="rm-foot-btn" @click="emit('logout')"><Icon name="logout" />退出</button>
     </div>

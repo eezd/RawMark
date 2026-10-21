@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import Icon from './Icon.vue'
 import { noteTitle } from './paths'
 import { closeTab, ws } from './workspace'
@@ -43,8 +43,14 @@ function onDragEnd() {
 // ---- 右键菜单 ----
 const menu = ref<{ path: string; x: number; y: number } | null>(null)
 
-function openMenu(e: MouseEvent, path: string) {
-  menu.value = { path, x: Math.min(e.clientX, innerWidth - 200), y: e.clientY }
+const menuElement = ref<HTMLElement>()
+async function openMenu(e: MouseEvent, path: string) {
+  menu.value = { path, x: e.clientX, y: e.clientY }
+  await nextTick()
+  if (menu.value?.path !== path || !menuElement.value) return
+  const { width, height } = menuElement.value.getBoundingClientRect()
+  menu.value.x = Math.max(4, Math.min(e.clientX, innerWidth - width - 4))
+  menu.value.y = Math.max(4, Math.min(e.clientY, innerHeight - height - 4))
 }
 
 async function closeMany(keep: (index: number, path: string) => boolean) {
@@ -101,7 +107,7 @@ function closeRight(path: string) {
     </button>
     <template v-if="menu">
       <div class="rm-menu-backdrop" @click="menu = null" @contextmenu.prevent="menu = null" />
-      <div class="rm-menu rm-tab-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }">
+      <div ref="menuElement" class="rm-menu rm-tab-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }">
         <button @click="closeMany((_, p) => p !== menu!.path)">关闭</button>
         <button @click="closeOthers(menu.path)">关闭其他标签页</button>
         <button @click="closeRight(menu.path)">关闭右侧标签页</button>
