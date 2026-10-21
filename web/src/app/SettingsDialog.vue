@@ -5,6 +5,7 @@ import { allCommands, formatKeys, runCommand } from './commands'
 import Icon, { type IconName } from './Icon.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
 import PluginsPanel from './PluginsPanel.vue'
+import { installApp, installPrompt } from './pwa'
 import { CONTENT_WIDTHS, FONT_SIZES, TAB_SIZES, loadSettings, settings, updateSettings, type Settings } from './settings'
 import SharePanel from './SharePanel.vue'
 import TokensPanel from './TokensPanel.vue'
@@ -184,6 +185,10 @@ async function changePassword() {
           <template v-else-if="section === 'about'">
             <div class="rm-setting"><h3>RawMark</h3></div>
             <p class="rm-share-note">纯 Markdown 笔记编辑器，文件即真源。</p>
+            <div v-if="installPrompt" class="rm-setting">
+              <span class="rm-setting-label">安装应用</span>
+              <button class="rm-btn" @click="installApp">安装 RawMark</button>
+            </div>
             <div class="rm-setting">
               <span class="rm-setting-label">构建版本</span>
               <code>{{ buildVersion }}</code>

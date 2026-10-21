@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { installApp, installPrompt, online, waitingWorker } from './pwa'
+import { online, waitingWorker } from './pwa'
 import { flushAll, readyToReload, toast } from './workspace'
 
 const busy = ref(false)
@@ -48,15 +48,11 @@ async function update() {
 </script>
 
 <template>
-  <div v-if="!online || waitingWorker || activated || installPrompt" class="rm-app-status" role="status">
+  <div v-if="!online || waitingWorker || activated" class="rm-app-status" role="status">
     <span v-if="!online">离线，无法加载或保存笔记</span>
     <template v-else-if="waitingWorker || activated">
       <span>有新版本</span>
       <button class="rm-btn" :disabled="busy" @click="update">{{ busy ? '正在保存…' : '保存并刷新' }}</button>
-    </template>
-    <template v-else-if="installPrompt">
-      <span>将 RawMark 添加到主屏幕</span>
-      <button class="rm-btn" @click="installApp">安装</button>
     </template>
   </div>
 </template>
