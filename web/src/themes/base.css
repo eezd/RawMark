@@ -160,15 +160,14 @@ body {
   pointer-events: none;
 }
 .cm-line.cm-rm-code .cm-rm-mono { font-family: inherit; }
-.cm-line.cm-rm-code-begin { padding-top: 10px; }
+.cm-line.cm-rm-code-begin { padding-top: 10px; min-height: 26px; }
 .cm-line.cm-rm-code-end { padding-bottom: 10px; }
 .cm-line.cm-rm-code-begin::before { border-radius: 8px 8px 0 0; }
 .cm-line.cm-rm-code-end::before { border-radius: 0 0 8px 8px; }
 .cm-line.cm-rm-code-begin.cm-rm-code-end::before { border-radius: 8px; }
-/* 未激活时的围栏行：压低行高，只显示右上角语言标签与复制按钮 */
-.cm-line.cm-rm-code-fence { font-size: 12px; line-height: 1.2; text-align: right; padding-right: 12px; }
+/* 围栏展开前后保持同一行高，语言标签与复制按钮不参与行高计算，避免代码内容跳动。 */
 .cm-rm-code-header { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; user-select: none; }
-.cm-line.cm-rm-code-begin:not(.cm-rm-code-fence) .cm-rm-code-header { position: absolute; top: 6px; right: 12px; }
+.cm-line.cm-rm-code-begin .cm-rm-code-header { position: absolute; top: 6px; right: 12px; }
 .cm-rm-code-lang { color: rgba(235, 235, 235, 0.38); font-size: 12px; line-height: 1; }
 .cm-rm-code-copy {
   display: inline-flex;
@@ -270,7 +269,8 @@ body {
   .cm-rm-table-toolbar { visibility: visible; opacity: 1; }
   .cm-rm-table-tools button { height: 36px; padding: 0 10px; }
   .cm-rm-code-copy { width: 36px; height: 36px; }
-  .cm-line.cm-rm-code { padding: 0 12px; }
+  .cm-line.cm-rm-code { padding-left: 12px; padding-right: 12px; }
+  .cm-line.cm-rm-code-begin { min-height: 36px; }
 }
 
 /* ---- Typora 扩展语法 ---- */
