@@ -72,7 +72,7 @@ function onRootDrop(e: DragEvent) {
     </div>
     <template v-if="rootMenu">
       <div class="rm-menu-backdrop" @click="rootMenu = null" @contextmenu.prevent="rootMenu = null" />
-      <div class="rm-menu rm-context-menu" :style="{ left: rootMenu.x + 'px', top: rootMenu.y + 'px' }"><button @click="ws.images = ''; rootMenu = null"><Icon name="image" />图片管理</button></div>
+      <div class="rm-menu rm-context-menu" :style="{ left: rootMenu.x + 'px', top: rootMenu.y + 'px' }"><button @click="ws.imagesAll = false; ws.images = ''; rootMenu = null"><Icon name="image" />图片管理</button></div>
     </template>
     <div class="rm-vault-status"><span class="rm-avatar">RM</span><div><strong>个人工作区</strong><small>Markdown 文件 · 自动保存</small></div></div>
     <div class="rm-sidebar-foot">

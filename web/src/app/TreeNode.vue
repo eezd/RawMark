@@ -85,7 +85,7 @@ function runMenu(action: 'note' | 'folder' | 'import' | 'images' | 'rename' | 'm
     expanded.add(path)
     void (action === 'note' ? createNote(path) : createFolder(path))
   } else if (action === 'import') ws.importing = path
-  else if (action === 'images') ws.images = path
+  else if (action === 'images') { ws.imagesAll = false; ws.images = path }
   else if (action === 'rename') ws.renaming = path
   else if (action === 'share') ws.sharing = minimalPaths(selectedPaths)
   else if (action === 'move') ws.moving = [...selectedPaths]

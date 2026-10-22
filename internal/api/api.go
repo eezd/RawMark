@@ -85,6 +85,7 @@ func (s *Server) routes() []route {
 		{"POST /api/v1/folders", authed, s.mkdir},
 		{"POST /api/v1/import", authed, s.importNotes},
 		{"POST /api/v1/assets", authed, s.uploadAsset},
+		{"POST /api/v1/assets/cleanup", authed, s.cleanupImages},
 		{"POST /api/v1/assets/import", authed, s.importAsset},
 		{"PUT /api/v1/assets/{path...}", authed, s.replaceImage},
 		{"GET /api/v1/raw/{path...}", authed, s.raw},
@@ -389,7 +390,16 @@ func (s *Server) uploadAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
-	link, err := s.vault.SaveAsset(r.URL.Query().Get("note"), header.Filename, file, maxAssetBytes)
+	var link string
+	if r.URL.Query().Has("folder") {
+		if r.URL.Query().Has("note") {
+			writeError(w, 400, "不能同时指定笔记和文件夹")
+			return
+		}
+		link, err = s.vault.SaveFolderAsset(r.URL.Query().Get("folder"), header.Filename, file, maxAssetBytes)
+	} else {
+		link, err = s.vault.SaveAsset(r.URL.Query().Get("note"), header.Filename, file, maxAssetBytes)
+	}
 	if err != nil {
 		vaultError(w, r, err)
 		return

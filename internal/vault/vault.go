@@ -504,13 +504,17 @@ func newTrashID() string {
 var trashIDPattern = regexp.MustCompile(`^\d{8}T\d{6}\.\d{3}-[0-9a-f]{8}$`)
 
 // Delete 把笔记（连同 .assets）、图片或文件夹移入回收站
-func (v *Vault) Delete(rel string) (item TrashItem, err error) {
+func (v *Vault) Delete(rel string) (TrashItem, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.deleteLocked(rel)
+}
+
+func (v *Vault) deleteLocked(rel string) (item TrashItem, err error) {
 	p, err := v.abs(rel)
 	if err != nil {
 		return TrashItem{}, err
 	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
 	info, err := os.Lstat(p)
 	if errors.Is(err, fs.ErrNotExist) {
 		return TrashItem{}, ErrNotFound
@@ -686,7 +690,28 @@ func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (stri
 	if !IsNote(note) {
 		return "", ErrInvalidPath
 	}
-	p, err := v.abs(note)
+	return v.saveAssetAt(AssetsDir(note), origName, r, limit)
+}
+
+// SaveFolderAsset 为图片管理上传到当前目录的共享 assets 目录，沿用哈希去重。
+func (v *Vault) SaveFolderAsset(folder, origName string, r io.Reader, limit int64) (string, error) {
+	if !IsImage(origName) {
+		return "", fmt.Errorf("%w：请选择图片文件", ErrInvalidPath)
+	}
+	if folder != "" {
+		info, err := v.Stat(folder)
+		if err != nil {
+			return "", err
+		}
+		if !info.IsDir() {
+			return "", ErrInvalidPath
+		}
+	}
+	return v.saveAssetAt(path.Join(folder, "assets"), origName, r, limit)
+}
+
+func (v *Vault) saveAssetAt(relativeDir, origName string, r io.Reader, limit int64) (string, error) {
+	dir, err := v.abs(relativeDir)
 	if err != nil {
 		return "", err
 	}
@@ -698,7 +723,6 @@ func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (stri
 		return "", ErrTooLarge
 	}
 	name := assetName(data, origName)
-	dir := AssetsDir(p)
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if err := v.checkInside(dir); err != nil {
@@ -728,7 +752,7 @@ func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (stri
 		} else if !bytes.Equal(existing, data) {
 			continue
 		}
-		return EscapeLinkPath(path.Base(AssetsDir(note))) + "/" + candidate, nil
+		return EscapeLinkPath(path.Base(relativeDir)) + "/" + candidate, nil
 	}
 }
 

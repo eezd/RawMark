@@ -71,6 +71,7 @@ export const ws = reactive({
   // 图片预览与管理，独立于笔记标签和草稿
   image: null as string | null,
   images: null as string | null,
+  imagesAll: false,
   // 电脑上侧栏折叠
   sidebarCollapsed: layout.sidebarCollapsed ?? false,
   // 大纲面板（电脑上在右侧常驻，手机上为浮层）
@@ -1094,7 +1095,7 @@ function registerBuiltinCommands() {
     { id: 'view.source', title: '开启/关闭源码编辑', when: hasNote, run: toggleSourceMode },
     { id: 'app.trash', title: '打开回收站', run: () => (ws.settings = 'trash') },
     { id: 'note.share', title: '分享当前笔记', when: hasNote, run: () => (ws.sharing = ws.active) },
-    { id: 'app.images', title: '管理根目录图片', run: () => (ws.images = '') },
+    { id: 'app.images', title: '管理根目录图片', run: () => { ws.imagesAll = false; ws.images = '' } },
     { id: 'app.shares', title: '管理分享链接', run: () => (ws.settings = 'shares') },
     { id: 'app.tokens', title: 'API 令牌', run: () => (ws.settings = 'tokens') },
   ]) {
@@ -1174,4 +1175,27 @@ export async function openReference(path: string, line: number) {
     v.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: 'center' }) })
     v.focus()
   })
+}
+
+
+export async function uploadFolderImages(folder: string, files: File[]) {
+  const failures: string[] = []
+  let uploaded = 0
+  await withOp(async () => {
+    for (const file of files) {
+      try { await api.uploadFolderImage(folder, file); uploaded++ }
+      catch (error) { failures.push(file.name + '：' + errorText(error)) }
+    }
+  })
+  await refreshTree()
+  return { uploaded, failures }
+}
+
+export async function cleanupImages(paths: string[]) {
+  await flushAll()
+  if (!readyToReload()) throw new Error('仍有未保存内容或正在处理粘贴、上传与文件操作，请完成后再清理')
+  const result = await withOp(() => api.cleanupImages(paths))
+  await refreshTree()
+  await refreshMetadata()
+  return result
 }

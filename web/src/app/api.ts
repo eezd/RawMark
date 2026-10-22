@@ -188,6 +188,12 @@ export const api = {
     return (await json<{ link: string }>(request('POST', '/api/v1/assets?note=' + encodeURIComponent(note), { body: form }))).link
   },
 
+  cleanupImages: (paths: string[]) => json<{ deleted: TrashItem[]; skipped: { path: string; reason: string }[] }>(request('POST', '/api/v1/assets/cleanup', { json: { paths } })),
+  uploadFolderImage: async (folder: string, file: File) => {
+    const body = new FormData()
+    body.append('file', file)
+    return json<{ link: string }>(request('POST', '/api/v1/assets?folder=' + encodeURIComponent(folder), { body }))
+  },
   replaceImage: (path: string, file: File) => {
     const body = new FormData()
     body.append('file', file)
