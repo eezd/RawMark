@@ -16,7 +16,7 @@ export const CONTENT_WIDTHS = [
 
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
-const DEFAULTS = { fontSize: 16, contentWidth: 760, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
+const DEFAULTS = { dailyFolder: 'Daily', templatesFolder: 'Templates', dailyTemplate: '', fontSize: 16, contentWidth: 760, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
 export type Settings = typeof DEFAULTS & Appearance & { shortcuts: Record<string, string[]> }
 
 const CACHE_KEY = 'rawmark.settings'
@@ -27,6 +27,9 @@ export const settings = reactive<Settings>(sanitize(JSON.parse(localStorage.getI
 function sanitize(raw: Record<string, unknown>): Settings {
   const pick = <T>(v: unknown, allowed: T[], def: T) => (allowed.includes(v as T) ? (v as T) : def)
   return {
+    dailyFolder: typeof raw.dailyFolder === 'string' ? raw.dailyFolder : DEFAULTS.dailyFolder,
+    templatesFolder: typeof raw.templatesFolder === 'string' && raw.templatesFolder !== '' ? raw.templatesFolder : DEFAULTS.templatesFolder,
+    dailyTemplate: typeof raw.dailyTemplate === 'string' ? raw.dailyTemplate : DEFAULTS.dailyTemplate,
     fontSize: typeof raw.fontSize === 'number' && Number.isFinite(raw.fontSize) && raw.fontSize > 0 ? raw.fontSize : DEFAULTS.fontSize,
     shortcuts: sanitizeShortcuts(raw.shortcuts),
     spellcheck: typeof raw.spellcheck === 'boolean' ? raw.spellcheck : DEFAULTS.spellcheck,

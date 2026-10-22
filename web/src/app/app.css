@@ -628,3 +628,7 @@ button {
   .rm-outline { width: min(84vw, 320px); }
   .rm-auth-card { padding: 28px 24px; }
 }
+.rm-notes-view { display: flex; flex-direction: column; flex: 1; min-height: 0; position: relative; }
+.rm-knowledge-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 14px 12px 0; }
+.rm-knowledge-nav button { display: flex; align-items: center; gap: 8px; padding: 9px 8px; font-size: 10px; border: 0; border-radius: 7px; background: none; color: var(--rm-text-muted); cursor: pointer; }
+.rm-knowledge-nav button:hover, .rm-knowledge-nav .on { background: var(--rm-active); color: var(--rm-accent); }

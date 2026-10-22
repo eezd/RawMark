@@ -4,6 +4,8 @@ import { api, ApiError } from './api'
 import { registerCommand } from './commands'
 import EditorPane from './EditorPane.vue'
 import AppHeader from './AppHeader.vue'
+import KnowledgePanel from './KnowledgePanel.vue'
+import TemplateDialog from './TemplateDialog.vue'
 import EditorChrome from './EditorChrome.vue'
 import Icon from './Icon.vue'
 import MobileToolbar from './MobileToolbar.vue'
@@ -119,14 +121,18 @@ onBeforeUnmount(() => {
         <button class="rm-icon-btn" title="快速打开" @click="ws.switcher = ''"><Icon name="search" :size="20" /></button>
         <button class="rm-icon-btn" title="命令" @click="ws.switcher = '>'"><Icon name="command" :size="20" /></button>
       </header>
+      <div v-show="ws.view === 'notes'" class="rm-notes-view">
       <TabBar />
       <EditorChrome />
       <NoteBanner />
       <EditorPane />
       <MobileToolbar />
+      </div>
+      <KnowledgePanel v-if="ws.view !== 'notes'" />
     </main>
-    <OutlinePanel v-if="ws.outlineOpen && ws.active" />
+    <OutlinePanel v-if="ws.outlineOpen && ws.active && ws.view === 'notes'" />
     </div>
+    <TemplateDialog v-if="ws.templateOpen" />
     <QuickSwitcher v-if="ws.switcher !== null" />
     <SettingsDialog v-if="ws.settings" />
     <ShareDialog v-if="ws.sharing" :path="ws.sharing" @close="ws.sharing = null" />

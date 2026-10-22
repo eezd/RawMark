@@ -9,6 +9,7 @@ import SearchPanel from './SearchPanel.vue'
 import { createFolder, createNote, move, openSearch, ws } from './workspace'
 import { sidebarViews } from '../plugins/registry'
 import PluginMount from './PluginMount.vue'
+import { openDailyNote } from './templates'
 
 const emit = defineEmits<{ logout: [] }>()
 const rootDrop = ref(false)
@@ -50,6 +51,12 @@ function onRootDrop(e: DragEvent) {
       <button class="rm-icon-btn" title="新建文件夹" @click="createFolder('')"><Icon name="folderAdd" /><span>新建目录</span></button>
       <button class="rm-icon-btn" title="导入" @click="ws.importing = ''"><Icon name="import" /><span>导入文档</span></button>
     </div>
+    <nav class="rm-knowledge-nav" aria-label="知识工具">
+      <button :class="{ on: ws.view === 'graph' }" @click="ws.view = 'graph'; ws.sidebarOpen = false"><Icon name="graph" />关系图谱</button>
+      <button :class="{ on: ws.view === 'tags' }" @click="ws.view = 'tags'; ws.sidebarOpen = false"><Icon name="tag" />标签索引</button>
+      <button @click="openDailyNote"><Icon name="calendar" />今日日记</button>
+      <button @click="ws.templateOpen = true"><Icon name="noteAdd" />从模板新建</button>
+    </nav>
     <div class="rm-tree-label">文件目录 <span>· VAULT EXPLORER</span></div>
     <nav v-if="sidebarViews.size" class="rm-plugin-tabs" aria-label="侧栏视图">
       <button class="rm-btn" :class="{ on: !currentView }" @click="selectedView = ''">文件</button>

@@ -77,6 +77,8 @@ export const ws = reactive({
   outlineOpen: layout.outlineOpen ?? false,
   sourceMode: false,
   focusMode: false,
+  view: 'notes' as 'notes' | 'graph' | 'tags',
+  templateOpen: false,
   // 最近打开的笔记，最新的在前
   recent: JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[],
   toasts: [] as Toast[],
@@ -476,6 +478,7 @@ export function revealPending(v: EditorView, path: string): boolean {
 // ---- 标签页 ----
 
 export async function openNote(path: string) {
+  ws.view = 'notes'
   ws.sidebarOpen = false
   if (tabOf(path)) {
     ws.active = path
@@ -666,8 +669,8 @@ export async function createNote(dir: string) {
 const creating = new Map<string, Promise<boolean>>()
 
 /** 在指定路径新建空笔记并打开，返回是否成功；不存在的上级目录由服务器创建 */
-export async function createNoteAt(path: string): Promise<boolean> {
-  const done = createNoteFile(path)
+export async function createNoteAt(path: string, content = ''): Promise<boolean> {
+  const done = createNoteFile(path, content)
   creating.set(path, done)
   try {
     return await done
@@ -676,17 +679,18 @@ export async function createNoteAt(path: string): Promise<boolean> {
   }
 }
 
-async function createNoteFile(path: string): Promise<boolean> {
+async function createNoteFile(path: string, content: string): Promise<boolean> {
   const exists = new Set(ws.entries.map((e) => e.path))
   const added = [path]
   for (let d = dirname(path); d && !exists.has(d); d = dirname(d)) added.push(d)
   ws.entries.push(...added.map((p, i) => ({ path: p, dir: i > 0, size: 0, mtime: Date.now() })))
   return withOp(async () => {
     try {
-      const rev = await api.writeFile(path, '', '')
+      const rev = await api.writeFile(path, content, '')
       ws.tabs.push({ path, rev, status: 'ready', dirty: false })
-      editorStates.set(path, buildState(path, ''))
+      editorStates.set(path, buildState(path, content))
       ws.active = path
+      ws.view = 'notes'
       return true
     } catch (err) {
       ws.entries = ws.entries.filter((e) => !added.includes(e.path))
@@ -1063,7 +1067,7 @@ registerBuiltinCommands()
 
 function registerBuiltinCommands() {
   for (const command of editorCommands) registerCommand({ ...command,
-    when: () => ws.settings === null && ws.active !== null && !!view,
+    when: () => ws.view === 'notes' && ws.settings === null && ws.images === null && !ws.templateOpen && ws.active !== null && !!view,
     run: () => { if (view) { command.run(view); view.focus() } },
   })
   const hasNote = () => ws.active !== null
