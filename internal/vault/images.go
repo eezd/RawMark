@@ -7,7 +7,6 @@ import (
 	"html"
 	"io"
 	"io/fs"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -48,59 +47,72 @@ func (v *Vault) ReplaceImage(rel, filename string, r io.Reader, limit int64) err
 	return atomicWrite(p, data)
 }
 
-type imageLinkChange struct {
+type linkChange struct {
 	path          string
 	before, after []byte
 }
 
-// 调用方持有写锁；所有原始内容留到移动成功，以便复合操作失败时回滚。
-func (v *Vault) imageLinkChanges(from, to string) ([]imageLinkChange, error) {
+// 调用方持有写锁；先计算全部改写，移动成功后再写入，出错时保留回滚依据。
+func (v *Vault) moveLinkChanges(from, to string, directory bool, ownAssets bool) ([]linkChange, error) {
 	entries, err := v.Tree()
 	if err != nil {
 		return nil, err
 	}
-	var changes []imageLinkChange
-	for _, e := range entries {
-		if e.Dir || !IsNote(e.Path) {
+	var changes []linkChange
+	for _, entry := range entries {
+		if entry.Dir || !IsNote(entry.Path) {
 			continue
 		}
-		p := filepath.Join(v.root, filepath.FromSlash(e.Path))
-		before, err := os.ReadFile(p)
+		before, _, err := v.Read(entry.Path)
 		if err != nil {
 			return nil, err
 		}
-		after, err := rewriteImageLinks(before, e.Path, from, to)
+		next := movedPath(entry.Path, from, to, directory)
+		after, err := rewriteMovedLinks(before, entry.Path, next, from, to, directory, ownAssets)
 		if err != nil {
 			return nil, err
+		}
+		if ownAssets && entry.Path == from {
+			after = RewriteAssetLinks(after, strings.TrimSuffix(path.Base(from), NoteExt), strings.TrimSuffix(path.Base(to), NoteExt))
 		}
 		if !bytes.Equal(before, after) {
-			changes = append(changes, imageLinkChange{p, before, after})
+			changes = append(changes, linkChange{filepath.Join(v.root, filepath.FromSlash(next)), before, after})
 		}
 	}
 	return changes, nil
 }
 
-func rewriteImageLinks(content []byte, note, from, to string) ([]byte, error) {
-	rel, err := filepath.Rel(filepath.FromSlash(path.Dir(note)), filepath.FromSlash(to))
-	if err != nil {
-		return nil, err
+func movedPath(p, from, to string, directory bool) string {
+	if p == from {
+		return to
 	}
-	spans := importLinkSpans(content)
+	if directory && strings.HasPrefix(p, from+"/") {
+		return to + strings.TrimPrefix(p, from)
+	}
+	return p
+}
+
+func rewriteMovedLinks(content []byte, oldNote, newNote, from, to string, directory, ownAssets bool) ([]byte, error) {
 	var out []byte
 	last := 0
-	for _, span := range spans {
+	for _, span := range importLinkSpans(content) {
 		if span.start < last {
 			continue
 		}
-		target := string(content[span.start:span.end])
-		if span.html {
-			target = html.UnescapeString(target)
-		} else {
-			target = markdownEscape.ReplaceAllString(target, "$1")
-		}
-		u, err := url.Parse(target)
-		if err != nil || u.IsAbs() || u.Host != "" || strings.HasPrefix(target, "/") || u.Path == "" || path.Clean(path.Join(path.Dir(note), u.Path)) != from {
+		target, u, ok := LocalTarget(oldNote, string(content[span.start:span.end]))
+		if !ok {
 			continue
+		}
+		mapped := movedPath(target, from, to, directory)
+		if ownAssets {
+			mapped = movedPath(mapped, AssetsDir(from), AssetsDir(to), true)
+		}
+		if mapped == target && path.Dir(oldNote) == path.Dir(newNote) {
+			continue
+		}
+		rel, err := filepath.Rel(filepath.FromSlash(path.Dir(newNote)), filepath.FromSlash(mapped))
+		if err != nil {
+			return nil, err
 		}
 		replacement := EscapeLinkPath(filepath.ToSlash(rel))
 		if u.RawQuery != "" {

@@ -72,9 +72,9 @@ func run(addr string) error {
 		return err
 	}
 	defer idx.Close()
-	go idx.Run(ctx)
-
 	hub := events.NewHub()
+	idx.OnIndexed = func() { hub.Broadcast(events.Event{Type: "indexed"}) }
+	go idx.Run(ctx)
 	if err := watch.Start(ctx, v, hub, idx.Update); err != nil {
 		return fmt.Errorf("启动文件监听失败: %w", err)
 	}

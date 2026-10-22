@@ -9,6 +9,7 @@ import { createEditorState, insertImageFiles, pasteImages, languageCompartment, 
 import { handleShortcut, registerCommand } from './commands'
 import { api, ApiError, encodePath, type Entry } from './api'
 import { drafts } from './drafts'
+import { refreshMetadata } from './metadata'
 import { connectEvents, type VaultEvent } from './events'
 import { basename, dirname, joinPath, isImage, NOTE_EXT, resolveAssetUrl } from './paths'
 import { loadSettings, settings } from './settings'
@@ -201,6 +202,7 @@ function buildState(path: string, doc: string): EditorState {
     spellcheck: settings.spellcheck,
     tabSize: settings.tabSize,
     sourceMode: ws.sourceMode,
+    openLink: (href) => { void openMarkdownLink(ref.path, href) },
     resolveImage: (src) => {
       const url = resolveAssetUrl(ref.path, src)
       const entry = ws.entries.find((e) => url === '/api/v1/raw/' + encodePath(e.path))
@@ -743,9 +745,8 @@ export async function move(from: string, to: string): Promise<FileResult> {
     return operationFailed(`“${basename(to)}”已存在`)
   }
   const result = await withOp<FileResult>(async () => {
-    // 图片改名会更新仓库中的引用，先保存已打开笔记，沿用版本冲突保护。
-    const imageMove = isImage(from) && ws.entries.some((e) => e.path === from && !e.dir)
-    const impacted = () => imageMove ? ws.tabs.map((t) => t.path) : affected(from)
+    // 移动会更新仓库中的相对链接，先保存全部已打开笔记，沿用版本冲突保护。
+    const impacted = () => ws.tabs.map((t) => t.path)
     const busy = () => impacted().some((p) => slots.get(p)?.uploads || slots.get(p)?.paused)
     if (busy()) {
       return operationFailed('笔记正在处理粘贴、上传或移动，请完成后再移动')
@@ -792,7 +793,7 @@ export async function move(from: string, to: string): Promise<FileResult> {
       paused.forEach((s) => s.paused--)
     }
     // 笔记改名时服务器会改写正文中的图片链接，版本随之变化，需要重新同步
-    await Promise.all((imageMove ? ws.tabs.map((t) => t.path) : affected(to)).map(async (p) => {
+    await Promise.all(ws.tabs.map((t) => t.path).map(async (p) => {
       const tab = tabOf(p)
       if (!tab) return
       if (tab.dirty) {
@@ -877,7 +878,8 @@ async function syncOpenTab(tab: Tab) {
 
 async function handleEvents(evs: VaultEvent[]) {
   for (const ev of evs) {
-    if (ev.type === 'settings') {
+    if (ev.type === 'indexed') void refreshMetadata()
+    else if (ev.type === 'settings') {
       void loadSettings().catch((err) => toast('同步设置失败：' + errorText(err)))
       void refreshPlugins()
     }
@@ -916,6 +918,7 @@ async function handleEvents(evs: VaultEvent[]) {
 }
 
 async function resync() {
+  void refreshMetadata()
   await refreshTree()
   await Promise.all(ws.tabs.map(syncOpenTab))
   pluginEvents.dispatchEvent(new CustomEvent('resync'))
@@ -1127,4 +1130,44 @@ export function stopWorkspace() {
   stopPlugins()
   disconnect?.()
   disconnect = undefined
+}
+
+
+async function openMarkdownLink(note: string, href: string) {
+  const decoded = href.replace(/\\([!"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])/g, '$1')
+  let url: URL
+  try { url = new URL(decoded, 'https://rawmark.local/' + encodePath(note)) }
+  catch { toast('链接格式无效'); return }
+  if (url.origin !== 'https://rawmark.local') {
+    if (['http:', 'https:', 'mailto:', 'tel:'].includes(url.protocol)) window.open(url.href, '_blank', 'noopener')
+    else toast('不支持的链接协议')
+    return
+  }
+  const target = decodeURIComponent(url.pathname.slice(1))
+  if (!ws.entries.some(e => e.path === target && !e.dir)) { toast('链接目标不存在：' + target); return }
+  if (!target.endsWith('.md')) { window.open('/api/v1/raw/' + encodePath(target), '_blank', 'noopener'); return }
+  await openNote(target)
+  if (url.hash) requestAnimationFrame(() => {
+    const state = editorStateOf(target), v = editorView()
+    if (!state || !v || ws.active !== target) return
+    const heading = decodeURIComponent(url.hash.slice(1)).toLocaleLowerCase()
+    for (let i = 1; i <= state.doc.lines; i++) {
+      const line = state.doc.line(i)
+      const title = line.text.replace(/^#{1,6}\s+/, '').trim().toLocaleLowerCase()
+      if (/^#{1,6}\s/.test(line.text) && (title === heading || title.replace(/\s+/g, '-') === heading)) {
+        v.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: 'start' }) }); break
+      }
+    }
+  })
+}
+
+export async function openReference(path: string, line: number) {
+  await openNote(path)
+  requestAnimationFrame(() => {
+    const v = editorView()
+    if (!v || ws.active !== path) return
+    const pos = v.state.doc.line(Math.min(line, v.state.doc.lines)).from
+    v.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: 'center' }) })
+    v.focus()
+  })
 }

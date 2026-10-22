@@ -76,6 +76,7 @@ func (s *Server) routes() []route {
 		{"POST /api/v1/auth/password", sessionOnly, s.changePassword},
 
 		{"GET /api/v1/tree", authed, s.tree},
+		{"GET /api/v1/metadata", authed, s.metadata},
 		{"POST /api/v1/export", authed, s.export},
 		{"GET /api/v1/files/{path...}", authed, s.readFile},
 		{"PUT /api/v1/files/{path...}", authed, s.writeFile},
@@ -521,4 +522,13 @@ func vaultError(w http.ResponseWriter, r *http.Request, err error) {
 	default:
 		internalError(w, r, err)
 	}
+}
+
+func (s *Server) metadata(w http.ResponseWriter, r *http.Request) {
+	notes, ready, err := s.index.Metadata()
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"notes": notes, "ready": ready})
 }

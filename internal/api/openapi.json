@@ -2431,6 +2431,24 @@
           }
         }
       }
+    },
+    "/metadata": {
+      "get": {
+        "summary": "读取笔记关系、标签与资源引用索引",
+        "security": [
+          {
+            "cookie": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "索引就绪状态与元数据列表，不含笔记正文"
+          }
+        }
+      }
     }
   },
   "components": {

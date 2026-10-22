@@ -440,13 +440,10 @@ func (v *Vault) Move(from, to string, commit func() error) (rewritten bool, err 
 			}
 		}
 	}
-	// 图片改名影响引用它的笔记：先读取全部待改正文，失败时不能先移动图片。
-	var links []imageLinkChange
-	if isImage {
-		links, err = v.imageLinkChanges(from, to)
-		if err != nil {
-			return false, err
-		}
+	// 笔记、目录和图片的移动都可能改变跨文件相对链接。
+	links, err := v.moveLinkChanges(from, to, info.IsDir(), srcAssets != "")
+	if err != nil {
+		return false, err
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return false, err
@@ -456,19 +453,13 @@ func (v *Vault) Move(from, to string, commit func() error) (rewritten bool, err 
 	}
 	assetsMoved := false
 	writtenLinks := 0
-	var originalNote []byte
 	defer func() {
 		if err == nil {
 			return
 		}
-		if rewritten {
-			if rollback := atomicWrite(dst, originalNote); rollback != nil {
-				err = errors.Join(err, fmt.Errorf("回滚笔记正文失败: %w", rollback))
-			}
-		}
 		for _, change := range links[:writtenLinks] {
 			if rollback := atomicWrite(change.path, change.before); rollback != nil {
-				err = errors.Join(err, fmt.Errorf("回滚图片引用失败: %w", rollback))
+				err = errors.Join(err, fmt.Errorf("回滚笔记引用失败: %w", rollback))
 			}
 		}
 		if assetsMoved {
@@ -485,27 +476,16 @@ func (v *Vault) Move(from, to string, commit func() error) (rewritten bool, err 
 			return false, err
 		}
 		writtenLinks++
+		if change.path == dst || info.IsDir() && strings.HasPrefix(change.path, dst+string(filepath.Separator)) {
+			rewritten = true
+		}
 	}
 	if srcAssets != "" {
 		if err := os.Rename(srcAssets, dstAssets); err != nil {
 			return false, fmt.Errorf("移动图片目录失败: %w", err)
 		}
 		assetsMoved = true
-		oldBase := strings.TrimSuffix(path.Base(from), NoteExt)
-		newBase := strings.TrimSuffix(path.Base(to), NoteExt)
-		if oldBase != newBase {
-			data, err := os.ReadFile(dst)
-			if err != nil {
-				return false, err
-			}
-			if out := RewriteAssetLinks(data, oldBase, newBase); !bytes.Equal(out, data) {
-				if err = atomicWrite(dst, out); err != nil {
-					return false, err
-				}
-				originalNote = data
-				rewritten = true
-			}
-		}
+
 	}
 	if commit != nil {
 		err = commit()

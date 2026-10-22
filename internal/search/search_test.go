@@ -92,15 +92,15 @@ func TestSearchTerms(t *testing.T) {
 	f.sync()
 
 	cases := map[string]string{
-		"装饰器":           "a.md,目录/c.md", // 3 个字符以上走 FTS
-		"检索":            "b.md,目录/c.md", // 不足 3 个字符走 LIKE
-		"codemirror":    "a.md",          // 不区分大小写
-		"装饰器 检索":        "目录/c.md",       // 多个词同时满足
-		"目录":            "目录/c.md",       // 命中路径
-		"不存在的词":         "",
-		"100%":          "",
-		`"引号"`:          "",
-		"   ":           "",
+		"装饰器":        "a.md,目录/c.md", // 3 个字符以上走 FTS
+		"检索":         "b.md,目录/c.md", // 不足 3 个字符走 LIKE
+		"codemirror": "a.md",         // 不区分大小写
+		"装饰器 检索":     "目录/c.md",      // 多个词同时满足
+		"目录":         "目录/c.md",      // 命中路径
+		"不存在的词":      "",
+		"100%":       "",
+		`"引号"`:       "",
+		"   ":        "",
 	}
 	for q, want := range cases {
 		if got := f.paths(q); got != want && !(strings.Contains(want, ",") && sameSet(got, want)) {
@@ -177,5 +177,31 @@ func TestSyncTracksChanges(t *testing.T) {
 	f.sync()
 	if got := f.paths("新内容"); got != "a.md" {
 		t.Errorf("重启后搜索 = %q", got)
+	}
+}
+
+func TestMetadataTracksChangesAndRebuild(t *testing.T) {
+	f := newFixture(t)
+	_, ready, err := f.idx.Metadata()
+	if ready || err != nil {
+		t.Fatalf("初始状态错误：%v %v", ready, err)
+	}
+	f.write("a.md", "#one [b](b.md)")
+	f.sync()
+	notes, ready, err := f.idx.Metadata()
+	if err != nil || !ready || len(notes) != 1 || len(notes[0].Links) != 1 || len(notes[0].Tags) != 1 {
+		t.Fatalf("元数据错误：%+v %v %v", notes, ready, err)
+	}
+	f.write("a.md", "#two")
+	f.sync()
+	notes, _, _ = f.idx.Metadata()
+	if len(notes[0].Links) != 0 || notes[0].Tags[0] != "two" {
+		t.Fatalf("元数据未更新：%+v", notes)
+	}
+	f.reopen()
+	f.sync()
+	notes, ready, err = f.idx.Metadata()
+	if err != nil || !ready || len(notes) != 1 || notes[0].Tags[0] != "two" {
+		t.Fatalf("索引恢复错误：%+v %v", notes, err)
 	}
 }

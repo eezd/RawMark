@@ -21,6 +21,8 @@ export const resolveImageUrl = Facet.define<(src: string) => string, (src: strin
   combine: (values) => values[0] ?? ((src) => src),
 })
 
+export const openLink = Facet.define<(href: string) => void, ((href: string) => void) | undefined>({ combine: values => values[0] })
+
 // 图片文件原位替换时重建预览，不改变正文、选区或撤销历史。
 export const refreshImages = StateEffect.define<null>()
 
@@ -307,7 +309,21 @@ function linkAt(state: EditorState, pos: number): string | null {
     if (node.name === 'URL') return state.sliceDoc(node.from, node.to).replace(/^<|>$/g, '')
     if (node.name === 'Link' || node.name === 'Autolink') {
       const url = node.getChild('URL')
-      return url ? state.sliceDoc(url.from, url.to).replace(/^<|>$/g, '') : null
+      if (url) return state.sliceDoc(url.from, url.to).replace(/^<|>$/g, '')
+      const text = (n: SyntaxNode) => state.sliceDoc(n.from, n.to)
+      const label = node.getChild('LinkLabel')
+      const close = node.getChildren('LinkMark').find(mark => text(mark) === ']')
+      if (!close) return null
+      const normalize = (value: string) => value.replace(/^\[|\]$/g, '').trim().replace(/\s+/g, ' ').toUpperCase()
+      const key = normalize(label && text(label) !== '[]' ? text(label) : state.sliceDoc(node.from, close.to))
+      let destination: string | null = null
+      syntaxTree(state).iterate({ enter(ref) {
+        if (ref.name !== 'LinkReference') return
+        const refLabel = ref.node.getChild('LinkLabel'), refUrl = ref.node.getChild('URL')
+        if (destination === null && refLabel && refUrl && normalize(text(refLabel)) === key) destination = text(refUrl).replace(/^<|>$/g, '')
+        return false
+      } })
+      return destination
     }
   }
   return null
@@ -352,7 +368,9 @@ const livePreviewPlugin = ViewPlugin.fromClass(
         const href = pos === null ? null : linkAt(view.state, pos)
         if (!href) return false
         e.preventDefault()
-        window.open(href, '_blank', 'noopener')
+        const handler = view.state.facet(openLink)
+        if (handler) handler(href)
+        else if (/^(https?:|mailto:|tel:)/i.test(href)) window.open(href, '_blank', 'noopener')
         return true
       },
     },

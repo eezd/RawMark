@@ -14,6 +14,16 @@ export interface ImportResult {
   warnings: string[]
 }
 
+export interface NoteMetadata {
+  path: string
+  rev: string
+  title: string
+  tags: string[]
+  links: { target: string; line: number }[]
+  assets: { target: string; line: number }[]
+  warnings: string[]
+}
+
 export interface Theme {
   id: string
   name: string
@@ -145,6 +155,7 @@ export const api = {
 
   exportFiles: (paths: string[]) => request('POST', '/api/v1/export', { json: { paths } }),
 
+  metadata: () => json<{ notes: NoteMetadata[]; ready: boolean }>(request('GET', '/api/v1/metadata')),
   tree: async () => (await json<{ entries: Entry[] }>(request('GET', '/api/v1/tree'))).entries,
   search: async (q: string) => (await json<{ results: SearchResult[] }>(request('GET', '/api/v1/search?q=' + encodeURIComponent(q)))).results,
 

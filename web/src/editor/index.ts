@@ -9,7 +9,7 @@ import { renderedBlocks } from './blocks'
 import { codeBlockHighlight } from './codeblocks'
 import { editorFocus } from './focus'
 import { defaultEditorKeys } from './shortcuts'
-import { livePreview, resolveImageUrl } from './livepreview'
+import { livePreview, resolveImageUrl, openLink } from './livepreview'
 import { tableEditing } from './table'
 import { markdownTheme } from './theme'
 import { editorExtensions, markdownSyntax, reportEditorFailure } from '../plugins/registry'
@@ -40,6 +40,7 @@ export interface EditorStateOptions {
   sourceMode?: boolean
   shortcuts?: KeyBinding[]
   resolveImage?: (src: string) => string
+  openLink?: (href: string) => void
   // 文档变化回调，仅对挂载在视图上的状态触发；未激活标签页的状态由调用方直接更新
   onChange?: (update: ViewUpdate) => void
   extensions?: Extension[]
@@ -70,6 +71,7 @@ export function createEditorState(opts: EditorStateOptions): EditorState {
     ]),
     EditorView.contentAttributes.of({ autocapitalize: 'sentences' }),
   ]
+  if (opts.openLink) extensions.push(openLink.of(opts.openLink))
   if (opts.resolveImage) extensions.push(resolveImageUrl.of(opts.resolveImage))
   if (opts.onChange) {
     const onChange = opts.onChange

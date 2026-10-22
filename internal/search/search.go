@@ -5,6 +5,7 @@ package search
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -19,13 +20,14 @@ import (
 )
 
 // 修改表结构时递增，旧索引会被丢弃重建
-const schemaVersion = 1
+const schemaVersion = 2
 
 const schema = `
 CREATE TABLE docs (
   id   INTEGER PRIMARY KEY,
   path TEXT NOT NULL UNIQUE,
-  rev  TEXT NOT NULL
+  rev  TEXT NOT NULL,
+  metadata TEXT NOT NULL
 );
 -- trigram 分词不依赖空格断词，中文可按任意片段检索；不足 3 个字符的词改用 LIKE
 CREATE VIRTUAL TABLE docs_fts USING fts5(path, body, tokenize = 'trigram');
@@ -50,8 +52,11 @@ type doc struct {
 }
 
 type Index struct {
-	db *sql.DB
-	v  *vault.Vault
+	OnIndexed func()
+	ready     bool
+	lastError error
+	db        *sql.DB
+	v         *vault.Vault
 
 	mu      sync.Mutex
 	pending map[string]string // 待同步的最新快照（路径 -> rev）
@@ -126,7 +131,12 @@ func (x *Index) Run(ctx context.Context) {
 			files := x.pending
 			x.mu.Unlock()
 			if err := x.sync(files); err != nil {
+				x.mu.Lock()
+				x.lastError = err
+				x.mu.Unlock()
 				slog.Error("更新搜索索引失败", "err", err)
+			} else if x.OnIndexed != nil {
+				x.OnIndexed()
 			}
 		}
 	}
@@ -168,7 +178,11 @@ func (x *Index) sync(files map[string]string) error {
 				return err
 			}
 		}
-		res, err := tx.Exec(`INSERT INTO docs (path, rev) VALUES (?, ?)`, p, rev)
+		metadata, err := json.Marshal(vault.Analyze(p, content))
+		if err != nil {
+			return err
+		}
+		res, err := tx.Exec(`INSERT INTO docs (path, rev, metadata) VALUES (?, ?, ?)`, p, rev, string(metadata))
 		if err != nil {
 			return err
 		}
@@ -185,6 +199,10 @@ func (x *Index) sync(files map[string]string) error {
 		return err
 	}
 	x.known = next
+	x.mu.Lock()
+	x.ready = true
+	x.lastError = nil
+	x.mu.Unlock()
 	return nil
 }
 
@@ -307,4 +325,37 @@ func indexRunes(s, sub []rune) int {
 		}
 	}
 	return -1
+}
+
+type NoteMetadata struct {
+	Path string `json:"path"`
+	Rev  string `json:"rev"`
+	vault.Metadata
+}
+
+func (x *Index) Metadata() ([]NoteMetadata, bool, error) {
+	x.mu.Lock()
+	ready, lastError := x.ready, x.lastError
+	x.mu.Unlock()
+	if lastError != nil {
+		return nil, ready, lastError
+	}
+	notes := []NoteMetadata{}
+	rows, err := x.db.Query(`SELECT path, rev, metadata FROM docs ORDER BY path`)
+	if err != nil {
+		return nil, ready, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var note NoteMetadata
+		var data string
+		if err := rows.Scan(&note.Path, &note.Rev, &data); err != nil {
+			return nil, ready, err
+		}
+		if err := json.Unmarshal([]byte(data), &note.Metadata); err != nil {
+			return nil, ready, err
+		}
+		notes = append(notes, note)
+	}
+	return notes, ready, rows.Err()
 }
