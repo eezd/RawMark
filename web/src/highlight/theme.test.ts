@@ -1,16 +1,22 @@
-import { expect, it } from 'vitest'
-import { createHighlighterCore } from 'shiki/core'
-import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
-import { bundledLanguages } from 'shiki/langs'
-import { codeTheme } from './theme'
+import { afterEach, expect, it, vi } from 'vitest'
+import type { HighlightResponse } from './protocol'
 
-it('实际语法高亮使用参考片段的关键字、字符串和注释颜色', async () => {
-  const language = await bundledLanguages.javascript()
-  const highlighter = await createHighlighterCore({ themes: [codeTheme], langs: language.default, engine: createJavaScriptRegexEngine() })
-  try {
-    const tokens = highlighter.codeToTokensBase('const value = "hello" // comment', { lang: 'javascript', theme: codeTheme.name }).flat()
-    expect(tokens.find((token) => token.content === 'const')?.color).toBe('#C678DD')
-    expect(tokens.find((token) => token.content.includes('hello'))?.color).toBe('#98C379')
-    expect(tokens.find((token) => token.content.includes('comment'))?.color).toBe('#8F9094')
-  } finally { highlighter.dispose() }
+afterEach(() => vi.unstubAllGlobals())
+
+it('编辑器与分享页共用的 Worker 返回 GitHub Dark 原始配色', async () => {
+  let reply: HighlightResponse | undefined
+  const worker = new class extends EventTarget {
+    postMessage(response: HighlightResponse) { reply = response }
+  }()
+  vi.stubGlobal('self', worker)
+  await import('./worker')
+  const code = 'const value = "hello" // comment'
+  worker.dispatchEvent(new MessageEvent('message', { data: { id: 1, lang: 'javascript', code } }))
+  await vi.waitFor(() => expect(reply).toBeDefined())
+  if (!reply || !('tokens' in reply) || !reply.tokens) throw new Error('高亮 Worker 未返回颜色')
+  const colors = new Map<string | number, string | number>()
+  for (let i = 0; i < reply.tokens.length; i += 4) colors.set(reply.tokens[i], reply.tokens[i + 2])
+  expect(colors.get(0)).toBe('#F97583')
+  expect(colors.get(code.indexOf('"hello"'))).toBe('#9ECBFF')
+  expect(colors.get(code.indexOf('//'))).toBe('#6A737D')
 })

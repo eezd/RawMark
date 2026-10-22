@@ -1,6 +1,6 @@
 /*
  * 基础主题。--rm-* 变量即主题 API，第三方主题只需覆盖这些变量。
- * 代码与编辑样式适配用户提供的 Obsidian CSS 片段。
+ * 编辑排版适配用户提供的 Obsidian CSS 片段，代码块颜色使用 Shiki GitHub Dark。
  */
 :root {
   color-scheme: light;
@@ -31,8 +31,8 @@
 
   --rm-inline-code-bg: #f8f8f8;
   --rm-inline-code-text: #e96900;
-  --rm-code-bg: #263238;
-  --rm-code-text: #abb2bf;
+  --rm-code-bg: #24292e;
+  --rm-code-text: #e1e4e8;
   --rm-code-font-size: 14px;
   --rm-highlight-bg: rgba(255, 213, 0, 0.35);
 }
@@ -47,7 +47,7 @@
   --rm-accent-strong: #42b883;
   --rm-inline-code-bg: #2f2f2f;
   --rm-inline-code-text: #f19a58;
-  --rm-code-bg: #263238;
+  --rm-code-bg: #24292e;
   --rm-highlight-bg: rgba(255, 213, 0, 0.28);
 
   --rm-sidebar-bg: #191b1d;
@@ -69,7 +69,7 @@
     --rm-accent-strong: #42b883;
     --rm-inline-code-bg: #2f2f2f;
     --rm-inline-code-text: #f19a58;
-    --rm-code-bg: #263238;
+    --rm-code-bg: #24292e;
     --rm-highlight-bg: rgba(255, 213, 0, 0.28);
 
     --rm-sidebar-bg: #191b1d;
