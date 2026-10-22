@@ -36,16 +36,11 @@ const codeTokenField = StateField.define<DecorationSet>({
 
 const markCache = new Map<string, Decoration>()
 
-function tokenMark(color: string, fontStyle: number): Decoration {
-  const key = color + '|' + fontStyle
-  let deco = markCache.get(key)
+function tokenMark(classes: string): Decoration {
+  let deco = markCache.get(classes)
   if (!deco) {
-    let style = color ? `color:${color}` : ''
-    if (fontStyle & 1) style += ';font-style:italic'
-    if (fontStyle & 2) style += ';font-weight:bold'
-    if (fontStyle & 4) style += ';text-decoration:underline'
-    deco = Decoration.mark({ attributes: { style } })
-    markCache.set(key, deco)
+    deco = Decoration.mark({ class: classes })
+    markCache.set(classes, deco)
   }
   return deco
 }
@@ -53,10 +48,19 @@ function tokenMark(color: string, fontStyle: number): Decoration {
 function tokensToDecorations(block: CodeBlock, run: TokenRun | null): Range<Decoration>[] {
   const out: Range<Decoration>[] = []
   if (!run) return out
-  for (let i = 0; i < run.length; i += 4) {
-    const from = block.from + (run[i] as number)
-    out.push(tokenMark(run[i + 2] as string, run[i + 3] as number).range(from, from + (run[i + 1] as number)))
+  let at = block.from
+  function visit(tokens: TokenRun) {
+    for (const token of tokens) {
+      if (typeof token === 'string') at += token.length
+      else {
+        const from = at
+        const index = out.length
+        visit(token.content)
+        if (at > from) out.splice(index, 0, tokenMark(token.classes).range(from, at))
+      }
+    }
   }
+  visit(run)
   return out
 }
 

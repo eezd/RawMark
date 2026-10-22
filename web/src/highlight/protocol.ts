@@ -6,8 +6,8 @@ export interface HighlightRequest {
   code: string
 }
 
-// 扁平数组：[offset, length, color, fontStyle, offset, length, ...]，避免大量小对象跨线程拷贝
-export type TokenRun = (number | string)[]
+// 保留 Prism 的嵌套 token 与原文，编辑器和分享页共用官方 token 类样式。
+export type TokenRun = (string | { classes: string; content: TokenRun })[]
 
 // 语言不受支持时 tokens 为 null；实际失败必须与纯文本结果区分。
 export type HighlightResponse = { id: number; tokens: TokenRun | null } | { id: number; error: Error }

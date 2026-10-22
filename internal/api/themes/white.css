@@ -16,7 +16,7 @@
   --rm-shadow: 0 12px 36px rgba(24, 31, 44, 0.12);
   --rm-inline-code-bg: #f8f8f8;
   --rm-inline-code-text: #e96900;
-  --rm-code-bg: #24292e;
-  --rm-code-text: #e1e4e8;
+  --rm-code-bg: #2d2d2d;
+  --rm-code-text: #ccc;
   --rm-highlight-bg: #fff0a8;
 }

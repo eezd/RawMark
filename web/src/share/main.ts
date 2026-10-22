@@ -1,5 +1,5 @@
 // 只读分享页（/s/{token}）：取回笔记内容，用与编辑器同一套解析器渲染为 HTML。不加载编辑器
-import { requestTokens } from '../highlight/client'
+import { requestTokens, type TokenRun } from '../highlight/client'
 import { renderMarkdown } from '../markdown/html'
 import { hydrate, renderMermaid } from '../markdown/render'
 import { applyAppearance, sanitizeAppearance } from '../themes/appearance'
@@ -278,22 +278,18 @@ async function decorateCode(code: HTMLElement) {
   const run = await requestTokens(lang, text)
   if (!run) return
   const out = document.createDocumentFragment()
-  let at = 0
-  for (let i = 0; i < run.length; i += 4) {
-    const from = run[i] as number
-    const to = from + (run[i + 1] as number)
-    if (from > at) out.append(text.slice(at, from))
-    const span = document.createElement('span')
-    const fontStyle = run[i + 3] as number
-    if (run[i + 2]) span.style.color = run[i + 2] as string
-    if (fontStyle & 1) span.style.fontStyle = 'italic'
-    if (fontStyle & 2) span.style.fontWeight = 'bold'
-    if (fontStyle & 4) span.style.textDecoration = 'underline'
-    span.textContent = text.slice(from, to)
-    out.append(span)
-    at = to
+  function appendTokens(parent: DocumentFragment | HTMLElement, tokens: TokenRun) {
+    for (const token of tokens) {
+      if (typeof token === 'string') parent.append(token)
+      else {
+        const span = document.createElement('span')
+        span.className = token.classes
+        appendTokens(span, token.content)
+        parent.append(span)
+      }
+    }
   }
-  out.append(text.slice(at))
+  appendTokens(out, run)
   code.replaceChildren(out)
 }
 
