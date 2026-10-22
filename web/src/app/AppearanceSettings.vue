@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { api, ApiError, type Theme } from './api'
+import { DISPLAY_DEFAULTS } from '../themes/typography'
 import { appearancePaused, fixedThemeMode, type CssSnippet } from '../themes/appearance'
 import { loadSettings, reloadTheme, settings, updateSettings, type Settings } from './settings'
 import { toast } from './workspace'
@@ -65,7 +66,7 @@ async function remove(snippet: CssSnippet) {
 }
 
 async function reset() {
-  if (!await change({ colorMode: 'system', theme: 'default', fontSize: 16, contentWidth: 760,
+  if (!await change({ colorMode: 'system', theme: 'default', ...DISPLAY_DEFAULTS,
     cssSnippets: settings.cssSnippets.map((s) => ({ ...s, enabled: false })) })) return
   toast('已恢复默认外观，CSS 片段已停用并保留')
 }
@@ -73,6 +74,7 @@ async function reset() {
 
 <template>
   <p v-if="appearancePaused" class="rm-appearance-note">已临时停用主题和 CSS。可恢复默认外观后重新打开页面。</p>
+  <div class="rm-theme-cards"><button v-for="mode in [{ id: 'light', title: '纯净浅色', subtitle: 'Serene · 日间写作' }, { id: 'dark', title: '沉静深色', subtitle: '沿用你的深色主题' }, { id: 'system', title: '跟随系统', subtitle: '随系统明暗切换' }]" :key="mode.id" :class="[mode.id, { on: (fixedMode ?? settings.colorMode) === mode.id }]" :disabled="busy" @click="change({ theme: 'default', colorMode: mode.id as Settings['colorMode'] })"><span class="rm-theme-sample"><i /><i /><i /></span><strong>{{ mode.title }}</strong><small>{{ mode.subtitle }}</small></button></div>
   <div class="rm-setting">
     <label for="rm-color-mode" class="rm-setting-label">明暗模式</label>
     <select id="rm-color-mode" :value="fixedMode ?? settings.colorMode" :disabled="busy || !!fixedMode" @change="change({ colorMode: ($event.target as HTMLSelectElement).value as Settings['colorMode'] })">

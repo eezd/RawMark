@@ -154,7 +154,7 @@ func (s *Server) publicAppearance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := map[string]any{}
-	for _, key := range []string{"colorMode", "fontSize", "contentWidth"} {
+	for _, key := range []string{"colorMode", "fontSize", "contentWidth", "textFont", "codeFont", "lineHeight", "paragraphSpacing", "glassOpacity"} {
 		if value, ok := settings[key]; ok {
 			out[key] = value
 		}

@@ -1,6 +1,7 @@
 // 应用设置：服务器上一份 JSON，全部设备共用；修改立即保存，其他设备经事件推送同步。
 // 本地缓存上次的值，启动时先套用，避免页面先按默认值显示再跳变
 import { reactive } from 'vue'
+import { DISPLAY_DEFAULTS, sanitizeDisplaySettings, applyDisplaySettings } from '../themes/typography'
 import { api } from './api'
 import { normalizeKeys } from '../keys'
 import { applyAppearance, appearancePaused, sanitizeAppearance, type Appearance } from '../themes/appearance'
@@ -16,7 +17,7 @@ export const CONTENT_WIDTHS = [
 
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
-const DEFAULTS = { dailyFolder: 'Daily', templatesFolder: 'Templates', dailyTemplate: '', fontSize: 16, contentWidth: 760, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
+const DEFAULTS = { dailyFolder: 'Daily', templatesFolder: 'Templates', dailyTemplate: '', selectionToolbar: true, ...DISPLAY_DEFAULTS, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
 export type Settings = typeof DEFAULTS & Appearance & { shortcuts: Record<string, string[]> }
 
 const CACHE_KEY = 'rawmark.settings'
@@ -30,16 +31,12 @@ function sanitize(raw: Record<string, unknown>): Settings {
     dailyFolder: typeof raw.dailyFolder === 'string' ? raw.dailyFolder : DEFAULTS.dailyFolder,
     templatesFolder: typeof raw.templatesFolder === 'string' && raw.templatesFolder !== '' ? raw.templatesFolder : DEFAULTS.templatesFolder,
     dailyTemplate: typeof raw.dailyTemplate === 'string' ? raw.dailyTemplate : DEFAULTS.dailyTemplate,
-    fontSize: typeof raw.fontSize === 'number' && Number.isFinite(raw.fontSize) && raw.fontSize > 0 ? raw.fontSize : DEFAULTS.fontSize,
+    ...sanitizeDisplaySettings(raw),
+    selectionToolbar: typeof raw.selectionToolbar === 'boolean' ? raw.selectionToolbar : true,
     shortcuts: sanitizeShortcuts(raw.shortcuts),
     spellcheck: typeof raw.spellcheck === 'boolean' ? raw.spellcheck : DEFAULTS.spellcheck,
     tabSize: pick(raw.tabSize, TAB_SIZES, DEFAULTS.tabSize),
     ...sanitizeAppearance(raw),
-    contentWidth: pick(
-      raw.contentWidth,
-      CONTENT_WIDTHS.map((w) => w.value),
-      DEFAULTS.contentWidth,
-    ),
     sidebarWidth:
       Number.isInteger(raw.sidebarWidth) && (raw.sidebarWidth as number) >= SIDEBAR_WIDTH.min && (raw.sidebarWidth as number) <= SIDEBAR_WIDTH.max
         ? (raw.sidebarWidth as number)
@@ -81,8 +78,7 @@ function applied(next: Settings) {
   Object.assign(settings, next)
   localStorage.setItem(CACHE_KEY, JSON.stringify(settings))
   const root = document.documentElement.style
-  root.setProperty('--rm-font-size', settings.fontSize + 'px')
-  root.setProperty('--rm-content-width', settings.contentWidth ? settings.contentWidth + 'px' : 'none')
+  applyDisplaySettings(settings)
   root.setProperty('--rm-sidebar-width', settings.sidebarWidth + 'px')
 }
 

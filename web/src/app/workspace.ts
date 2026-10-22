@@ -1018,7 +1018,7 @@ export async function startWorkspace() {
     (r) => localStorage.setItem(RECENT_KEY, JSON.stringify(r)),
   )
   watch(
-    () => ({ sidebarCollapsed: ws.sidebarCollapsed, outlineOpen: ws.outlineOpen }),
+    () => ({ sidebarCollapsed: ws.sidebarCollapsed, outlineOpen: ws.outlineOpen, focusMode: ws.focusMode }),
     (l) => {
       localStorage.setItem(LAYOUT_KEY, JSON.stringify(l))
       // 编辑区宽度变化，需要重新测量
@@ -1027,7 +1027,7 @@ export async function startWorkspace() {
   )
   // 字号、正文宽度变化后行高随之改变，编辑器需要重新测量
   watch(
-    () => [settings.fontSize, settings.contentWidth, settings.sidebarWidth],
+    () => [settings.fontSize, settings.contentWidth, settings.sidebarWidth, settings.textFont, settings.codeFont, settings.lineHeight, settings.paragraphSpacing],
     () => view?.requestMeasure(),
   )
   watch(

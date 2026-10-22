@@ -99,7 +99,7 @@ body {
   outline: none;
 }
 .cm-editor .cm-scroller {
-  font-family: var(--rm-font-text);
+  font-family: var(--rm-font-editor, var(--rm-font-text));
 }
 .cm-editor .cm-content {
   max-width: var(--rm-content-width);
