@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import { localDate, renderTemplate } from './template'
 
@@ -11,5 +12,10 @@ describe('Markdown 模板', () => {
     expect(result).toContain('![图](../Templates/assets/a.png)')
     expect(result).toContain('[ref]: ../docs/guide.md#%E6%A0%87%E9%A2%98')
     expect(result).toContain('`![](assets/a.png)`\n```\n![](assets/a.png)\n```')
+  })
+  it('链接实体和 Markdown 转义按真实文件名重定位', () => {
+    const result = renderTemplate('[文档](a&amp;b.md) [括号](a\\(1\\).md)', 'Templates/日记.md', 'Daily/今天.md')
+    expect(result).toContain('[文档](../Templates/a%26b.md)')
+    expect(result).toContain('[括号](../Templates/a(1).md)')
   })
 })

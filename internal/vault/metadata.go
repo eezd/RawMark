@@ -13,7 +13,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/yuin/goldmark/v2/ast"
-	"github.com/yuin/goldmark/v2/parser"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -111,7 +110,7 @@ func Analyze(note string, content []byte) Metadata {
 			}
 		}
 	}
-	root := parser.New().Parse(source)
+	root := parseMetadata(source)
 	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
@@ -129,16 +128,16 @@ func Analyze(note string, content []byte) Metadata {
 			}
 		}
 		switch node := n.(type) {
-		case *ast.CodeBlock, *ast.CodeSpan, *ast.HTMLBlock, *ast.RawHTML, *ast.LinkReferenceDefinition:
+		case *ast.AutoLink, *ast.CodeBlock, *ast.CodeSpan, *ast.HTMLBlock, *ast.RawHTML, *ast.LinkReferenceDefinition:
 			return ast.WalkSkipChildren, nil
 		case *ast.Link:
-			addRef(node.Destination.Value(source), node.Pos())
+			addRef(node.Destination.Str(source), node.Pos())
 			return ast.WalkSkipChildren, nil
 		case *ast.Image:
-			addRef(node.Destination.Value(source), node.Pos())
+			addRef(node.Destination.Str(source), node.Pos())
 			return ast.WalkSkipChildren, nil
 		case *ast.Text:
-			value := node.Value.Value(source)
+			value := node.Value.Str(source)
 			for _, loc := range inlineTag.FindAllStringIndex(value, -1) {
 				if loc[0] > 0 {
 					prev, _ := utf8.DecodeLastRuneInString(value[:loc[0]])
@@ -152,8 +151,19 @@ func Analyze(note string, content []byte) Metadata {
 		return ast.WalkContinue, nil
 	})
 	// HTML 资源也可能被历史导入的笔记引用；清理不能漏掉它们。
+	excluded := nonProseRanges(root)
 	for _, span := range importLinkSpans(content) {
 		if !span.html {
+			continue
+		}
+		skip := false
+		for _, region := range excluded {
+			if span.start >= region[0] && span.start < region[1] {
+				skip = true
+				break
+			}
+		}
+		if skip {
 			continue
 		}
 		target, _, ok := LocalTarget(note, string(content[span.start:span.end]))

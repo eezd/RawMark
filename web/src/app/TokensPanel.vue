@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { copyText } from '../editor/widgets'
+import { copyText } from '../clipboard'
 import { api, ApiError, type ApiToken } from './api'
 import Icon from './Icon.vue'
 import { toast } from './workspace'

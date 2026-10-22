@@ -73,3 +73,23 @@ func TestMoveMaintainsIncomingAndOutgoingLinks(t *testing.T) {
 		t.Fatal("移动主体未回滚", err)
 	}
 }
+
+func TestMetadataSkipsMathAndResolvesFootnotes(t *testing.T) {
+	content := "#正文\n\n公式 $x + #1 + [fake](bad.md)$\n\n$$\n#2 [fake](bad2.md) <img src=\"assets/fake.png\">\n$$\n\n脚注[^a]\n\n[^a]: ![图片](assets/foot.png)\n\n\\#escaped https://example.com/?x=#url\n"
+	m := Analyze("a.md", []byte(content))
+	if !reflect.DeepEqual(m.Tags, []string{"正文"}) || len(m.Links) != 0 || len(m.Assets) != 1 || m.Assets[0].Target != "assets/foot.png" {
+		t.Fatalf("扩展语法误识别：%+v", m)
+	}
+	rewritten, err := rewriteMovedLinks([]byte(content), "a.md", "dir/a.md", "a.md", "dir/a.md", false, false)
+	if err != nil || !strings.Contains(string(rewritten), "[fake](bad.md)") || !strings.Contains(string(rewritten), "[fake](bad2.md)") || !strings.Contains(string(rewritten), "../assets/foot.png") {
+		t.Fatalf("公式或脚注改写不符：%s %v", rewritten, err)
+	}
+}
+
+func TestRenamedAssetsPreserveMathExamples(t *testing.T) {
+	content := "公式 $x + ![](a.assets/fake.png)$\n\n$$\n<img src=\"a.assets/fake.png\">\n$$\n\n![](a.assets/real.png)\n"
+	got := string(RewriteAssetLinks([]byte(content), "a", "b"))
+	if !strings.Contains(got, "$x + ![](a.assets/fake.png)$") || !strings.Contains(got, "src=\"a.assets/fake.png\"") || !strings.Contains(got, "![](b.assets/real.png)") {
+		t.Fatalf("公式示例被修改：%s", got)
+	}
+}

@@ -7,7 +7,7 @@ import (
 )
 
 // RewriteAssetLinks 在笔记改名后，把正文中指向旧图片目录（oldBase.assets/）的链接改为新目录。
-// 覆盖行内链接/图片 `](…)`、引用定义 `[x]: …` 与 HTML `src="…"`，跳过代码块和行内代码。
+// 覆盖行内链接/图片 `](…)`、引用定义 `[x]: …` 与 HTML `src="…"`，跳过代码与公式。
 func RewriteAssetLinks(content []byte, oldBase, newBase string) []byte {
 	oldRaw := regexp.QuoteMeta(oldBase + AssetsExt + "/")
 	oldEsc := regexp.QuoteMeta(EscapeLinkPath(oldBase+AssetsExt) + "/")
@@ -16,9 +16,30 @@ func RewriteAssetLinks(content []byte, oldBase, newBase string) []byte {
 	refDef := regexp.MustCompile(`^( {0,3}\[[^\]]+\]:\s*<?)` + target)
 	repl := []byte("${1}${2}" + strings.ReplaceAll(EscapeLinkPath(newBase+AssetsExt), "$", "$$") + "/")
 
-	return transformMarkdownLines(content, refDef, func(line, _ []byte, _ int) []byte {
-		line = refDef.ReplaceAll(line, repl)
-		return transformOutsideCode(line, func(text []byte, _ int) []byte { return inline.ReplaceAll(text, repl) })
+	excluded := nonProseRanges(parseMetadata(content))
+	replace := func(pattern *regexp.Regexp, source []byte, offset int) []byte {
+		var out []byte
+		last := 0
+		for _, match := range pattern.FindAllSubmatchIndex(source, -1) {
+			skip := false
+			for _, region := range excluded {
+				if offset+match[0] >= region[0] && offset+match[0] < region[1] {
+					skip = true
+					break
+				}
+			}
+			if skip {
+				continue
+			}
+			out = append(out, source[last:match[0]]...)
+			out = pattern.Expand(out, repl, source, match)
+			last = match[1]
+		}
+		return append(out, source[last:]...)
+	}
+	return transformMarkdownLines(content, refDef, func(line, _ []byte, offset int) []byte {
+		line = transformOutsideCode(line, func(text []byte, start int) []byte { return replace(inline, text, offset+start) })
+		return replace(refDef, line, offset)
 	})
 }
 

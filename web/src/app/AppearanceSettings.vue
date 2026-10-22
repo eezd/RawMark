@@ -75,6 +75,7 @@ async function reset() {
 <template>
   <p v-if="appearancePaused" class="rm-appearance-note">已临时停用主题和 CSS。可恢复默认外观后重新打开页面。</p>
   <div class="rm-theme-cards"><button v-for="mode in [{ id: 'light', title: '纯净浅色', subtitle: 'Serene · 日间写作' }, { id: 'dark', title: '沉静深色', subtitle: '沿用你的深色主题' }, { id: 'system', title: '跟随系统', subtitle: '随系统明暗切换' }]" :key="mode.id" :class="[mode.id, { on: (fixedMode ?? settings.colorMode) === mode.id }]" :disabled="busy" @click="change({ theme: 'default', colorMode: mode.id as Settings['colorMode'] })"><span class="rm-theme-sample"><i /><i /><i /></span><strong>{{ mode.title }}</strong><small>{{ mode.subtitle }}</small></button></div>
+  <details class="rm-appearance-advanced"><summary>自定义主题与 CSS 片段</summary>
   <div class="rm-setting">
     <label for="rm-color-mode" class="rm-setting-label">明暗模式</label>
     <select id="rm-color-mode" :value="fixedMode ?? settings.colorMode" :disabled="busy || !!fixedMode" @change="change({ colorMode: ($event.target as HTMLSelectElement).value as Settings['colorMode'] })">
@@ -105,4 +106,5 @@ async function reset() {
   </form>
   <div class="rm-setting"><span class="rm-setting-label">默认外观</span><button class="rm-btn" :disabled="busy" @click="reset">恢复默认外观</button></div>
   <p class="rm-appearance-note">若自定义样式导致界面无法操作，可在地址末尾加 <code>?reset-appearance</code>，临时停用后再恢复默认。</p>
+  </details>
 </template>

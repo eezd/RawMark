@@ -48,14 +48,17 @@ function show() {
 onMounted(() => {
   view = createEditorView(host.value!, EditorState.create())
   attachView(view)
+  document.fonts.addEventListener('loadingdone', measure)
   show()
 })
+function measure() { view.requestMeasure() }
 onBeforeUnmount(() => {
+  document.fonts.removeEventListener('loadingdone', measure)
   if (shown) storeViewState(shown.path, view.state)
   attachView(null)
   view.destroy()
 })
-watch(() => [ws.active, tab.value?.status], show, { flush: 'post' })
+watch(() => [ws.active, tab.value?.status, ws.view, ws.images], () => { show(); requestAnimationFrame(() => view.requestMeasure()) }, { flush: 'post' })
 </script>
 
 <template>

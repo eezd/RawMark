@@ -38,7 +38,7 @@ const references = computed(() => {
 })
 const certain = computed(() => metadata.ready && !metadata.error && !metadata.notes.some(note => note.warnings.length))
 function shared(path: string) {
-  return shares.value.some(share => (!share.expiresAt || share.expiresAt * 1000 > Date.now()) && share.items.some(item => item.exists && (path === item.path || path.startsWith(item.path + '/') || item.path.endsWith('.md') && path.startsWith(item.path.slice(0,-3) + '.assets/'))))
+  return shares.value.some(share => (!share.expiresAt || share.expiresAt > Date.now()) && share.items.some(item => item.exists && (path === item.path || path.startsWith(item.path + '/') || item.path.endsWith('.md') && path.startsWith(item.path.slice(0,-3) + '.assets/'))))
 }
 const images = computed(() => scopeImages.value.filter(entry => {
   const count = references.value.get(entry.path)?.length ?? 0
@@ -88,7 +88,7 @@ async function clean() {
 </script>
 <template>
   <section class="rm-media-library" aria-label="图片库" @keydown.esc.stop="!busy && (ws.images = null)">
-    <header class="rm-media-header"><div><small>ASSET LIBRARY</small><h1>图片与灵感资源</h1><p>{{ ws.imagesAll ? '整个知识库' : (dir || '根目录') + ' · 当前目录及直属附件' }} · {{ scopeImages.length }} 张图片 · {{ size(totalSize) }}</p></div><button class="rm-btn" :disabled="busy" @click="ws.images = null">返回笔记</button></header>
+    <header class="rm-media-header"><div><small>ASSET LIBRARY</small><h1>图片与灵感资源</h1><p>{{ ws.imagesAll ? '整个知识库' : (dir || '根目录') + ' · 当前目录及直属附件' }} · {{ scopeImages.length }} 张图片 · {{ size(totalSize) }}</p></div><button class="rm-btn" :disabled="busy" @click="ws.images = null; ws.view = 'notes'">返回笔记</button></header>
     <div class="rm-media-mobile-filters"><select v-model="ws.imagesAll" aria-label="资源范围"><option :value="false">当前目录</option><option :value="true">整个知识库</option></select><select v-model="usage" aria-label="引用状态"><option value="all">全部图片</option><option value="used" :disabled="!certain">已被引用</option><option value="unused" :disabled="!certain">未被引用</option></select><button class="rm-btn" :disabled="busy || !certain || !sharesReady" @click="proposeCleanup">清理孤立图片</button></div>
     <div class="rm-media-workspace">
       <aside class="rm-media-filters"><span class="rm-media-section-label">资源范围</span><button :class="{ on: !ws.imagesAll }" @click="ws.imagesAll = false"><Icon name="folder" />{{ dir || '根目录' }}</button><button :class="{ on: ws.imagesAll }" @click="ws.imagesAll = true"><Icon name="image" />整个知识库</button><span class="rm-media-section-label">引用状态</span><button v-for="item in [{ id: 'all', label: '全部图片' }, { id: 'used', label: '已被引用' }, { id: 'unused', label: '未被引用' }]" :key="item.id" :class="{ on: usage === item.id }" :disabled="item.id !== 'all' && !certain" @click="usage = item.id">{{ item.label }}</button><span class="rm-media-section-label">整理资源</span><button :disabled="busy || !certain || !sharesReady" @click="proposeCleanup"><Icon name="trash" />清理孤立图片 <small>{{ orphans.length }}</small></button><p>清理前核对全库引用和有效分享，图片移入回收站，可恢复。</p></aside>

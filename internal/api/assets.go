@@ -1,7 +1,9 @@
 package api
 
 import (
+	"errors"
 	"net/http"
+	"rawmark/internal/vault"
 	"time"
 )
 
@@ -22,12 +24,17 @@ func (s *Server) cleanupImages(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 		scopes := []string{}
-		now := time.Now().Unix()
+		now := time.Now().UnixMilli()
 		for _, share := range shares {
 			if share.ExpiresAt != 0 && share.ExpiresAt <= now {
 				continue
 			}
 			for _, item := range share.Items {
+				if _, err := s.vault.Stat(item.Path); errors.Is(err, vault.ErrNotFound) {
+					continue
+				} else if err != nil {
+					return nil, err
+				}
 				scopes = append(scopes, item.Path)
 			}
 		}

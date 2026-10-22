@@ -732,7 +732,7 @@
           {
             "name": "note",
             "in": "query",
-            "required": true,
+            "required": false,
             "description": "所属笔记路径",
             "schema": {
               "type": "string"
@@ -792,7 +792,8 @@
               }
             }
           }
-        }
+        },
+        "description": "note 与 folder 必须且只能指定一个；note 上传到笔记附件目录，folder 上传到目录的 assets 子目录。"
       }
     },
     "/assets/import": {

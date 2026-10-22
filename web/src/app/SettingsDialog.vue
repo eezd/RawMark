@@ -16,7 +16,7 @@ import { toast, ws, type SettingsSection } from './workspace'
 
 const SECTIONS: { id: SettingsSection; title: string; icon: IconName }[] = [
   { id: 'appearance', title: '常规与外观', icon: 'palette' },
-  { id: 'editor', title: '编辑与阅读排版', icon: 'edit' },
+  { id: 'editor', title: '编辑器与模板', icon: 'edit' },
   { id: 'plugins', title: '插件', icon: 'command' },
   { id: 'account', title: '账户', icon: 'user' },
   { id: 'shortcuts', title: '快捷键', icon: 'command' },
@@ -172,7 +172,7 @@ async function changePassword() {
             <div class="rm-setting"><label for="rm-daily-folder" class="rm-setting-label">日记目录</label><input id="rm-daily-folder" :value="settings.dailyFolder" placeholder="根目录" @change="changeFolder('dailyFolder', $event)" /></div>
             <div class="rm-setting"><label for="rm-templates-folder" class="rm-setting-label">模板目录</label><input id="rm-templates-folder" :value="settings.templatesFolder" @change="changeFolder('templatesFolder', $event)" /></div>
             <div class="rm-setting"><label for="rm-daily-template" class="rm-setting-label">日记模板</label><select id="rm-daily-template" :value="settings.dailyTemplate" @change="change({ dailyTemplate: ($event.target as HTMLSelectElement).value })"><option value="">空白笔记</option><option v-for="entry in dailyTemplates" :key="entry.path" :value="entry.path">{{ entry.path }}</option><option v-if="missingDailyTemplate" :value="settings.dailyTemplate">{{ settings.dailyTemplate }}（不存在）</option></select></div>
-            <p class="rm-share-note">日记使用本地日期命名，已有日记直接打开。模板支持 {{ '{{date}}' }}、{{ '{{time}}' }}、{{ '{{title}}' }}。</p>
+            <p class="rm-share-note">日记使用本地日期命名，已有日记直接打开。模板支持 <code v-pre>{{date}}</code>、<code v-pre>{{time}}</code>、<code v-pre>{{title}}</code>。</p>
             <p class="rm-share-note">设置保存在服务器上，所有设备共用。</p>
           </template>
 

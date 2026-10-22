@@ -95,7 +95,18 @@ func movedPath(p, from, to string, directory bool) string {
 func rewriteMovedLinks(content []byte, oldNote, newNote, from, to string, directory, ownAssets bool) ([]byte, error) {
 	var out []byte
 	last := 0
+	excluded := nonProseRanges(parseMetadata(content))
 	for _, span := range importLinkSpans(content) {
+		skip := false
+		for _, region := range excluded {
+			if span.start >= region[0] && span.start < region[1] {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
 		if span.start < last {
 			continue
 		}

@@ -1,5 +1,6 @@
 // 工作区状态与操作：目录树、标签页、保存队列、冲突处理、实时同步。
 // 文件操作一律先更新界面再请求服务器，失败时回滚，保证"操作即时生效"。
+import { decodeLinkDestination } from '../markdown/links'
 import { Annotation, EditorState, Transaction } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { nextTick, reactive, watch } from 'vue'
@@ -1139,7 +1140,7 @@ export function stopWorkspace() {
 
 
 async function openMarkdownLink(note: string, href: string) {
-  const decoded = href.replace(/\\([!"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])/g, '$1')
+  const decoded = decodeLinkDestination(href)
   let url: URL
   try { url = new URL(decoded, 'https://rawmark.local/' + encodePath(note)) }
   catch { toast('链接格式无效'); return }
@@ -1148,7 +1149,9 @@ async function openMarkdownLink(note: string, href: string) {
     else toast('不支持的链接协议')
     return
   }
-  const target = decodeURIComponent(url.pathname.slice(1))
+  let target: string
+  try { target = decodeURIComponent(url.pathname.slice(1)); decodeURIComponent(url.hash.slice(1)) }
+  catch { toast('链接编码无效'); return }
   if (!ws.entries.some(e => e.path === target && !e.dir)) { toast('链接目标不存在：' + target); return }
   if (!target.endsWith('.md')) { window.open('/api/v1/raw/' + encodePath(target), '_blank', 'noopener'); return }
   await openNote(target)

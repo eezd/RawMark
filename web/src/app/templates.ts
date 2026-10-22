@@ -7,7 +7,9 @@ import { createNoteAt, openNote, toast, ws } from './workspace'
 export async function createFromTemplate(path: string, template: string) {
   if (ws.entries.some(entry => entry.path === path)) { toast('目标笔记已存在'); return false }
   const content = template ? renderTemplate((await api.readFile(template)).content, template, path) : ''
-  return createNoteAt(path, content)
+  const created = await createNoteAt(path, content)
+  if (created) ws.sidebarOpen = false
+  return created
 }
 
 export async function openDailyNote() {

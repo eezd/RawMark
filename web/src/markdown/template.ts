@@ -1,4 +1,5 @@
 import { markdownParser } from './html'
+import { decodeLinkDestination } from './links'
 
 export function localDate(now = new Date()): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -8,9 +9,9 @@ export function renderTemplate(content: string, template: string, target: string
   const changes: { from: number; to: number; value: string }[] = []
   markdownParser.parse(content).iterate({ enter(node) {
     if (node.name !== 'URL' || !['Link', 'Image', 'LinkReference'].includes(node.node.parent?.name ?? '')) return
-    const raw = content.slice(node.from, node.to).replace(/^<|>$/g, '')
+    const raw = decodeLinkDestination(content.slice(node.from, node.to).replace(/^<|>$/g, ''))
     if (/^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(raw)) return
-    const url = new URL(raw.replace(/\\([!-/:-@[-`{-~])/g, '$1'), 'https://rawmark.local/' + template.split('/').map(encodeURIComponent).join('/'))
+    const url = new URL(raw, 'https://rawmark.local/' + template.split('/').map(encodeURIComponent).join('/'))
     const parts = decodeURIComponent(url.pathname.slice(1)).split('/')
     const base = target.slice(0, Math.max(0, target.lastIndexOf('/'))).split('/').filter(Boolean)
     while (base.length && base[0] === parts[0]) { base.shift(); parts.shift() }

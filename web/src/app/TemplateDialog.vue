@@ -20,7 +20,7 @@ async function create() {
   <div class="rm-dialog-backdrop" @click.self="!busy && (ws.templateOpen = false)" @keydown.esc.stop="!busy && (ws.templateOpen = false)">
     <section class="rm-dialog rm-template-dialog" role="dialog" aria-label="从模板新建">
       <div class="rm-dialog-head"><h2>从模板开始</h2><button class="rm-icon-btn" title="关闭" :disabled="busy" @click="ws.templateOpen = false"><Icon name="close" /></button></div>
-      <p class="rm-share-note">模板是 {{ settings.templatesFolder }}/ 下的 Markdown 文件。支持 {{ '{{date}}' }}、{{ '{{time}}' }} 和 {{ '{{title}}' }}，图片沿用原模板资源。</p>
+      <p class="rm-share-note">模板是 {{ settings.templatesFolder }}/ 下的 Markdown 文件。支持 <code v-pre>{{date}}</code>、<code v-pre>{{time}}</code> 和 <code v-pre>{{title}}</code>，图片沿用原模板资源。</p>
       <form @submit.prevent="create">
         <label>选择模板<select v-model="selected"><option value="">空白笔记</option><option v-for="template in templates" :key="template.path" :value="template.path">{{ template.path }}</option></select></label>
         <label>笔记路径<input v-model="path" aria-label="笔记路径" required /></label>
