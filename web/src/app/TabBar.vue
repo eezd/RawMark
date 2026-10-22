@@ -3,7 +3,7 @@ import { nextTick, ref } from 'vue'
 import { commandTitle } from './commands'
 import Icon from './Icon.vue'
 import { noteTitle } from './paths'
-import { closeTab, toggleSourceMode, ws, type Tab } from './workspace'
+import { closeTab, createNote, ws, type Tab } from './workspace'
 
 // 拖动排序：拖到某个标签的左半边插到它前面，右半边插到它后面
 const TAB_TYPE = 'application/x-rawmark-tab'
@@ -104,14 +104,7 @@ function closeRight(path: string) {
         <Icon name="close" :size="12" />
       </button>
     </div>
-    <div v-if="ws.active" class="rm-tabs-actions">
-      <button class="rm-icon-btn" :title="ws.sourceMode ? '关闭源码编辑' : '开启源码编辑'" :aria-pressed="ws.sourceMode" @mousedown.prevent @click="toggleSourceMode">
-        <Icon name="source" />
-      </button>
-      <button class="rm-icon-btn rm-tabs-outline" :class="{ on: ws.outlineOpen }" :title="commandTitle('view.outline')" @click="ws.outlineOpen = !ws.outlineOpen">
-        <Icon name="outline" />
-      </button>
-    </div>
+    <button class="rm-icon-btn rm-tab-add" title="新建笔记" @click="createNote('')"><Icon name="plus" /></button>
     <template v-if="menu">
       <div class="rm-menu-backdrop" @click="menu = null" @contextmenu.prevent="menu = null" />
       <div ref="menuElement" class="rm-menu rm-tab-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }">

@@ -39,15 +39,18 @@ function onRootDrop(e: DragEvent) {
 
 <template>
   <div class="rm-sidebar-inner">
-    <div class="rm-sidebar-head">
-      <span class="rm-brand">RawMark</span>
-      <button class="rm-icon-btn" :class="{ on: ws.searchOpen }" :title="commandTitle('app.search')" @click="ws.searchOpen ? (ws.searchOpen = false) : openSearch()">
-        <Icon name="search" />
-      </button>
-      <button class="rm-icon-btn" title="新建笔记" @click="createNote('')"><Icon name="noteAdd" /></button>
-      <button class="rm-icon-btn" title="新建文件夹" @click="createFolder('')"><Icon name="folderAdd" /></button>
-      <button class="rm-icon-btn" title="导入" @click="ws.importing = ''"><Icon name="import" /></button>
+    <div class="rm-vault-heading">
+      <span class="rm-vault-icon"><Icon name="folder" :size="22" /></span>
+      <div><strong>个人知识库 · Vault</strong><small>Personal Knowledge Vault</small></div>
+      <button class="rm-icon-btn" title="折叠目录" @click="ws.sidebarCollapsed = true; ws.sidebarOpen = false"><Icon name="menu" /></button>
     </div>
+    <div class="rm-sidebar-head">
+      <button class="rm-icon-btn" :class="{ on: ws.searchOpen }" :title="commandTitle('app.search')" @click="ws.searchOpen ? (ws.searchOpen = false) : openSearch()"><Icon name="search" /><span>搜索</span></button>
+      <button class="rm-icon-btn" title="新建笔记" @click="createNote('')"><Icon name="noteAdd" /><span>新建笔记</span></button>
+      <button class="rm-icon-btn" title="新建文件夹" @click="createFolder('')"><Icon name="folderAdd" /><span>新建目录</span></button>
+      <button class="rm-icon-btn" title="导入" @click="ws.importing = ''"><Icon name="import" /><span>导入文档</span></button>
+    </div>
+    <div class="rm-tree-label">文件目录 <span>· VAULT EXPLORER</span></div>
     <nav v-if="sidebarViews.size" class="rm-plugin-tabs" aria-label="侧栏视图">
       <button class="rm-btn" :class="{ on: !currentView }" @click="selectedView = ''">文件</button>
       <button v-for="[id, pluginView] in sidebarViews" :key="id" class="rm-btn" :class="{ on: selectedView === id }" @click="selectedView = id">{{ pluginView.title }}</button>
@@ -64,6 +67,7 @@ function onRootDrop(e: DragEvent) {
       <div class="rm-menu-backdrop" @click="rootMenu = null" @contextmenu.prevent="rootMenu = null" />
       <div class="rm-menu rm-context-menu" :style="{ left: rootMenu.x + 'px', top: rootMenu.y + 'px' }"><button @click="ws.images = ''; rootMenu = null"><Icon name="image" />图片管理</button></div>
     </template>
+    <div class="rm-vault-status"><span class="rm-avatar">RM</span><div><strong>个人工作区</strong><small>Markdown 文件 · 自动保存</small></div></div>
     <div class="rm-sidebar-foot">
       <button class="rm-foot-btn" :title="commandTitle('app.settings')" @click="ws.settings = 'index'"><Icon name="settings" />设置</button>
       <button class="rm-foot-btn" @click="emit('logout')"><Icon name="logout" />退出</button>

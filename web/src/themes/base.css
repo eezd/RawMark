@@ -1,40 +1,36 @@
+@import './fonts.css';
 @import 'prismjs/themes/prism-tomorrow.css';
 
-/*
- * 基础主题。--rm-* 变量即主题 API，第三方主题只需覆盖这些变量。
- * 编辑排版适配用户提供的 Obsidian CSS 片段，代码块颜色使用 Prism Tomorrow Night。
- */
+/* 基础主题。--rm-* 变量继续作为主题接口，字体在本地加载。 */
 :root {
   color-scheme: light;
-  --rm-sidebar-bg: #f9f9f9;
-  --rm-sidebar-width: 260px;
-  --rm-hover: rgba(0, 0, 0, 0.045);
-  --rm-active: rgba(66, 184, 131, 0.14);
-  --rm-danger: #e5484d;
+  --rm-sidebar-width: 288px;
+  --rm-font-text: 'Manrope', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --rm-font-heading: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  --rm-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --rm-font-size: 16px;
+  --rm-line-height: 1.75;
+  --rm-content-width: 760px;
+  --rm-paragraph-spacing: 16px;
+  --rm-glass-opacity: 0.75;
+  --rm-bg: #faf8ff;
+  --rm-sidebar-bg: #f2f3ff;
+  --rm-text: #131b2e;
+  --rm-text-muted: #777587;
+  --rm-divider: rgba(119, 117, 135, 0.14);
+  --rm-accent: #4f46e5;
+  --rm-accent-strong: #3525cd;
+  --rm-selection: rgba(79, 70, 229, 0.16);
+  --rm-hover: rgba(199, 196, 216, 0.14);
+  --rm-active: rgba(255, 255, 255, 0.85);
+  --rm-danger: #ba1a1a;
   --rm-warn-bg: #fff8e6;
   --rm-warn-text: #8a5a00;
-  --rm-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-
-  --rm-font-text: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', sans-serif;
-  --rm-font-mono: ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, Monaco, 'Cascadia Mono', Consolas,
-    'Liberation Mono', 'Noto Sans Mono', 'DejaVu Sans Mono', 'Roboto Mono', 'Courier New', monospace;
-  --rm-font-size: 16px;
-  --rm-line-height: 1.7;
-  --rm-content-width: 760px;
-
-  --rm-bg: #ffffff;
-  --rm-text: #252a2e;
-  --rm-text-muted: rgba(60, 60, 60, 0.7);
-  --rm-divider: rgba(60, 60, 60, 0.12);
-  --rm-accent: #42b883;
-  --rm-accent-strong: #33a06f;
-  --rm-selection: rgba(66, 184, 131, 0.22);
-
-  --rm-inline-code-bg: #f8f8f8;
-  --rm-inline-code-text: #e96900;
-  --rm-code-bg: #2d2d2d;
-  --rm-code-text: #ccc;
+  --rm-shadow: 0 12px 40px -12px rgba(19, 27, 46, 0.18), 0 2px 8px rgba(19, 27, 46, 0.03);
+  --rm-inline-code-bg: #eaedff;
+  --rm-inline-code-text: #3525cd;
+  --rm-code-bg: #ffffff;
+  --rm-code-text: #334155;
   --rm-code-font-size: 14px;
   --rm-highlight-bg: rgba(255, 213, 0, 0.35);
 }
@@ -50,6 +46,7 @@
   --rm-inline-code-bg: #2f2f2f;
   --rm-inline-code-text: #f19a58;
   --rm-code-bg: #2d2d2d;
+  --rm-code-text: #ccc;
   --rm-highlight-bg: rgba(255, 213, 0, 0.28);
 
   --rm-sidebar-bg: #191b1d;
@@ -72,6 +69,7 @@
     --rm-inline-code-bg: #2f2f2f;
     --rm-inline-code-text: #f19a58;
     --rm-code-bg: #2d2d2d;
+  --rm-code-text: #ccc;
     --rm-highlight-bg: rgba(255, 213, 0, 0.28);
 
     --rm-sidebar-bg: #191b1d;
@@ -107,11 +105,11 @@ body {
   max-width: var(--rm-content-width);
   margin: 0 auto;
   padding: 32px 24px 40vh;
-  caret-color: #ff0000;
+  caret-color: var(--rm-accent);
 }
 .cm-editor .cm-content.cm-rm-source { font-family: var(--rm-font-mono); }
 .cm-editor .cm-cursor {
-  border-left: 2px solid #ff0000;
+  border-left: 2px solid var(--rm-accent);
 }
 .cm-editor .cm-selectionBackground,
 .cm-editor.cm-focused .cm-selectionBackground {
@@ -170,7 +168,7 @@ body {
 /* 围栏展开前后保持同一行高，语言标签与复制按钮不参与行高计算，避免代码内容跳动。 */
 .cm-rm-code-header { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; user-select: none; }
 .cm-line.cm-rm-code-begin .cm-rm-code-header { position: absolute; top: 6px; right: 12px; }
-.cm-rm-code-lang { color: rgba(235, 235, 235, 0.38); font-size: 12px; line-height: 1; }
+.cm-rm-code-lang { color: var(--rm-text-muted); font-size: 12px; line-height: 1; }
 .cm-rm-code-copy {
   display: inline-flex;
   align-items: center;
@@ -181,19 +179,19 @@ body {
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: rgba(235, 235, 235, 0.45);
+  color: var(--rm-text-muted);
   cursor: pointer;
   transition: color 0.15s, background-color 0.15s;
 }
-.cm-rm-code-copy:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.cm-rm-code-copy:hover { color: var(--rm-accent-strong); background: var(--rm-hover); }
 .cm-rm-code-copy.cm-rm-copied { color: #42d392; }
-.cm-rm-code .cm-rm-markup { color: rgba(235, 235, 235, 0.38); }
+.cm-rm-code .cm-rm-markup { color: var(--rm-text-muted); }
 
 /* 引用 */
 .cm-line.cm-rm-quote {
-  border-left: 4px solid #42b983;
+  border-left: 3px solid var(--rm-accent);
   padding: 5px 15px;
-  background: rgba(66, 185, 131, 0.1);
+  background: color-mix(in srgb, var(--rm-accent) 4%, transparent);
 }
 
 /* 列表 */
@@ -317,3 +315,28 @@ body {
 .cm-line.cm-rm-frontmatter { font-family: var(--rm-font-mono); font-size: 0.85em; color: var(--rm-text-muted); background: var(--rm-inline-code-bg); padding: 0 12px; }
 .cm-line.cm-rm-frontmatter-begin { border-radius: 6px 6px 0 0; padding-top: 4px; }
 .cm-line.cm-rm-frontmatter-end { border-radius: 0 0 6px 6px; padding-bottom: 4px; }
+
+/* 浅色编辑排版与分享共用同一套 Prism token 颜色。 */
+:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) .token { text-shadow: none; background: none; }
+:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.comment,.prolog,.doctype,.cdata) { color: #94a3b8; }
+:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.punctuation,.operator) { color: #64748b; }
+:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.keyword,.atrule,.tag) { color: #7c3aed; }
+:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.string,.char,.attr-value,.builtin) { color: #059669; }
+:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.function,.class-name) { color: #2563eb; }
+:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.number,.boolean,.constant) { color: #d97706; }
+.cm-line:is(.cm-rm-h1,.cm-rm-h2,.cm-rm-h3,.cm-rm-h4,.cm-rm-h5,.cm-rm-h6) { font-family: var(--rm-font-heading); font-weight: 600; }
+.cm-line.cm-rm-h1 { font-size: 2.125em; line-height: 1.4; }
+.cm-line.cm-rm-h2 { font-size: 1.5em; line-height: 1.5; }
+.cm-editor .cm-content { padding-top: 36px; }
+.cm-rm-code-lang { font-family: var(--rm-font-mono); }
+.cm-line.cm-rm-code-begin::before { border-top: 1px solid var(--rm-divider); }
+.cm-line.cm-rm-code-end::before { border-bottom: 1px solid var(--rm-divider); }
+.cm-line.cm-rm-paragraph-end { padding-bottom: var(--rm-paragraph-spacing); }
+@media (max-width: 767px) {
+  :root:not([data-rm-color-mode="dark"]) { --rm-code-bg: #283044; --rm-code-text: #eef0ff; }
+  :root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.keyword,.atrule,.tag) { color: #c4b5fd; }
+  :root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.string,.char,.attr-value,.builtin) { color: #6ee7b7; }
+  :root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.function,.class-name) { color: #93c5fd; }
+  :root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.number,.boolean,.constant) { color: #fcd34d; }
+  .cm-line.cm-rm-h1 { font-size: 1.75em; }
+}

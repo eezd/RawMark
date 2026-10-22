@@ -16,7 +16,7 @@ export const CONTENT_WIDTHS = [
 
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
-const DEFAULTS = { fontSize: 16, contentWidth: 760, sidebarWidth: 260, spellcheck: false, tabSize: 4 }
+const DEFAULTS = { fontSize: 16, contentWidth: 760, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
 export type Settings = typeof DEFAULTS & Appearance & { shortcuts: Record<string, string[]> }
 
 const CACHE_KEY = 'rawmark.settings'

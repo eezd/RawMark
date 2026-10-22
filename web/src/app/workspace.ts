@@ -75,6 +75,7 @@ export const ws = reactive({
   // 大纲面板（电脑上在右侧常驻，手机上为浮层）
   outlineOpen: layout.outlineOpen ?? false,
   sourceMode: false,
+  focusMode: false,
   // 最近打开的笔记，最新的在前
   recent: JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[],
   toasts: [] as Toast[],

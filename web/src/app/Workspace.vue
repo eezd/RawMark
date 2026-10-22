@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { api, ApiError } from './api'
 import { registerCommand } from './commands'
 import EditorPane from './EditorPane.vue'
+import AppHeader from './AppHeader.vue'
+import EditorChrome from './EditorChrome.vue'
 import Icon from './Icon.vue'
 import MobileToolbar from './MobileToolbar.vue'
 import MoveDialog from './MoveDialog.vue'
@@ -96,10 +98,12 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="rm-shell"
-    :class="{ 'sidebar-open': ws.sidebarOpen, 'sidebar-collapsed': ws.sidebarCollapsed }"
+    :class="{ 'sidebar-open': ws.sidebarOpen, 'sidebar-collapsed': ws.sidebarCollapsed, 'focus-mode': ws.focusMode }"
     @touchstart.passive="onTouchStart"
     @touchmove.passive="onTouchMove"
   >
+    <AppHeader />
+    <div class="rm-workspace">
     <aside class="rm-sidebar">
       <Sidebar @logout="logout" />
       <div class="rm-sidebar-resize" title="拖动调整宽度" @pointerdown.prevent="startResize" />
@@ -116,11 +120,13 @@ onBeforeUnmount(() => {
         <button class="rm-icon-btn" title="命令" @click="ws.switcher = '>'"><Icon name="command" :size="20" /></button>
       </header>
       <TabBar />
+      <EditorChrome />
       <NoteBanner />
       <EditorPane />
       <MobileToolbar />
     </main>
     <OutlinePanel v-if="ws.outlineOpen && ws.active" />
+    </div>
     <QuickSwitcher v-if="ws.switcher !== null" />
     <SettingsDialog v-if="ws.settings" />
     <ShareDialog v-if="ws.sharing" :path="ws.sharing" @close="ws.sharing = null" />
