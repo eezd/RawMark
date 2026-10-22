@@ -22,6 +22,7 @@ export type TabStatus = 'loading' | 'ready' | 'conflict' | 'deleted' | 'error'
 
 export interface Tab {
   path: string
+  pinned?: boolean
   // 最近一次与服务器一致的版本
   rev: string
   status: TabStatus
@@ -957,7 +958,7 @@ export async function startWorkspace() {
   const settingsLoaded = loadSettings().catch((err) => toast('读取设置失败：' + errorText(err)))
   await refreshTree()
   await settingsLoaded
-  const saved = JSON.parse(localStorage.getItem(TABS_KEY) ?? '{"paths":[],"active":null}') as { paths: string[]; active: string | null }
+  const saved = JSON.parse(localStorage.getItem(TABS_KEY) ?? '{"paths":[],"active":null}') as { paths: string[]; active: string | null; pinned?: string[] }
   const exists = new Set(ws.entries.map((e) => e.path))
   await Promise.all(saved.paths.filter((p) => exists.has(p)).map(openNote))
   try {
@@ -965,6 +966,7 @@ export async function startWorkspace() {
   } catch (err) {
     toast('恢复本地草稿失败：' + errorText(err))
   }
+  for (const tab of ws.tabs) tab.pinned = saved.pinned?.includes(tab.path) ?? false
   ws.active = saved.active && tabOf(saved.active) ? saved.active : (ws.tabs[0]?.path ?? null)
   let eventQueue = Promise.resolve()
   let stopped = false
@@ -991,8 +993,8 @@ export async function startWorkspace() {
   if (listenersInstalled) return
   listenersInstalled = true
   watch(
-    () => [ws.tabs.map((t) => t.path), ws.active] as const,
-    ([paths, active]) => localStorage.setItem(TABS_KEY, JSON.stringify({ paths, active })),
+    () => ({ paths: ws.tabs.map((t) => t.path), active: ws.active, pinned: ws.tabs.filter((t) => t.pinned).map((t) => t.path) }),
+    (tabs) => localStorage.setItem(TABS_KEY, JSON.stringify(tabs)),
     // 启动期间（如等待目录刷新时）打开的标签页也要立即记录
     { immediate: true },
   )

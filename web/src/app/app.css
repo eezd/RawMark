@@ -308,6 +308,7 @@ button {
 .rm-tab:hover { background: var(--rm-hover); }
 .rm-tab.active { background: var(--rm-active); color: var(--rm-text); }
 .rm-tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-tab-pin { display: inline-flex; flex: none; color: var(--rm-accent-strong); }
 .rm-tab-close {
   position: relative;
   display: inline-flex;
