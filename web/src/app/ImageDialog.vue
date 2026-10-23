@@ -116,16 +116,18 @@ async function trash() {
 
 <style scoped>
 .rm-image-dialog { max-width: 860px; width: min(860px, calc(100vw - 24px)); }
-.rm-image-body { display: flex; flex-direction: column; gap: 14px; padding: 0 20px 20px; overflow-y: auto; font-size: 14px; }
+.rm-image-body { display: flex; flex-direction: column; gap: 14px; padding: 0 20px 20px; overflow-y: auto; font-size: var(--rm-ui-font-size); }
 .rm-image-body p { margin: 0; }
 .rm-image-path { overflow-wrap: anywhere; color: var(--rm-text-muted); }
 .rm-image-preview { display: flex; align-items: center; justify-content: center; min-height: 140px; background: var(--rm-bg); border: 1px solid var(--rm-divider); border-radius: 6px; padding: 12px; }
 .rm-image-preview img { display: block; max-width: 100%; max-height: 44dvh; object-fit: contain; }
 .rm-image-navigation, .rm-image-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.rm-image-navigation span { font-size: 12px; color: var(--rm-text-muted); text-align: center; }
+.rm-image-actions { flex-wrap: wrap; }
+.rm-image-navigation span { font-size: var(--rm-ui-font-small); color: var(--rm-text-muted); text-align: center; }
 .rm-image-navigation button, .rm-image-rename button { white-space: nowrap; }
 .rm-image-rename { display: flex; flex-direction: column; gap: 8px; }
 .rm-image-rename > div { display: flex; align-items: center; gap: 8px; }
 .rm-image-rename input { min-width: 0; flex: 1; width: 0; border: 1px solid var(--rm-divider); background: var(--rm-bg); color: var(--rm-text); padding: 8px; border-radius: 6px; font: inherit; }
-.rm-image-hint { color: var(--rm-text-muted); font-size: 12px; line-height: 1.6; }
+.rm-image-hint { color: var(--rm-text-muted); font-size: var(--rm-ui-font-small); line-height: 1.6; }
+@media(max-width:767px), (pointer:coarse) { .rm-image-rename input { font-size: max(16px, var(--rm-ui-font-size)); } }
 </style>

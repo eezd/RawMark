@@ -12,9 +12,16 @@ export async function createFromTemplate(path: string, template: string) {
   return created
 }
 
+let openingDaily = false
 export async function openDailyNote() {
-  const path = joinPath(settings.dailyFolder, localDate() + '.md')
-  if (ws.entries.some(entry => !entry.dir && entry.path === path)) { await openNote(path); return }
-  try { await createFromTemplate(path, settings.dailyTemplate) }
+  // 模板读取也属于打开日记的过程，此时尚未加入乐观目录。
+  if (openingDaily) return
+  openingDaily = true
+  try {
+    const path = joinPath(settings.dailyFolder, localDate() + '.md')
+    if (ws.entries.some(entry => !entry.dir && entry.path === path)) { await openNote(path); return }
+    await createFromTemplate(path, settings.dailyTemplate)
+  }
   catch (error) { toast('创建日记失败：' + (error instanceof Error ? error.message : '网络错误')) }
+  finally { openingDaily = false }
 }

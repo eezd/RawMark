@@ -785,4 +785,4 @@ func EscapeLinkPath(s string) string {
 	return linkEscaper.Replace(s)
 }
 
-var linkEscaper = strings.NewReplacer("%", "%25", "#", "%23", "?", "%3F", " ", "%20", "(", "%28", ")", "%29", "<", "%3C", ">", "%3E")
+var linkEscaper = strings.NewReplacer("%", "%25", "&", "%26", "#", "%23", "?", "%3F", " ", "%20", "(", "%28", ")", "%29", "<", "%3C", ">", "%3E")

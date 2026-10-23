@@ -66,3 +66,33 @@ func TestFolderUploadReusesDeduplication(t *testing.T) {
 		t.Fatalf("目标目录不存在应报错：%v", err)
 	}
 }
+
+func TestCleanupProtectsLinkedImages(t *testing.T) {
+	for _, style := range []string{"内联链接", "引用式链接"} {
+		t.Run(style, func(t *testing.T) {
+			v := newVault(t)
+			link, err := v.SaveFolderAsset("", "preview.png", strings.NewReader("image"), 100)
+			if err != nil {
+				t.Fatal(err)
+			}
+			content := "[![预览](" + link + ")](https://example.com)"
+			if style == "引用式链接" {
+				content = "[![预览][image]][site]\n\n[image]: " + link + "\n[site]: https://example.com\n"
+			}
+			if _, err := v.Write("a.md", []byte(content), Precondition{}); err != nil {
+				t.Fatal(err)
+			}
+			metadata := Analyze("a.md", []byte(content))
+			if len(metadata.Assets) != 1 || metadata.Assets[0].Target != link {
+				t.Fatalf("链接内图片未记录引用：%+v", metadata)
+			}
+			result, err := v.CleanupImages([]string{link}, func() ([]string, error) { return nil, nil })
+			if err != nil || len(result.Deleted) != 0 || len(result.Skipped) != 1 || result.Skipped[0].Reason != "仍被笔记引用" {
+				t.Fatalf("链接内图片未受保护：%+v %v", result, err)
+			}
+			if _, err := v.Stat(link); err != nil {
+				t.Fatal("正文引用的图片不应被移走", err)
+			}
+		})
+	}
+}

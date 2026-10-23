@@ -93,3 +93,27 @@ func TestRenamedAssetsPreserveMathExamples(t *testing.T) {
 		t.Fatalf("公式示例被修改：%s", got)
 	}
 }
+
+func TestMovePreservesEntityShapedFilenames(t *testing.T) {
+	v := newVault(t)
+	for p, body := range map[string]string{"source.md": "[目标](target.md)", "target.md": "正文"} {
+		if _, err := v.Write(p, []byte(body), Precondition{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const target = "a&copy;.md"
+	if _, err := v.Move("target.md", target, nil); err != nil {
+		t.Fatal(err)
+	}
+	body, _, err := v.Read("source.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata := Analyze("source.md", body)
+	if string(body) != "[目标](a%26copy;.md)" || len(metadata.Links) != 1 || metadata.Links[0].Target != target {
+		t.Fatalf("改名后的链接指向错误：%s %+v", body, metadata.Links)
+	}
+	if _, _, err := v.Read(metadata.Links[0].Target); err != nil {
+		t.Fatal("改写后的链接无法打开", err)
+	}
+}

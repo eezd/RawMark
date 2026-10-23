@@ -9,6 +9,16 @@
   --rm-font-heading: 'Noto Serif SC', 'Source Han Serif SC', serif;
   --rm-font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --rm-font-size: 16px;
+  /* 界面排版独立于正文；辅助文字随界面缩放，但不小于 13px。 */
+  --rm-ui-font-size: 16px;
+  --rm-ui-font-small: max(13px, calc(var(--rm-ui-font-size) - 2px));
+  --rm-ui-font-caption: max(13px, calc(var(--rm-ui-font-size) - 3px));
+  --rm-ui-font-heading: calc(var(--rm-ui-font-size) + 4px);
+  --rm-ui-font-title: calc(var(--rm-ui-font-size) + 12px);
+  --rm-icon-size: calc(var(--rm-ui-font-size) + 4px);
+  --rm-control-size: max(40px, calc(var(--rm-ui-font-size) + 24px));
+  --rm-control-compact: max(32px, calc(var(--rm-ui-font-size) + 16px));
+  --rm-header-height: calc(var(--rm-ui-font-size) + 48px);
   --rm-line-height: 1.75;
   --rm-content-width: 760px;
   --rm-paragraph-spacing: 16px;
@@ -89,6 +99,14 @@ body {
   font-family: var(--rm-font-text);
 }
 
+body { font-size: var(--rm-ui-font-size); line-height: 1.5; }
+button, input, select, textarea { font: inherit; }
+.rm-icon { flex: none; width: var(--rm-icon-size); height: var(--rm-icon-size); }
+@media (pointer: coarse), (max-width: 767px) {
+  :root { --rm-control-size: max(44px, calc(var(--rm-ui-font-size) + 24px)); --rm-control-compact: max(44px, calc(var(--rm-ui-font-size) + 16px)); }
+  input:not([type=checkbox],[type=radio],[type=range]), select, textarea { font-size: max(16px, var(--rm-ui-font-size)); }
+}
+
 .cm-editor {
   font-size: var(--rm-font-size);
   line-height: var(--rm-line-height);
@@ -160,7 +178,7 @@ body {
   pointer-events: none;
 }
 .cm-line.cm-rm-code .cm-rm-mono { font-family: inherit; }
-.cm-line.cm-rm-code-begin { padding-top: 10px; min-height: 26px; }
+.cm-line.cm-rm-code-begin { padding-top: 10px; min-height: var(--rm-control-compact); }
 .cm-line.cm-rm-code-end { padding-bottom: 10px; }
 .cm-line.cm-rm-code-begin::before { border-radius: 8px 8px 0 0; }
 .cm-line.cm-rm-code-end::before { border-radius: 0 0 8px 8px; }
@@ -168,13 +186,13 @@ body {
 /* 围栏展开前后保持同一行高，语言标签与复制按钮不参与行高计算，避免代码内容跳动。 */
 .cm-rm-code-header { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; user-select: none; }
 .cm-line.cm-rm-code-begin .cm-rm-code-header { position: absolute; top: 6px; right: 12px; }
-.cm-rm-code-lang { color: var(--rm-text-muted); font-size: 12px; line-height: 1; }
+.cm-rm-code-lang { color: var(--rm-text-muted); font-size: var(--rm-ui-font-small); line-height: 1; }
 .cm-rm-code-copy {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: var(--rm-control-compact);
+  height: var(--rm-control-compact);
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -235,6 +253,8 @@ body {
 .cm-rm-table-widget:hover .cm-rm-table-toolbar,
 .cm-rm-table-widget:focus-within .cm-rm-table-toolbar { visibility: visible; opacity: 1; }
 .cm-rm-table-tools {
+  max-width: 100%;
+  flex-wrap: wrap;
   display: inline-flex;
   align-items: center;
   padding: 2px;
@@ -244,22 +264,24 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 .cm-rm-table-tools button {
+  min-width: var(--rm-control-compact);
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 26px;
+  height: var(--rm-control-compact);
   padding: 0 8px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--rm-text-muted);
-  font: 12px/1 var(--rm-font-text);
+  font: var(--rm-ui-font-small)/1 var(--rm-font-text);
   cursor: pointer;
   transition: color 0.15s, background-color 0.15s;
 }
 .cm-rm-table-tools button:hover { color: var(--rm-accent-strong); background: var(--rm-selection); }
 .cm-rm-table-tools button.cm-rm-danger:hover { color: #e5484d; background: rgba(229, 72, 77, 0.1); }
-.cm-rm-table-tools svg { flex: none; }
+.cm-rm-table-tools svg { flex: none; width: var(--rm-ui-font-size); height: var(--rm-ui-font-size); }
+.cm-rm-code-copy svg { width: var(--rm-icon-size); height: var(--rm-icon-size); }
 .cm-rm-table-tools .cm-rm-sep { width: 1px; height: 16px; margin: 0 2px; background: var(--rm-divider); }
 .cm-rm-image { cursor: pointer; }
 
@@ -267,10 +289,7 @@ body {
   .cm-editor .cm-content { padding: 16px 16px 40vh; }
   /* 触屏没有悬停，工具栏常显，按钮加大触控热区 */
   .cm-rm-table-toolbar { visibility: visible; opacity: 1; }
-  .cm-rm-table-tools button { height: 36px; padding: 0 10px; }
-  .cm-rm-code-copy { width: 36px; height: 36px; }
   .cm-line.cm-rm-code { padding-left: 12px; padding-right: 12px; }
-  .cm-line.cm-rm-code-begin { min-height: 36px; }
 }
 
 /* ---- Typora 扩展语法 ---- */
@@ -297,7 +316,7 @@ body {
   background: rgba(229, 72, 77, 0.08);
   color: #e5484d;
   font-family: var(--rm-font-mono);
-  font-size: 12px;
+  font-size: var(--rm-ui-font-small);
   text-align: left;
   white-space: pre-wrap;
 }

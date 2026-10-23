@@ -132,7 +132,7 @@ func Analyze(note string, content []byte) Metadata {
 			return ast.WalkSkipChildren, nil
 		case *ast.Link:
 			addRef(node.Destination.Str(source), node.Pos())
-			return ast.WalkSkipChildren, nil
+			// 链接文字中可以嵌套图片，仍须记录其资源引用。
 		case *ast.Image:
 			addRef(node.Destination.Str(source), node.Pos())
 			return ast.WalkSkipChildren, nil

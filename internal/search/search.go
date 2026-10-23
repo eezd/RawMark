@@ -19,8 +19,8 @@ import (
 	"rawmark/internal/vault"
 )
 
-// 修改表结构时递增，旧索引会被丢弃重建
-const schemaVersion = 2
+// 表结构或派生元数据的解析规则变化时递增，旧索引会被丢弃重建。
+const schemaVersion = 3
 
 const schema = `
 CREATE TABLE docs (

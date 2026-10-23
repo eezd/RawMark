@@ -1810,6 +1810,13 @@
                         "dark"
                       ]
                     },
+                    "uiFontSize": {
+                      "type": "integer",
+                      "minimum": 14,
+                      "maximum": 20,
+                      "default": 16,
+                      "description": "界面字号，与正文排版字号独立"
+                    },
                     "fontSize": {
                       "type": "integer"
                     },

@@ -236,9 +236,8 @@ function render(note: SharedNote) {
   const backdrop = action('', '关闭文章大纲', () => root.classList.remove('toc-open'))
   backdrop.className = 'rm-share-sidebar-backdrop'
   root.append(backdrop)
-  resolveImages(article)
-  resolveLinks(article)
-  resolveLinks(header)
+  resolveImages(surface)
+  resolveLinks(surface)
   const toc = document.createElement('nav')
   toc.className = 'rm-public-toc'
   toc.setAttribute('aria-label', '文章大纲')
@@ -259,7 +258,7 @@ function render(note: SharedNote) {
   const hint = Object.assign(document.createElement('p'), { className: 'rm-reading-hint', textContent: '当前内容为只读分享，修改由知识库作者在源文件中完成。' })
   aside.append(hint)
   void sharedNavigation(aside)
-  hydrate(article)
+  hydrate(surface)
   for (const code of article.querySelectorAll<HTMLElement>('pre > code')) void decorateCode(code).catch(error => {
     code.title = '代码高亮失败，已保留源码'
     console.error('分享页代码高亮失败', error)

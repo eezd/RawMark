@@ -8,11 +8,13 @@ export const CODE_FONTS = {
   jetbrains: { label: 'JetBrains Mono', css: "'JetBrains Mono', ui-monospace, monospace" },
   system: { label: '系统等宽字体', css: 'ui-monospace, monospace' },
 }
-export const DISPLAY_DEFAULTS = { fontSize: 16, contentWidth: 760, textFont: 'sans' as keyof typeof TEXT_FONTS, codeFont: 'jetbrains' as keyof typeof CODE_FONTS, lineHeight: 1.75, paragraphSpacing: 16, glassOpacity: .75 }
+export const UI_FONT_SIZE = { min: 14, max: 20, default: 16 }
+export const DISPLAY_DEFAULTS = { uiFontSize: UI_FONT_SIZE.default, fontSize: 16, contentWidth: 760, textFont: 'sans' as keyof typeof TEXT_FONTS, codeFont: 'jetbrains' as keyof typeof CODE_FONTS, lineHeight: 1.75, paragraphSpacing: 16, glassOpacity: .75 }
 export type DisplaySettings = typeof DISPLAY_DEFAULTS
 export function sanitizeDisplaySettings(raw: Record<string, unknown>): DisplaySettings {
   const ranged = (key: 'lineHeight' | 'paragraphSpacing' | 'glassOpacity', min: number, max: number) => typeof raw[key] === 'number' && Number.isFinite(raw[key]) && raw[key] >= min && raw[key] <= max ? raw[key] : DISPLAY_DEFAULTS[key]
   return {
+    uiFontSize: typeof raw.uiFontSize === 'number' && Number.isInteger(raw.uiFontSize) && raw.uiFontSize >= UI_FONT_SIZE.min && raw.uiFontSize <= UI_FONT_SIZE.max ? raw.uiFontSize : UI_FONT_SIZE.default,
     fontSize: typeof raw.fontSize === 'number' && Number.isFinite(raw.fontSize) && raw.fontSize > 0 ? raw.fontSize : 16,
     contentWidth: typeof raw.contentWidth === 'number' && [0, 680, 760, 960].includes(raw.contentWidth) ? raw.contentWidth : 760,
     textFont: raw.textFont === 'serif' || raw.textFont === 'system' ? raw.textFont : 'sans',
@@ -22,6 +24,7 @@ export function sanitizeDisplaySettings(raw: Record<string, unknown>): DisplaySe
 }
 export function applyDisplaySettings(settings: DisplaySettings) {
   const root = document.documentElement.style
+  root.setProperty('--rm-ui-font-size', settings.uiFontSize + 'px')
   root.setProperty('--rm-font-size', settings.fontSize + 'px')
   root.setProperty('--rm-content-width', settings.contentWidth ? settings.contentWidth + 'px' : 'none')
   root.setProperty('--rm-font-editor', TEXT_FONTS[settings.textFont].css)

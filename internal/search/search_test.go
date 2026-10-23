@@ -205,3 +205,22 @@ func TestMetadataTracksChangesAndRebuild(t *testing.T) {
 		t.Fatalf("索引恢复错误：%+v %v", notes, err)
 	}
 }
+
+func TestRebuildsLinkedImageMetadataFromOldIndex(t *testing.T) {
+	f := newFixture(t)
+	f.write("a.md", "[![预览](assets/used.png)](https://example.com)")
+	f.sync()
+	// 模拟旧版索引漏记图片引用；笔记正文和 rev 均不改变。
+	if _, err := f.idx.db.Exec(`UPDATE docs SET metadata = ?`, `{"title":"a","tags":[],"links":[],"assets":[],"warnings":[]}`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.idx.db.Exec(`PRAGMA user_version = 2`); err != nil {
+		t.Fatal(err)
+	}
+	f.reopen()
+	f.sync()
+	notes, ready, err := f.idx.Metadata()
+	if err != nil || !ready || len(notes) != 1 || len(notes[0].Assets) != 1 || notes[0].Assets[0].Target != "assets/used.png" {
+		t.Fatalf("旧索引未重新提取图片引用：%+v %v", notes, err)
+	}
+}

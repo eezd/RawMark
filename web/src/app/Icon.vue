@@ -44,8 +44,9 @@ defineProps<{ name: IconName; size?: number }>()
 
 <template>
   <svg
-    :width="size ?? 16"
-    :height="size ?? 16"
+    :width="size"
+    :height="size"
+    :class="{ 'rm-icon': size === undefined }"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"

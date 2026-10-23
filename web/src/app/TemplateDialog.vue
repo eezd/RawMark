@@ -30,5 +30,6 @@ async function create() {
   </div>
 </template>
 <style scoped>
-.rm-template-dialog { width: min(520px, calc(100vw - 24px)); } form { display: grid; gap: 20px; padding: 20px; } label { display: grid; gap: 9px; font-size: 12px; } input, select { padding: 10px; border: 1px solid var(--rm-divider); border-radius: 8px; background: var(--rm-bg); color: var(--rm-text); font: inherit; } .rm-template-actions { display: flex; justify-content: space-between; gap: 12px; }
+.rm-template-dialog { width: min(520px, calc(100vw - 24px)); overflow-y: auto; } form { display: grid; gap: 20px; padding: 20px; } label { display: grid; gap: 9px; font-size: var(--rm-ui-font-size); } input, select { padding: 10px; border: 1px solid var(--rm-divider); border-radius: 8px; background: var(--rm-bg); color: var(--rm-text); font: inherit; } .rm-template-actions { display: flex; justify-content: space-between; gap: 12px; }
+@media(max-width:767px), (pointer:coarse) { input, select { font-size: max(16px, var(--rm-ui-font-size)); } }
 </style>

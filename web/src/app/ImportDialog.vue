@@ -102,13 +102,14 @@ async function submit() {
 </template>
 
 <style scoped>
-.rm-import-body { display: flex; flex-direction: column; gap: 16px; padding: 8px 20px 20px; overflow-y: auto; font-size: 14px; }
+.rm-import-body { display: flex; flex-direction: column; gap: 16px; padding: 8px 20px 20px; overflow-y: auto; font-size: var(--rm-ui-font-size); }
 .rm-import-body p { margin: 0; }
 .rm-import-body label { display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere; }
 .rm-import-body input { min-width: 0; padding: 8px; border: 1px solid var(--rm-divider); border-radius: 6px; background: var(--rm-bg); color: var(--rm-text); font: inherit; }
 .rm-import-target, .rm-import-hint { color: var(--rm-text-muted); overflow-wrap: anywhere; }
-.rm-import-hint { font-size: 12px; line-height: 1.6; }
+.rm-import-hint { font-size: var(--rm-ui-font-small); line-height: 1.6; }
 .rm-import-files { display: flex; flex-direction: column; gap: 12px; }
 .rm-import-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .rm-import-warnings { line-height: 1.6; overflow-wrap: anywhere; }
+@media(max-width:767px), (pointer:coarse) { .rm-import-body input { font-size: max(16px, var(--rm-ui-font-size)); } }
 </style>

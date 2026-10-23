@@ -43,7 +43,7 @@ func TestThemeAndShareAppearanceBoundaries(t *testing.T) {
 		t.Fatal("未读取到主题 CSS")
 	}
 	f.write("笔记.md", "正文")
-	f.do(f.admin, "PATCH", "/api/v1/settings", `{"theme":"paper","colorMode":"dark","fontSize":18,"privateSetting":"不公开","cssSnippets":[{"id":"a","name":"启用","css":"body { color: red }","enabled":true},{"id":"b","name":"停用","css":"不公开片段","enabled":false}]}`, nil)
+	f.do(f.admin, "PATCH", "/api/v1/settings", `{"theme":"paper","colorMode":"dark","fontSize":18,"uiFontSize":20,"privateSetting":"不公开","cssSnippets":[{"id":"a","name":"启用","css":"body { color: red }","enabled":true},{"id":"b","name":"停用","css":"不公开片段","enabled":false}]}`, nil)
 	sh := decode[shareView](t, f.do(f.admin, "POST", "/api/v1/shares", `{"path":"笔记.md","password":"访问密码"}`, nil))
 	base := "/api/v1/public/shares/" + sh.Token
 	if code := f.status(guest, "GET", base+"/appearance", "", nil); code != 401 {
@@ -59,7 +59,7 @@ func TestThemeAndShareAppearanceBoundaries(t *testing.T) {
 	if err := json.Unmarshal(raw, &appearance); err != nil {
 		t.Fatal(err)
 	}
-	if res.StatusCode != 200 || appearance["colorMode"] != "dark" || !strings.Contains(appearance["themeCSS"].(string), "#faf6ed") {
+	if res.StatusCode != 200 || appearance["colorMode"] != "dark" || appearance["uiFontSize"] != float64(20) || appearance["fontSize"] != float64(18) || !strings.Contains(appearance["themeCSS"].(string), "#faf6ed") {
 		t.Fatalf("分享外观错误：%s", raw)
 	}
 	if strings.Contains(string(raw), "不公开") || len(appearance["cssSnippets"].([]any)) != 1 {

@@ -97,11 +97,11 @@ function closeRight(path: string) {
       @drop="onDrop"
       @dragend="onDragEnd"
     >
-      <span v-if="tab.pinned" class="rm-tab-pin" title="已固定"><Icon name="pin" :size="12" /></span>
+      <span v-if="tab.pinned" class="rm-tab-pin" title="已固定"><Icon name="pin" :size="16" /></span>
       <span class="rm-tab-title">{{ noteTitle(tab.path) }}</span>
       <button class="rm-tab-close" :class="{ dirty: tab.dirty }" title="关闭" @click.stop="closeTab(tab.path)">
         <span class="rm-dirty-dot" />
-        <Icon name="close" :size="12" />
+        <Icon name="close" :size="16" />
       </button>
     </div>
     <button class="rm-icon-btn rm-tab-add" title="新建笔记" @click="createNote('')"><Icon name="plus" /></button>

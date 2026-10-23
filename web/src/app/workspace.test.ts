@@ -6,7 +6,10 @@ import { api, ApiError } from './api'
 import { drafts, type Draft } from './drafts'
 import { connectEvents } from './events'
 import { pluginEvents } from '../plugins/registry'
-import { attachView, closeTab, editorStateOf, flush, keepLocalVersion, importNotes, move, remove, readyToReload, openNote, refreshTree, replaceImage, restore, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
+import { attachView, closeTab, createNoteAt, editorStateOf, flush, keepLocalVersion, importNotes, move, remove, readyToReload, openNote, refreshTree, replaceImage, restore, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
+import { openDailyNote } from './templates'
+import { settings } from './settings'
+import { localDate } from '../markdown/template'
 
 vi.mock('./events', () => ({ connectEvents: vi.fn(() => () => {}) }))
 
@@ -98,6 +101,75 @@ async function edit(path: string) {
   attachView(view)
   return view
 }
+
+describe('笔记打开与创建', () => {
+  it('从图片库新建或打开已有笔记时显示笔记视图', async () => {
+    vi.spyOn(api, 'writeFile').mockResolvedValue('r1')
+    vi.spyOn(drafts, 'delete').mockResolvedValue(undefined)
+    ws.images = ''
+    ws.view = 'graph'
+    expect(await createNoteAt('gallery-create.md', '正文')).toBe(true)
+    expect(ws.images).toBeNull()
+    expect(ws.view).toBe('notes')
+    expect(ws.active).toBe('gallery-create.md')
+    ws.images = ''
+    await openNote('gallery-create.md')
+    expect(ws.images).toBeNull()
+    expect(editorStateOf('gallery-create.md')?.doc.toString()).toBe('正文')
+    await closeTab('gallery-create.md')
+  })
+
+  it.each([true, false])('创建期间打开同一路径，创建成功=%s，不产生重复或错误标签', async (succeeds) => {
+    const path = `pending-create-${succeeds}.md`
+    let finish!: (rev: string) => void
+    let fail!: (error: Error) => void
+    vi.spyOn(api, 'writeFile').mockImplementation(() => new Promise((resolve, reject) => { finish = resolve; fail = reject }))
+    vi.spyOn(api, 'readFile').mockRejectedValue(new ApiError(404, '文件不存在'))
+    vi.spyOn(drafts, 'delete').mockResolvedValue(undefined)
+    const creating = createNoteAt(path, '创建内容')
+    const opening = openNote(path)
+    if (succeeds) finish('r1')
+    else fail(new ApiError(500, '创建写入失败'))
+    expect(await creating).toBe(succeeds)
+    await opening
+    expect(ws.tabs.filter(tab => tab.path === path)).toHaveLength(succeeds ? 1 : 0)
+    if (succeeds) {
+      expect(ws.tabs.find(tab => tab.path === path)?.status).toBe('ready')
+      expect(editorStateOf(path)?.doc.toString()).toBe('创建内容')
+      await closeTab(path)
+    } else {
+      expect(ws.toasts.some(toast => toast.text.includes('创建写入失败'))).toBe(true)
+    }
+    expect(ws.toasts.some(toast => toast.text.includes('打开失败：文件不存在'))).toBe(false)
+  })
+
+  it('日记模板读取期间重复打开只创建一个标签，之后仍可再次打开', async () => {
+    const previousFolder = settings.dailyFolder, previousTemplate = settings.dailyTemplate
+    settings.dailyFolder = 'Daily-review'
+    settings.dailyTemplate = 'Templates/daily.md'
+    const path = settings.dailyFolder + '/' + localDate() + '.md'
+    let finish!: (value: { content: string; rev: string }) => void
+    vi.spyOn(api, 'readFile').mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    vi.spyOn(api, 'writeFile').mockResolvedValue('r1')
+    vi.spyOn(drafts, 'delete').mockResolvedValue(undefined)
+    try {
+      const first = openDailyNote(), second = openDailyNote()
+      finish({ content: '# {{date}}\n\n日记', rev: 'template-r1' })
+      await Promise.all([first, second])
+      expect(ws.tabs.filter(tab => tab.path === path)).toHaveLength(1)
+      expect(editorStateOf(path)?.doc.toString()).toContain('日记')
+      await closeTab(path)
+      vi.mocked(api.readFile).mockResolvedValue({ content: '重新打开的日记', rev: 'r1' })
+      await openDailyNote()
+      expect(ws.tabs.filter(tab => tab.path === path)).toHaveLength(1)
+      expect(editorStateOf(path)?.doc.toString()).toBe('重新打开的日记')
+      await closeTab(path)
+    } finally {
+      settings.dailyFolder = previousFolder
+      settings.dailyTemplate = previousTemplate
+    }
+  })
+})
 
 describe('保存与关闭', () => {
   it('关闭冲突标签前持久化冲突之后的新输入，草稿失败时保留标签', async () => {

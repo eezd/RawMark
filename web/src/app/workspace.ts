@@ -481,7 +481,11 @@ export function revealPending(v: EditorView, path: string): boolean {
 
 export async function openNote(path: string) {
   ws.view = 'notes'
+  ws.images = null
   ws.sidebarOpen = false
+  // 目录中的新笔记先乐观显示，读取前须等它真正创建成功。
+  const pending = creating.get(path)
+  if (pending && !(await pending)) return
   if (tabOf(path)) {
     ws.active = path
     return
@@ -672,6 +676,8 @@ const creating = new Map<string, Promise<boolean>>()
 
 /** 在指定路径新建空笔记并打开，返回是否成功；不存在的上级目录由服务器创建 */
 export async function createNoteAt(path: string, content = ''): Promise<boolean> {
+  ws.view = 'notes'
+  ws.images = null
   const done = createNoteFile(path, content)
   creating.set(path, done)
   try {
@@ -692,7 +698,6 @@ async function createNoteFile(path: string, content: string): Promise<boolean> {
       ws.tabs.push({ path, rev, status: 'ready', dirty: false })
       editorStates.set(path, buildState(path, content))
       ws.active = path
-      ws.view = 'notes'
       return true
     } catch (err) {
       ws.entries = ws.entries.filter((e) => !added.includes(e.path))
@@ -1029,7 +1034,7 @@ export async function startWorkspace() {
   )
   // 字号、正文宽度变化后行高随之改变，编辑器需要重新测量
   watch(
-    () => [settings.fontSize, settings.contentWidth, settings.sidebarWidth, settings.textFont, settings.codeFont, settings.lineHeight, settings.paragraphSpacing],
+    () => [settings.uiFontSize, settings.fontSize, settings.contentWidth, settings.sidebarWidth, settings.textFont, settings.codeFont, settings.lineHeight, settings.paragraphSpacing],
     () => view?.requestMeasure(),
   )
   watch(

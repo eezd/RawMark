@@ -4,7 +4,7 @@ import { api, ApiError } from './api'
 import { runCommand } from './commands'
 import Icon, { type IconName } from './Icon.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
-import { CODE_FONTS, TEXT_FONTS } from '../themes/typography'
+import { CODE_FONTS, TEXT_FONTS, UI_FONT_SIZE } from '../themes/typography'
 import PluginsPanel from './PluginsPanel.vue'
 import { installApp, installPrompt } from './pwa'
 import { CONTENT_WIDTHS, TAB_SIZES, loadSettings, settings, updateSettings, type Settings } from './settings'
@@ -71,6 +71,17 @@ function changeFont(event: Event) {
   if (value !== settings.fontSize) void change({ fontSize: value })
 }
 
+function changeUIFont(event: Event) {
+  const input = event.target as HTMLInputElement
+  const value = input.valueAsNumber
+  if (!Number.isInteger(value) || value < UI_FONT_SIZE.min || value > UI_FONT_SIZE.max) {
+    toast(`界面字号须为 ${UI_FONT_SIZE.min}–${UI_FONT_SIZE.max} 之间的整数`)
+    input.value = String(settings.uiFontSize)
+    return
+  }
+  if (value !== settings.uiFontSize) void change({ uiFontSize: value })
+}
+
 function changeFolder(key: 'dailyFolder' | 'templatesFolder', event: Event) {
   const input = event.target as HTMLInputElement
   const path = input.value.trim()
@@ -124,14 +135,23 @@ async function changePassword() {
         <div class="rm-settings-content">
           <PluginsPanel v-if="section === 'plugins'" />
           <template v-else-if="section === 'appearance'">
+            <h3 class="rm-settings-group-title">界面显示</h3>
+            <div class="rm-setting">
+              <label for="rm-ui-font-size" class="rm-setting-label">界面字号</label>
+              <div class="rm-ui-font-control">
+                <label class="rm-font-input"><input id="rm-ui-font-size" type="number" :min="UI_FONT_SIZE.min" :max="UI_FONT_SIZE.max" step="1" :value="settings.uiFontSize" @blur="changeUIFont" @keydown.enter="($event.target as HTMLInputElement).blur()" /> px</label>
+                <button class="rm-btn" aria-label="重置界面字号" @click="change({ uiFontSize: UI_FONT_SIZE.default })">重置</button>
+              </div>
+            </div>
+            <p class="rm-share-note">调整菜单、侧栏与按钮文字，不影响正文和代码字号。</p>
             <AppearanceSettings />
             <div class="rm-setting"><label for="rm-glass-opacity" class="rm-setting-label">磨砂玻璃通透度</label><input id="rm-glass-opacity" type="range" min="0.4" max="1" step="0.05" :value="settings.glassOpacity" @change="change({ glassOpacity: Number(($event.target as HTMLInputElement).value) })" /><span>{{ Math.round(settings.glassOpacity * 100) }}%</span></div>
             <h3 class="rm-settings-group-title">编辑与阅读排版</h3>
             <div class="rm-setting"><label for="rm-text-font" class="rm-setting-label">正文主要字体</label><select id="rm-text-font" :value="settings.textFont" @change="change({ textFont: ($event.target as HTMLSelectElement).value as Settings['textFont'] })"><option v-for="(font, id) in TEXT_FONTS" :key="id" :value="id">{{ font.label }}</option></select></div>
             <div class="rm-setting"><label for="rm-code-font" class="rm-setting-label">代码字体</label><select id="rm-code-font" :value="settings.codeFont" @change="change({ codeFont: ($event.target as HTMLSelectElement).value as Settings['codeFont'] })"><option v-for="(font, id) in CODE_FONTS" :key="id" :value="id">{{ font.label }}</option></select></div>
             <div class="rm-setting">
-              <span class="rm-setting-label">字号</span>
-              <label class="rm-font-input"><input type="number" step="any" :value="settings.fontSize" aria-label="字号" @blur="changeFont" @keydown.enter="($event.target as HTMLInputElement).blur()" /> px</label>
+              <span class="rm-setting-label">编辑器字号</span>
+              <label class="rm-font-input"><input type="number" step="any" :value="settings.fontSize" aria-label="编辑器字号" @blur="changeFont" @keydown.enter="($event.target as HTMLInputElement).blur()" /> px</label>
             </div>
             <div class="rm-setting">
               <span class="rm-setting-label">正文宽度</span>

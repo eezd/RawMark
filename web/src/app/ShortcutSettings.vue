@@ -59,7 +59,7 @@ async function reset(command: Command) {
       <div class="rm-shortcut-bindings">
         <span v-for="(key, index) in commandKeys(command)" :key="key" class="rm-shortcut-chip">
           <kbd>{{ formatKeys(key) }}</kbd>
-          <button class="rm-icon-btn" :disabled="busy" :aria-label="`移除${command.title}的${formatKeys(key)}`" @click="save({ ...settings.shortcuts, [command.id]: commandKeys(command).filter((_, i) => i !== index) })"><Icon name="close" :size="12" /></button>
+          <button class="rm-icon-btn" :disabled="busy" :aria-label="`移除${command.title}的${formatKeys(key)}`" @click="save({ ...settings.shortcuts, [command.id]: commandKeys(command).filter((_, i) => i !== index) })"><Icon name="close" :size="16" /></button>
         </span>
         <input v-if="recording === command.id" :ref="(el) => { recorder = el as HTMLInputElement }" data-shortcut-recorder readonly aria-label="按下快捷键" placeholder="按下快捷键…" @keydown.prevent.stop="capture($event, command)" @blur="recording = null" />
         <button v-else class="rm-btn" :disabled="busy" @click="record(command.id)">添加</button>

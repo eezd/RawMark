@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { indentLess, indentMore, redo, undo } from '@codemirror/commands'
 import type { EditorView } from '@codemirror/view'
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { cycleHeading, insertLink, toggleBlock, toggleBold, toggleCode, toggleItalic, toggleStrike, toggleInline } from '../editor/format'
 import Icon from './Icon.vue'
 import { settings } from './settings'
@@ -11,6 +11,7 @@ import { activeTab, onEditorUpdate, ws, editorView, insertImagesFromPicker } fro
 // 按钮在 mousedown 时阻止默认行为，焦点留在编辑器中，键盘不会收起
 // （不能在 pointerdown 上阻止：WebKit 会因此不再触发 click）
 const visible = ref(false)
+const floatingToolbar = ref<HTMLDivElement>()
 const floating = ref<{ left: number; top: number } | null>(null)
 let unsubscribe: (() => void) | undefined
 const coarse = matchMedia('(pointer: coarse)')
@@ -45,7 +46,7 @@ function hideKeyboard() {
 
 // 焦点从编辑器移到别处时，focusout 先于新元素获得焦点，等一帧再判断
 function sync() {
-  requestAnimationFrame(() => {
+  requestAnimationFrame(async () => {
     const v = editorView()
     visible.value = !!ws.active && activeTab()?.status === 'ready' && (!coarse.matches || !!v?.hasFocus)
     floating.value = null
@@ -54,7 +55,15 @@ function sync() {
     const coords = v.coordsAtPos(selection.head)
     const rect = v.scrollDOM.getBoundingClientRect()
     if (!coords || coords.bottom < rect.top || coords.top > rect.bottom) return
-    floating.value = { left: Math.max(12, Math.min(innerWidth - 248, coords.left - 120)), top: coords.top - 48 > rect.top ? coords.top - 48 : coords.bottom + 8 }
+    floating.value = { left: 0, top: 0 }
+    await nextTick()
+    const toolbar = floatingToolbar.value
+    if (!toolbar || !floating.value) return
+    const { width, height } = toolbar.getBoundingClientRect()
+    floating.value = {
+      left: Math.max(12, Math.min(innerWidth - width - 12, coords.left - width / 2)),
+      top: Math.max(8, Math.min(innerHeight - height - 8, coords.top - height - 8 > rect.top ? coords.top - height - 8 : coords.bottom + 8)),
+    }
   })
 }
 
@@ -73,7 +82,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('focusin', sync)
   document.removeEventListener('focusout', sync)
 })
-watch(() => [ws.active, activeTab()?.status, settings.selectionToolbar, ws.settings, ws.images], sync)
+watch(() => [ws.active, activeTab()?.status, settings.selectionToolbar, settings.uiFontSize, ws.settings, ws.images], sync)
 </script>
 
 <template>
@@ -97,7 +106,7 @@ watch(() => [ws.active, activeTab()?.status, settings.selectionToolbar, ws.setti
       <Icon name="chevron" class="down" />
     </button>
   </div>
-  <div v-if="floating && ws.view === 'notes'" class="rm-selection-toolbar" role="toolbar" aria-label="选中文本格式" :style="{ left: floating.left + 'px', top: floating.top + 'px' }">
+  <div ref="floatingToolbar" v-if="floating && ws.view === 'notes'" class="rm-selection-toolbar" role="toolbar" aria-label="选中文本格式" :style="{ left: floating.left + 'px', top: floating.top + 'px' }">
     <button v-for="b in BUTTONS.slice(0, 5).concat(BUTTONS.filter(button => button.title === '行内代码' || button.title === '链接'))" :key="b.title" :title="b.title" :aria-label="b.title" :class="b.cls" @mousedown.prevent @click="run(b.run)">{{ b.label }}</button>
   </div>
 </template>
