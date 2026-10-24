@@ -35,7 +35,7 @@ export interface Tab {
   conflictRev?: string
 }
 
-export type SettingsSection = 'appearance' | 'editor' | 'templates' | 'account' | 'shortcuts' | 'tokens' | 'trash' | 'plugins' | 'about'
+export type SettingsSection = 'appearance' | 'editor' | 'account' | 'shortcuts' | 'tokens' | 'trash' | 'plugins' | 'about'
 
 export interface Toast {
   id: number
@@ -78,7 +78,6 @@ export const ws = reactive({
   sourceMode: false,
   focusMode: false,
   view: 'notes' as 'notes' | 'graph' | 'tags',
-  templateOpen: false,
   // 最近打开的笔记，最新的在前
   recent: JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[],
   toasts: [] as Toast[],
@@ -1078,7 +1077,7 @@ registerBuiltinCommands()
 
 function registerBuiltinCommands() {
   for (const command of editorCommands) registerCommand({ ...command,
-    when: () => ws.view === 'notes' && ws.settings === null && ws.images === null && !ws.templateOpen && ws.active !== null && !!view,
+    when: () => ws.view === 'notes' && ws.settings === null && ws.images === null && ws.active !== null && !!view,
     run: () => { if (view) { command.run(view); view.focus() } },
   })
   const hasNote = () => ws.active !== null

@@ -4,7 +4,6 @@ import type { SettingsSection } from './workspace'
 export const SETTINGS_SECTIONS: { id: SettingsSection; title: string; icon: IconName; description: string }[] = [
   { id: 'appearance', title: '外观', icon: 'palette', description: '界面字号、主题、明暗模式与 CSS 片段' },
   { id: 'editor', title: '编辑器', icon: 'edit', description: '正文排版、代码字体与编辑行为' },
-  { id: 'templates', title: '日记与模板', icon: 'calendar', description: '日记目录、模板目录与日记模板' },
   { id: 'shortcuts', title: '快捷键', icon: 'command', description: '查找命令，添加、移除或重置快捷键' },
   { id: 'plugins', title: '插件', icon: 'grid', description: '安装、启停和管理插件及其设置页' },
   { id: 'tokens', title: 'API 令牌', icon: 'key', description: '创建或撤销 REST API 访问令牌' },
@@ -30,9 +29,6 @@ export const SETTING_ITEMS = {
   'spellcheck': { section: 'editor', title: '拼写检查', description: '使用浏览器的拼写检查，检查语言取决于浏览器设置。', keywords: '语言 拼写' },
   'tab-size': { section: 'editor', title: '制表符宽度', description: '仅调整 Tab 字符的显示宽度，不改写正文；Tab 键仍按两个空格缩进。', keywords: 'Tab 缩进 空格' },
   'typography-preview': { section: 'editor', title: '排版预览', description: '查看当前正文与代码字体的显示效果。', keywords: '字号 行高 段距 预览' },
-  'daily-folder': { section: 'templates', title: '日记目录', description: '仓库相对目录；留空时保存在根目录，修改不会移动已有日记。', keywords: '路径 Daily' },
-  'templates-folder': { section: 'templates', title: '模板目录', description: '仓库相对目录，修改不会移动已有模板。', keywords: '路径 Templates' },
-  'daily-template': { section: 'templates', title: '日记模板', description: '日记按本地日期命名，已有日记直接打开。', keywords: '空白笔记 日期' },
   'password': { section: 'account', title: '修改登录密码', description: '修改后其他设备需要重新登录。', keywords: '账户 安全 鉴权' },
   'logout': { section: 'account', title: '退出登录', description: '退出当前设备的登录会话。', keywords: '账户 会话' },
   'install': { section: 'about', title: '安装应用', description: '浏览器支持安装时，可将 RawMark 添加到桌面或主屏幕。', keywords: 'PWA 安装' },

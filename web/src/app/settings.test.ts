@@ -41,13 +41,26 @@ async function search(selector: string, query: string) {
 }
 
 describe('设置查找与重置', () => {
+  it('移除日记和模板设置、搜索与命令入口', async () => {
+    expect(searchSettings('日记')).toEqual([])
+    expect(searchSettings('日历')).toEqual([])
+    expect(DEFAULTS).not.toHaveProperty('dailyFolder')
+    expect(searchSettings('模板')).toEqual([])
+    expect(DEFAULTS).not.toHaveProperty('templatesFolder')
+    ws.settings = 'appearance'
+    mount(SettingsDialog)
+    expect(host!.textContent).not.toContain('日记')
+    expect(host!.querySelector('#rm-templates-folder')).toBeNull()
+    expect(host!.textContent).not.toContain('模板')
+  })
+
   it('设置和命令不再提供分享入口', async () => {
     expect(searchSettings('分享')).toEqual([])
     expect(allCommands().map(command => command.id)).not.toContain('note.share')
     expect(allCommands().map(command => command.id)).not.toContain('app.shares')
     ws.settings = 'appearance'
     mount(SettingsDialog)
-    expect(host!.querySelectorAll('.rm-settings-tab')).toHaveLength(9)
+    expect(host!.querySelectorAll('.rm-settings-tab')).toHaveLength(8)
     expect(host!.textContent).not.toContain('分享')
   })
 
@@ -55,7 +68,6 @@ describe('设置查找与重置', () => {
     expect(searchSettings('   ')).toEqual([])
     expect(searchSettings('CSS 高级')).toEqual([expect.objectContaining({ id: 'css-snippets', section: 'appearance' })])
     expect(searchSettings('api')).toEqual(expect.arrayContaining([expect.objectContaining({ section: 'tokens', title: 'API 令牌' }), expect.objectContaining({ id: 'openapi' })]))
-    settings.dailyFolder = 'private-note-folder'
     settings.cssSnippets = [{ id: 'private', name: 'private-snippet-name', enabled: true, css: ':root { --private: 1 }' }]
     expect(searchSettings('private')).toEqual([])
   })

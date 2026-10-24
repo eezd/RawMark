@@ -7,9 +7,6 @@ import { drafts, type Draft } from './drafts'
 import { connectEvents } from './events'
 import { pluginEvents } from '../plugins/registry'
 import { attachView, closeTab, createNoteAt, editorStateOf, flush, keepLocalVersion, importNotes, move, remove, readyToReload, openNote, refreshTree, replaceImage, restore, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
-import { openDailyNote } from './templates'
-import { settings } from './settings'
-import { localDate } from '../markdown/template'
 
 vi.mock('./events', () => ({ connectEvents: vi.fn(() => () => {}) }))
 
@@ -143,32 +140,6 @@ describe('笔记打开与创建', () => {
     expect(ws.toasts.some(toast => toast.text.includes('打开失败：文件不存在'))).toBe(false)
   })
 
-  it('日记模板读取期间重复打开只创建一个标签，之后仍可再次打开', async () => {
-    const previousFolder = settings.dailyFolder, previousTemplate = settings.dailyTemplate
-    settings.dailyFolder = 'Daily-review'
-    settings.dailyTemplate = 'Templates/daily.md'
-    const path = settings.dailyFolder + '/' + localDate() + '.md'
-    let finish!: (value: { content: string; rev: string }) => void
-    vi.spyOn(api, 'readFile').mockImplementation(() => new Promise(resolve => { finish = resolve }))
-    vi.spyOn(api, 'writeFile').mockResolvedValue('r1')
-    vi.spyOn(drafts, 'delete').mockResolvedValue(undefined)
-    try {
-      const first = openDailyNote(), second = openDailyNote()
-      finish({ content: '# {{date}}\n\n日记', rev: 'template-r1' })
-      await Promise.all([first, second])
-      expect(ws.tabs.filter(tab => tab.path === path)).toHaveLength(1)
-      expect(editorStateOf(path)?.doc.toString()).toContain('日记')
-      await closeTab(path)
-      vi.mocked(api.readFile).mockResolvedValue({ content: '重新打开的日记', rev: 'r1' })
-      await openDailyNote()
-      expect(ws.tabs.filter(tab => tab.path === path)).toHaveLength(1)
-      expect(editorStateOf(path)?.doc.toString()).toBe('重新打开的日记')
-      await closeTab(path)
-    } finally {
-      settings.dailyFolder = previousFolder
-      settings.dailyTemplate = previousTemplate
-    }
-  })
 })
 
 describe('保存与关闭', () => {

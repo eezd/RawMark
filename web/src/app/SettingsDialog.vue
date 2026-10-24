@@ -20,8 +20,6 @@ if (!buildVersion) throw new Error('缺少应用构建版本信息')
 
 const section = computed(() => (ws.settings === 'index' ? 'appearance' : ws.settings!))
 // 手机上一次只显示分组列表或分组内容
-const dailyTemplates = computed(() => ws.entries.filter(entry => !entry.dir && entry.path.endsWith('.md')))
-const missingDailyTemplate = computed(() => settings.dailyTemplate && !dailyTemplates.value.some(entry => entry.path === settings.dailyTemplate))
 const showList = ref(ws.settings === 'index')
 const current = computed(() => SETTINGS_SECTIONS.find((s) => s.id === section.value)!)
 const query = ref('')
@@ -31,7 +29,7 @@ const dialog = ref<HTMLElement>()
 const content = ref<HTMLElement>()
 const heading = ref<HTMLElement>()
 const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-const preferenceSection = computed(() => ['appearance', 'editor', 'templates', 'shortcuts'].includes(section.value))
+const preferenceSection = computed(() => ['appearance', 'editor', 'shortcuts'].includes(section.value))
 const saveLabel = computed(() => settingsSave.pending ? '保存中…' : settingsSave.result === 'error' ? '保存失败' : settingsSave.result === 'saved' ? '已保存' : '修改自动保存')
 
 async function open(id: SettingsSection) {
@@ -114,15 +112,6 @@ function changeUIFont(event: Event) {
   if (value !== settings.uiFontSize) void change({ uiFontSize: value })
 }
 
-function changeFolder(key: 'dailyFolder' | 'templatesFolder', event: Event) {
-  const input = event.target as HTMLInputElement
-  const path = input.value.trim()
-  if ((key === 'templatesFolder' && !path) || path && path.split('/').some(part => !part || part.startsWith('.') || /[\\\0]/.test(part))) {
-    toast('请输入有效的仓库相对目录'); input.value = settings[key]; return
-  }
-  void change({ [key]: path })
-}
-
 // ---- 修改登录密码 ----
 const pw = ref({ current: '', next: '', confirm: '' })
 const pwError = ref('')
@@ -194,13 +183,6 @@ async function changePassword() {
               <SettingRow id="selection-toolbar" control="rm-selection-toolbar"><input id="rm-selection-toolbar" type="checkbox" :checked="settings.selectionToolbar" @change="change({ selectionToolbar: ($event.target as HTMLInputElement).checked })" /></SettingRow>
               <SettingRow id="spellcheck" control="rm-spellcheck"><input id="rm-spellcheck" type="checkbox" :checked="settings.spellcheck" @change="change({ spellcheck: ($event.target as HTMLInputElement).checked })" /></SettingRow>
               <SettingRow id="tab-size" control="rm-tab-size" resettable @reset="change({ tabSize: DEFAULTS.tabSize })"><select id="rm-tab-size" :value="settings.tabSize" @change="change({ tabSize: Number(($event.target as HTMLSelectElement).value) })"><option v-for="n in TAB_SIZES" :key="n" :value="n">{{ n }} 列</option></select></SettingRow>
-            </template>
-
-            <template v-else-if="section === 'templates'">
-              <SettingRow id="daily-folder" control="rm-daily-folder"><input id="rm-daily-folder" :value="settings.dailyFolder" placeholder="根目录" @change="changeFolder('dailyFolder', $event)" /></SettingRow>
-              <SettingRow id="templates-folder" control="rm-templates-folder"><input id="rm-templates-folder" :value="settings.templatesFolder" @change="changeFolder('templatesFolder', $event)" /></SettingRow>
-              <SettingRow id="daily-template" control="rm-daily-template"><select id="rm-daily-template" :value="settings.dailyTemplate" @change="change({ dailyTemplate: ($event.target as HTMLSelectElement).value })"><option value="">空白笔记</option><option v-for="entry in dailyTemplates" :key="entry.path" :value="entry.path">{{ entry.path }}</option><option v-if="missingDailyTemplate" :value="settings.dailyTemplate">{{ settings.dailyTemplate }}（不存在）</option></select></SettingRow>
-              <p class="rm-share-note">模板支持 <code v-pre>{{date}}</code>、<code v-pre>{{time}}</code>、<code v-pre>{{title}}</code>。</p>
             </template>
 
             <template v-else-if="section === 'account'">

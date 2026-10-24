@@ -4,7 +4,6 @@ import { api, ApiError } from './api'
 import { registerCommand } from './commands'
 import EditorPane from './EditorPane.vue'
 import KnowledgePanel from './KnowledgePanel.vue'
-import TemplateDialog from './TemplateDialog.vue'
 import EditorChrome from './EditorChrome.vue'
 import Icon from './Icon.vue'
 import SelectionToolbar from './SelectionToolbar.vue'
@@ -133,7 +132,6 @@ onBeforeUnmount(() => {
       <OutlinePanel v-if="ws.outlineOpen && !ws.focusMode && ws.active && ws.view === 'notes' && ws.images === null" />
     </Transition>
     </div>
-    <TemplateDialog v-if="ws.templateOpen" />
     <QuickSwitcher v-if="ws.switcher !== null" />
     <SettingsDialog v-if="ws.settings" />
     <ImportDialog v-if="ws.importing !== null" :dir="ws.importing" @close="ws.importing = null" />

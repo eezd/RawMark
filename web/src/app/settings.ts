@@ -17,7 +17,7 @@ export const CONTENT_WIDTHS = [
 
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
-export const DEFAULTS = { dailyFolder: 'Daily', templatesFolder: 'Templates', dailyTemplate: '', selectionToolbar: true, ...DISPLAY_DEFAULTS, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
+export const DEFAULTS = { selectionToolbar: true, ...DISPLAY_DEFAULTS, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
 export type Settings = typeof DEFAULTS & Appearance & { shortcuts: Record<string, string[]> }
 
 const CACHE_KEY = 'rawmark.settings'
@@ -36,9 +36,6 @@ export class SettingsAppearanceError extends Error {
 function sanitize(raw: Record<string, unknown>): Settings {
   const pick = <T>(v: unknown, allowed: T[], def: T) => (allowed.includes(v as T) ? (v as T) : def)
   return {
-    dailyFolder: typeof raw.dailyFolder === 'string' ? raw.dailyFolder : DEFAULTS.dailyFolder,
-    templatesFolder: typeof raw.templatesFolder === 'string' && raw.templatesFolder !== '' ? raw.templatesFolder : DEFAULTS.templatesFolder,
-    dailyTemplate: typeof raw.dailyTemplate === 'string' ? raw.dailyTemplate : DEFAULTS.dailyTemplate,
     ...sanitizeDisplaySettings(raw),
     selectionToolbar: typeof raw.selectionToolbar === 'boolean' ? raw.selectionToolbar : true,
     shortcuts: sanitizeShortcuts(raw.shortcuts),
