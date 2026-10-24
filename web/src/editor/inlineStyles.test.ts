@@ -19,6 +19,42 @@ function editor(doc: string, text: string = doc) {
 }
 
 describe('局部外观', () => {
+  it.each([
+    ['a\\*b', '*', '\\*'],
+    ['a&amp;b', 'amp', '&amp;'],
+    ['a&#42;b', '42', '&#42;'],
+    ['a&#x2a;b', 'x2a', '&#x2a;'],
+    ['a:smile:b', 'smile', ':smile:'],
+    ['a[^note]b\n\n[^note]: footnote', 'note', '[^note]'],
+    ['a<https://example.com>b', 'example', '<https://example.com>'],
+  ])('局部选择语法单元时整体设置外观：%s', (doc, selection, atom) => {
+    const e = editor(doc, selection)
+    expect(e.run(applyInlineStyles({ color: '#0000ff' }))).toBe(true)
+    expect(e.doc).toBe(doc.replace(atom, `<span style="color: #0000ff">${atom}</span>`))
+    expect(renderMarkdown(e.doc).replace('<span style="color: #0000ff">', '').replace('</span>', '')).toBe(renderMarkdown(doc))
+    expect(e.target.state.sliceDoc(e.target.state.selection.main.from, e.target.state.selection.main.to)).toBe(selection)
+    e.run(clearInlineStyles)
+    expect(e.doc).toBe(doc)
+  })
+  it('局部选择转义字符后切换下划线，不改变正文含义，且可撤销', () => {
+    const e = editor('a\\*b', '*')
+    e.run(toggleUnderline)
+    expect(e.doc).toBe('a<u>\\*</u>b')
+    expect(renderMarkdown(e.doc)).toBe('<p>a<u>*</u>b</p>\n')
+    e.run(toggleUnderline)
+    expect(e.doc).toBe('a\\*b')
+    expect(undo(e.target)).toBe(true)
+    expect(e.doc).toBe('a<u>\\*</u>b')
+  })
+  it('同一字符实体内多个选区只格式化一次并保留反向选区', () => {
+    const e = editor('&amp;')
+    e.target.dispatch({ selection: EditorSelection.create([EditorSelection.range(2, 1), EditorSelection.range(3, 4)]) })
+    e.run(toggleSelectionMark('StrongEmphasis'))
+    expect(e.doc).toBe('**&amp;**')
+    expect(renderMarkdown(e.doc)).toBe('<p><strong>&amp;</strong></p>\n')
+    expect(e.target.state.selection.ranges.map(range => e.target.state.sliceDoc(range.from, range.to))).toEqual(['a', 'p'])
+    expect(e.target.state.selection.main.anchor).toBeGreaterThan(e.target.state.selection.main.head)
+  })
   it('下划线可切换，并能和 Markdown 粗体叠加', () => {
     const e = editor('hello')
     e.run(toggleUnderline)

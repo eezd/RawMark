@@ -6,7 +6,7 @@ import type { FormatCommand } from './format'
 
 interface Wrapper { marks: { from: number; to: number }[] }
 interface Segment {
-  from: number; to: number; styles: InlineStyles; underline: boolean; formats: string[]; wrappers: Wrapper[]
+  from: number; to: number; atomic: boolean; styles: InlineStyles; underline: boolean; formats: string[]; wrappers: Wrapper[]
 }
 const TEXT_CONTAINERS = new Set(['Paragraph', 'TableCell', 'Emphasis', 'StrongEmphasis', 'Strikethrough', 'Highlight', 'Superscript', 'Subscript', 'Underline', 'InlineStyle'])
 const PROTECTED = new Set(['FencedCode', 'CodeBlock', 'InlineCode', 'InlineMath', 'BlockMath', 'FrontMatter', 'HTMLBlock', 'Image'])
@@ -24,9 +24,9 @@ function formattingTree(state: EditorState) {
 function segments(state: EditorState): Segment[] {
   const result: Segment[] = []
   function walk(node: SyntaxNode, styles: InlineStyles = {}, underline = false, formats: string[] = [], wrappers: Wrapper[] = []) {
-    if (['InlineCode', 'InlineMath', 'Image', 'FootnoteReference', 'Emoji', 'Autolink'].includes(node.name)) {
+    if (['InlineCode', 'InlineMath', 'Image', 'FootnoteReference', 'Emoji', 'Autolink', 'Escape', 'Entity'].includes(node.name)) {
       // 不拆开原子语法；调整同一外层标签的其他文字时，仍须保留这些未选内容的原样式。
-      result.push({ from: node.from, to: node.to, styles, underline, formats, wrappers })
+      result.push({ from: node.from, to: node.to, atomic: true, styles, underline, formats, wrappers })
       return
     }
     if (PROTECTED.has(node.name)) return
@@ -49,7 +49,7 @@ function segments(state: EditorState): Segment[] {
         // 连续段落里的下一行仍可能带列表缩进或引用前缀，标签必须写在前缀之后。
         const prefixEnd = line.from + /^(?:[\t ]*>[\t ]?)*[\t ]*/.exec(line.text)![0].length
         const contentFrom = Math.max(start, prefixEnd)
-        if (contentFrom < end) result.push({ from: contentFrom, to: end, styles, underline, formats, wrappers })
+        if (contentFrom < end) result.push({ from: contentFrom, to: end, atomic: false, styles, underline, formats, wrappers })
       }
     }
     let pos = node.from
@@ -62,8 +62,7 @@ function segments(state: EditorState): Segment[] {
     for (let child = node.firstChild; child; child = child.nextSibling) {
       if (child.to <= pos || child.from >= end) continue
       if (textContainer && child.from > pos) add(pos, child.from)
-      if (child.name === 'Escape' || child.name === 'Entity') add(child.from, child.to)
-      else walk(child, styles, underline, formats, wrappers)
+      walk(child, styles, underline, formats, wrappers)
       pos = child.to
     }
     if (textContainer && pos < end) add(pos, end)
@@ -122,7 +121,8 @@ function editAppearance(update: (styles: InlineStyles, underline: boolean, forma
         wrappers.add(wrapper)
         for (const mark of wrapper.marks) changes.push({ from: mark.from, to: mark.to, insert: '' })
       }
-      const cuts = [...new Set([run.from, run.to, ...state.selection.ranges.flatMap(range => [Math.max(run.from, Math.min(run.to, range.from)), Math.max(run.from, Math.min(run.to, range.to))])])].sort((a, b) => a - b)
+      // 部分选中转义字符等语法单元时，格式应用于整个单元，不能把标签插进语法内部。
+      const cuts = run.atomic ? [run.from, run.to] : [...new Set([run.from, run.to, ...state.selection.ranges.flatMap(range => [Math.max(run.from, Math.min(run.to, range.from)), Math.max(run.from, Math.min(run.to, range.to))])])].sort((a, b) => a - b)
       let insert = ''
       for (let i = 0; i < cuts.length - 1; i++) {
         const from = cuts[i], to = cuts[i + 1]
