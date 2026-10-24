@@ -26,6 +26,73 @@ func TestNoteUploadsShareFolderAssetsAndRejectInvalidNotes(t *testing.T) {
 	}
 }
 
+func TestNoteMoveWithoutSharedImagesIgnoresUnrelatedInvalidMetadata(t *testing.T) {
+	for _, body := range []string{"# Plain note\n\nNo images or links.", "[attachment](./document.pdf)", "![](plain.assets/old.png)"} {
+		t.Run(body, func(t *testing.T) {
+			v := newVault(t)
+			if _, err := v.Write("unrelated.md", []byte("---\ntags: [broken\n---\n# Unrelated"), Precondition{}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := v.Write("old/plain.md", []byte(body), Precondition{}); err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(body, "plain.assets") {
+				if err := v.Mkdir("old/plain.assets"); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(v.Root(), "old/plain.assets/old.png"), []byte("legacy"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := v.Move("old/plain.md", "new/plain.md"); err != nil {
+				t.Fatal("无共享图片的移动不应被无关元数据阻断", err)
+			}
+			got, _, err := v.Read("new/plain.md")
+			expected := strings.ReplaceAll(body, "./document.pdf", "../old/document.pdf")
+			if err != nil || string(got) != expected {
+				t.Fatalf("移动后的正文不符：%q %v", got, err)
+			}
+			if _, err := v.Stat("old/plain.md"); !errors.Is(err, ErrNotFound) {
+				t.Fatal("源笔记未移走", err)
+			}
+			if strings.Contains(body, "plain.assets") {
+				image, err := os.ReadFile(filepath.Join(v.Root(), "new/plain.assets/old.png"))
+				if err != nil || string(image) != "legacy" {
+					t.Fatalf("独立附件未随笔记移动：%q %v", image, err)
+				}
+			}
+		})
+	}
+}
+
+func TestNoteImageMoveStillRejectsUncertainReferences(t *testing.T) {
+	v := newVault(t)
+	link, err := v.SaveAsset("old/plain.md", "p.png", strings.NewReader("image"), 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := "![](" + link + ")"
+	for note, content := range map[string]string{"old/plain.md": body, "unrelated.md": "---\ntags: [broken\n---\n# Unrelated"} {
+		if _, err := v.Write(note, []byte(content), Precondition{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := v.Move("old/plain.md", "new/plain.md"); !errors.Is(err, ErrInvalidPath) {
+		t.Fatal("无法确认其他笔记引用时不得移除共享图片", err)
+	}
+	got, _, err := v.Read("old/plain.md")
+	if err != nil || string(got) != body {
+		t.Fatalf("失败后原文被改写：%q %v", got, err)
+	}
+	image, err := os.ReadFile(filepath.Join(v.Root(), "old", link))
+	if err != nil || string(image) != "image" {
+		t.Fatalf("失败后源图丢失：%q %v", image, err)
+	}
+	if _, err := v.Stat("new/plain.md"); !errors.Is(err, ErrNotFound) {
+		t.Fatal("失败后出现目标笔记", err)
+	}
+}
+
 func TestNoteMoveTransfersSharedImagesWithoutBreakingOtherNotes(t *testing.T) {
 	for _, shared := range []bool{false, true} {
 		for _, collision := range []string{"none", "same", "different"} {

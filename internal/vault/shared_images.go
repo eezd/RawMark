@@ -27,6 +27,15 @@ func (v *Vault) copyNoteImages(from, to string) (transfers []imageTransfer, targ
 	if len(metadata.Warnings) != 0 {
 		return nil, nil, fmt.Errorf("%w：%s 的元数据异常，无法确认图片引用", ErrInvalidPath, from)
 	}
+	var images []Reference
+	for _, ref := range metadata.Assets {
+		if IsImage(ref.Target) && !strings.HasPrefix(ref.Target, AssetsDir(from)+"/") {
+			images = append(images, ref)
+		}
+	}
+	if len(images) == 0 {
+		return nil, nil, nil
+	}
 	entries, err := v.Tree()
 	if err != nil {
 		return nil, nil, err
@@ -49,10 +58,7 @@ func (v *Vault) copyNoteImages(from, to string) (transfers []imageTransfer, targ
 		}
 	}
 	targets = map[string]string{}
-	for _, ref := range metadata.Assets {
-		if !IsImage(ref.Target) || strings.HasPrefix(ref.Target, AssetsDir(from)+"/") {
-			continue
-		}
+	for _, ref := range images {
 		if _, seen := targets[ref.Target]; seen {
 			continue
 		}
