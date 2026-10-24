@@ -1,10 +1,15 @@
+import type { IconName } from './icons'
+
 // REST API 客户端，与服务端 internal/api 对应
+
+export type TreeIcon = { kind: 'emoji'; value: string } | { kind: 'builtin'; value: IconName }
 
 export interface Entry {
   path: string
   dir: boolean
   size: number
   mtime: number
+  icon?: TreeIcon
 }
 
 export interface ImportResult {
@@ -144,6 +149,7 @@ export const api = {
   exportFiles: (paths: string[]) => request('POST', '/api/v1/export', { json: { paths } }),
 
   metadata: () => json<{ notes: NoteMetadata[]; ready: boolean }>(request('GET', '/api/v1/metadata')),
+  setTreeIcon: (path: string, icon: TreeIcon | null) => request('PUT', '/api/v1/tree-icon', { json: { path, icon } }),
   tree: async () => (await json<{ entries: Entry[] }>(request('GET', '/api/v1/tree'))).entries,
   search: async (q: string) => (await json<{ results: SearchResult[] }>(request('GET', '/api/v1/search?q=' + encodeURIComponent(q)))).results,
 

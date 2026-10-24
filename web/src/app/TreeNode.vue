@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import Icon from './Icon.vue'
 import { basename, dirname, inAssetDir, isImage, joinPath } from './paths'
-import { contextSelection, dropDirectory, expanded, selectedPaths, selectPath, type TreeNode } from './tree'
+import { contextSelection, dropDirectory, expanded, selectedPaths, selectPath, treeIconTarget, type TreeNode } from './tree'
 import { batchFiles, exportFiles } from './batch'
 import { createFolder, createNote, move, openNote, renameTarget, ws } from './workspace'
 
@@ -78,7 +78,7 @@ function commitRename() {
   if (target && target !== props.node.path) void move(props.node.path, target)
 }
 
-function runMenu(action: 'note' | 'folder' | 'import' | 'images' | 'rename' | 'move' | 'delete' | 'export') {
+function runMenu(action: 'note' | 'folder' | 'import' | 'images' | 'icon' | 'rename' | 'move' | 'delete' | 'export') {
   menuOpen.value = false
   const path = props.node.path
   if (action === 'note' || action === 'folder') {
@@ -86,10 +86,16 @@ function runMenu(action: 'note' | 'folder' | 'import' | 'images' | 'rename' | 'm
     void (action === 'note' ? createNote(path) : createFolder(path))
   } else if (action === 'import') ws.importing = path
   else if (action === 'images') { ws.imagesAll = false; ws.images = path }
+  else if (action === 'icon') editIcon()
   else if (action === 'rename') ws.renaming = path
   else if (action === 'move') ws.moving = [...selectedPaths]
   else if (action === 'export') void exportFiles([...selectedPaths])
   else void batchFiles('delete', [...selectedPaths])
+}
+
+function editIcon(event?: MouseEvent) {
+  const anchor = event?.currentTarget instanceof HTMLElement ? event.currentTarget : row.value?.querySelector<HTMLElement>('.rm-tree-icon')
+  if (anchor) treeIconTarget.value = { path: props.node.path, anchor }
 }
 
 function showMenu() {
@@ -152,6 +158,7 @@ function onDrop(e: DragEvent) {
       :draggable="!isRenaming && !assetDir"
       role="treeitem"
       :aria-selected="selectedPaths.has(node.path)"
+      :aria-expanded="node.dir ? isOpen : undefined"
       @click="activate"
       @contextmenu.prevent.stop="showMenu"
       @touchstart.passive="onTouchStart"
@@ -163,6 +170,12 @@ function onDrop(e: DragEvent) {
       @drop="onDrop"
     >
       <span class="rm-tree-chevron" :class="{ open: isOpen, hidden: !node.dir }"><Icon name="chevron" :size="16" /></span>
+      <button v-if="!isRenaming" type="button" class="rm-tree-icon" :class="{ 'rm-emoji': node.icon?.kind === 'emoji' || (!node.icon && !image) }" :aria-label="'修改图标：' + node.name" title="修改图标" @click.stop="editIcon" @touchstart.stop @contextmenu.prevent.stop="editIcon">
+        <Icon v-if="node.icon?.kind === 'builtin'" :name="node.icon.value" :size="18" />
+        <template v-else-if="node.icon?.kind === 'emoji'">{{ node.icon.value }}</template>
+        <Icon v-else-if="image" name="image" :size="18" />
+        <template v-else>{{ node.dir ? '📂' : '📄' }}</template>
+      </button>
       <input
         v-if="isRenaming"
         ref="input"
@@ -173,7 +186,6 @@ function onDrop(e: DragEvent) {
         @keydown.esc.prevent="cancelRename"
         @blur="commitRename"
       />
-      <Icon v-if="image" name="image" :size="18" />
       <span v-if="!isRenaming" class="rm-tree-name">{{ node.dir ? node.name : node.name.replace(/\.md$/, '') }}</span>
       <button v-if="!isRenaming" class="rm-icon-btn rm-tree-more" title="更多操作" @click.stop="menuOpen ? (menuOpen = false) : showMenu()">
         <Icon name="more" />
@@ -189,15 +201,20 @@ function onDrop(e: DragEvent) {
           <button @click="runMenu('import')"><Icon name="import" />导入</button>
         </template>
         <button v-if="image && selectedPaths.size === 1" @click="menuOpen = false; ws.image = node.path"><Icon name="image" />预览 / 替换图片</button>
+        <button v-if="selectedPaths.size === 1" @click="runMenu('icon')"><Icon name="palette" />修改图标</button>
         <button v-if="!assetDir && selectedPaths.size === 1" @click="runMenu('rename')"><Icon name="edit" />重命名</button>
         <button v-if="!assetDir" @click="runMenu('move')"><Icon name="folder" />移动到…</button>
         <button @click="runMenu('export')"><Icon name="note" />导出 Markdown</button>
         <button v-if="!assetDir" class="danger" @click="runMenu('delete')"><Icon name="trash" />删除</button>
       </div>
     </Teleport>
-    <ul v-if="node.dir && isOpen" class="rm-tree-list">
-      <TreeNode v-for="child in node.children" :key="child.path" :node="child" :depth="depth + 1" />
-    </ul>
+    <Transition name="rm-tree-expand" @before-leave="($el: Element) => $el.setAttribute('inert', '')" @leave-cancelled="($el: Element) => $el.removeAttribute('inert')">
+      <div v-if="node.dir && isOpen" class="rm-tree-children">
+        <ul class="rm-tree-list">
+          <TreeNode v-for="child in node.children" :key="child.path" :node="child" :depth="depth + 1" />
+        </ul>
+      </div>
+    </Transition>
   </li>
 </template>
 

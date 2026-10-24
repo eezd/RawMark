@@ -8,7 +8,7 @@ import { editorCommands } from '../editor/shortcuts'
 import { refreshImages } from '../editor/livepreview'
 import { createEditorState, insertImageFiles, pasteImages, languageCompartment, pluginCompartment, pluginEditorExtensions, pluginLanguage, preferencesCompartment, previewCompartment, previewExtensions } from '../editor'
 import { handleShortcut, registerCommand } from './commands'
-import { api, ApiError, encodePath, type Entry } from './api'
+import { api, ApiError, encodePath, type Entry, type TreeIcon } from './api'
 import { drafts } from './drafts'
 import { refreshMetadata } from './metadata'
 import { connectEvents, type VaultEvent } from './events'
@@ -661,6 +661,12 @@ async function withOp<T>(fn: () => Promise<T>): Promise<T> {
     localTreeEdits++
     if (--opsInFlight === 0 && treeWaiters.length) scheduleTreeRefresh()
   }
+}
+
+export async function saveTreeIcon(path: string, icon: TreeIcon | null) {
+  await withOp(() => api.setTreeIcon(path, icon))
+  try { await refreshTree() }
+  catch (err) { toast('图标已保存，目录刷新失败：' + errorText(err)) }
 }
 
 export async function createNote(dir: string) {

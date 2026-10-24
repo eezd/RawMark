@@ -1,5 +1,5 @@
-import { computed, reactive, ref, watch } from 'vue'
-import type { Entry } from './api'
+import { computed, reactive, ref, shallowRef, watch } from 'vue'
+import type { Entry, TreeIcon } from './api'
 import { basename, dirname, hiddenAssetPath } from './paths'
 import { rangePaths } from './selection'
 import { ws } from './workspace'
@@ -8,6 +8,7 @@ export interface TreeNode {
   name: string
   path: string
   dir: boolean
+  icon?: TreeIcon
   children: TreeNode[]
 }
 
@@ -18,7 +19,7 @@ function build(entries: Entry[]): TreeNode[] {
   const dirs = new Map<string, TreeNode>()
   // 先按路径排序，保证父目录先于子项出现
   for (const e of [...entries].sort((a, b) => a.path.length - b.path.length)) {
-    const node: TreeNode = { name: basename(e.path), path: e.path, dir: e.dir, children: [] }
+    const node: TreeNode = { name: basename(e.path), path: e.path, dir: e.dir, icon: e.icon, children: [] }
     if (e.dir) dirs.set(e.path, node)
     ;(dirs.get(dirname(e.path))?.children ?? root).push(node)
   }
@@ -31,6 +32,8 @@ function build(entries: Entry[]): TreeNode[] {
 }
 
 export const tree = computed(() => build(ws.entries.filter((entry) => !hiddenAssetPath(entry.path))))
+
+export const treeIconTarget = shallowRef<{ path: string; anchor: HTMLElement } | null>(null)
 
 // null 表示无接收目标，空字符串表示根目录；文件行指向它的直接父目录。
 export const dropDirectory = ref<string | null>(null)

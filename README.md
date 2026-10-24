@@ -52,6 +52,8 @@ docker run -d --name rawmark \
 | `RAWMARK_VAULT` | `$RAWMARK_DATA/vault` | 笔记仓库目录，可指向已有的笔记文件夹 |
 | `RAWMARK_ADDR` | `:8080` | 监听地址 |
 
+文件树默认使用 📂 / 📄，可点击图标或右键“修改图标”，选择表情或内置线性图标。自定义属性存于仓库的 `.rawmark/tree-icons.json`，随应用内移动、重命名及回收站恢复保留，不改动或导出到 Markdown 正文；外部文件操作不保证跟随。
+
 ## 开发
 
 需要 Go 1.27+ 与 Node 24+。开发时不必构建前端或 Docker 镜像，一键启动：

@@ -3,8 +3,9 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import Icon from './Icon.vue'
 import { basename } from './paths'
 import { commandTitle } from './commands'
-import { dropDirectory, tree } from './tree'
+import { dropDirectory, tree, treeIconTarget } from './tree'
 import TreeNode from './TreeNode.vue'
+import TreeIconPicker from './TreeIconPicker.vue'
 import SearchPanel from './SearchPanel.vue'
 import { createFolder, createNote, move, openSearch, ws } from './workspace'
 import { sidebarViews } from '../plugins/registry'
@@ -89,6 +90,7 @@ onUnmounted(() => {
   window.removeEventListener('blur', clearDrop)
   window.removeEventListener('keydown', onDragKeydown)
   clearDrop()
+  treeIconTarget.value = null
 })
 </script>
 
@@ -96,8 +98,8 @@ onUnmounted(() => {
   <div class="rm-sidebar-inner">
     <div class="rm-vault-heading">
       <button class="rm-icon-btn" title="折叠目录" aria-label="折叠目录" @click="ws.sidebarCollapsed = true; ws.sidebarOpen = false"><Icon name="menu" /></button>
+      <button class="rm-tree-label" title="文件目录操作" aria-haspopup="true" :aria-expanded="rootMenu !== null" @click="rootContext" @contextmenu="rootContext">文件目录</button>
     </div>
-    <button class="rm-tree-label" title="文件目录操作" aria-haspopup="true" :aria-expanded="rootMenu !== null" @click="rootContext" @contextmenu="rootContext">文件目录</button>
     <nav v-if="sidebarViews.size" class="rm-plugin-tabs" aria-label="侧栏视图">
       <button class="rm-btn" :class="{ on: !currentView }" @click="selectedView = ''">文件</button>
       <button v-for="[id, pluginView] in sidebarViews" :key="id" class="rm-btn" :class="{ on: selectedView === id }" @click="selectedView = id">{{ pluginView.title }}</button>
@@ -121,6 +123,7 @@ onUnmounted(() => {
         <button @click="runRootMenu('images')"><Icon name="image" />图片管理</button>
       </div>
     </Teleport>
+    <TreeIconPicker v-if="treeIconTarget" :key="treeIconTarget.path" :target="treeIconTarget" />
     <div class="rm-sidebar-foot">
       <button class="rm-foot-btn" :title="commandTitle('app.settings')" @click="ws.settings = 'index'"><Icon name="settings" />设置</button>
       <button class="rm-foot-btn" @click="emit('logout')"><Icon name="logout" />退出</button>

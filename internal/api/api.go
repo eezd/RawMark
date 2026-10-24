@@ -76,6 +76,7 @@ func (s *Server) routes() []route {
 		{"POST /api/v1/auth/password", sessionOnly, s.changePassword},
 
 		{"GET /api/v1/tree", authed, s.tree},
+		{"PUT /api/v1/tree-icon", authed, s.setTreeIcon},
 		{"GET /api/v1/metadata", authed, s.metadata},
 		{"POST /api/v1/export", authed, s.export},
 		{"GET /api/v1/files/{path...}", authed, s.readFile},
@@ -290,6 +291,27 @@ func (s *Server) tree(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"entries": entries})
 }
 
+func (s *Server) setTreeIcon(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Path string          `json:"path"`
+		Icon json.RawMessage `json:"icon"`
+	}
+	if !readJSON(w, r, &body) {
+		return
+	}
+	var icon *vault.TreeIcon
+	if len(body.Icon) == 0 || json.Unmarshal(body.Icon, &icon) != nil {
+		writeError(w, 400, "请求格式错误：需要 icon（null 恢复默认）")
+		return
+	}
+	if err := s.vault.SetTreeIcon(body.Path, icon); err != nil {
+		vaultError(w, r, err)
+		return
+	}
+	s.hub.Broadcast(events.Event{Type: "tree"})
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
 const searchLimit = 50
 
 func (s *Server) search(w http.ResponseWriter, r *http.Request) {
@@ -355,6 +377,9 @@ func (s *Server) move(w http.ResponseWriter, r *http.Request) {
 	if rewritten {
 		// 原子改写替换了文件身份，监听器无法再从快照中识别这次移动。
 		s.hub.Broadcast(events.Event{Type: "moved", From: body.From, Path: body.To}, events.Event{Type: "tree"})
+	} else {
+		// 图标提交在文件移动之后；不能仅依赖文件监听器较早的通知。
+		s.hub.Broadcast(events.Event{Type: "tree"})
 	}
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
@@ -461,6 +486,7 @@ func (s *Server) trashRestore(w http.ResponseWriter, r *http.Request) {
 		vaultError(w, r, err)
 		return
 	}
+	s.hub.Broadcast(events.Event{Type: "tree"})
 	writeJSON(w, 200, item)
 }
 
@@ -511,7 +537,7 @@ func vaultError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.As(err, &conflict):
 		writeJSON(w, 412, map[string]string{"error": err.Error(), "rev": conflict.Rev})
-	case errors.Is(err, vault.ErrInvalidPath), errors.Is(err, vault.ErrInvalidImport):
+	case errors.Is(err, vault.ErrInvalidPath), errors.Is(err, vault.ErrInvalidImport), errors.Is(err, vault.ErrInvalidIcon):
 		writeError(w, 400, err.Error())
 	case errors.Is(err, vault.ErrNotFound):
 		writeError(w, 404, err.Error())

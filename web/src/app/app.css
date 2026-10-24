@@ -156,7 +156,7 @@ button {
 .rm-tree-row { -webkit-touch-callout: none; }
 .rm-tree-row.active { --rm-tree-row-overlay: var(--rm-active); background: var(--rm-active); color: var(--rm-text); font-weight: 500; }
 .rm-tree-row.drop { outline: 2px solid var(--rm-accent); outline-offset: -2px; }
-.rm-tree-chevron { display: inline-flex; flex: none; width: var(--rm-ui-font-size); color: var(--rm-text-muted); transition: transform 0.15s; }
+.rm-tree-chevron { display: inline-flex; flex: none; width: var(--rm-ui-font-size); color: var(--rm-text-muted); transition: transform var(--rm-panel-duration) var(--rm-panel-easing); }
 .rm-tree-chevron.open { transform: rotate(90deg); }
 .rm-tree-chevron.hidden { visibility: hidden; }
 .rm-tree-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -631,7 +631,7 @@ button {
 
 /* 轻玻璃工作台 */
 .rm-vault-heading { display: flex; align-items: center; padding: 2px 4px; }
-.rm-tree-label { flex: none; min-height: var(--rm-control-compact); padding: var(--rm-space-1) var(--rm-space-3); border: 0; background: none; font-size: var(--rm-ui-font-small); font-weight: 500; color: var(--rm-text-muted); text-align: left; cursor: pointer; }
+.rm-tree-label { margin-left: auto; flex: none; min-height: var(--rm-control-compact); padding: var(--rm-space-1) var(--rm-space-3); border: 0; background: none; font-size: var(--rm-ui-font-small); font-weight: 500; color: var(--rm-text-muted); text-align: right; cursor: pointer; }
 .rm-tree-label:hover { background: var(--rm-hover); }
 .rm-tree { padding: 0 var(--rm-space-2) var(--rm-space-2); }
 .rm-tree-row { height: var(--rm-control-compact); font-size: inherit; gap: var(--rm-space-1); }
@@ -713,3 +713,14 @@ button {
 @media (max-width: 767px), (pointer: coarse) {
   input:not([type=checkbox],[type=radio],[type=range]), select, textarea { font-size: max(16px, var(--rm-ui-font-size)); }
 }
+
+/* 文件树子层按实际内容高度展开；退出期间不能继续点击或聚焦。 */
+.rm-tree-children { display: grid; grid-template-rows: 1fr; }
+.rm-tree-children > .rm-tree-list { min-height: 0; overflow: hidden; }
+.rm-tree-expand-enter-active, .rm-tree-expand-leave-active { transition: grid-template-rows var(--rm-panel-duration) var(--rm-panel-easing), opacity var(--rm-panel-duration) var(--rm-panel-easing); }
+.rm-tree-expand-enter-from, .rm-tree-expand-leave-to { grid-template-rows: 0fr; opacity: 0; }
+.rm-tree-expand-leave-active { pointer-events: none; }
+.rm-emoji { font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; font-weight: normal; font-style: normal; }
+.rm-tree-icon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 20px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: none; color: inherit; font-size: 17px; line-height: 1; cursor: pointer; }
+.rm-tree-icon:hover { background: var(--rm-hover); }
+@media (pointer: coarse) { .rm-tree-icon { width: 28px; height: 44px; } }

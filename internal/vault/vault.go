@@ -54,6 +54,7 @@ type Entry struct {
 	Size    int64       `json:"size"`
 	ModTime int64       `json:"mtime"` // 毫秒
 	Info    fs.FileInfo `json:"-"`
+	Icon    *TreeIcon   `json:"icon,omitempty"`
 }
 
 type TrashItem struct {
@@ -306,12 +307,19 @@ func (v *Vault) Tree() ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	icons, err := v.readTreeIcons()
+	if err != nil {
+		return nil, err
+	}
 	visible := []Entry{}
 	for _, e := range entries {
 		if e.Dir {
 			e.Size = 0
 		}
 		if e.Dir || IsImage(e.Path) || (IsNote(e.Path) && !strings.Contains(e.Path, AssetsExt+"/")) {
+			if icon, ok := icons[e.Path]; ok {
+				e.Icon = &icon
+			}
 			visible = append(visible, e)
 		}
 	}
@@ -396,6 +404,15 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 	if _, err := os.Lstat(dst); err == nil {
 		return false, ErrExists
 	}
+	icons, err := v.readTreeIcons()
+	if err != nil {
+		return false, err
+	}
+	movedIcons := takeTreeIcons(icons, from, info.IsDir())
+	iconsChanged := len(movedIcons) > 0
+	for p, icon := range movedIcons {
+		icons[movedPath(p, from, to, info.IsDir())] = icon
+	}
 	srcAssets, dstAssets := "", ""
 	if isNote {
 		if st, err := os.Stat(AssetsDir(src)); err == nil && st.IsDir() {
@@ -403,6 +420,13 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 			if _, err := os.Lstat(dstAssets); err == nil {
 				return false, ErrExists
 			}
+		}
+	}
+	if srcAssets != "" {
+		attached := takeTreeIcons(icons, AssetsDir(from), true)
+		iconsChanged = iconsChanged || len(attached) > 0
+		for p, icon := range attached {
+			icons[movedPath(p, AssetsDir(from), AssetsDir(to), true)] = icon
 		}
 	}
 	var images []imageTransfer
@@ -486,6 +510,9 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 			images[i].removed = true
 		}
 	}
+	if iconsChanged {
+		err = v.writeTreeIcons(icons)
+	}
 	return rewritten, err
 }
 
@@ -531,16 +558,32 @@ func (v *Vault) deleteLocked(rel string) (item TrashItem, err error) {
 			item.Assets = filepath.Base(AssetsDir(p))
 		}
 	}
+	icons, err := v.readTreeIcons()
+	if err != nil {
+		return TrashItem{}, err
+	}
+	metadata := trashMetadata{TrashItem: item, Icons: takeTreeIcons(icons, rel, item.Dir)}
+	if item.Assets != "" {
+		for p, icon := range takeTreeIcons(icons, AssetsDir(rel), true) {
+			metadata.Icons[p] = icon
+		}
+	}
 	dir := filepath.Join(v.trash, item.ID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return TrashItem{}, err
 	}
-	noteMoved := false
+	noteMoved, assetsMoved := false, false
 	defer func() {
 		if err == nil {
 			return
 		}
 		rollbackFailed := false
+		if assetsMoved {
+			if rollback := os.Rename(filepath.Join(dir, item.Assets), AssetsDir(p)); rollback != nil {
+				err = errors.Join(err, fmt.Errorf("回滚回收站图片失败: %w", rollback))
+				rollbackFailed = true
+			}
+		}
 		if noteMoved {
 			if rollback := os.Rename(filepath.Join(dir, filepath.Base(p)), p); rollback != nil {
 				err = errors.Join(err, fmt.Errorf("回滚回收站笔记失败: %w", rollback))
@@ -554,7 +597,7 @@ func (v *Vault) deleteLocked(rel string) (item TrashItem, err error) {
 			}
 		}
 	}()
-	meta, _ := json.Marshal(item)
+	meta, _ := json.Marshal(metadata)
 	if err = atomicWrite(filepath.Join(dir, "meta.json"), meta); err != nil {
 		return item, err
 	}
@@ -567,25 +610,39 @@ func (v *Vault) deleteLocked(rel string) (item TrashItem, err error) {
 			return item, fmt.Errorf("移动图片目录到回收站失败: %w", err)
 		}
 	}
-	return item, nil
+	assetsMoved = item.Assets != ""
+	if len(metadata.Icons) > 0 {
+		err = v.writeTreeIcons(icons)
+	}
+	return item, err
 }
 
 func (v *Vault) readTrashItem(id string) (TrashItem, error) {
+	metadata, err := v.readTrashMetadata(id)
+	return metadata.TrashItem, err
+}
+
+func (v *Vault) readTrashMetadata(id string) (trashMetadata, error) {
 	if !trashIDPattern.MatchString(id) {
-		return TrashItem{}, ErrInvalidPath
+		return trashMetadata{}, ErrInvalidPath
 	}
 	data, err := os.ReadFile(filepath.Join(v.trash, id, "meta.json"))
 	if errors.Is(err, fs.ErrNotExist) {
-		return TrashItem{}, ErrNotFound
+		return trashMetadata{}, ErrNotFound
 	}
 	if err != nil {
-		return TrashItem{}, err
+		return trashMetadata{}, err
 	}
-	var item TrashItem
-	if err := json.Unmarshal(data, &item); err != nil {
-		return TrashItem{}, fmt.Errorf("回收站条目 %s 元数据损坏: %w", id, err)
+	var metadata trashMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return trashMetadata{}, fmt.Errorf("回收站条目 %s 元数据损坏: %w", id, err)
 	}
-	return item, nil
+	for p, icon := range metadata.Icons {
+		if _, err := CleanPath(p); err != nil || !icon.valid() || !(p == metadata.Path || metadata.Dir && strings.HasPrefix(p, metadata.Path+"/") || metadata.Assets != "" && (p == AssetsDir(metadata.Path) || strings.HasPrefix(p, AssetsDir(metadata.Path)+"/"))) {
+			return trashMetadata{}, fmt.Errorf("回收站条目 %s 图标元数据损坏", id)
+		}
+	}
+	return metadata, nil
 }
 
 func (v *Vault) TrashList() ([]TrashItem, error) {
@@ -609,7 +666,8 @@ func (v *Vault) TrashList() ([]TrashItem, error) {
 }
 
 func (v *Vault) Restore(id string) (item TrashItem, err error) {
-	item, err = v.readTrashItem(id)
+	metadata, err := v.readTrashMetadata(id)
+	item = metadata.TrashItem
 	if err != nil {
 		return TrashItem{}, err
 	}
@@ -619,6 +677,13 @@ func (v *Vault) Restore(id string) (item TrashItem, err error) {
 	}
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	icons, err := v.readTreeIcons()
+	if err != nil {
+		return TrashItem{}, err
+	}
+	for p, icon := range metadata.Icons {
+		icons[p] = icon
+	}
 	if _, err := os.Lstat(dst); err == nil {
 		return TrashItem{}, ErrExists
 	}
@@ -645,7 +710,7 @@ func (v *Vault) Restore(id string) (item TrashItem, err error) {
 				err = errors.Join(err, rollback)
 				return
 			}
-			meta, _ := json.Marshal(item)
+			meta, _ := json.Marshal(metadata)
 			if rollback := atomicWrite(filepath.Join(dir, "meta.json"), meta); rollback != nil {
 				err = errors.Join(err, rollback)
 			}
@@ -666,7 +731,13 @@ func (v *Vault) Restore(id string) (item TrashItem, err error) {
 		assetsMoved = true
 	}
 	cleaning = true
-	return item, os.RemoveAll(dir)
+	if err = os.RemoveAll(dir); err != nil {
+		return item, err
+	}
+	if len(metadata.Icons) > 0 {
+		err = v.writeTreeIcons(icons)
+	}
+	return item, err
 }
 
 func (v *Vault) Purge(id string) error {

@@ -1967,6 +1967,61 @@
           }
         }
       }
+    },
+    "/tree-icon": {
+      "put": {
+        "summary": "设置单个文件或目录的图标，null 恢复默认",
+        "tags": [
+          "文件"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "path",
+                  "icon"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/TreeIcon"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "非法路径或图标"
+          },
+          "404": {
+            "description": "文件不存在"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2018,6 +2073,9 @@
           "mtime": {
             "type": "integer",
             "description": "修改时间（Unix 毫秒）"
+          },
+          "icon": {
+            "$ref": "#/components/schemas/TreeIcon"
           }
         }
       },
@@ -2153,6 +2211,26 @@
           },
           "enabled": {
             "type": "boolean"
+          }
+        }
+      },
+      "TreeIcon": {
+        "type": "object",
+        "required": [
+          "kind",
+          "value"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "emoji",
+              "builtin"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "description": "Emoji 字符或内置线性图标名称，最多64字节"
           }
         }
       }
