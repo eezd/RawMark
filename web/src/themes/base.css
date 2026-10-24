@@ -1,13 +1,14 @@
 @import './fonts.css';
 @import 'highlight.js/styles/atom-one-dark.css';
+@import './maple-font.css';
 
 /* 基础主题。--rm-* 变量继续作为主题接口，字体在本地加载。 */
 :root {
   color-scheme: light;
   --rm-sidebar-width: 288px;
-  --rm-font-text: 'Manrope', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --rm-font-heading: 'Noto Serif SC', 'Source Han Serif SC', serif;
-  --rm-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --rm-font-text: 'Maple Mono Normal NL NF CN', monospace;
+  --rm-font-heading: var(--rm-font-editor, var(--rm-font-text));
+  --rm-font-mono: 'Maple Mono Normal NL NF CN', monospace;
   --rm-font-size: 16px;
   /* 界面排版独立于正文；辅助文字随界面缩放，但不小于 13px。 */
   --rm-ui-font-size: 14px;

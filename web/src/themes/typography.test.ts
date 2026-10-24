@@ -31,3 +31,13 @@ describe('界面与正文排版设置', () => {
     expect(style.getPropertyValue('--rm-font-size')).toBe('24px')
   })
 })
+
+it('缺省或无效字体统一使用 Maple，保留用户已有的显式选择', () => {
+  expect(sanitizeDisplaySettings({})).toMatchObject({ textFont: 'maple', codeFont: 'maple' })
+  expect(sanitizeDisplaySettings({ textFont: 'unknown', codeFont: 'unknown' })).toMatchObject({ textFont: 'maple', codeFont: 'maple' })
+  for (const textFont of ['sans', 'serif', 'system', 'maple']) expect(sanitizeDisplaySettings({ textFont }).textFont).toBe(textFont)
+  for (const codeFont of ['jetbrains', 'system', 'maple']) expect(sanitizeDisplaySettings({ codeFont }).codeFont).toBe(codeFont)
+  applyDisplaySettings(DISPLAY_DEFAULTS)
+  expect(document.documentElement.style.getPropertyValue('--rm-font-editor')).toContain('Maple Mono Normal NL NF CN')
+  expect(document.documentElement.style.getPropertyValue('--rm-font-mono')).toContain('Maple Mono Normal NL NF CN')
+})
