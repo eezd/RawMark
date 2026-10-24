@@ -9,7 +9,6 @@ let nextId = 1
 
 beforeAll(async () => {
   vi.stubGlobal('self', worker)
-  vi.stubGlobal('Prism', {})
   await import('./worker')
 })
 afterAll(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
@@ -34,31 +33,31 @@ it('首次高亮 HTML 就包含内嵌脚本和样式，不依赖其他代码块�
   const tokens = await highlight('html', source)
   expect(tokens).not.toBeNull()
   expect(text(tokens!)).toBe(source)
-  expect(hasToken(tokens!, 'token keyword', 'const')).toBe(true)
-  expect(hasToken(tokens!, 'token property', 'color')).toBe(true)
+  expect(hasToken(tokens!, 'hljs-keyword', 'const')).toBe(true)
+  expect(hasToken(tokens!, 'hljs-attribute', 'color')).toBe(true)
 })
 
-it('Prism token 保留原文、语言别名与嵌套语法，不再返回旧颜色', async () => {
+it('highlight.js token 保留原文、语言别名与嵌套语法，不再返回旧颜色', async () => {
   const source = 'const value = `中文😀 ${name}` // comment\n'
   const tokens = await highlight('js', source)
   expect(tokens).not.toBeNull()
   expect(text(tokens!)).toBe(source)
-  expect(hasToken(tokens!, 'token keyword', 'const')).toBe(true)
-  expect(hasToken(tokens!, 'token template-string', '`中文😀 ${name}`')).toBe(true)
-  expect(hasToken(tokens!, 'token interpolation', '${name}')).toBe(true)
-  expect(hasToken(tokens!, 'token comment', '// comment')).toBe(true)
+  expect(hasToken(tokens!, 'hljs-keyword', 'const')).toBe(true)
+  expect(hasToken(tokens!, 'hljs-string', '`中文😀 ${name}`')).toBe(true)
+  expect(hasToken(tokens!, 'hljs-subst', '${name}')).toBe(true)
+  expect(hasToken(tokens!, 'hljs-comment', '// comment')).toBe(true)
   expect(await highlight('javascript', source)).toEqual(tokens)
 })
 
-it('按需加载语言依赖，并发请求和常见别名得到实际高亮', async () => {
+it('并发请求和常见别名得到实际高亮', async () => {
   const samples = [
-    ['python', 'print("hello")', 'token string', '"hello"'],
-    ['tsx', 'const App = () => <div title="hello">你好</div>', 'token attr-value', '="hello"'],
-    ['sh', 'echo "$HOME"', 'token environment constant', '$HOME'],
-    ['yaml', 'name: hello', 'token key atrule', 'name'],
-    ['json', '{"value": true}', 'token boolean', 'true'],
-    ['go', 'package main\nfunc main() {}', 'token keyword', 'package'],
-    ['php', '<?php echo $value; ?><div>中文😀</div>', 'token keyword', 'echo'],
+    ['python', 'print("hello")', 'hljs-string', '"hello"'],
+    ['tsx', 'const App = () => <div title="hello">你好</div>', 'hljs-string', '"hello"'],
+    ['sh', 'echo "$HOME"', 'hljs-variable', '$HOME'],
+    ['yaml', 'name: hello', 'hljs-attr', 'name:'],
+    ['json', '{"value": true}', 'hljs-keyword', 'true'],
+    ['go', 'package main\nfunc main() {}', 'hljs-keyword', 'package'],
+    ['php', '<?php echo $value; ?><div>中文😀</div>', 'hljs-keyword', 'echo'],
   ]
   await Promise.all(samples.map(async ([lang, source, classes, content]) => {
     const tokens = await highlight(lang, source)
@@ -70,9 +69,24 @@ it('按需加载语言依赖，并发请求和常见别名得到实际高亮', a
 
 it('未知语言保持纯文本，真实分词失败返回原始原因且不阻断下一次请求', async () => {
   for (const lang of ['unknown-language', 'constructor', '__proto__']) expect(await highlight(lang, 'text')).toBeNull()
-  const { default: prism } = await import('prismjs')
+  const { default: hljs } = await import('highlight.js')
   const cause = new Error('分词失败')
-  vi.spyOn(prism, 'tokenize').mockImplementationOnce(() => { throw cause })
+  vi.spyOn(hljs, 'highlight').mockImplementationOnce(() => { throw cause })
   await expect(highlight('python', 'print(1)')).rejects.toMatchObject({ cause })
   expect(await highlight('python', 'print(1)')).not.toBeNull()
+})
+
+it('HTML 特殊字符、转义实体和伪造 span 原样保留，不作为标记解析', async () => {
+  const source = `const value = "&lt; &amp; &quot; &#x27; <span class='hljs-keyword'>中文😀</span>"; // > & '\n`
+  const tokens = await highlight('js', source)
+  expect(text(tokens!)).toBe(source)
+  expect(hasToken(tokens!, 'hljs-keyword', '中文😀')).toBe(false)
+})
+
+it('库安全模式返回的实际异常不伪装成成功的纯文本结果', async () => {
+  const { default: hljs } = await import('highlight.js')
+  const cause = new Error('语法运行失败')
+  const original = hljs.highlight('value', { language: 'js' })
+  vi.spyOn(hljs, 'highlight').mockReturnValueOnce({ ...original, errorRaised: cause })
+  await expect(highlight('js', 'value')).rejects.toMatchObject({ cause })
 })

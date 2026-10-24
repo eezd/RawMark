@@ -18,14 +18,13 @@
     "@lezer/highlight": "^1.2.5",
     "@lezer/markdown": "^1.8.0",
     "gemoji": "^8.1.0",
+    "highlight.js": "^11.12.0",
     "katex": "^0.18.11",
     "mermaid": "^12.2.0",
-    "prismjs": "^1.30.0",
     "turndown": "^7.2.4",
     "vue": "^3.5.44"
   },
   "devDependencies": {
-    "@types/prismjs": "^1.26.6",
     "@types/turndown": "^5.0.6",
     "@vitejs/plugin-vue": "^6.0.10",
     "commonmark-spec": "^0.31.2",

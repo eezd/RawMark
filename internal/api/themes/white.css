@@ -16,12 +16,6 @@
   --rm-shadow: 0 12px 40px -12px rgba(19, 27, 46, 0.18), 0 2px 8px rgba(19, 27, 46, 0.03);
   --rm-inline-code-bg: #eaedff;
   --rm-inline-code-text: #3525cd;
-  --rm-code-bg: #ffffff;
-  --rm-code-text: #334155;
   --rm-code-font-size: 14px;
   --rm-highlight-bg: rgba(255, 213, 0, 0.35);
-}
-
-@media (max-width: 767px) {
-  :root { --rm-code-bg: #283044; --rm-code-text: #eef0ff; }
 }

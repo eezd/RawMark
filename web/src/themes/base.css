@@ -1,5 +1,5 @@
 @import './fonts.css';
-@import 'prismjs/themes/prism-tomorrow.css';
+@import 'highlight.js/styles/atom-one-dark.css';
 
 /* 基础主题。--rm-* 变量继续作为主题接口，字体在本地加载。 */
 :root {
@@ -47,8 +47,8 @@
   --rm-shadow: 0 12px 40px -12px rgba(19, 27, 46, 0.18), 0 2px 8px rgba(19, 27, 46, 0.03);
   --rm-inline-code-bg: #eaedff;
   --rm-inline-code-text: #3525cd;
-  --rm-code-bg: #ffffff;
-  --rm-code-text: #334155;
+  --rm-code-bg: #282c34;
+  --rm-code-text: #abb2bf;
   --rm-code-font-size: 14px;
   --rm-highlight-bg: rgba(255, 213, 0, 0.35);
 }
@@ -63,8 +63,6 @@
   --rm-accent-strong: #42b883;
   --rm-inline-code-bg: #2f2f2f;
   --rm-inline-code-text: #f19a58;
-  --rm-code-bg: #2d2d2d;
-  --rm-code-text: #ccc;
   --rm-highlight-bg: rgba(255, 213, 0, 0.28);
 
   --rm-sidebar-bg: #191b1d;
@@ -86,8 +84,6 @@
     --rm-accent-strong: #42b883;
     --rm-inline-code-bg: #2f2f2f;
     --rm-inline-code-text: #f19a58;
-    --rm-code-bg: #2d2d2d;
-  --rm-code-text: #ccc;
     --rm-highlight-bg: rgba(255, 213, 0, 0.28);
 
     --rm-sidebar-bg: #191b1d;
@@ -343,14 +339,6 @@ button, input, select, textarea { font: inherit; }
 .cm-line.cm-rm-frontmatter-begin { border-radius: 6px 6px 0 0; padding-top: 4px; }
 .cm-line.cm-rm-frontmatter-end { border-radius: 0 0 6px 6px; padding-bottom: 4px; }
 
-/* 浅色编辑器的 Prism token 颜色。 */
-:root:not([data-rm-color-mode="dark"]) .cm-rm-code .token { text-shadow: none; background: none; }
-:root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.comment,.prolog,.doctype,.cdata) { color: #94a3b8; }
-:root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.punctuation,.operator) { color: #64748b; }
-:root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.keyword,.atrule,.tag) { color: #7c3aed; }
-:root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.string,.char,.attr-value,.builtin) { color: #059669; }
-:root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.function,.class-name) { color: #2563eb; }
-:root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.number,.boolean,.constant) { color: #d97706; }
 .cm-line:is(.cm-rm-h1,.cm-rm-h2,.cm-rm-h3,.cm-rm-h4,.cm-rm-h5,.cm-rm-h6) { font-family: var(--rm-font-heading); font-weight: 600; }
 .cm-line.cm-rm-h1 { font-size: 2.125em; line-height: 1.4; }
 .cm-line.cm-rm-h2 { font-size: 1.5em; line-height: 1.5; }
@@ -361,10 +349,5 @@ button, input, select, textarea { font: inherit; }
 .cm-line.cm-rm-code-end::before { border-bottom: 1px solid var(--rm-divider); }
 .cm-line.cm-rm-paragraph-end { padding-bottom: var(--rm-paragraph-spacing); }
 @media (max-width: 767px) {
-  :root:not([data-rm-color-mode="dark"]) { --rm-code-bg: #283044; --rm-code-text: #eef0ff; }
-  :root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.keyword,.atrule,.tag) { color: #c4b5fd; }
-  :root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.string,.char,.attr-value,.builtin) { color: #6ee7b7; }
-  :root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.function,.class-name) { color: #93c5fd; }
-  :root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.number,.boolean,.constant) { color: #fcd34d; }
   .cm-line.cm-rm-h1 { font-size: 1.75em; }
 }

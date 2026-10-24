@@ -34,6 +34,6 @@ it('启动和运行失败均结束请求，失败不会伪装成缓存结果且�
   await crashed
   const recovered = requestTokens('python', 'print(1)')
   const replacement = control.workers[1]!
-  replacement.dispatchEvent(new MessageEvent('message', { data: { id: replacement.request!.id, tokens: [{ classes: 'token function', content: ['print'] }] } }))
-  await expect(recovered).resolves.toEqual([{ classes: 'token function', content: ['print'] }])
+  replacement.dispatchEvent(new MessageEvent('message', { data: { id: replacement.request!.id, tokens: [{ classes: 'hljs-title function_', content: ['print'] }] } }))
+  await expect(recovered).resolves.toEqual([{ classes: 'hljs-title function_', content: ['print'] }])
 })
