@@ -34,5 +34,5 @@ with zipfile.ZipFile(sys.argv[1]) as archive:
             font.flavor = 'woff2'
             name = f'{variant.lower()}-{block:02x}.woff2'
             font.save(output / name)
-            css.append(f"@font-face {{ font-family: '{family}'; font-style: {style}; font-weight: {weight}; font-display: swap; src: url('./fonts/maple/{name}') format('woff2'); unicode-range: U+{block * 4096:X}-{(block + 1) * 4096 - 1:X}; }}")
+            css.append(f"@font-face {{ font-family: '{family}'; font-style: {style}; font-weight: {weight}; font-display: block; src: url('./fonts/maple/{name}') format('woff2'); unicode-range: U+{block * 4096:X}-{(block + 1) * 4096 - 1:X}; }}")
 (root / 'maple-font.css').write_text('\n'.join(css) + '\n')
