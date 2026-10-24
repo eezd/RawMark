@@ -41,6 +41,22 @@ async function search(selector: string, query: string) {
 }
 
 describe('设置查找与重置', () => {
+  it('编辑器字号在输入时立即生效，无需回车或失焦', async () => {
+    ws.settings = 'editor'
+    mount(SettingsDialog)
+    const input = host!.querySelector<HTMLInputElement>('#rm-font-size')!
+    input.value = '24'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(settings.fontSize).toBe(24)
+    expect(document.documentElement.style.getPropertyValue('--rm-font-size')).toBe('24px')
+    await vi.waitFor(() => expect(api.patchSettings).toHaveBeenCalledWith({ fontSize: 24 }))
+    input.value = ''
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(settings.fontSize).toBe(24)
+    input.dispatchEvent(new Event('blur'))
+    expect(input.value).toBe('24')
+  })
+
   it('移除日记和模板设置、搜索与命令入口', async () => {
     expect(searchSettings('日记')).toEqual([])
     expect(searchSettings('日历')).toEqual([])

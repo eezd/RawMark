@@ -94,6 +94,7 @@ function changeFont(event: Event) {
   const input = event.target as HTMLInputElement
   const value = input.valueAsNumber
   if (!Number.isFinite(value) || value <= 0) {
+    if (event.type === 'input') return
     toast('字号必须为正数')
     input.value = String(settings.fontSize)
     return
@@ -174,7 +175,7 @@ async function changePassword() {
               <h3 class="rm-settings-group-title">正文与代码</h3>
               <SettingRow id="text-font" control="rm-text-font" resettable @reset="change({ textFont: DEFAULTS.textFont })"><select id="rm-text-font" :value="settings.textFont" @change="change({ textFont: ($event.target as HTMLSelectElement).value as Settings['textFont'] })"><option v-for="(font, id) in TEXT_FONTS" :key="id" :value="id">{{ font.label }}</option></select></SettingRow>
               <SettingRow id="code-font" control="rm-code-font" resettable @reset="change({ codeFont: DEFAULTS.codeFont })"><select id="rm-code-font" :value="settings.codeFont" @change="change({ codeFont: ($event.target as HTMLSelectElement).value as Settings['codeFont'] })"><option v-for="(font, id) in CODE_FONTS" :key="id" :value="id">{{ font.label }}</option></select></SettingRow>
-              <SettingRow id="font-size" control="rm-font-size" resettable @reset="change({ fontSize: DEFAULTS.fontSize })"><label class="rm-font-input"><input id="rm-font-size" type="number" min="0" step="any" :value="settings.fontSize" @blur="changeFont" @keydown.enter="($event.target as HTMLInputElement).blur()" /> px</label></SettingRow>
+              <SettingRow id="font-size" control="rm-font-size" resettable @reset="change({ fontSize: DEFAULTS.fontSize })"><label class="rm-font-input"><input id="rm-font-size" type="number" min="0" step="any" :value="settings.fontSize" @input="changeFont" @blur="changeFont" @keydown.enter="($event.target as HTMLInputElement).blur()" /> px</label></SettingRow>
               <SettingRow id="content-width" resettable @reset="change({ contentWidth: DEFAULTS.contentWidth })"><div class="rm-segmented" role="radiogroup" aria-label="正文宽度"><button v-for="w in CONTENT_WIDTHS" :key="w.value" role="radio" :aria-checked="settings.contentWidth === w.value" :class="{ on: settings.contentWidth === w.value }" @click="change({ contentWidth: w.value })">{{ w.label }}</button></div></SettingRow>
               <SettingRow id="line-height" control="rm-line-height" resettable @reset="change({ lineHeight: DEFAULTS.lineHeight })"><input id="rm-line-height" type="range" min="1.2" max="2.5" step="0.05" :value="settings.lineHeight" @change="change({ lineHeight: Number(($event.target as HTMLInputElement).value) })" /><output for="rm-line-height">{{ settings.lineHeight.toFixed(2) }}</output></SettingRow>
               <SettingRow id="paragraph-spacing" control="rm-paragraph-spacing" resettable @reset="change({ paragraphSpacing: DEFAULTS.paragraphSpacing })"><input id="rm-paragraph-spacing" type="range" min="0" max="40" step="2" :value="settings.paragraphSpacing" @change="change({ paragraphSpacing: Number(($event.target as HTMLInputElement).value) })" /><output for="rm-paragraph-spacing">{{ settings.paragraphSpacing }}px</output></SettingRow>
