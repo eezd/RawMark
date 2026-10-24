@@ -83,6 +83,7 @@ func run(addr string) error {
 	srv := api.New(v, am, st, hub, idx)
 	srv.ThemesDir = filepath.Join(dataDir, "themes")
 	srv.PluginsDir = filepath.Join(dataDir, "plugins")
+	srv.FontsDir = filepath.Join(dataDir, "fonts")
 	httpServer := &http.Server{
 		Addr:              addr,
 		Handler:           srv.Handler(web.Dist()),

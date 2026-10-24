@@ -40,6 +40,7 @@ type Server struct {
 	// ThemesDir 指向数据目录中的主题目录；为空时只有内置主题。
 	ThemesDir  string
 	PluginsDir string
+	FontsDir   string
 	pluginsMu  sync.Mutex
 }
 
@@ -98,6 +99,10 @@ func (s *Server) routes() []route {
 
 		{"GET /api/v1/settings", authed, s.getSettings},
 		{"PATCH /api/v1/settings", sessionOnly, s.patchSettings},
+		{"GET /api/v1/fonts", sessionOnly, s.listFonts},
+		{"POST /api/v1/fonts", sessionOnly, s.importFont},
+		{"GET /api/v1/fonts/{id}/file", sessionOnly, s.fontFile},
+		{"DELETE /api/v1/fonts/{id}", sessionOnly, s.deleteFont},
 		{"GET /api/v1/plugins", sessionOnly, s.listPlugins},
 		{"POST /api/v1/plugins", sessionOnly, s.installPlugin},
 		{"PATCH /api/v1/plugins/{id}", sessionOnly, s.togglePlugin},

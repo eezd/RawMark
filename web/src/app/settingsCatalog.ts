@@ -13,6 +13,7 @@ export const SETTINGS_SECTIONS: { id: SettingsSection; title: string; icon: Icon
 ]
 
 export const SETTING_ITEMS = {
+  'ui-font': { section: 'appearance', title: '界面字体', description: '用于菜单、侧栏与按钮；可导入或删除字体，Maple 为不可删除的默认字体。', keywords: 'UI 字体 导入 删除 TTF OTF WOFF' },
   'ui-font-size': { section: 'appearance', title: '界面字号', description: '调整菜单、侧栏与按钮文字，不影响正文和代码字号。', keywords: 'UI 大小' },
   'theme-select': { section: 'appearance', title: '主题', description: '使用内置主题，或从服务器数据目录的 themes 文件夹添加主题。', keywords: '白色 黑色 自定义' },
   'color-mode': { section: 'appearance', title: '明暗模式', description: '选择浅色、深色，或跟随系统切换。', keywords: '黑暗 夜间 light dark system' },

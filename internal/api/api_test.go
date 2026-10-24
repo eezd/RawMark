@@ -130,6 +130,7 @@ func newFixture(t *testing.T) *fixture {
 	server := New(v, am, st, hub, idx)
 	server.ThemesDir = filepath.Join(dir, "themes")
 	server.PluginsDir = filepath.Join(dir, "plugins")
+	server.FontsDir = filepath.Join(dir, "fonts")
 	srv := httptest.NewServer(server.Handler(fstest.MapFS{}))
 	t.Cleanup(srv.Close)
 	f := &fixture{t: t, url: srv.URL, root: v.Root(), store: st, hub: hub, admin: newClient()}

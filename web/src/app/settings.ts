@@ -1,7 +1,8 @@
 // 应用设置：服务器上一份 JSON，全部设备共用；修改立即保存，其他设备经事件推送同步。
 // 本地缓存上次的值，启动时先套用，避免页面先按默认值显示再跳变
 import { reactive } from 'vue'
-import { DISPLAY_DEFAULTS, sanitizeDisplaySettings, applyDisplaySettings } from '../themes/typography'
+import { applyFontCatalog, customFonts, parseFontCatalog } from './fonts'
+import { DISPLAY_DEFAULTS, FONT_PRESETS, sanitizeDisplaySettings, applyDisplaySettings } from '../themes/typography'
 import { api } from './api'
 import { normalizeKeys } from '../keys'
 import { applyAppearance, appearancePaused, sanitizeAppearance, type Appearance } from '../themes/appearance'
@@ -17,7 +18,7 @@ export const CONTENT_WIDTHS = [
 
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
-export const DEFAULTS = { selectionToolbar: true, ...DISPLAY_DEFAULTS, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
+export const DEFAULTS = { hiddenFonts: [] as string[], selectionToolbar: true, ...DISPLAY_DEFAULTS, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
 export type Settings = typeof DEFAULTS & Appearance & { shortcuts: Record<string, string[]> }
 
 const CACHE_KEY = 'rawmark.settings'
@@ -35,8 +36,10 @@ export class SettingsAppearanceError extends Error {
 // 服务器上的设置可能由旧版本、API 或插件写入，取值不合法的项退回默认值
 function sanitize(raw: Record<string, unknown>): Settings {
   const pick = <T>(v: unknown, allowed: T[], def: T) => (allowed.includes(v as T) ? (v as T) : def)
+  const hiddenFonts = Array.isArray(raw.hiddenFonts) ? raw.hiddenFonts.filter((id): id is string => typeof id === 'string' && id !== 'maple' && Object.hasOwn(FONT_PRESETS, id)) : []
   return {
-    ...sanitizeDisplaySettings(raw),
+    hiddenFonts,
+    ...sanitizeDisplaySettings(raw, customFonts.value.map(font => font.id), hiddenFonts),
     selectionToolbar: typeof raw.selectionToolbar === 'boolean' ? raw.selectionToolbar : true,
     shortcuts: sanitizeShortcuts(raw.shortcuts),
     spellcheck: typeof raw.spellcheck === 'boolean' ? raw.spellcheck : DEFAULTS.spellcheck,
@@ -92,7 +95,9 @@ applied({ ...settings })
 applyAppearance({ ...settings, theme: 'default', cssSnippets: [] }, '')
 
 export async function loadSettings() {
-  applied(sanitize(await api.settings()))
+  const [raw, fonts] = await Promise.all([api.settings(), api.fonts()])
+  applyFontCatalog(parseFontCatalog(fonts))
+  applied(sanitize(raw))
   await applySettingsAppearance()
 }
 

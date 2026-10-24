@@ -2022,6 +2022,139 @@
           }
         }
       }
+    },
+    "/fonts": {
+      "get": {
+        "summary": "列出已导入字体",
+        "tags": [
+          "设置"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "只接受登录会话"
+          }
+        }
+      },
+      "post": {
+        "summary": "导入字体，按内容去重（TTF/OTF/WOFF/WOFF2，上限30 MB）",
+        "tags": [
+          "设置"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "只接受登录会话"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fonts/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "delete": {
+        "summary": "删除导入字体，将使用它的界面、正文和代码字体恢复Maple；Maple不可删除",
+        "tags": [
+          "设置"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "只接受登录会话"
+          }
+        }
+      }
+    },
+    "/fonts/{id}/file": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "summary": "读取导入字体文件",
+        "tags": [
+          "设置"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "只接受登录会话"
+          }
+        }
+      }
     }
   },
   "components": {

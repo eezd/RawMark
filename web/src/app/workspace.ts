@@ -1037,7 +1037,7 @@ export async function startWorkspace() {
   )
   // 字号、正文宽度变化后行高随之改变，编辑器需要重新测量
   watch(
-    () => [settings.uiFontSize, settings.fontSize, settings.contentWidth, settings.sidebarWidth, settings.textFont, settings.codeFont, settings.lineHeight, settings.paragraphSpacing],
+    () => [settings.uiFont, settings.uiFontSize, settings.fontSize, settings.contentWidth, settings.sidebarWidth, settings.textFont, settings.codeFont, settings.lineHeight, settings.paragraphSpacing],
     () => view?.requestMeasure(),
   )
   watch(

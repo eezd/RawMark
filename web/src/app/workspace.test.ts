@@ -24,6 +24,7 @@ describe('事件同步', () => {
   it('目录移动映射整个已打开的子树，并把未保存输入写入新路径', async () => {
     const tree = vi.spyOn(api, 'tree').mockResolvedValue([{ path: 'from/note.md', dir: false, size: 0, mtime: 0 }])
     vi.spyOn(api, 'settings').mockResolvedValue({})
+    vi.spyOn(api, 'fonts').mockResolvedValue([])
     vi.spyOn(api, 'plugins').mockResolvedValue([])
     vi.spyOn(drafts, 'all').mockResolvedValue([])
     vi.spyOn(drafts, 'put').mockImplementation(async (draft) => draft.path)
@@ -48,6 +49,7 @@ describe('事件同步', () => {
     const entries = [{ path: 'sync.md', dir: false, size: 0, mtime: 0 }]
     vi.spyOn(api, 'tree').mockResolvedValue(entries)
     vi.spyOn(api, 'settings').mockResolvedValue({})
+    vi.spyOn(api, 'fonts').mockResolvedValue([])
     vi.spyOn(api, 'plugins').mockResolvedValue([])
     vi.spyOn(drafts, 'all').mockResolvedValue([])
     vi.spyOn(drafts, 'delete').mockResolvedValue(undefined)
@@ -139,6 +141,7 @@ describe('笔记打开与创建', () => {
     }
     expect(ws.toasts.some(toast => toast.text.includes('打开失败：文件不存在'))).toBe(false)
   })
+
 
 })
 

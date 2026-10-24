@@ -24,6 +24,8 @@ import { flushAll, readyToReload, startWorkspace, stopWorkspace, toast, ws } fro
 const emit = defineEmits<{ logout: [] }>()
 const title = computed(() => (ws.active ? noteTitle(ws.active) : 'RawMark'))
 const resizingSidebar = ref(false)
+// 自定义字体需登录后读取；初始化期间保留排版，但不先显示默认字体。
+const initializing = ref(true)
 
 // 拖动侧栏右缘调整宽度：拖动中只改 CSS 变量，松手后保存到设置
 function startResize(e: PointerEvent) {
@@ -91,7 +93,11 @@ function onTouchMove(e: TouchEvent) {
 
 const unregisterLogout = registerCommand({ id: 'app.logout', title: '退出登录', run: () => void logout() })
 
-onMounted(() => void startWorkspace().catch((err) => toast('工作区初始化失败，请重新加载：' + (err instanceof ApiError ? err.message : '网络或本地存储错误'))))
+onMounted(async () => {
+  try { await startWorkspace() }
+  catch (err) { toast('工作区初始化失败，请重新加载：' + (err instanceof ApiError ? err.message : '网络或本地存储错误')) }
+  finally { initializing.value = false }
+})
 onBeforeUnmount(() => {
   unregisterLogout()
   stopWorkspace()
@@ -101,6 +107,8 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="rm-shell"
+    :style="initializing ? { opacity: 0, pointerEvents: 'none' } : undefined"
+    :inert="initializing"
     :class="{ 'sidebar-open': ws.sidebarOpen, 'sidebar-collapsed': ws.sidebarCollapsed, 'sidebar-resizing': resizingSidebar, 'focus-mode': ws.focusMode }"
     @touchstart.passive="onTouchStart"
     @touchmove.passive="onTouchMove"

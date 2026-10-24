@@ -35,6 +35,12 @@ export interface Theme {
   version: string
 }
 
+export interface CustomFont {
+  id: string
+  name: string
+  format: 'ttf' | 'otf' | 'woff' | 'woff2'
+}
+
 export interface InstalledPlugin {
   id: string
   name: string
@@ -123,6 +129,13 @@ export const api = {
   changePassword: (current: string, next: string) => request('POST', '/api/v1/auth/password', { json: { current, next } }),
 
   settings: () => json<Record<string, unknown>>(request('GET', '/api/v1/settings')),
+  fonts: async () => (await json<{ fonts: CustomFont[] }>(request('GET', '/api/v1/fonts'))).fonts,
+  importFont: (file: File) => {
+    const body = new FormData()
+    body.append('file', file)
+    return json<CustomFont>(request('POST', '/api/v1/fonts', { body }))
+  },
+  deleteFont: (id: string) => request('DELETE', '/api/v1/fonts/' + encodeURIComponent(id)),
   themes: async () => (await json<{ themes: Theme[] }>(request('GET', '/api/v1/themes'))).themes,
   theme: (id: string) => json<Theme & { css: string }>(request('GET', '/api/v1/themes/' + encodeURIComponent(id))),
   plugins: async () => (await json<{ plugins: InstalledPlugin[] }>(request('GET', '/api/v1/plugins'))).plugins,

@@ -4,7 +4,8 @@ import { api, ApiError } from './api'
 import { runCommand } from './commands'
 import Icon from './Icon.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
-import { CODE_FONTS, TEXT_FONTS, UI_FONT_SIZE } from '../themes/typography'
+import { UI_FONT_SIZE } from '../themes/typography'
+import FontPicker from './FontPicker.vue'
 import PluginsPanel from './PluginsPanel.vue'
 import { installApp, installPrompt } from './pwa'
 import { CONTENT_WIDTHS, DEFAULTS, TAB_SIZES, loadSettings, settings, settingsSave, SettingsAppearanceError, updateSettings, type Settings } from './settings'
@@ -164,6 +165,7 @@ async function changePassword() {
           <div v-show="!searching" class="rm-settings-page">
             <PluginsPanel v-if="section === 'plugins'" />
             <template v-else-if="section === 'appearance'">
+              <SettingRow id="ui-font" control="rm-ui-font" resettable @reset="change({ uiFont: DEFAULTS.uiFont })"><FontPicker id="rm-ui-font" setting="uiFont" /></SettingRow>
               <SettingRow id="ui-font-size" control="rm-ui-font-size" resettable @reset="change({ uiFontSize: DEFAULTS.uiFontSize })">
                 <label class="rm-font-input"><input id="rm-ui-font-size" type="number" :min="UI_FONT_SIZE.min" :max="UI_FONT_SIZE.max" step="1" :value="settings.uiFontSize" @blur="changeUIFont" @keydown.enter="($event.target as HTMLInputElement).blur()" /> px</label>
               </SettingRow>
@@ -173,8 +175,8 @@ async function changePassword() {
 
             <template v-else-if="section === 'editor'">
               <h3 class="rm-settings-group-title">正文与代码</h3>
-              <SettingRow id="text-font" control="rm-text-font" resettable @reset="change({ textFont: DEFAULTS.textFont })"><select id="rm-text-font" :value="settings.textFont" @change="change({ textFont: ($event.target as HTMLSelectElement).value as Settings['textFont'] })"><option v-for="(font, id) in TEXT_FONTS" :key="id" :value="id">{{ font.label }}</option></select></SettingRow>
-              <SettingRow id="code-font" control="rm-code-font" resettable @reset="change({ codeFont: DEFAULTS.codeFont })"><select id="rm-code-font" :value="settings.codeFont" @change="change({ codeFont: ($event.target as HTMLSelectElement).value as Settings['codeFont'] })"><option v-for="(font, id) in CODE_FONTS" :key="id" :value="id">{{ font.label }}</option></select></SettingRow>
+              <SettingRow id="text-font" control="rm-text-font" resettable @reset="change({ textFont: DEFAULTS.textFont })"><FontPicker id="rm-text-font" setting="textFont" /></SettingRow>
+              <SettingRow id="code-font" control="rm-code-font" resettable @reset="change({ codeFont: DEFAULTS.codeFont })"><FontPicker id="rm-code-font" setting="codeFont" /></SettingRow>
               <SettingRow id="font-size" control="rm-font-size" resettable @reset="change({ fontSize: DEFAULTS.fontSize })"><label class="rm-font-input"><input id="rm-font-size" type="number" min="0" step="any" :value="settings.fontSize" @input="changeFont" @blur="changeFont" @keydown.enter="($event.target as HTMLInputElement).blur()" /> px</label></SettingRow>
               <SettingRow id="content-width" resettable @reset="change({ contentWidth: DEFAULTS.contentWidth })"><div class="rm-segmented" role="radiogroup" aria-label="正文宽度"><button v-for="w in CONTENT_WIDTHS" :key="w.value" role="radio" :aria-checked="settings.contentWidth === w.value" :class="{ on: settings.contentWidth === w.value }" @click="change({ contentWidth: w.value })">{{ w.label }}</button></div></SettingRow>
               <SettingRow id="line-height" control="rm-line-height" resettable @reset="change({ lineHeight: DEFAULTS.lineHeight })"><input id="rm-line-height" type="range" min="1.2" max="2.5" step="0.05" :value="settings.lineHeight" @change="change({ lineHeight: Number(($event.target as HTMLInputElement).value) })" /><output for="rm-line-height">{{ settings.lineHeight.toFixed(2) }}</output></SettingRow>

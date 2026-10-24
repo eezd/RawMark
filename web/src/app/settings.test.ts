@@ -8,15 +8,18 @@ import ShortcutSettings from './ShortcutSettings.vue'
 import { DEFAULTS, loadSettings, settings, settingsSave, SettingsAppearanceError, updateSettings } from './settings'
 import { searchSettings } from './settingsCatalog'
 import { ws } from './workspace'
+import { applyFontCatalog } from './fonts'
 
 let app: App | undefined
 let host: HTMLElement | undefined
 const cleanup: (() => void)[] = []
 beforeEach(() => {
+  applyFontCatalog([])
   Object.assign(settings, DEFAULTS, { colorMode: 'system', theme: 'default', cssSnippets: [], shortcuts: {} })
   Object.assign(settingsSave, { pending: 0, result: 'idle', error: '' })
   vi.spyOn(api, 'patchSettings').mockResolvedValue({})
   vi.spyOn(api, 'settings').mockResolvedValue({})
+  vi.spyOn(api, 'fonts').mockResolvedValue([])
   vi.spyOn(api, 'themes').mockResolvedValue([{ id: 'default', name: '默认', version: '1' }])
 })
 afterEach(() => {
@@ -70,6 +73,76 @@ describe('设置查找与重置', () => {
     expect(host!.textContent).not.toContain('模板')
   })
 
+  it('界面与编辑器共用字体管理，删除预设同步恢复使用位置，Maple不可删除', async () => {
+    settings.uiFont = settings.textFont = settings.codeFont = 'serif'
+    ws.settings = 'appearance'
+    mount(SettingsDialog)
+    host!.querySelector<HTMLButtonElement>('#rm-ui-font')!.click()
+    await nextTick()
+    expect(host!.querySelector('button[aria-label^="删除字体 Maple"]')).toBeNull()
+    host!.querySelector<HTMLButtonElement>('button[aria-label="删除字体 Noto Serif SC · 思源宋体"]')!.click()
+    await vi.waitFor(() => expect(settings.hiddenFonts).toContain('serif'))
+    expect(settings.uiFont).toBe('maple')
+    expect(settings.textFont).toBe('maple')
+    expect(settings.codeFont).toBe('maple')
+    const editor = [...host!.querySelectorAll<HTMLButtonElement>('.rm-settings-tab')].find(button => button.textContent === '编辑器')!
+    editor.click()
+    await nextTick()
+    host!.querySelector<HTMLButtonElement>('#rm-text-font')!.click()
+    await nextTick()
+    expect(host!.querySelector('.rm-font-options')!.textContent).not.toContain('Noto Serif SC')
+    expect(host!.querySelector('.rm-font-options')!.textContent).toContain('导入字体')
+  })
+
+  it('先装载字体资源再恢复服务器上的自定义字体，字体删除后恢复Maple', async () => {
+    const font = { id: 'custom-' + 'a'.repeat(64), name: '导入字体', format: 'woff2' as const }
+    vi.mocked(api.fonts).mockResolvedValue([font])
+    vi.mocked(api.settings).mockResolvedValue({ uiFont: font.id, textFont: font.id, codeFont: font.id })
+    await loadSettings()
+    expect(settings.uiFont).toBe(font.id)
+    expect(document.querySelector('#rm-custom-fonts')!.textContent).toContain('/api/v1/fonts/' + font.id + '/file')
+    expect(document.documentElement.style.getPropertyValue('--rm-font-text')).toContain(font.id)
+    vi.mocked(api.fonts).mockResolvedValue([])
+    await loadSettings()
+    expect(settings.uiFont).toBe('maple')
+    expect(settings.textFont).toBe('maple')
+    expect(settings.codeFont).toBe('maple')
+  })
+
+  it('字体保存失败后重新读取原选择并显示错误', async () => {
+    vi.mocked(api.patchSettings).mockRejectedValueOnce(new ApiError(500, '字体设置写入失败'))
+    ws.settings = 'appearance'
+    mount(SettingsDialog)
+    host!.querySelector<HTMLButtonElement>('#rm-ui-font')!.click()
+    await nextTick()
+    const serif = [...host!.querySelectorAll<HTMLButtonElement>('.rm-font-choice')].find(button => button.textContent === 'Noto Serif SC · 思源宋体')!
+    serif.click()
+    await vi.waitFor(() => expect(host!.querySelector('[role="alert"]')!.textContent).toContain('字体设置写入失败'))
+    expect(settings.uiFont).toBe('maple')
+    expect(host!.querySelector<HTMLButtonElement>('#rm-ui-font')!.textContent).toContain('Maple')
+  })
+
+  it('删除字体失败保留原字体和设置，允许重试', async () => {
+    const font = { id: 'custom-' + 'b'.repeat(64), name: '不可删除测试', format: 'woff2' as const }
+    applyFontCatalog([font])
+    settings.uiFont = font.id
+    vi.spyOn(api, 'deleteFont').mockRejectedValueOnce(new ApiError(500, '字体删除失败'))
+    ws.settings = 'appearance'
+    mount(SettingsDialog)
+    host!.querySelector<HTMLButtonElement>('#rm-ui-font')!.click()
+    await nextTick()
+    host!.querySelector<HTMLButtonElement>('button[aria-label="删除字体 不可删除测试"]')!.click()
+    await vi.waitFor(() => expect(host!.querySelector('[role="alert"]')!.textContent).toContain('字体删除失败'))
+    expect(settings.uiFont).toBe(font.id)
+    expect(host!.querySelector<HTMLButtonElement>('#rm-ui-font')!.disabled).toBe(false)
+  })
+
+  it('忽略隐藏Maple的外部设置，不允许移除默认字体', async () => {
+    vi.mocked(api.settings).mockResolvedValue({ hiddenFonts: ['maple', 'serif'], uiFont: 'serif' })
+    await loadSettings()
+    expect(settings.hiddenFonts).toEqual(['serif'])
+    expect(settings.uiFont).toBe('maple')
+  })
   it('设置和命令不再提供分享入口', async () => {
     expect(searchSettings('分享')).toEqual([])
     expect(allCommands().map(command => command.id)).not.toContain('note.share')
