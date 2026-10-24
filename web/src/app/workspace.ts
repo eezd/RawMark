@@ -35,7 +35,7 @@ export interface Tab {
   conflictRev?: string
 }
 
-export type SettingsSection = 'appearance' | 'editor' | 'account' | 'shortcuts' | 'shares' | 'tokens' | 'trash' | 'plugins' | 'about'
+export type SettingsSection = 'appearance' | 'editor' | 'templates' | 'account' | 'shortcuts' | 'tokens' | 'trash' | 'plugins' | 'about'
 
 export interface Toast {
   id: number
@@ -63,8 +63,6 @@ export const ws = reactive({
   switcher: null as string | null,
   // 打开的设置分组，null 为关闭；index 为从通用入口打开（手机上先显示分组列表，电脑上显示第一组）
   settings: (pluginsPaused ? 'plugins' : appearancePaused ? 'appearance' : null) as SettingsSection | 'index' | null,
-  // 分享当前笔记的对话框（笔记路径）
-  sharing: null as string | string[] | null,
   // 「移动到…」对话框（笔记或文件夹路径）
   moving: null as string | string[] | null,
   // 导入目标目录，空字符串为根目录
@@ -1100,9 +1098,7 @@ function registerBuiltinCommands() {
     { id: 'view.outline', title: '显示/隐藏大纲', keys: ['Mod+Shift+O'], when: hasNote, run: () => (ws.outlineOpen = !ws.outlineOpen) },
     { id: 'view.source', title: '开启/关闭源码编辑', when: hasNote, run: toggleSourceMode },
     { id: 'app.trash', title: '打开回收站', run: () => (ws.settings = 'trash') },
-    { id: 'note.share', title: '分享当前笔记', when: hasNote, run: () => (ws.sharing = ws.active) },
     { id: 'app.images', title: '管理根目录图片', run: () => { ws.imagesAll = false; ws.images = '' } },
-    { id: 'app.shares', title: '管理分享链接', run: () => (ws.settings = 'shares') },
     { id: 'app.tokens', title: 'API 令牌', run: () => (ws.settings = 'tokens') },
   ]) {
     registerCommand(cmd)

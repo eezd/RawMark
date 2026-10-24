@@ -47,7 +47,7 @@ function toggle(plugin: InstalledPlugin) {
     <button class="rm-btn" :disabled="busy" @click="fileInput?.click()">安装 ZIP</button>
     <input ref="fileInput" type="file" accept=".zip,application/zip" hidden @change="install" />
   </div>
-  <p class="rm-appearance-note">插件拥有页面内完整权限，请只安装可信来源。安装后默认停用；启用状态在所有设备同步。分享页不加载外部插件。</p>
+  <p class="rm-appearance-note">插件拥有页面内完整权限，请只安装可信来源。安装后默认停用；启用状态在所有设备同步。</p>
   <p v-if="error || pluginState.error" class="rm-appearance-note rm-auth-error">{{ error || pluginState.error }}</p>
   <p v-if="!pluginState.installed.length && !pluginState.error" class="rm-appearance-note">尚未安装插件。</p>
   <div v-for="plugin in pluginState.installed" :key="plugin.id" class="rm-plugin-row">

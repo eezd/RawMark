@@ -1,35 +1,48 @@
 package api
 
 import (
+	"io"
 	"net/http"
-	"rawmark/internal/store"
 	"rawmark/internal/vault"
 	"testing"
-	"time"
 )
 
-func TestImageCleanupHonorsShareExpiryAndReferences(t *testing.T) {
+func TestImageCleanupHonorsReferences(t *testing.T) {
 	f := newFixture(t)
-	f.write("assets/active.png", "active")
-	f.write("assets/expired.png", "expired")
+	f.write("assets/orphan.png", "orphan")
+	f.write("assets/unused.png", "unused")
 	f.write("assets/used.png", "used")
 	f.write("note.md", "[image](assets/used.png)")
-	for _, share := range []store.Share{
-		{Token: "active", Items: []store.ShareItem{{ID: 0, Path: "assets/active.png"}}, ExpiresAt: time.Now().Add(time.Hour).UnixMilli()},
-		{Token: "expired", Items: []store.ShareItem{{ID: 0, Path: "assets/expired.png"}}, ExpiresAt: time.Now().Add(-time.Hour).UnixMilli()},
-	} {
-		if err := f.store.CreateShare(share); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if code := f.status(newClient(), "POST", "/api/v1/assets/cleanup", `{"paths":["assets/expired.png"]}`, nil); code != http.StatusUnauthorized {
+	if code := f.status(newClient(), "POST", "/api/v1/assets/cleanup", `{"paths":["assets/unused.png"]}`, nil); code != http.StatusUnauthorized {
 		t.Fatal(code)
 	}
-	result := decode[vault.CleanupResult](t, f.do(f.admin, "POST", "/api/v1/assets/cleanup", `{"paths":["assets/active.png","assets/expired.png","assets/used.png"]}`, nil))
-	if len(result.Deleted) != 1 || result.Deleted[0].Path != "assets/expired.png" || len(result.Skipped) != 2 {
-		t.Fatalf("引用或分享保护不符：%+v", result)
+	result := decode[vault.CleanupResult](t, f.do(f.admin, "POST", "/api/v1/assets/cleanup", `{"paths":["assets/orphan.png","assets/unused.png","assets/used.png"]}`, nil))
+	if len(result.Deleted) != 2 || len(result.Skipped) != 1 || result.Skipped[0].Path != "assets/used.png" {
+		t.Fatalf("引用保护不符：%+v", result)
 	}
 	if code := f.status(newClient(), "GET", "/api/v1/metadata", "", nil); code != http.StatusUnauthorized {
 		t.Fatal(code)
+	}
+}
+
+func TestImageCleanupRejectsDirectories(t *testing.T) {
+	f := newFixture(t)
+	f.write("assets/folder.png/keep.md", "保留目录内的笔记")
+	f.write("assets/orphan.png", "image")
+	res := f.do(f.admin, "POST", "/api/v1/assets/cleanup", `{"paths":["assets/folder.png","assets/orphan.png"]}`, nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("清理应逐项汇报：%d", res.StatusCode)
+	}
+	result := decode[vault.CleanupResult](t, res)
+	if len(result.Deleted) != 1 || result.Deleted[0].Path != "assets/orphan.png" || len(result.Skipped) != 1 || result.Skipped[0].Path != "assets/folder.png" || result.Skipped[0].Reason != "不是图片文件" {
+		t.Fatalf("目录应跳过，普通孤立图片仍可清理：%+v", result)
+	}
+	kept := f.do(f.admin, "GET", "/api/v1/files/assets/folder.png/keep.md", "", nil)
+	if kept.StatusCode != http.StatusOK {
+		t.Fatalf("目录内笔记被误移：%d", kept.StatusCode)
+	}
+	got, err := io.ReadAll(kept.Body)
+	if err != nil || string(got) != "保留目录内的笔记" {
+		t.Fatalf("目录内笔记内容被改变：%q %v", got, err)
 	}
 }

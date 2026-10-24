@@ -42,10 +42,10 @@ func (h *staticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
-	// 分享页 /s/{token} 是独立的入口，只加载渲染器
-	share := strings.HasPrefix(name, "s/")
-	if share {
-		name = "share.html"
+	// 已移除的公开入口不能回退到应用首页。
+	if name == "s" || strings.HasPrefix(name, "s/") || name == "share.html" {
+		writeError(w, 404, "页面不存在")
+		return
 	}
 	f, err := h.load(name)
 	if err != nil {
@@ -64,9 +64,6 @@ func (h *staticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasSuffix(name, ".html") {
 		hd.Set("Content-Security-Policy", appCSP)
-	}
-	if share {
-		hd.Set("X-Robots-Tag", "noindex")
 	}
 	if path.Ext(name) == ".webmanifest" {
 		// Go 的 MIME 表未必包含此扩展名，不能让 ServeContent 对压缩后的数据嗅探类型。

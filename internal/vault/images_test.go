@@ -20,7 +20,7 @@ func TestImageMoveUpdatesLocalReferences(t *testing.T) {
 	if _, err := v.Write("notes/a.md", []byte(content), Precondition{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := v.Move("assets/原图.png", "elsewhere/新图 #.png", nil); err != nil {
+	if _, err := v.Move("assets/原图.png", "elsewhere/新图 #.png"); err != nil {
 		t.Fatal(err)
 	}
 	out, _, err := v.Read("notes/a.md")
@@ -33,7 +33,7 @@ func TestImageMoveUpdatesLocalReferences(t *testing.T) {
 	if string(out) != want {
 		t.Fatalf("链接改写不符：\n%s\n期望：\n%s", out, want)
 	}
-	if _, err := v.Move("elsewhere/新图 #.png", "elsewhere/新图.jpg", nil); !errors.Is(err, ErrInvalidPath) {
+	if _, err := v.Move("elsewhere/新图 #.png", "elsewhere/新图.jpg"); !errors.Is(err, ErrInvalidPath) {
 		t.Fatalf("不能用重命名改变图片格式：%v", err)
 	}
 	item, err := v.Delete("elsewhere/新图 #.png")
@@ -62,7 +62,7 @@ func TestImageMovePreservesMultilineMarkdownAndIgnoresLiteralPaths(t *testing.T)
 	if _, err := v.Write("文章.md", []byte(content), Precondition{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := v.Move("old.png", "new.png", nil); err != nil {
+	if _, err := v.Move("old.png", "new.png"); err != nil {
 		t.Fatal(err)
 	}
 	body, _, err := v.Read("文章.md")
@@ -136,44 +136,5 @@ func TestImagesDoNotExposeOrModifySymlinks(t *testing.T) {
 	}
 	if err := v.ReplaceImage("link.png", "x.png", strings.NewReader("new"), 100); !errors.Is(err, ErrInvalidPath) {
 		t.Fatalf("不能替换仓库外文件：%v", err)
-	}
-}
-
-func TestMoveCommitFailureRestoresExactReferences(t *testing.T) {
-	for _, source := range []string{"from.png", "from.md"} {
-		t.Run(source, func(t *testing.T) {
-			v := newVault(t)
-			content := "![](from.assets/a.png)"
-			if _, err := v.Write("from.md", []byte(content), Precondition{}); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.Mkdir(filepath.Join(v.Root(), "from.assets"), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(v.Root(), "from.png"), []byte("image"), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			refs := "![](from.png)\n![](to.png)"
-			if _, err := v.Write("refs.md", []byte(refs), Precondition{}); err != nil {
-				t.Fatal(err)
-			}
-			failure := errors.New("关联数据提交失败")
-			target := strings.Replace(source, "from", "to", 1)
-			if _, err := v.Move(source, target, func() error { return failure }); !errors.Is(err, failure) {
-				t.Fatal(err)
-			}
-			for name, want := range map[string]string{"from.md": content, "refs.md": refs} {
-				got, _, err := v.Read(name)
-				if err != nil || string(got) != want {
-					t.Fatalf("回滚须保留原始正文：%s %q %v", name, got, err)
-				}
-			}
-			if _, err := os.Stat(filepath.Join(v.Root(), target)); !os.IsNotExist(err) {
-				t.Fatalf("失败后目标仍存在：%v", err)
-			}
-			if _, err := os.Stat(filepath.Join(v.Root(), "from.assets")); err != nil {
-				t.Fatal(err)
-			}
-		})
 	}
 }

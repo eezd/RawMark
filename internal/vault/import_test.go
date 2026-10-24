@@ -70,7 +70,7 @@ func TestImportZipAssetsAndMove(t *testing.T) {
 	if err := v.Mkdir("移动目标"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := v.Move("知识库/目录/笔记.md", "移动目标/改名.md", nil); err != nil {
+	if _, err := v.Move("知识库/目录/笔记.md", "移动目标/改名.md"); err != nil {
 		t.Fatal(err)
 	}
 	moved, _, err := v.Read("移动目标/改名.md")

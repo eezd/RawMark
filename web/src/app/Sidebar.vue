@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import Icon from './Icon.vue'
 import { basename } from './paths'
 import { commandTitle } from './commands'
@@ -9,15 +9,44 @@ import SearchPanel from './SearchPanel.vue'
 import { createFolder, createNote, move, openSearch, ws } from './workspace'
 import { sidebarViews } from '../plugins/registry'
 import PluginMount from './PluginMount.vue'
-import { openDailyNote } from './templates'
 
 const emit = defineEmits<{ logout: [] }>()
 const rootDrop = ref(false)
 const rootMenu = ref<{ x: number; y: number } | null>(null)
-function rootContext(event: MouseEvent) {
+const menuElement = ref<HTMLElement>()
+async function rootContext(event: MouseEvent) {
   if (event.target instanceof Element && event.target.closest('.rm-tree-row')) return
   event.preventDefault()
-  rootMenu.value = { x: Math.max(4, Math.min(event.clientX, innerWidth - 170)), y: Math.max(4, Math.min(event.clientY, innerHeight - 50)) }
+  const anchor = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  rootMenu.value = event.type === 'click' ? { x: anchor.left, y: anchor.bottom } : { x: event.clientX, y: event.clientY }
+  await nextTick()
+  if (!rootMenu.value || !menuElement.value) return
+  const { width, height } = menuElement.value.getBoundingClientRect()
+  rootMenu.value.x = Math.max(4, Math.min(rootMenu.value.x, innerWidth - width - 4))
+  rootMenu.value.y = Math.max(4, Math.min(rootMenu.value.y, innerHeight - height - 4))
+}
+watch(rootMenu, (menu, _previous, onCleanup) => {
+  if (!menu) return
+  const close = () => { rootMenu.value = null }
+  const onKeydown = (event: KeyboardEvent) => { if (event.key === 'Escape') close() }
+  window.addEventListener('resize', close)
+  window.addEventListener('keydown', onKeydown)
+  onCleanup(() => {
+    window.removeEventListener('resize', close)
+    window.removeEventListener('keydown', onKeydown)
+  })
+})
+
+function runRootMenu(action: 'search' | 'tags' | 'note' | 'folder' | 'import' | 'images') {
+  rootMenu.value = null
+  if (action === 'search') openSearch()
+  else if (action === 'tags') { ws.view = 'tags'; ws.images = null; ws.sidebarOpen = false }
+  else if (action === 'note' || action === 'folder') {
+    selectedView.value = ''
+    ws.searchOpen = false
+    void (action === 'note' ? createNote('') : createFolder(''))
+  } else if (action === 'import') ws.importing = ''
+  else { ws.imagesAll = false; ws.images = '' }
 }
 const selectedView = ref('')
 const currentView = computed(() => sidebarViews.get(selectedView.value))
@@ -41,23 +70,9 @@ function onRootDrop(e: DragEvent) {
 <template>
   <div class="rm-sidebar-inner">
     <div class="rm-vault-heading">
-      <span class="rm-vault-icon"><Icon name="folder" :size="22" /></span>
-      <div><strong>个人知识库 · Vault</strong><small>Personal Knowledge Vault</small></div>
-      <button class="rm-icon-btn" title="折叠目录" @click="ws.sidebarCollapsed = true; ws.sidebarOpen = false"><Icon name="menu" /></button>
+      <button class="rm-icon-btn" title="折叠目录" aria-label="折叠目录" @click="ws.sidebarCollapsed = true; ws.sidebarOpen = false"><Icon name="menu" /></button>
     </div>
-    <div class="rm-sidebar-head">
-      <button class="rm-icon-btn" :class="{ on: ws.searchOpen }" :title="commandTitle('app.search')" @click="ws.searchOpen ? (ws.searchOpen = false) : openSearch()"><Icon name="search" /><span>搜索</span></button>
-      <button class="rm-icon-btn" title="新建笔记" @click="createNote('')"><Icon name="noteAdd" /><span>新建笔记</span></button>
-      <button class="rm-icon-btn" title="新建文件夹" @click="createFolder('')"><Icon name="folderAdd" /><span>新建目录</span></button>
-      <button class="rm-icon-btn" title="导入" @click="ws.importing = ''"><Icon name="import" /><span>导入文档</span></button>
-    </div>
-    <nav class="rm-knowledge-nav" aria-label="知识工具">
-      <button :class="{ on: ws.view === 'graph' }" @click="ws.view = 'graph'; ws.sidebarOpen = false"><Icon name="graph" />关系图谱</button>
-      <button :class="{ on: ws.view === 'tags' }" @click="ws.view = 'tags'; ws.sidebarOpen = false"><Icon name="tag" />标签索引</button>
-      <button @click="openDailyNote"><Icon name="calendar" />今日日记</button>
-      <button @click="ws.templateOpen = true"><Icon name="noteAdd" />从模板新建</button>
-    </nav>
-    <div class="rm-tree-label">文件目录 <span>· VAULT EXPLORER</span></div>
+    <button class="rm-tree-label" title="文件目录操作" aria-haspopup="true" :aria-expanded="rootMenu !== null" @click="rootContext" @contextmenu="rootContext">文件目录</button>
     <nav v-if="sidebarViews.size" class="rm-plugin-tabs" aria-label="侧栏视图">
       <button class="rm-btn" :class="{ on: !currentView }" @click="selectedView = ''">文件</button>
       <button v-for="[id, pluginView] in sidebarViews" :key="id" class="rm-btn" :class="{ on: selectedView === id }" @click="selectedView = id">{{ pluginView.title }}</button>
@@ -70,11 +85,17 @@ function onRootDrop(e: DragEvent) {
       </ul>
       <p v-if="!tree.length" class="rm-tree-empty">还没有笔记</p>
     </div>
-    <template v-if="rootMenu">
-      <div class="rm-menu-backdrop" @click="rootMenu = null" @contextmenu.prevent="rootMenu = null" />
-      <div class="rm-menu rm-context-menu" :style="{ left: rootMenu.x + 'px', top: rootMenu.y + 'px' }"><button @click="ws.imagesAll = false; ws.images = ''; rootMenu = null"><Icon name="image" />图片管理</button></div>
-    </template>
-    <div class="rm-vault-status"><span class="rm-avatar">RM</span><div><strong>个人工作区</strong><small>Markdown 文件 · 自动保存</small></div></div>
+    <Teleport v-if="rootMenu" to="body">
+      <div class="rm-menu-backdrop rm-context-menu-backdrop" @click="rootMenu = null" @contextmenu.prevent="rootMenu = null" />
+      <div ref="menuElement" class="rm-menu rm-context-menu" :style="{ left: rootMenu.x + 'px', top: rootMenu.y + 'px' }">
+        <button :title="commandTitle('app.search')" @click="runRootMenu('search')"><Icon name="search" />搜索</button>
+        <button @click="runRootMenu('tags')"><Icon name="tag" />标签索引</button>
+        <button @click="runRootMenu('note')"><Icon name="noteAdd" />新建笔记</button>
+        <button @click="runRootMenu('folder')"><Icon name="folderAdd" />新建目录</button>
+        <button @click="runRootMenu('import')"><Icon name="import" />导入文档</button>
+        <button @click="runRootMenu('images')"><Icon name="image" />图片管理</button>
+      </div>
+    </Teleport>
     <div class="rm-sidebar-foot">
       <button class="rm-foot-btn" :title="commandTitle('app.settings')" @click="ws.settings = 'index'"><Icon name="settings" />设置</button>
       <button class="rm-foot-btn" @click="emit('logout')"><Icon name="logout" />退出</button>

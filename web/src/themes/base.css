@@ -10,14 +10,22 @@
   --rm-font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --rm-font-size: 16px;
   /* 界面排版独立于正文；辅助文字随界面缩放，但不小于 13px。 */
-  --rm-ui-font-size: 16px;
+  --rm-ui-font-size: 14px;
   --rm-ui-font-small: max(13px, calc(var(--rm-ui-font-size) - 2px));
   --rm-ui-font-caption: max(13px, calc(var(--rm-ui-font-size) - 3px));
   --rm-ui-font-heading: calc(var(--rm-ui-font-size) + 4px);
-  --rm-ui-font-title: calc(var(--rm-ui-font-size) + 12px);
-  --rm-icon-size: calc(var(--rm-ui-font-size) + 4px);
-  --rm-control-size: max(40px, calc(var(--rm-ui-font-size) + 24px));
-  --rm-control-compact: max(32px, calc(var(--rm-ui-font-size) + 16px));
+  --rm-ui-font-title: calc(var(--rm-ui-font-size) + 8px);
+  --rm-ui-line-height: 1.5;
+  --rm-icon-size: max(16px, calc(var(--rm-ui-font-size) + 2px));
+  --rm-control-size: max(32px, calc(var(--rm-ui-font-size) + 18px));
+  --rm-control-compact: max(28px, calc(var(--rm-ui-font-size) + 14px));
+  --rm-space-1: 4px;
+  --rm-space-2: 8px;
+  --rm-space-3: 12px;
+  --rm-space-4: 16px;
+  --rm-space-6: 24px;
+  --rm-panel-duration: 220ms;
+  --rm-panel-easing: cubic-bezier(0.2, 0, 0, 1);
   --rm-header-height: calc(var(--rm-ui-font-size) + 48px);
   --rm-line-height: 1.75;
   --rm-content-width: 760px;
@@ -99,7 +107,7 @@ body {
   font-family: var(--rm-font-text);
 }
 
-body { font-size: var(--rm-ui-font-size); line-height: 1.5; }
+body { font-size: var(--rm-ui-font-size); line-height: var(--rm-ui-line-height); }
 button, input, select, textarea { font: inherit; }
 .rm-icon { flex: none; width: var(--rm-icon-size); height: var(--rm-icon-size); }
 @media (pointer: coarse), (max-width: 767px) {
@@ -335,27 +343,27 @@ button, input, select, textarea { font: inherit; }
 .cm-line.cm-rm-frontmatter-begin { border-radius: 6px 6px 0 0; padding-top: 4px; }
 .cm-line.cm-rm-frontmatter-end { border-radius: 0 0 6px 6px; padding-bottom: 4px; }
 
-/* 浅色编辑排版与分享共用同一套 Prism token 颜色。 */
-:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) .token { text-shadow: none; background: none; }
-:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.comment,.prolog,.doctype,.cdata) { color: #94a3b8; }
-:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.punctuation,.operator) { color: #64748b; }
-:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.keyword,.atrule,.tag) { color: #7c3aed; }
-:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.string,.char,.attr-value,.builtin) { color: #059669; }
-:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.function,.class-name) { color: #2563eb; }
-:root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.number,.boolean,.constant) { color: #d97706; }
+/* 浅色编辑器的 Prism token 颜色。 */
+:root:not([data-rm-color-mode="dark"]) .cm-rm-code .token { text-shadow: none; background: none; }
+:root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.comment,.prolog,.doctype,.cdata) { color: #94a3b8; }
+:root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.punctuation,.operator) { color: #64748b; }
+:root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.keyword,.atrule,.tag) { color: #7c3aed; }
+:root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.string,.char,.attr-value,.builtin) { color: #059669; }
+:root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.function,.class-name) { color: #2563eb; }
+:root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.number,.boolean,.constant) { color: #d97706; }
 .cm-line:is(.cm-rm-h1,.cm-rm-h2,.cm-rm-h3,.cm-rm-h4,.cm-rm-h5,.cm-rm-h6) { font-family: var(--rm-font-heading); font-weight: 600; }
 .cm-line.cm-rm-h1 { font-size: 2.125em; line-height: 1.4; }
 .cm-line.cm-rm-h2 { font-size: 1.5em; line-height: 1.5; }
-.cm-editor .cm-content { padding-top: 36px; }
+.cm-editor .cm-content { padding-top: 16px; }
 .cm-rm-code-lang { font-family: var(--rm-font-mono); }
 .cm-line.cm-rm-code-begin::before { border-top: 1px solid var(--rm-divider); }
 .cm-line.cm-rm-code-end::before { border-bottom: 1px solid var(--rm-divider); }
 .cm-line.cm-rm-paragraph-end { padding-bottom: var(--rm-paragraph-spacing); }
 @media (max-width: 767px) {
   :root:not([data-rm-color-mode="dark"]) { --rm-code-bg: #283044; --rm-code-text: #eef0ff; }
-  :root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.keyword,.atrule,.tag) { color: #c4b5fd; }
-  :root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.string,.char,.attr-value,.builtin) { color: #6ee7b7; }
-  :root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.function,.class-name) { color: #93c5fd; }
-  :root:not([data-rm-color-mode="dark"]) :is(.cm-rm-code, .rm-share-content pre) :is(.number,.boolean,.constant) { color: #fcd34d; }
+  :root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.keyword,.atrule,.tag) { color: #c4b5fd; }
+  :root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.string,.char,.attr-value,.builtin) { color: #6ee7b7; }
+  :root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.function,.class-name) { color: #93c5fd; }
+  :root:not([data-rm-color-mode="dark"]) .cm-rm-code :is(.number,.boolean,.constant) { color: #fcd34d; }
   .cm-line.cm-rm-h1 { font-size: 1.75em; }
 }

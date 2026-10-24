@@ -1,30 +1,19 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api, ApiError } from './api'
 import { runCommand } from './commands'
-import Icon, { type IconName } from './Icon.vue'
+import Icon from './Icon.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
 import { CODE_FONTS, TEXT_FONTS, UI_FONT_SIZE } from '../themes/typography'
 import PluginsPanel from './PluginsPanel.vue'
 import { installApp, installPrompt } from './pwa'
-import { CONTENT_WIDTHS, TAB_SIZES, loadSettings, settings, updateSettings, type Settings } from './settings'
+import { CONTENT_WIDTHS, DEFAULTS, TAB_SIZES, loadSettings, settings, settingsSave, SettingsAppearanceError, updateSettings, type Settings } from './settings'
+import SettingRow from './SettingRow.vue'
+import { SETTINGS_SECTIONS, searchSettings, type SettingSearchResult } from './settingsCatalog'
 import ShortcutSettings from './ShortcutSettings.vue'
-import SharePanel from './SharePanel.vue'
 import TokensPanel from './TokensPanel.vue'
 import TrashPanel from './TrashPanel.vue'
 import { toast, ws, type SettingsSection } from './workspace'
-
-const SECTIONS: { id: SettingsSection; title: string; icon: IconName }[] = [
-  { id: 'appearance', title: '常规与外观', icon: 'palette' },
-  { id: 'editor', title: '编辑器与模板', icon: 'edit' },
-  { id: 'plugins', title: '插件', icon: 'command' },
-  { id: 'account', title: '账户', icon: 'user' },
-  { id: 'shortcuts', title: '快捷键', icon: 'command' },
-  { id: 'shares', title: '分享链接', icon: 'link' },
-  { id: 'tokens', title: 'API 令牌', icon: 'key' },
-  { id: 'trash', title: '回收站', icon: 'trash' },
-  { id: 'about', title: '关于', icon: 'info' },
-]
 
 const buildVersion = import.meta.env.DEV ? '开发版' : document.querySelector<HTMLMetaElement>('meta[name="rawmark-version"]')?.content
 if (!buildVersion) throw new Error('缺少应用构建版本信息')
@@ -34,11 +23,44 @@ const section = computed(() => (ws.settings === 'index' ? 'appearance' : ws.sett
 const dailyTemplates = computed(() => ws.entries.filter(entry => !entry.dir && entry.path.endsWith('.md')))
 const missingDailyTemplate = computed(() => settings.dailyTemplate && !dailyTemplates.value.some(entry => entry.path === settings.dailyTemplate))
 const showList = ref(ws.settings === 'index')
-const current = computed(() => SECTIONS.find((s) => s.id === section.value)!)
+const current = computed(() => SETTINGS_SECTIONS.find((s) => s.id === section.value)!)
+const query = ref('')
+const searching = computed(() => !!query.value.trim())
+const results = computed(() => searchSettings(query.value))
+const dialog = ref<HTMLElement>()
+const content = ref<HTMLElement>()
+const heading = ref<HTMLElement>()
+const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+const preferenceSection = computed(() => ['appearance', 'editor', 'templates', 'shortcuts'].includes(section.value))
+const saveLabel = computed(() => settingsSave.pending ? '保存中…' : settingsSave.result === 'error' ? '保存失败' : settingsSave.result === 'saved' ? '已保存' : '修改自动保存')
 
-function open(id: SettingsSection) {
+async function open(id: SettingsSection) {
+  query.value = ''
   ws.settings = id
   showList.value = false
+  await nextTick()
+  content.value!.scrollTop = 0
+  heading.value!.focus({ preventScroll: true })
+}
+
+async function locate(result: SettingSearchResult) {
+  await open(result.section)
+  if (!result.id) return
+  const target = document.getElementById('rm-setting-' + result.id)!
+  // 设置可能位于 CSS 或排版预览的折叠区内。
+  for (let parent = target.parentElement; parent && parent !== content.value; parent = parent.parentElement) {
+    if (parent instanceof HTMLDetailsElement) parent.open = true
+  }
+  if (target instanceof HTMLDetailsElement) target.open = true
+  await nextTick()
+  target.focus({ preventScroll: true })
+  target.scrollIntoView({ block: 'center' })
+}
+
+function back() {
+  query.value = ''
+  showList.value = true
+  void nextTick(() => dialog.value!.querySelector<HTMLInputElement>('.rm-settings-search input')!.focus())
 }
 
 function close() {
@@ -46,15 +68,25 @@ function close() {
 }
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape' && !e.isComposing) close()
+  if (e.isComposing) return
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close() }
+  if (e.key !== 'Tab') return
+  const controls = [...dialog.value!.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex="0"]')].filter(el => el.getClientRects().length > 0 && !el.closest('[hidden]'))
+  const first = controls[0], last = controls.at(-1)
+  if (e.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement as HTMLElement))) {
+    e.preventDefault(); last?.focus()
+  } else if (!e.shiftKey && (document.activeElement === last || !controls.includes(document.activeElement as HTMLElement))) {
+    e.preventDefault(); first?.focus()
+  }
 }
-onMounted(() => window.addEventListener('keydown', onKey))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+onMounted(() => dialog.value!.focus({ preventScroll: true }))
+onBeforeUnmount(() => { if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }) })
 
 async function change(patch: Partial<Settings>) {
   try {
     await updateSettings(patch)
   } catch (err) {
+    if (err instanceof SettingsAppearanceError) { toast(err.message); return }
     toast('保存设置失败：' + (err instanceof ApiError ? err.message : '网络错误，请检查连接'))
     void loadSettings().catch(error => toast('重新读取设置失败：' + (error instanceof Error ? error.message : '网络错误')))
   }
@@ -114,125 +146,86 @@ async function changePassword() {
 </script>
 
 <template>
-  <div class="rm-dialog-backdrop" @click.self="close">
-    <div class="rm-dialog rm-settings" :class="{ 'show-list': showList }" role="dialog" aria-label="设置">
-      <nav class="rm-settings-nav">
+  <div class="rm-dialog-backdrop rm-settings-backdrop" @click.self="close">
+    <div ref="dialog" class="rm-dialog rm-settings" :class="{ 'show-list': showList, searching }" role="dialog" aria-modal="true" aria-label="设置" tabindex="-1" @keydown="onKey">
+      <nav class="rm-settings-nav" aria-label="设置分类">
         <div class="rm-dialog-head">
-          <h2>偏好设置中心<small>Personal Preferences Vault</small></h2>
-          <button class="rm-icon-btn rm-settings-close-list" title="关闭" @click="close"><Icon name="close" /></button>
+          <h2>设置</h2>
+          <button class="rm-icon-btn rm-settings-close-list" title="关闭设置" @click="close"><Icon name="close" /></button>
         </div>
-        <button v-for="s in SECTIONS" :key="s.id" class="rm-settings-tab" :class="{ on: s.id === section }" @click="open(s.id)">
-          <Icon :name="s.icon" />{{ s.title }}
-        </button>
-        <div class="rm-settings-nav-foot"><button v-if="installPrompt" class="rm-btn" @click="installApp">安装到桌面</button><small>RawMark · {{ buildVersion }}</small></div>
+        <label class="rm-settings-search"><Icon name="search" /><input v-model="query" type="search" aria-label="搜索设置" placeholder="搜索设置" /><button v-if="query" class="rm-icon-btn" aria-label="清空设置搜索" @click="query = ''"><Icon name="close" /></button></label>
+        <div class="rm-settings-categories">
+          <button v-for="s in SETTINGS_SECTIONS" :key="s.id" class="rm-settings-tab" :class="{ on: s.id === section && !searching }" :aria-current="s.id === section && !searching ? 'page' : undefined" @click="open(s.id)"><Icon :name="s.icon" />{{ s.title }}</button>
+        </div>
+        <div class="rm-settings-nav-foot"><span>RawMark</span><small>{{ buildVersion }}</small></div>
       </nav>
       <section class="rm-settings-body">
         <div class="rm-dialog-head">
-          <button class="rm-icon-btn rm-settings-back" title="返回" @click="showList = true"><Icon name="chevron" class="flip" /></button>
-          <div class="rm-settings-heading"><small>首选项 / {{ current.title }}</small><h2>{{ current.title }}</h2><p>让工作区适合你的写作习惯，修改即时保存。</p></div>
-          <button class="rm-icon-btn" title="关闭" @click="close"><Icon name="close" /></button>
+          <button class="rm-icon-btn rm-settings-back" title="返回设置分类" @click="back"><Icon name="chevron" class="flip" /></button>
+          <h2 ref="heading" tabindex="-1">{{ searching ? '搜索结果' : current.title }}</h2>
+          <span v-if="preferenceSection && !searching" class="rm-settings-save" :class="{ error: settingsSave.result === 'error' && !settingsSave.pending }" :title="settingsSave.error || '偏好设置保存在服务器上，所有设备共用'" role="status" aria-live="polite">{{ saveLabel }}</span>
+          <button class="rm-icon-btn" title="关闭设置" @click="close"><Icon name="close" /></button>
         </div>
-        <div class="rm-settings-content">
-          <PluginsPanel v-if="section === 'plugins'" />
-          <template v-else-if="section === 'appearance'">
-            <h3 class="rm-settings-group-title">界面显示</h3>
-            <div class="rm-setting">
-              <label for="rm-ui-font-size" class="rm-setting-label">界面字号</label>
-              <div class="rm-ui-font-control">
+        <div ref="content" class="rm-settings-content">
+          <div v-if="searching" class="rm-settings-results">
+            <p class="rm-settings-result-count" role="status">{{ results.length ? `找到 ${results.length} 项设置` : '没有匹配的设置，试试其他关键词。' }}</p>
+            <button v-for="result in results" :key="result.id || result.section" class="rm-settings-result" @click="locate(result)"><span><strong>{{ result.title }}</strong><small>{{ result.description }}</small></span><small>{{ SETTINGS_SECTIONS.find(s => s.id === result.section)!.title }}</small><Icon name="chevron" /></button>
+          </div>
+          <div v-show="!searching" class="rm-settings-page">
+            <PluginsPanel v-if="section === 'plugins'" />
+            <template v-else-if="section === 'appearance'">
+              <SettingRow id="ui-font-size" control="rm-ui-font-size" resettable @reset="change({ uiFontSize: DEFAULTS.uiFontSize })">
                 <label class="rm-font-input"><input id="rm-ui-font-size" type="number" :min="UI_FONT_SIZE.min" :max="UI_FONT_SIZE.max" step="1" :value="settings.uiFontSize" @blur="changeUIFont" @keydown.enter="($event.target as HTMLInputElement).blur()" /> px</label>
-                <button class="rm-btn" aria-label="重置界面字号" @click="change({ uiFontSize: UI_FONT_SIZE.default })">重置</button>
-              </div>
-            </div>
-            <p class="rm-share-note">调整菜单、侧栏与按钮文字，不影响正文和代码字号。</p>
-            <AppearanceSettings />
-            <div class="rm-setting"><label for="rm-glass-opacity" class="rm-setting-label">磨砂玻璃通透度</label><input id="rm-glass-opacity" type="range" min="0.4" max="1" step="0.05" :value="settings.glassOpacity" @change="change({ glassOpacity: Number(($event.target as HTMLInputElement).value) })" /><span>{{ Math.round(settings.glassOpacity * 100) }}%</span></div>
-            <h3 class="rm-settings-group-title">编辑与阅读排版</h3>
-            <div class="rm-setting"><label for="rm-text-font" class="rm-setting-label">正文主要字体</label><select id="rm-text-font" :value="settings.textFont" @change="change({ textFont: ($event.target as HTMLSelectElement).value as Settings['textFont'] })"><option v-for="(font, id) in TEXT_FONTS" :key="id" :value="id">{{ font.label }}</option></select></div>
-            <div class="rm-setting"><label for="rm-code-font" class="rm-setting-label">代码字体</label><select id="rm-code-font" :value="settings.codeFont" @change="change({ codeFont: ($event.target as HTMLSelectElement).value as Settings['codeFont'] })"><option v-for="(font, id) in CODE_FONTS" :key="id" :value="id">{{ font.label }}</option></select></div>
-            <div class="rm-setting">
-              <span class="rm-setting-label">编辑器字号</span>
-              <label class="rm-font-input"><input type="number" step="any" :value="settings.fontSize" aria-label="编辑器字号" @blur="changeFont" @keydown.enter="($event.target as HTMLInputElement).blur()" /> px</label>
-            </div>
-            <div class="rm-setting">
-              <span class="rm-setting-label">正文宽度</span>
-              <div class="rm-segmented" role="radiogroup" aria-label="正文宽度">
-                <button
-                  v-for="w in CONTENT_WIDTHS"
-                  :key="w.value"
-                  role="radio"
-                  :aria-checked="settings.contentWidth === w.value"
-                  :class="{ on: settings.contentWidth === w.value }"
-                  @click="change({ contentWidth: w.value })"
-                >
-                  {{ w.label }}
-                </button>
-              </div>
-            </div>
-            <div class="rm-setting"><label for="rm-line-height" class="rm-setting-label">正文行高</label><input id="rm-line-height" type="range" min="1.2" max="2.5" step="0.05" :value="settings.lineHeight" @change="change({ lineHeight: Number(($event.target as HTMLInputElement).value) })" /><span>{{ settings.lineHeight.toFixed(2) }}</span></div>
-            <div class="rm-setting"><label for="rm-paragraph-spacing" class="rm-setting-label">段落间距</label><input id="rm-paragraph-spacing" type="range" min="0" max="40" step="2" :value="settings.paragraphSpacing" @change="change({ paragraphSpacing: Number(($event.target as HTMLInputElement).value) })" /><span>{{ settings.paragraphSpacing }}px</span></div>
-            <div class="rm-setting"><label for="rm-selection-toolbar" class="rm-setting-label">选中文本浮动工具栏</label><input id="rm-selection-toolbar" type="checkbox" :checked="settings.selectionToolbar" @change="change({ selectionToolbar: ($event.target as HTMLInputElement).checked })" /></div>
-            <article class="rm-typography-preview"><small>LIVE TYPOGRAPHY PREVIEW</small><h2>让文字自由呼吸</h2><p>用简洁的记录，连接每一个想法。Markdown 文件始终属于你。</p><p>真实内容，自然排版，专注当下的灵感。</p><code>const idea = 'Hello, RawMark'</code></article>
-            <p class="rm-share-note">设置保存在服务器上，所有设备共用。</p>
-          </template>
+              </SettingRow>
+              <SettingRow id="glass-opacity" control="rm-glass-opacity" resettable @reset="change({ glassOpacity: DEFAULTS.glassOpacity })"><input id="rm-glass-opacity" type="range" min="0.4" max="1" step="0.05" :value="settings.glassOpacity" @change="change({ glassOpacity: Number(($event.target as HTMLInputElement).value) })" /><output for="rm-glass-opacity">{{ Math.round(settings.glassOpacity * 100) }}%</output></SettingRow>
+              <AppearanceSettings />
+            </template>
 
-          <template v-else-if="section === 'editor'">
-            <div class="rm-setting">
-              <label for="rm-spellcheck" class="rm-setting-label">拼写检查</label>
-              <input id="rm-spellcheck" type="checkbox" :checked="settings.spellcheck" @change="change({ spellcheck: ($event.target as HTMLInputElement).checked })" />
-            </div>
-            <p class="rm-share-note">使用浏览器的拼写检查，检查语言取决于浏览器设置。</p>
-            <div class="rm-setting">
-              <label for="rm-tab-size" class="rm-setting-label">制表符宽度</label>
-              <select id="rm-tab-size" :value="settings.tabSize" @change="change({ tabSize: Number(($event.target as HTMLSelectElement).value) })">
-                <option v-for="n in TAB_SIZES" :key="n" :value="n">{{ n }} 列</option>
-              </select>
-            </div>
-            <p class="rm-share-note">仅调整 Tab 字符的显示宽度，不改写正文。Tab 键仍按两个空格缩进。</p>
-            <h3 class="rm-settings-group-title">日记与模板</h3>
-            <div class="rm-setting"><label for="rm-daily-folder" class="rm-setting-label">日记目录</label><input id="rm-daily-folder" :value="settings.dailyFolder" placeholder="根目录" @change="changeFolder('dailyFolder', $event)" /></div>
-            <div class="rm-setting"><label for="rm-templates-folder" class="rm-setting-label">模板目录</label><input id="rm-templates-folder" :value="settings.templatesFolder" @change="changeFolder('templatesFolder', $event)" /></div>
-            <div class="rm-setting"><label for="rm-daily-template" class="rm-setting-label">日记模板</label><select id="rm-daily-template" :value="settings.dailyTemplate" @change="change({ dailyTemplate: ($event.target as HTMLSelectElement).value })"><option value="">空白笔记</option><option v-for="entry in dailyTemplates" :key="entry.path" :value="entry.path">{{ entry.path }}</option><option v-if="missingDailyTemplate" :value="settings.dailyTemplate">{{ settings.dailyTemplate }}（不存在）</option></select></div>
-            <p class="rm-share-note">日记使用本地日期命名，已有日记直接打开。模板支持 <code v-pre>{{date}}</code>、<code v-pre>{{time}}</code>、<code v-pre>{{title}}</code>。</p>
-            <p class="rm-share-note">设置保存在服务器上，所有设备共用。</p>
-          </template>
+            <template v-else-if="section === 'editor'">
+              <h3 class="rm-settings-group-title">正文与代码</h3>
+              <SettingRow id="text-font" control="rm-text-font" resettable @reset="change({ textFont: DEFAULTS.textFont })"><select id="rm-text-font" :value="settings.textFont" @change="change({ textFont: ($event.target as HTMLSelectElement).value as Settings['textFont'] })"><option v-for="(font, id) in TEXT_FONTS" :key="id" :value="id">{{ font.label }}</option></select></SettingRow>
+              <SettingRow id="code-font" control="rm-code-font" resettable @reset="change({ codeFont: DEFAULTS.codeFont })"><select id="rm-code-font" :value="settings.codeFont" @change="change({ codeFont: ($event.target as HTMLSelectElement).value as Settings['codeFont'] })"><option v-for="(font, id) in CODE_FONTS" :key="id" :value="id">{{ font.label }}</option></select></SettingRow>
+              <SettingRow id="font-size" control="rm-font-size" resettable @reset="change({ fontSize: DEFAULTS.fontSize })"><label class="rm-font-input"><input id="rm-font-size" type="number" min="0" step="any" :value="settings.fontSize" @blur="changeFont" @keydown.enter="($event.target as HTMLInputElement).blur()" /> px</label></SettingRow>
+              <SettingRow id="content-width" resettable @reset="change({ contentWidth: DEFAULTS.contentWidth })"><div class="rm-segmented" role="radiogroup" aria-label="正文宽度"><button v-for="w in CONTENT_WIDTHS" :key="w.value" role="radio" :aria-checked="settings.contentWidth === w.value" :class="{ on: settings.contentWidth === w.value }" @click="change({ contentWidth: w.value })">{{ w.label }}</button></div></SettingRow>
+              <SettingRow id="line-height" control="rm-line-height" resettable @reset="change({ lineHeight: DEFAULTS.lineHeight })"><input id="rm-line-height" type="range" min="1.2" max="2.5" step="0.05" :value="settings.lineHeight" @change="change({ lineHeight: Number(($event.target as HTMLInputElement).value) })" /><output for="rm-line-height">{{ settings.lineHeight.toFixed(2) }}</output></SettingRow>
+              <SettingRow id="paragraph-spacing" control="rm-paragraph-spacing" resettable @reset="change({ paragraphSpacing: DEFAULTS.paragraphSpacing })"><input id="rm-paragraph-spacing" type="range" min="0" max="40" step="2" :value="settings.paragraphSpacing" @change="change({ paragraphSpacing: Number(($event.target as HTMLInputElement).value) })" /><output for="rm-paragraph-spacing">{{ settings.paragraphSpacing }}px</output></SettingRow>
+              <details id="rm-setting-typography-preview" class="rm-settings-details" tabindex="-1"><summary>排版预览</summary><article class="rm-typography-preview"><h2>让文字自由呼吸</h2><p>用简洁的记录，连接每一个想法。Markdown 文件始终属于你。</p><p>真实内容，自然排版，专注当下的灵感。</p><code>const idea = 'Hello, RawMark'</code></article></details>
+              <h3 class="rm-settings-group-title">编辑行为</h3>
+              <SettingRow id="selection-toolbar" control="rm-selection-toolbar"><input id="rm-selection-toolbar" type="checkbox" :checked="settings.selectionToolbar" @change="change({ selectionToolbar: ($event.target as HTMLInputElement).checked })" /></SettingRow>
+              <SettingRow id="spellcheck" control="rm-spellcheck"><input id="rm-spellcheck" type="checkbox" :checked="settings.spellcheck" @change="change({ spellcheck: ($event.target as HTMLInputElement).checked })" /></SettingRow>
+              <SettingRow id="tab-size" control="rm-tab-size" resettable @reset="change({ tabSize: DEFAULTS.tabSize })"><select id="rm-tab-size" :value="settings.tabSize" @change="change({ tabSize: Number(($event.target as HTMLSelectElement).value) })"><option v-for="n in TAB_SIZES" :key="n" :value="n">{{ n }} 列</option></select></SettingRow>
+            </template>
 
-          <template v-else-if="section === 'account'">
-            <form class="rm-auth-card rm-settings-form" @submit.prevent="changePassword">
-              <h3>修改登录密码</h3>
-              <label><span>当前密码</span><input v-model="pw.current" type="password" autocomplete="current-password" required /></label>
-              <label><span>新密码</span><input v-model="pw.next" type="password" autocomplete="new-password" required /></label>
-              <label><span>确认新密码</span><input v-model="pw.confirm" type="password" autocomplete="new-password" required /></label>
-              <p v-if="pwError" class="rm-auth-error">{{ pwError }}</p>
-              <button class="rm-btn rm-btn-primary" type="submit" :disabled="pwBusy">修改密码</button>
-            </form>
-            <div class="rm-setting">
-              <span class="rm-setting-label">退出登录</span>
-              <button class="rm-btn" @click="close(), runCommand('app.logout')"><Icon name="logout" />退出</button>
-            </div>
-          </template>
+            <template v-else-if="section === 'templates'">
+              <SettingRow id="daily-folder" control="rm-daily-folder"><input id="rm-daily-folder" :value="settings.dailyFolder" placeholder="根目录" @change="changeFolder('dailyFolder', $event)" /></SettingRow>
+              <SettingRow id="templates-folder" control="rm-templates-folder"><input id="rm-templates-folder" :value="settings.templatesFolder" @change="changeFolder('templatesFolder', $event)" /></SettingRow>
+              <SettingRow id="daily-template" control="rm-daily-template"><select id="rm-daily-template" :value="settings.dailyTemplate" @change="change({ dailyTemplate: ($event.target as HTMLSelectElement).value })"><option value="">空白笔记</option><option v-for="entry in dailyTemplates" :key="entry.path" :value="entry.path">{{ entry.path }}</option><option v-if="missingDailyTemplate" :value="settings.dailyTemplate">{{ settings.dailyTemplate }}（不存在）</option></select></SettingRow>
+              <p class="rm-share-note">模板支持 <code v-pre>{{date}}</code>、<code v-pre>{{time}}</code>、<code v-pre>{{title}}</code>。</p>
+            </template>
 
-          <ShortcutSettings v-else-if="section === 'shortcuts'" />
+            <template v-else-if="section === 'account'">
+              <form id="rm-setting-password" class="rm-auth-card rm-settings-form" tabindex="-1" @submit.prevent="changePassword">
+                <h3>修改登录密码</h3>
+                <p class="rm-share-note">修改后其他设备需要重新登录。</p>
+                <label><span>当前密码</span><input v-model="pw.current" type="password" autocomplete="current-password" required /></label>
+                <label><span>新密码</span><input v-model="pw.next" type="password" autocomplete="new-password" required /></label>
+                <label><span>确认新密码</span><input v-model="pw.confirm" type="password" autocomplete="new-password" required /></label>
+                <p v-if="pwError" class="rm-auth-error" role="alert">{{ pwError }}</p>
+                <button class="rm-btn rm-btn-primary" type="submit" :disabled="pwBusy">修改密码</button>
+              </form>
+              <SettingRow id="logout"><button class="rm-btn" @click="close(), runCommand('app.logout')"><Icon name="logout" />退出</button></SettingRow>
+            </template>
 
-          <SharePanel v-else-if="section === 'shares'" :path="null" />
-          <TokensPanel v-else-if="section === 'tokens'" />
-          <TrashPanel v-else-if="section === 'trash'" />
-          <template v-else-if="section === 'about'">
-            <div class="rm-setting"><h3>RawMark</h3></div>
-            <p class="rm-share-note">纯 Markdown 笔记编辑器，文件即真源。</p>
-            <div v-if="installPrompt" class="rm-setting">
-              <span class="rm-setting-label">安装应用</span>
-              <button class="rm-btn" @click="installApp">安装 RawMark</button>
-            </div>
-            <div class="rm-setting">
-              <span class="rm-setting-label">构建版本</span>
-              <code>{{ buildVersion }}</code>
-            </div>
-            <div class="rm-setting">
-              <span class="rm-setting-label">API 文档</span>
-              <a class="rm-btn" href="/api/v1/openapi.json" target="_blank" rel="noopener">查看 OpenAPI 文档</a>
-            </div>
-            <p class="rm-share-note">在「API 令牌」中创建令牌后，可通过 REST API 读取或写入笔记。</p>
-          </template>
+            <ShortcutSettings v-else-if="section === 'shortcuts'" />
+            <TokensPanel v-else-if="section === 'tokens'" />
+            <TrashPanel v-else-if="section === 'trash'" />
+            <template v-else-if="section === 'about'">
+              <p class="rm-share-note">RawMark · 纯 Markdown 笔记编辑器，文件即真源。</p>
+              <SettingRow id="version"><code>{{ buildVersion }}</code></SettingRow>
+              <SettingRow id="install"><button v-if="installPrompt" class="rm-btn" @click="installApp">安装 RawMark</button><span v-else class="rm-settings-unavailable">当前浏览器暂未提供安装入口</span></SettingRow>
+              <SettingRow id="openapi"><a class="rm-btn" href="/api/v1/openapi.json" target="_blank" rel="noopener">查看 OpenAPI 文档</a></SettingRow>
+            </template>
+          </div>
         </div>
       </section>
     </div>

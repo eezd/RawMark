@@ -53,18 +53,6 @@ export interface SearchResult {
   snippet: string
 }
 
-export interface Share {
-  items: { id: number; path: string; exists: boolean }[]
-  token: string
-  path?: string
-  createdAt: number
-  // 0 为永久
-  expiresAt: number
-  hasPassword: boolean
-  // 分享的文件或文件夹是否仍存在
-  exists: boolean
-}
-
 export interface ApiToken {
   id: string
   name: string
@@ -202,13 +190,6 @@ export const api = {
 
   importImage: async (note: string, url: string): Promise<string> =>
     (await json<{ link: string }>(request('POST', '/api/v1/assets/import?note=' + encodeURIComponent(note), { json: { url } }))).link,
-
-  shares: async (path?: string) =>
-    (await json<{ shares: Share[] }>(request('GET', '/api/v1/shares' + (path ? '?path=' + encodeURIComponent(path) : '')))).shares,
-  // expiresIn 为有效时长（秒），0 为永久
-  createShare: (path: string | string[], password: string, expiresIn: number) =>
-    json<Share>(request('POST', '/api/v1/shares', { json: { ...(typeof path === 'string' ? { path } : { paths: path }), password, expiresIn } })),
-  deleteShare: (token: string) => request('DELETE', '/api/v1/shares/' + encodeURIComponent(token)),
 
   tokens: async () => (await json<{ tokens: ApiToken[] }>(request('GET', '/api/v1/tokens'))).tokens,
   // 返回的 token 明文只有这一次

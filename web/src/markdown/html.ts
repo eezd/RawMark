@@ -462,7 +462,7 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
         const name = text(label.from + 2, label.to - 2)
         return `<div class="footnote" id="${escapeAttr(footnoteId(name))}"><sup>${escapeHtml(name)}</sup> ${inline(node, label.to, node.to).trim()}</div>\n`
       }
-      // 目录占位，由分享页根据标题填充
+      // 目录占位，由调用方根据标题填充
       case 'TableOfContents':
         return '<nav class="toc"></nav>\n'
       // front matter 是元数据，不输出

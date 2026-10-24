@@ -4,7 +4,6 @@ import type { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Icon from './Icon.vue'
-import NoteRelations from './NoteRelations.vue'
 import { activeTab, editorView, onEditorUpdate, ws } from './workspace'
 
 // 大纲：当前笔记的标题列表，点击跳转；高亮光标所在的章节
@@ -103,7 +102,6 @@ const minLevel = () => Math.min(...headings.value.map((h) => h.level))
         </li>
       </ul>
       <p v-else class="rm-tree-empty">没有标题</p>
-      <NoteRelations />
     </aside>
   </div>
 </template>

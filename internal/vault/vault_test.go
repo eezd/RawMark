@@ -62,7 +62,12 @@ func TestAssetSymlinkEscapeRejected(t *testing.T) {
 
 func TestMoveRollsBackWhenAssetDestinationIsTooLong(t *testing.T) {
 	v := newVault(t)
-	if _, err := v.Write("n.md", []byte("原文"), Precondition{}); err != nil {
+	content := "原文 ![](n.assets/x.png)"
+	if _, err := v.Write("n.md", []byte(content), Precondition{}); err != nil {
+		t.Fatal(err)
+	}
+	refs := "[原文](n.md) [目标](" + strings.Repeat("a", 250) + ".md)"
+	if _, err := v.Write("refs.md", []byte(refs), Precondition{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := v.SaveAsset("n.md", "x.png", strings.NewReader("image"), 100); err != nil {
@@ -70,11 +75,13 @@ func TestMoveRollsBackWhenAssetDestinationIsTooLong(t *testing.T) {
 	}
 	// 笔记名可写入，但派生的 .assets 名超过文件系统的单段长度限制。
 	destination := strings.Repeat("a", 250) + ".md"
-	if _, err := v.Move("n.md", destination, nil); err == nil {
+	if _, err := v.Move("n.md", destination); err == nil {
 		t.Fatal("图片目录移动应失败")
 	}
-	if content, _, err := v.Read("n.md"); err != nil || string(content) != "原文" {
-		t.Fatalf("原笔记未恢复: %q %v", content, err)
+	for name, want := range map[string]string{"n.md": content, "refs.md": refs} {
+		if got, _, err := v.Read(name); err != nil || string(got) != want {
+			t.Fatalf("原笔记与引用未恢复: %s %q %v", name, got, err)
+		}
 	}
 	if _, err := os.Stat(filepath.Join(v.Root(), "n.assets")); err != nil {
 		t.Fatal(err)
@@ -170,7 +177,7 @@ func TestMoveCarriesAssetsAndRewritesLinks(t *testing.T) {
 	if !strings.HasPrefix(link, "笔记%20A.assets/") {
 		t.Fatalf("资源链接不符: %s", link)
 	}
-	if rewritten, err := v.Move("dir/笔记 A.md", "other/B.md", nil); err != nil || !rewritten {
+	if rewritten, err := v.Move("dir/笔记 A.md", "other/B.md"); err != nil || !rewritten {
 		t.Fatalf("应报告正文改写: %v %v", rewritten, err)
 	}
 	data, _, err := v.Read("other/B.md")
@@ -184,7 +191,7 @@ func TestMoveCarriesAssetsAndRewritesLinks(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(v.Root(), "other", "B.assets", strings.TrimPrefix(link, "笔记%20A.assets/"))); err != nil {
 		t.Fatal("图片目录未随笔记移动:", err)
 	}
-	if _, err := v.Move("other", "other/sub", nil); !errors.Is(err, ErrInvalidPath) {
+	if _, err := v.Move("other", "other/sub"); !errors.Is(err, ErrInvalidPath) {
 		t.Fatal("文件夹移入自身应被拒绝")
 	}
 }

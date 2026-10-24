@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api, ApiError } from './api'
 import { registerCommand } from './commands'
 import EditorPane from './EditorPane.vue'
-import AppHeader from './AppHeader.vue'
 import KnowledgePanel from './KnowledgePanel.vue'
 import TemplateDialog from './TemplateDialog.vue'
 import EditorChrome from './EditorChrome.vue'
@@ -17,21 +16,21 @@ import NoteBanner from './NoteBanner.vue'
 import OutlinePanel from './OutlinePanel.vue'
 import QuickSwitcher from './QuickSwitcher.vue'
 import SettingsDialog from './SettingsDialog.vue'
-import ShareDialog from './ShareDialog.vue'
 import { noteTitle } from './paths'
-import { SIDEBAR_WIDTH, settings, updateSettings } from './settings'
+import { SIDEBAR_WIDTH, settings, SettingsAppearanceError, updateSettings } from './settings'
 import Sidebar from './Sidebar.vue'
 import TabBar from './TabBar.vue'
-import { activeTab, flushAll, readyToReload, startWorkspace, stopWorkspace, toast, toggleSourceMode, ws } from './workspace'
+import { flushAll, readyToReload, startWorkspace, stopWorkspace, toast, ws } from './workspace'
 
 const emit = defineEmits<{ logout: [] }>()
 const title = computed(() => (ws.active ? noteTitle(ws.active) : 'RawMark'))
-const saving = computed(() => activeTab()?.dirty)
+const resizingSidebar = ref(false)
 
 // 拖动侧栏右缘调整宽度：拖动中只改 CSS 变量，松手后保存到设置
 function startResize(e: PointerEvent) {
   const handle = e.currentTarget as HTMLElement
   handle.setPointerCapture(e.pointerId)
+  resizingSidebar.value = true
   const startX = e.clientX
   const startWidth = settings.sidebarWidth
   let width = startWidth
@@ -42,10 +41,13 @@ function startResize(e: PointerEvent) {
   const onUp = () => {
     handle.removeEventListener('pointermove', onMove)
     handle.removeEventListener('pointerup', onUp)
-    if (width !== startWidth) updateSettings({ sidebarWidth: width }).catch(() => toast('保存侧栏宽度失败'))
+    handle.removeEventListener('lostpointercapture', onUp)
+    resizingSidebar.value = false
+    if (width !== startWidth) updateSettings({ sidebarWidth: width }).catch(error => toast(error instanceof SettingsAppearanceError ? error.message : '保存侧栏宽度失败'))
   }
   handle.addEventListener('pointermove', onMove)
   handle.addEventListener('pointerup', onUp)
+  handle.addEventListener('lostpointercapture', onUp)
 }
 
 async function logout() {
@@ -100,11 +102,10 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="rm-shell"
-    :class="{ 'sidebar-open': ws.sidebarOpen, 'sidebar-collapsed': ws.sidebarCollapsed, 'focus-mode': ws.focusMode }"
+    :class="{ 'sidebar-open': ws.sidebarOpen, 'sidebar-collapsed': ws.sidebarCollapsed, 'sidebar-resizing': resizingSidebar, 'focus-mode': ws.focusMode }"
     @touchstart.passive="onTouchStart"
     @touchmove.passive="onTouchMove"
   >
-    <AppHeader />
     <div class="rm-workspace">
     <aside class="rm-sidebar">
       <Sidebar @logout="logout" />
@@ -113,13 +114,10 @@ onBeforeUnmount(() => {
     <div class="rm-backdrop" @click="ws.sidebarOpen = false" />
     <main class="rm-main">
       <header class="rm-mobile-bar">
-        <button class="rm-icon-btn" title="目录" @click="ws.sidebarOpen = true"><Icon name="menu" :size="20" /></button>
+        <button class="rm-icon-btn" title="目录" @click="ws.sidebarOpen = true"><Icon name="menu" /></button>
         <button class="rm-mobile-title" title="切换笔记" @click="ws.switcher = ''">{{ title }}</button>
-        <span class="rm-save-state" :class="{ on: saving }" />
-        <button v-if="ws.active" class="rm-icon-btn" :title="ws.sourceMode ? '关闭源码编辑' : '开启源码编辑'" :aria-pressed="ws.sourceMode" @mousedown.prevent @click="toggleSourceMode"><Icon name="source" :size="20" /></button>
-        <button v-if="ws.active" class="rm-icon-btn" title="大纲" @click="ws.outlineOpen = !ws.outlineOpen"><Icon name="outline" :size="20" /></button>
-        <button class="rm-icon-btn" title="快速打开" @click="ws.switcher = ''"><Icon name="search" :size="20" /></button>
-        <button class="rm-icon-btn" title="命令" @click="ws.switcher = '>'"><Icon name="command" :size="20" /></button>
+        <button class="rm-icon-btn" title="快速打开" @click="ws.switcher = ''"><Icon name="search" /></button>
+        <button class="rm-icon-btn" title="命令" @click="ws.switcher = '>'"><Icon name="command" /></button>
       </header>
       <div v-show="ws.view === 'notes' && ws.images === null" class="rm-notes-view">
       <TabBar />
@@ -131,12 +129,13 @@ onBeforeUnmount(() => {
       <KnowledgePanel v-if="ws.view !== 'notes' && ws.images === null" />
       <ImageGallery v-if="ws.images !== null" :dir="ws.images" />
     </main>
-    <OutlinePanel v-if="ws.outlineOpen && ws.active && ws.view === 'notes' && ws.images === null" />
+    <Transition name="rm-outline-panel">
+      <OutlinePanel v-if="ws.outlineOpen && !ws.focusMode && ws.active && ws.view === 'notes' && ws.images === null" />
+    </Transition>
     </div>
     <TemplateDialog v-if="ws.templateOpen" />
     <QuickSwitcher v-if="ws.switcher !== null" />
     <SettingsDialog v-if="ws.settings" />
-    <ShareDialog v-if="ws.sharing" :path="ws.sharing" @close="ws.sharing = null" />
     <ImportDialog v-if="ws.importing !== null" :dir="ws.importing" @close="ws.importing = null" />
     <ImageDialog v-if="ws.image" :path="ws.image" />
     <MoveDialog v-if="ws.moving" :path="ws.moving" @close="ws.moving = null" />

@@ -50,7 +50,7 @@ self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
   if (request.method !== 'GET' || url.origin !== self.location.origin) return
-  // 只匹配构建产物与应用入口，不缓存 API、分享地址、笔记图片或插件。
+  // 只匹配构建产物与应用入口，不缓存 API、笔记图片或插件。
   const entry = request.mode === 'navigate' && (url.pathname === '/' || url.pathname === '/index.html')
   if (!entry && !paths.has(url.pathname) && !url.pathname.startsWith('/assets/')) return
   event.respondWith((async () => {

@@ -54,7 +54,7 @@ const (
 	public access = iota
 	// 登录会话或 API 令牌（只读令牌可用 GET 和只读导出接口）
 	authed
-	// 只允许登录会话：管理分享与 API 令牌，避免令牌给自己扩权
+	// 只允许登录会话：管理 API 令牌，避免令牌给自己扩权
 	sessionOnly
 )
 
@@ -106,17 +106,9 @@ func (s *Server) routes() []route {
 		{"PUT /api/v1/plugins/{id}/data", sessionOnly, s.putPluginData},
 		{"GET /api/v1/themes", authed, s.listThemes},
 		{"GET /api/v1/themes/{id}", authed, s.getTheme},
-		{"GET /api/v1/shares", sessionOnly, s.listShares},
-		{"POST /api/v1/shares", sessionOnly, s.createShare},
-		{"DELETE /api/v1/shares/{token}", sessionOnly, s.deleteShare},
 		{"GET /api/v1/tokens", sessionOnly, s.listTokens},
 		{"POST /api/v1/tokens", sessionOnly, s.createToken},
 		{"DELETE /api/v1/tokens/{id}", sessionOnly, s.deleteToken},
-
-		{"GET /api/v1/public/shares/{token}", public, s.publicShare},
-		{"GET /api/v1/public/shares/{token}/appearance", public, s.publicAppearance},
-		{"POST /api/v1/public/shares/{token}/unlock", public, s.unlockShare},
-		{"GET /api/v1/public/shares/{token}/assets/{path...}", public, s.publicShareAsset},
 	}
 }
 
@@ -355,9 +347,7 @@ func (s *Server) move(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &body) {
 		return
 	}
-	rewritten, err := s.vault.Move(body.From, body.To, func() error {
-		return s.store.MoveShares(body.From, body.To)
-	})
+	rewritten, err := s.vault.Move(body.From, body.To)
 	if err != nil {
 		vaultError(w, r, err)
 		return

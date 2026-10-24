@@ -362,46 +362,11 @@ func (v *Vault) TreeAt(rel string) ([]Entry, error) {
 	return entries, err
 }
 
-// ScopedPath 校验公开访问的子路径，并阻止符号链接跳出已分享的目录。
-func (v *Vault) ScopedPath(root, rel string) (string, error) {
-	if _, err := CleanPath(rel); err != nil {
-		return "", ErrNotFound
-	}
-	base, err := v.abs(root)
-	if err != nil {
-		return "", err
-	}
-	base, err = filepath.EvalSymlinks(base)
-	if errors.Is(err, fs.ErrNotExist) {
-		return "", ErrNotFound
-	}
-	if err != nil {
-		return "", err
-	}
-	p := path.Join(root, rel)
-	full, err := v.abs(p)
-	if err != nil {
-		return "", err
-	}
-	full, err = filepath.EvalSymlinks(full)
-	if errors.Is(err, fs.ErrNotExist) {
-		return "", ErrNotFound
-	}
-	if err != nil {
-		return "", err
-	}
-	if full != filepath.Join(base, filepath.FromSlash(rel)) {
-		return "", ErrNotFound
-	}
-	return p, nil
-}
-
 // ---- 移动 / 重命名 ----
 
 // Move 移动或重命名笔记、图片或文件夹，返回是否原子改写了移动主体（改变文件身份）。
 // 笔记的 .assets 目录随之移动；笔记改名时同步改写正文中指向自身图片目录的链接。
-// commit 用于提交关联元数据；失败时在释放写锁前恢复文件及原始正文，nil 表示无关联元数据。
-func (v *Vault) Move(from, to string, commit func() error) (rewritten bool, err error) {
+func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 	src, err := v.abs(from)
 	if err != nil {
 		return false, err
@@ -451,7 +416,6 @@ func (v *Vault) Move(from, to string, commit func() error) (rewritten bool, err 
 	if err := os.Rename(src, dst); err != nil {
 		return false, err
 	}
-	assetsMoved := false
 	writtenLinks := 0
 	defer func() {
 		if err == nil {
@@ -460,11 +424,6 @@ func (v *Vault) Move(from, to string, commit func() error) (rewritten bool, err 
 		for _, change := range links[:writtenLinks] {
 			if rollback := atomicWrite(change.path, change.before); rollback != nil {
 				err = errors.Join(err, fmt.Errorf("回滚笔记引用失败: %w", rollback))
-			}
-		}
-		if assetsMoved {
-			if rollback := os.Rename(dstAssets, srcAssets); rollback != nil {
-				err = errors.Join(err, fmt.Errorf("回滚图片移动失败: %w", rollback))
 			}
 		}
 		if rollback := os.Rename(dst, src); rollback != nil {
@@ -484,11 +443,6 @@ func (v *Vault) Move(from, to string, commit func() error) (rewritten bool, err 
 		if err := os.Rename(srcAssets, dstAssets); err != nil {
 			return false, fmt.Errorf("移动图片目录失败: %w", err)
 		}
-		assetsMoved = true
-
-	}
-	if commit != nil {
-		err = commit()
 	}
 	return rewritten, err
 }

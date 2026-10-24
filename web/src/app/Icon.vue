@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // 线性图标（24×24 视框，描边绘制）
 const paths = {
-  share: 'M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8.6 10.5l6.8-4M8.6 13.5l6.8 4',
   plus: 'M12 5v14M5 12h14',
   eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   expand: 'M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5',
@@ -9,6 +8,10 @@ const paths = {
   calendar: 'M4 5h16v16H4zM8 2v6M16 2v6M4 11h16',
   tag: 'M3 3h8l10 10-8 8L3 11zM7 7h.01',
   copy: 'M9 9h12v12H9zM5 15H3V3h12v2',
+  task: 'M3 3h7v7H3zM5 6l1 1 2-2M14 6h7M3 14h7v7H3zM14 18h7',
+  quote: 'M10 11H4V5h6v8a6 6 0 0 1-6 6M20 11h-6V5h6v8a6 6 0 0 1-6 6',
+  undo: 'm8 4-5 5 5 5M3 9h10a6 6 0 0 1 0 12h-2',
+  redo: 'm16 4 5 5-5 5M21 9H11a6 6 0 0 0 0 12h2',
   print: 'M6 9V3h12v6M6 17H3V9h18v8h-3M6 14h12v7H6z',
   grid: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
 

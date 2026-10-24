@@ -8,12 +8,12 @@ import (
 	"testing"
 )
 
-func TestCleanupChecksFreshReferencesAndShares(t *testing.T) {
+func TestCleanupChecksFreshReferences(t *testing.T) {
 	v := newVault(t)
 	if _, err := v.Write("a.md", []byte("[图片](assets/used.png)"), Precondition{}); err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range []string{"assets/used.png", "assets/orphan.png", "public/shared.png", "a.assets/attached.png"} {
+	for _, p := range []string{"assets/used.png", "assets/orphan.png", "public/orphan.png", "a.assets/attached.png"} {
 		full := filepath.Join(v.Root(), p)
 		if err := os.MkdirAll(filepath.Dir(full), 0755); err != nil {
 			t.Fatal(err)
@@ -22,8 +22,8 @@ func TestCleanupChecksFreshReferencesAndShares(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	result, err := v.CleanupImages([]string{"assets/used.png", "assets/orphan.png", "public/shared.png", "a.assets/attached.png", "../outside.png"}, func() ([]string, error) { return []string{"public", "a.md"}, nil })
-	if err != nil || len(result.Deleted) != 1 || result.Deleted[0].Path != "assets/orphan.png" || len(result.Skipped) != 4 {
+	result, err := v.CleanupImages([]string{"assets/used.png", "assets/orphan.png", "public/orphan.png", "a.assets/attached.png", "../outside.png"})
+	if err != nil || len(result.Deleted) != 3 || result.Deleted[0].Path != "assets/orphan.png" || len(result.Skipped) != 2 {
 		t.Fatalf("清理结果不符：%+v %v", result, err)
 	}
 	if _, err := v.Restore(result.Deleted[0].ID); err != nil {
@@ -32,23 +32,12 @@ func TestCleanupChecksFreshReferencesAndShares(t *testing.T) {
 	if _, err := v.Write("a.md", []byte("---\ntags: [broken\n---"), Precondition{}); err != nil {
 		t.Fatal(err)
 	}
-	result, err = v.CleanupImages([]string{"assets/orphan.png"}, func() ([]string, error) { return nil, nil })
+	result, err = v.CleanupImages([]string{"assets/orphan.png"})
 	if err == nil || len(result.Deleted) != 0 {
 		t.Fatal("不完整的引用分析不能删除图片", result, err)
 	}
 	if _, err := os.Stat(filepath.Join(v.Root(), "assets/orphan.png")); err != nil {
 		t.Fatal(err)
-	}
-	if _, err := v.Write("a.md", []byte(""), Precondition{}); err != nil {
-		t.Fatal(err)
-	}
-	cause := errors.New("分享读取失败")
-	_, err = v.CleanupImages([]string{"assets/orphan.png"}, func() ([]string, error) { return nil, cause })
-	if !errors.Is(err, cause) {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(v.Root(), "assets/orphan.png")); err != nil {
-		t.Fatal("分享校验失败后不应删除", err)
 	}
 }
 
@@ -86,7 +75,7 @@ func TestCleanupProtectsLinkedImages(t *testing.T) {
 			if len(metadata.Assets) != 1 || metadata.Assets[0].Target != link {
 				t.Fatalf("链接内图片未记录引用：%+v", metadata)
 			}
-			result, err := v.CleanupImages([]string{link}, func() ([]string, error) { return nil, nil })
+			result, err := v.CleanupImages([]string{link})
 			if err != nil || len(result.Deleted) != 0 || len(result.Skipped) != 1 || result.Skipped[0].Reason != "仍被笔记引用" {
 				t.Fatalf("链接内图片未受保护：%+v %v", result, err)
 			}

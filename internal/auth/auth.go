@@ -1,8 +1,7 @@
-// Package auth 实现单用户登录（Argon2id 密码哈希、会话令牌、登录限速），以及分享密码与 API 令牌的校验。
+// Package auth 实现单用户登录（Argon2id 密码哈希、会话令牌、登录限速），以及 API 令牌的校验。
 package auth
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -21,7 +20,6 @@ import (
 
 const (
 	passwordKey    = "auth.password"
-	shareSecretKey = "share.secret"
 	apiTokenPrefix = "rm_"
 	SessionTTL     = 30 * 24 * time.Hour
 	MinPasswordLen = 8
@@ -32,7 +30,7 @@ const (
 	argonThreads = 4
 	argonKeyLen  = 32
 
-	// 同一来源在窗口内累计失败 maxFailures 次（登录与分享密码合计）即封禁 lockout
+	// 同一来源在窗口内累计失败 maxFailures 次即封禁 lockout
 	maxFailures   = 30
 	failureWindow = 15 * time.Minute
 	lockout       = 15 * time.Minute
@@ -149,70 +147,6 @@ func (m *Manager) ChangePassword(ip, keepToken, current, next string) error {
 	return m.store.DeleteOtherSessions(hashToken(keepToken))
 }
 
-// ---- 分享 ----
-
-// HashSharePassword 为分享密码生成哈希；空密码表示不设密码，返回空字符串
-func HashSharePassword(password string) string {
-	if password == "" {
-		return ""
-	}
-	return hashPassword(password)
-}
-
-// CheckSharePassword 校验分享密码，与登录共用按来源的失败限速。
-// 成功不清零失败计数：否则知道某个分享密码的人可以借此反复重置计数，无限尝试登录密码
-func (m *Manager) CheckSharePassword(ip, hash, password string) error {
-	if !m.allow(ip) {
-		return ErrRateLimited
-	}
-	ok, err := verifyPassword(hash, password)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		m.recordFailure(ip)
-		return ErrBadCredentials
-	}
-	return nil
-}
-
-// ShareCookie 生成输入分享密码后发给访客的凭据：绑定分享令牌与密码哈希，撤销分享即失效
-func (m *Manager) ShareCookie(token, passwordHash string) (string, error) {
-	secret, err := m.shareSecret()
-	if err != nil {
-		return "", err
-	}
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(token + "\x00" + passwordHash))
-	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
-}
-
-func (m *Manager) ValidShareCookie(cookie, token, passwordHash string) (bool, error) {
-	want, err := m.ShareCookie(token, passwordHash)
-	if err != nil {
-		return false, err
-	}
-	return hmac.Equal([]byte(cookie), []byte(want)), nil
-}
-
-// shareSecret 读取签名密钥，首次使用时生成并保存
-func (m *Manager) shareSecret() ([]byte, error) {
-	v, ok, err := m.store.Setting(shareSecretKey)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		if _, err := m.store.SetSettingIfAbsent(shareSecretKey, randomToken()); err != nil {
-			return nil, err
-		}
-		// 并发首次生成时以先写入的为准
-		if v, _, err = m.store.Setting(shareSecretKey); err != nil {
-			return nil, err
-		}
-	}
-	return base64.RawURLEncoding.DecodeString(v)
-}
-
 // ---- API 令牌 ----
 
 // CreateAPIToken 创建令牌，返回只显示这一次的明文
@@ -312,13 +246,6 @@ func verifyPassword(encoded, password string) (bool, error) {
 
 func randomToken() string {
 	b := make([]byte, 32)
-	rand.Read(b)
-	return base64.RawURLEncoding.EncodeToString(b)
-}
-
-// NewShareToken 生成分享链接中的令牌（128 位随机数，比会话令牌短，便于复制）
-func NewShareToken() string {
-	b := make([]byte, 16)
 	rand.Read(b)
 	return base64.RawURLEncoding.EncodeToString(b)
 }

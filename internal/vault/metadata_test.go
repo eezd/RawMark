@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -42,7 +41,7 @@ func TestMoveMaintainsIncomingAndOutgoingLinks(t *testing.T) {
 	if _, err := v.SaveAsset("dir/a.md", "p.png", strings.NewReader("image"), 100); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := v.Move("dir/a.md", "new/renamed.md", nil); err != nil {
+	if _, err := v.Move("dir/a.md", "new/renamed.md"); err != nil {
 		t.Fatal(err)
 	}
 	body, _, _ := v.Read("new/renamed.md")
@@ -53,24 +52,12 @@ func TestMoveMaintainsIncomingAndOutgoingLinks(t *testing.T) {
 	if string(body) != "[入链](../new/renamed.md?q=1#section)" {
 		t.Fatalf("入链错误：%s", body)
 	}
-	if _, err := v.Move("new", "deep/folder", nil); err != nil {
+	if _, err := v.Move("new", "deep/folder"); err != nil {
 		t.Fatal(err)
 	}
 	body, _, _ = v.Read("deep/folder/renamed.md")
 	if !strings.Contains(string(body), "../../other.md") {
 		t.Fatalf("目录出链错误：%s", body)
-	}
-	original, _, _ := v.Read("other.md")
-	failure := errors.New("提交失败")
-	if _, err := v.Move("deep/folder", "rollback", func() error { return failure }); !errors.Is(err, failure) {
-		t.Fatal(err)
-	}
-	body, _, _ = v.Read("other.md")
-	if string(body) != string(original) {
-		t.Fatalf("入链未回滚：%s", body)
-	}
-	if _, _, err := v.Read("deep/folder/renamed.md"); err != nil {
-		t.Fatal("移动主体未回滚", err)
 	}
 }
 
@@ -102,7 +89,7 @@ func TestMovePreservesEntityShapedFilenames(t *testing.T) {
 		}
 	}
 	const target = "a&copy;.md"
-	if _, err := v.Move("target.md", target, nil); err != nil {
+	if _, err := v.Move("target.md", target); err != nil {
 		t.Fatal(err)
 	}
 	body, _, err := v.Read("source.md")

@@ -1,4 +1,4 @@
-// Package store 保存应用自身的数据（设置、会话、分享、API 令牌）。笔记内容不在这里，见 vault。
+// Package store 保存应用自身的数据（设置、会话、API 令牌）。笔记内容不在这里，见 vault。
 package store
 
 import (
@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
 );
-` + shareSchema + `
 CREATE TABLE IF NOT EXISTS api_tokens (
   id           TEXT PRIMARY KEY,
   name         TEXT NOT NULL,
@@ -37,10 +36,6 @@ func Open(path string) (*Store, error) {
 	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, err
-	}
-	if err := migrateShares(db); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("迁移分享数据失败: %w", err)
 	}
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
@@ -105,126 +100,6 @@ func (s *Store) DeleteOtherSessions(keepHash string) error {
 
 func (s *Store) DeleteExpiredSessions() error {
 	_, err := s.db.Exec(`DELETE FROM sessions WHERE expires_at <= ?`, time.Now().Unix())
-	return err
-}
-
-// ---- 分享 ----
-
-// Share 为一个只读分享链接，Items 标识各个独立跟随移动的主体。
-// Path 仅用于已有单主体调用与响应，不单独存储。
-type Share struct {
-	Token        string      `json:"token"`
-	Path         string      `json:"path,omitempty"`
-	Items        []ShareItem `json:"items"`
-	PasswordHash string      `json:"-"`
-	CreatedAt    int64       `json:"createdAt"`
-	ExpiresAt    int64       `json:"expiresAt"`
-}
-type ShareItem struct {
-	ID   int    `json:"id"`
-	Path string `json:"path"`
-}
-
-func (s *Store) CreateShare(sh Share) error {
-	items := sh.Items
-	if len(items) == 0 && sh.Path != "" {
-		items = []ShareItem{{ID: 0, Path: sh.Path}}
-	}
-	if len(items) == 0 {
-		return fmt.Errorf("分享缺少主体")
-	}
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err = tx.Exec(`INSERT INTO shares (token, password_hash, created_at, expires_at) VALUES (?, ?, ?, ?)`, sh.Token, sh.PasswordHash, sh.CreatedAt, sh.ExpiresAt); err != nil {
-		return err
-	}
-	for _, item := range items {
-		if _, err = tx.Exec(`INSERT INTO share_items (share_token, item_id, path) VALUES (?, ?, ?)`, sh.Token, item.ID, item.Path); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
-}
-
-func (s *Store) GetShare(token string) (sh Share, ok bool, err error) {
-	err = s.db.QueryRow(`SELECT token, password_hash, created_at, expires_at FROM shares WHERE token = ?`, token).Scan(&sh.Token, &sh.PasswordHash, &sh.CreatedAt, &sh.ExpiresAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Share{}, false, nil
-	}
-	if err != nil {
-		return sh, false, err
-	}
-	err = s.shareItems(&sh)
-	return sh, err == nil, err
-}
-
-func (s *Store) shareItems(sh *Share) error {
-	rows, err := s.db.Query(`SELECT item_id, path FROM share_items WHERE share_token = ? ORDER BY item_id`, sh.Token)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var item ShareItem
-		if err := rows.Scan(&item.ID, &item.Path); err != nil {
-			return err
-		}
-		sh.Items = append(sh.Items, item)
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	if len(sh.Items) == 0 {
-		return fmt.Errorf("分享缺少主体")
-	}
-	if len(sh.Items) == 1 {
-		sh.Path = sh.Items[0].Path
-	}
-	return nil
-}
-
-func (s *Store) Shares() ([]Share, error) {
-	rows, err := s.db.Query(`SELECT token, password_hash, created_at, expires_at FROM shares ORDER BY created_at DESC, token`)
-	if err != nil {
-		return nil, err
-	}
-	out := []Share{}
-	for rows.Next() {
-		var sh Share
-		if err := rows.Scan(&sh.Token, &sh.PasswordHash, &sh.CreatedAt, &sh.ExpiresAt); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		out = append(out, sh)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return nil, err
-	}
-	for i := range out {
-		if err := s.shareItems(&out[i]); err != nil {
-			return nil, err
-		}
-	}
-	return out, nil
-}
-
-func (s *Store) DeleteShare(token string) (bool, error) {
-	res, err := s.db.Exec(`DELETE FROM shares WHERE token = ?`, token)
-	if err != nil {
-		return false, err
-	}
-	n, err := res.RowsAffected()
-	return n == 1, err
-}
-
-func (s *Store) MoveShares(from, to string) error {
-	_, err := s.db.Exec(`UPDATE share_items SET path = CASE WHEN path = ?1 THEN ?2 ELSE ?2 || substr(path, length(?1) + 1) END
- WHERE path = ?1 OR substr(path,1,length(?1)+1) = ?1 || '/'`, from, to)
 	return err
 }
 

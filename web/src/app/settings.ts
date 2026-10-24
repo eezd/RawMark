@@ -17,12 +17,20 @@ export const CONTENT_WIDTHS = [
 
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
-const DEFAULTS = { dailyFolder: 'Daily', templatesFolder: 'Templates', dailyTemplate: '', selectionToolbar: true, ...DISPLAY_DEFAULTS, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
+export const DEFAULTS = { dailyFolder: 'Daily', templatesFolder: 'Templates', dailyTemplate: '', selectionToolbar: true, ...DISPLAY_DEFAULTS, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
 export type Settings = typeof DEFAULTS & Appearance & { shortcuts: Record<string, string[]> }
 
 const CACHE_KEY = 'rawmark.settings'
 
 export const settings = reactive<Settings>(sanitize(JSON.parse(localStorage.getItem(CACHE_KEY) ?? '{}')))
+// 只记录写入结果；重新读取设置和主题应用不代表保存成功。
+export const settingsSave = reactive({ pending: 0, result: 'idle' as 'idle' | 'saved' | 'error', error: '' })
+
+export class SettingsAppearanceError extends Error {
+  constructor(cause: unknown) {
+    super('设置已保存，但主题应用失败：' + (cause instanceof Error ? cause.message : String(cause)), { cause })
+  }
+}
 
 // 服务器上的设置可能由旧版本、API 或插件写入，取值不合法的项退回默认值
 function sanitize(raw: Record<string, unknown>): Settings {
@@ -101,12 +109,24 @@ export async function updateSettings(patch: Partial<Settings>) {
   applied({ ...settings, ...patch })
   // 设置请求串行提交，防止快速切换和片段编辑的旧请求覆盖新值。
   await saveSettings(patch)
-  await applySettingsAppearance()
+  try { await applySettingsAppearance() }
+  catch (cause) { throw new SettingsAppearanceError(cause) }
 }
 
 let saveQueue: Promise<unknown> = Promise.resolve()
 function saveSettings(patch: Partial<Settings>) {
-  const pending = saveQueue.then(() => api.patchSettings(patch))
+  settingsSave.pending++
+  const pending = saveQueue.then(async () => {
+    try {
+      await api.patchSettings(patch)
+      settingsSave.result = 'saved'
+      settingsSave.error = ''
+    } catch (cause) {
+      settingsSave.result = 'error'
+      settingsSave.error = cause instanceof Error ? cause.message : String(cause)
+      throw cause
+    } finally { settingsSave.pending-- }
+  })
   saveQueue = pending.catch(() => {})
   return pending
 }

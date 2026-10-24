@@ -24,7 +24,6 @@
 /* 绿色按钮使用深色文字，保持按钮的文字对比度。 */
 .rm-btn-primary,
 .rm-btn-primary:hover,
-.rm-segmented button.on,
-.rm-share-password button {
+.rm-segmented button.on {
   color: #101b16;
 }

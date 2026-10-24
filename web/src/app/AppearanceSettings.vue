@@ -3,7 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { api, ApiError, type Theme } from './api'
 import { DISPLAY_DEFAULTS } from '../themes/typography'
 import { appearancePaused, fixedThemeMode, type CssSnippet } from '../themes/appearance'
-import { loadSettings, reloadTheme, settings, updateSettings, type Settings } from './settings'
+import { loadSettings, reloadTheme, settings, SettingsAppearanceError, updateSettings, type Settings } from './settings'
+import SettingRow from './SettingRow.vue'
 import { toast } from './workspace'
 
 const themes = ref<Theme[]>([{ id: 'default', name: '默认', version: '1' }])
@@ -30,6 +31,7 @@ async function change(patch: Partial<Settings>): Promise<boolean> {
     await updateSettings(patch)
     return true
   } catch (err) {
+    if (err instanceof SettingsAppearanceError) { toast(err.message); return true }
     toast('保存外观失败：' + (err instanceof ApiError ? err.message : '网络错误，请检查连接'))
     void loadSettings().catch((err) => toast('重新读取外观失败：' + (err instanceof ApiError ? err.message : '网络错误')))
     return false
@@ -68,43 +70,39 @@ async function remove(snippet: CssSnippet) {
 async function reset() {
   if (!await change({ colorMode: 'system', theme: 'default', ...DISPLAY_DEFAULTS,
     cssSnippets: settings.cssSnippets.map((s) => ({ ...s, enabled: false })) })) return
-  toast('已恢复默认外观，CSS 片段已停用并保留')
+  toast('已恢复默认外观与排版，CSS 片段已停用并保留')
 }
 </script>
 
 <template>
   <p v-if="appearancePaused" class="rm-appearance-note">已临时停用主题和 CSS。可恢复默认外观后重新打开页面。</p>
-  <div class="rm-theme-cards"><button v-for="mode in [{ id: 'light', title: '纯净浅色', subtitle: 'Serene · 日间写作' }, { id: 'dark', title: '沉静深色', subtitle: '沿用你的深色主题' }, { id: 'system', title: '跟随系统', subtitle: '随系统明暗切换' }]" :key="mode.id" :class="[mode.id, { on: (fixedMode ?? settings.colorMode) === mode.id }]" :disabled="busy" @click="change({ theme: 'default', colorMode: mode.id as Settings['colorMode'] })"><span class="rm-theme-sample"><i /><i /><i /></span><strong>{{ mode.title }}</strong><small>{{ mode.subtitle }}</small></button></div>
-  <details class="rm-appearance-advanced"><summary>自定义主题与 CSS 片段</summary>
-  <div class="rm-setting">
-    <label for="rm-color-mode" class="rm-setting-label">明暗模式</label>
-    <select id="rm-color-mode" :value="fixedMode ?? settings.colorMode" :disabled="busy || !!fixedMode" @change="change({ colorMode: ($event.target as HTMLSelectElement).value as Settings['colorMode'] })">
-      <option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option>
-    </select>
-  </div>
-  <div class="rm-setting">
-    <label for="rm-theme-select" class="rm-setting-label">主题</label>
+  <SettingRow id="theme-select" control="rm-theme-select">
     <select id="rm-theme-select" :value="settings.theme" :disabled="busy" @change="change({ theme: ($event.target as HTMLSelectElement).value })">
       <option v-for="theme in themes" :key="theme.id" :value="theme.id">{{ theme.name }}</option>
       <option v-if="missingTheme" :value="settings.theme">{{ settings.theme }}（不可用）</option>
     </select>
     <button class="rm-btn" :disabled="busy" @click="refreshThemes">刷新列表</button>
-  </div>
-  <p v-if="error" class="rm-appearance-note rm-auth-error">{{ error }}</p>
-  <p v-if="fixedMode" class="rm-appearance-note">白色、黑色主题固定使用对应明暗模式；切换回默认或自定义主题后使用原来的明暗设置。</p>
-  <p class="rm-appearance-note">可选择内置主题，或从服务器数据目录的 themes 文件夹添加主题；主题和已启用的 CSS 也会应用到分享页。</p>
-  <div class="rm-setting"><span class="rm-setting-label">CSS 片段</span><button class="rm-btn" :disabled="busy" @click="edit()">新建片段</button></div>
-  <div v-for="snippet in settings.cssSnippets" :key="snippet.id" class="rm-snippet-row">
-    <label><input type="checkbox" :checked="snippet.enabled" :disabled="busy" @change="toggle(snippet)" />{{ snippet.name }}</label>
-    <button class="rm-btn" :disabled="busy" @click="edit(snippet)">编辑</button>
-    <button class="rm-btn rm-btn-danger" :disabled="busy" @click="remove(snippet)">删除</button>
-  </div>
-  <form v-if="editing !== null" class="rm-snippet-form" @submit.prevent="saveSnippet">
-    <label>片段名称<input v-model="draft.name" aria-label="片段名称" maxlength="100" required /></label>
-    <label>CSS<textarea v-model="draft.css" aria-label="CSS" rows="9" spellcheck="false" placeholder=":root { --rm-accent: #805ad5; }" /></label>
-    <div><button class="rm-btn" :disabled="busy" type="submit">保存并应用</button> <button class="rm-btn" type="button" @click="editing = null">取消</button></div>
-  </form>
-  <div class="rm-setting"><span class="rm-setting-label">默认外观</span><button class="rm-btn" :disabled="busy" @click="reset">恢复默认外观</button></div>
-  <p class="rm-appearance-note">若自定义样式导致界面无法操作，可在地址末尾加 <code>?reset-appearance</code>，临时停用后再恢复默认。</p>
+  </SettingRow>
+  <SettingRow id="color-mode">
+    <div class="rm-segmented" role="radiogroup" aria-label="明暗模式">
+      <button v-for="mode in [{ id: 'light', title: '浅色' }, { id: 'dark', title: '深色' }, { id: 'system', title: '跟随系统' }]" :key="mode.id" role="radio" :aria-checked="(fixedMode ?? settings.colorMode) === mode.id" :class="{ on: (fixedMode ?? settings.colorMode) === mode.id }" :disabled="busy || !!fixedMode" @click="change({ colorMode: mode.id as Settings['colorMode'] })">{{ mode.title }}</button>
+    </div>
+  </SettingRow>
+  <p v-if="error" class="rm-appearance-note rm-auth-error" role="alert">{{ error }}</p>
+  <p v-if="fixedMode" class="rm-appearance-note">白色、黑色主题固定使用对应明暗模式；切换回默认或自定义主题后可调整明暗设置。</p>
+  <details class="rm-settings-details rm-appearance-advanced"><summary>自定义 CSS 与恢复</summary>
+    <SettingRow id="css-snippets"><button class="rm-btn" :disabled="busy" @click="edit()">新建片段</button></SettingRow>
+    <div v-for="snippet in settings.cssSnippets" :key="snippet.id" class="rm-snippet-row">
+      <label><input type="checkbox" :checked="snippet.enabled" :disabled="busy" @change="toggle(snippet)" />{{ snippet.name }}</label>
+      <button class="rm-btn" :disabled="busy" @click="edit(snippet)">编辑</button>
+      <button class="rm-btn rm-btn-danger" :disabled="busy" @click="remove(snippet)">删除</button>
+    </div>
+    <form v-if="editing !== null" class="rm-snippet-form" @submit.prevent="saveSnippet">
+      <label>片段名称<input v-model="draft.name" aria-label="片段名称" maxlength="100" required /></label>
+      <label>CSS<textarea v-model="draft.css" aria-label="CSS" rows="9" spellcheck="false" placeholder=":root { --rm-accent: #805ad5; }" /></label>
+      <div><button class="rm-btn" :disabled="busy" type="submit">保存并应用</button> <button class="rm-btn" type="button" @click="editing = null">取消</button></div>
+    </form>
+    <SettingRow id="reset-appearance"><button class="rm-btn" :disabled="busy" @click="reset">恢复默认外观与排版</button></SettingRow>
+    <p class="rm-appearance-note">若自定义样式导致界面无法操作，可在地址末尾加 <code>?reset-appearance</code>，临时停用后再恢复默认。</p>
   </details>
 </template>

@@ -170,7 +170,7 @@ func (w *Watcher) scan() (map[string]fileState, error) {
 	return next, nil
 }
 
-// diff 按文件系统身份识别移动，内容相同不代表同一个分享主体。
+// diff 按文件系统身份识别移动，内容相同不代表同一个文件。
 func diff(prev, next map[string]fileState) []events.Event {
 	var evs []events.Event
 	structural := false

@@ -1,21 +1,31 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { allCommands, commandKeys, formatKeys, shortcutConflict, type Command } from './commands'
 import { recordedKeys } from '../keys'
-import { loadSettings, settings, updateSettings } from './settings'
+import { loadSettings, settings, SettingsAppearanceError, updateSettings } from './settings'
 import { toast } from './workspace'
 import Icon from './Icon.vue'
 
 const commands = computed(allCommands)
+const query = ref('')
+const filteredCommands = computed(() => {
+  const terms = query.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
+  return commands.value.filter(command => {
+    const text = [command.title, command.id, ...commandKeys(command).map(formatKeys)].join(' ').toLocaleLowerCase()
+    return terms.every(term => text.includes(term))
+  })
+})
 const recording = ref<string | null>(null)
 const recorder = ref<HTMLInputElement>()
 const error = ref('')
 const busy = ref(false)
+watch(query, () => { recording.value = null; error.value = '' })
 
 async function save(shortcuts: Record<string, string[]>) {
   busy.value = true
   try { await updateSettings({ shortcuts }) }
   catch (cause) {
+    if (cause instanceof SettingsAppearanceError) { toast(cause.message); return }
     toast('保存快捷键失败：' + (cause instanceof Error ? cause.message : String(cause)))
     await loadSettings().catch((cause) => toast('重新读取设置失败：' + String(cause)))
   } finally { busy.value = false }
@@ -51,11 +61,12 @@ async function reset(command: Command) {
 
 <template>
   <div class="rm-shortcut-settings">
-    <button class="rm-btn" :disabled="busy" @click="recording = null; error = ''; save({})">重置全部快捷键</button>
+    <div class="rm-shortcut-toolbar"><input v-model="query" type="search" aria-label="搜索快捷键" placeholder="搜索命令或快捷键" /><button class="rm-btn" :disabled="busy" @click="recording = null; error = ''; save({})">重置全部快捷键</button></div>
     <p class="rm-share-note">点击添加后按下组合键，Esc 取消；× 移除绑定，重置恢复默认。设置在所有设备间同步。</p>
+    <p class="rm-settings-result-count" role="status">{{ filteredCommands.length }} / {{ commands.length }} 个命令{{ filteredCommands.length ? '' : '，没有匹配的快捷键。' }}</p>
     <p v-if="error" role="alert" class="rm-auth-error">{{ error }}</p>
-    <div v-for="command in commands" :key="command.id" class="rm-shortcut-row">
-      <span>{{ command.title }}</span>
+    <div v-for="command in filteredCommands" :key="command.id" class="rm-shortcut-row">
+      <span class="rm-shortcut-title">{{ command.title }}<small>{{ command.id }}</small></span>
       <div class="rm-shortcut-bindings">
         <span v-for="(key, index) in commandKeys(command)" :key="key" class="rm-shortcut-chip">
           <kbd>{{ formatKeys(key) }}</kbd>
