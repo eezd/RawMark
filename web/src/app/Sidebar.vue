@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import Icon from './Icon.vue'
 import { basename } from './paths'
 import { commandTitle } from './commands'
-import { tree } from './tree'
+import { dropDirectory, tree } from './tree'
 import TreeNode from './TreeNode.vue'
 import SearchPanel from './SearchPanel.vue'
 import { createFolder, createNote, move, openSearch, ws } from './workspace'
@@ -11,7 +11,6 @@ import { sidebarViews } from '../plugins/registry'
 import PluginMount from './PluginMount.vue'
 
 const emit = defineEmits<{ logout: [] }>()
-const rootDrop = ref(false)
 const rootMenu = ref<{ x: number; y: number } | null>(null)
 const menuElement = ref<HTMLElement>()
 async function rootContext(event: MouseEvent) {
@@ -54,17 +53,43 @@ watch(() => ws.searchOpen, () => { selectedView.value = '' })
 
 function onRootDragOver(e: DragEvent) {
   if (!e.dataTransfer?.types.includes('application/x-rawmark-path')) return
+  if (e.target instanceof Element && e.target.closest('.rm-tree-item')) {
+    dropDirectory.value = null
+    return
+  }
   e.preventDefault()
-  rootDrop.value = true
+  dropDirectory.value = ''
 }
 
 function onRootDrop(e: DragEvent) {
-  rootDrop.value = false
+  dropDirectory.value = null
+  if (!e.dataTransfer?.types.includes('application/x-rawmark-path')) return
+  if (e.target instanceof Element && e.target.closest('.rm-tree-item')) return
+  e.preventDefault()
   const src = e.dataTransfer?.getData('application/x-rawmark-path')
   if (!src || !src.includes('/')) return
-  e.preventDefault()
   void move(src, basename(src))
 }
+
+function clearDrop() { dropDirectory.value = null }
+function onTreeDragLeave(e: DragEvent) {
+  if (e.currentTarget instanceof Element && e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) return
+  clearDrop()
+}
+function onDragKeydown(e: KeyboardEvent) { if (e.key === 'Escape') clearDrop() }
+onMounted(() => {
+  window.addEventListener('dragend', clearDrop)
+  window.addEventListener('drop', clearDrop)
+  window.addEventListener('blur', clearDrop)
+  window.addEventListener('keydown', onDragKeydown)
+})
+onUnmounted(() => {
+  window.removeEventListener('dragend', clearDrop)
+  window.removeEventListener('drop', clearDrop)
+  window.removeEventListener('blur', clearDrop)
+  window.removeEventListener('keydown', onDragKeydown)
+  clearDrop()
+})
 </script>
 
 <template>
@@ -79,7 +104,7 @@ function onRootDrop(e: DragEvent) {
     </nav>
     <PluginMount v-if="currentView" :key="selectedView" :view="currentView" />
     <SearchPanel v-else-if="ws.searchOpen" />
-    <div v-else class="rm-tree" @contextmenu="rootContext" :class="{ drop: rootDrop }" @dragover="onRootDragOver" @dragleave="rootDrop = false" @drop="onRootDrop">
+    <div v-else class="rm-tree" @contextmenu="rootContext" :class="{ drop: dropDirectory === '' }" @dragover="onRootDragOver" @dragleave="onTreeDragLeave" @drop="onRootDrop">
       <ul class="rm-tree-list">
         <TreeNode v-for="node in tree" :key="node.path" :node="node" :depth="0" />
       </ul>

@@ -1,4 +1,4 @@
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import type { Entry } from './api'
 import { basename, dirname, hiddenAssetPath } from './paths'
 import { rangePaths } from './selection'
@@ -31,6 +31,9 @@ function build(entries: Entry[]): TreeNode[] {
 }
 
 export const tree = computed(() => build(ws.entries.filter((entry) => !hiddenAssetPath(entry.path))))
+
+// null 表示无接收目标，空字符串表示根目录；文件行指向它的直接父目录。
+export const dropDirectory = ref<string | null>(null)
 
 const EXPANDED_KEY = 'rawmark.expanded'
 export const expanded = reactive(new Set<string>(JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? '[]') as string[]))

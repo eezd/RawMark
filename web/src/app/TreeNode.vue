@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import Icon from './Icon.vue'
-import { basename, inAssetDir, isImage, joinPath } from './paths'
-import { contextSelection, expanded, selectedPaths, selectPath, type TreeNode } from './tree'
+import { basename, dirname, inAssetDir, isImage, joinPath } from './paths'
+import { contextSelection, dropDirectory, expanded, selectedPaths, selectPath, type TreeNode } from './tree'
 import { batchFiles, exportFiles } from './batch'
 import { createFolder, createNote, move, openNote, renameTarget, ws } from './workspace'
 
@@ -17,7 +17,6 @@ const menuOpen = ref(false)
 const row = ref<HTMLElement>()
 const menuElement = ref<HTMLElement>()
 const menuPosition = ref({ left: 0, top: 0 })
-const dropTarget = ref(false)
 const input = ref<HTMLInputElement>()
 const draft = ref('')
 
@@ -124,20 +123,22 @@ function onDragStart(e: DragEvent) {
 }
 
 function onDragOver(e: DragEvent) {
-  if (!props.node.dir || assetDir.value || !e.dataTransfer?.types.includes('application/x-rawmark-path')) return
+  if (!e.dataTransfer?.types.includes('application/x-rawmark-path')) return
   e.preventDefault()
   e.stopPropagation()
-  dropTarget.value = true
+  dropDirectory.value = assetDir.value ? null : (props.node.dir ? props.node.path : dirname(props.node.path))
 }
 
 function onDrop(e: DragEvent) {
-  dropTarget.value = false
-  const src = e.dataTransfer?.getData('application/x-rawmark-path')
-  if (!props.node.dir || assetDir.value || !src) return
+  dropDirectory.value = null
+  if (!e.dataTransfer?.types.includes('application/x-rawmark-path')) return
   e.preventDefault()
   e.stopPropagation()
-  const to = joinPath(props.node.path, basename(src))
-  if (src !== props.node.path && !props.node.path.startsWith(src + '/') && to !== src) void move(src, to)
+  const src = e.dataTransfer.getData('application/x-rawmark-path')
+  if (assetDir.value || !src) return
+  const dir = props.node.dir ? props.node.path : dirname(props.node.path)
+  const to = joinPath(dir, basename(src))
+  if (src !== dir && !dir.startsWith(src + '/') && to !== src) void move(src, to)
 }
 </script>
 
@@ -146,7 +147,7 @@ function onDrop(e: DragEvent) {
     <div
       ref="row"
       class="rm-tree-row"
-      :class="{ active: isActive, selected: selectedPaths.has(node.path), drop: dropTarget, 'menu-open': menuOpen }"
+      :class="{ active: isActive, selected: selectedPaths.has(node.path), drop: node.dir && dropDirectory === node.path, 'menu-open': menuOpen }"
       :style="{ paddingLeft: depth * 14 + 8 + 'px' }"
       :draggable="!isRenaming && !assetDir"
       role="treeitem"
@@ -159,7 +160,6 @@ function onDrop(e: DragEvent) {
       @touchcancel="cancelPress"
       @dragstart="onDragStart"
       @dragover="onDragOver"
-      @dragleave="dropTarget = false"
       @drop="onDrop"
     >
       <span class="rm-tree-chevron" :class="{ open: isOpen, hidden: !node.dir }"><Icon name="chevron" :size="16" /></span>
