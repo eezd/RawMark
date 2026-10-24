@@ -38,9 +38,7 @@ func TestMoveMaintainsIncomingAndOutgoingLinks(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := v.SaveAsset("dir/a.md", "p.png", strings.NewReader("image"), 100); err != nil {
-		t.Fatal(err)
-	}
+	legacyAsset(t, v, "dir/a.md", "p.png", "image")
 	if _, err := v.Move("dir/a.md", "new/renamed.md"); err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +65,7 @@ func TestMetadataSkipsMathAndResolvesFootnotes(t *testing.T) {
 	if !reflect.DeepEqual(m.Tags, []string{"正文"}) || len(m.Links) != 0 || len(m.Assets) != 1 || m.Assets[0].Target != "assets/foot.png" {
 		t.Fatalf("扩展语法误识别：%+v", m)
 	}
-	rewritten, err := rewriteMovedLinks([]byte(content), "a.md", "dir/a.md", "a.md", "dir/a.md", false, false)
+	rewritten, err := rewriteLocalLinks([]byte(content), "a.md", "dir/a.md", func(target string) string { return target })
 	if err != nil || !strings.Contains(string(rewritten), "[fake](bad.md)") || !strings.Contains(string(rewritten), "[fake](bad2.md)") || !strings.Contains(string(rewritten), "../assets/foot.png") {
 		t.Fatalf("公式或脚注改写不符：%s %v", rewritten, err)
 	}

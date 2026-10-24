@@ -53,14 +53,14 @@ func TestImportZipAssetsAndMove(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Notes != 2 || result.Assets != 3 || len(result.Warnings) != 1 || len(result.Paths) != 1 || result.Paths[0] != "知识库" {
+	if result.Notes != 2 || result.Assets != 2 || len(result.Warnings) != 1 || len(result.Paths) != 1 || result.Paths[0] != "知识库" {
 		t.Fatalf("结果不符: %+v", result)
 	}
 	body, _, err := v.Read("知识库/目录/笔记.md")
 	if err != nil {
 		t.Fatal(err)
 	}
-	link := EscapeLinkPath("笔记.assets") + "/" + assetName([]byte("image"), "x.png")
+	link := "./assets/" + assetName([]byte("image"), "x.png")
 	expected := strings.Replace(content, "<assets/图 (1).png>", "<"+link+">", 1)
 	expected = strings.Replace(expected, "[图]: assets/图%20(1).png", "[图]: "+link, 1)
 	expected = strings.Replace(expected, "src=\"assets/图%20(1).png\"", "src=\""+link+"\"", 1)
@@ -77,15 +77,14 @@ func TestImportZipAssetsAndMove(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(moved), "改名.assets/") {
+	if !strings.Contains(string(moved), "./assets/") {
 		t.Fatal("图片链接未跟随改名")
 	}
-	if _, err := os.Stat(filepath.Join(v.root, "移动目标/改名.assets", assetName([]byte("image"), "x.png"))); err != nil {
+	if _, err := os.Stat(filepath.Join(v.root, "移动目标/assets", assetName([]byte("image"), "x.png"))); err != nil {
 		t.Fatal("附件未跟随", err)
 	}
-	original, err := os.ReadFile(filepath.Join(v.root, "知识库/目录/assets/图 (1).png"))
-	if err != nil || string(original) != "image" {
-		t.Fatal("原始附件丢失", err)
+	if _, err := os.Stat(filepath.Join(v.root, "知识库/目录/assets/图 (1).png")); !os.IsNotExist(err) {
+		t.Fatal("已迁移的重复原图应移除", err)
 	}
 }
 
@@ -101,14 +100,14 @@ func TestImportPreservesContainersAndOnlyRewritesActualLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Notes != 1 || result.Assets != 3 || len(result.Warnings) != 0 {
+	if result.Notes != 1 || result.Assets != 2 || len(result.Warnings) != 0 {
 		t.Fatalf("仅真实图片应生成附件副本，脚注正文不应产生缺失警告：%+v", result)
 	}
 	body, _, err := v.Read("导入/文章.md")
 	if err != nil {
 		t.Fatal(err)
 	}
-	link := EscapeLinkPath("文章.assets") + "/" + assetName([]byte("image"), "x.png")
+	link := "./assets/" + assetName([]byte("image"), "x.png")
 	want := strings.Replace(content, "[pic]: assets/image.png", "[pic]: "+link, 1)
 	want = strings.Replace(want, "![跨行](\nassets/image.png", "![跨行](\n"+link, 1)
 	if string(body) != want {

@@ -371,7 +371,7 @@ func (s *Server) mkdir(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
-// uploadAsset 接收 multipart 表单中的 file 字段，存入 ?note= 指定笔记的 .assets 目录
+// uploadAsset 接收 multipart 表单中的 file 字段，存入指定笔记或目录下的共享 assets 目录。
 func (s *Server) uploadAsset(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxAssetBytes+1<<20)
 	file, header, err := r.FormFile("file")

@@ -405,8 +405,35 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 			}
 		}
 	}
+	var images []imageTransfer
+	var imageTargets map[string]string
+	defer func() {
+		if err == nil {
+			return
+		}
+		for _, image := range images {
+			if image.removed {
+				if rollback := atomicWrite(filepath.Join(v.root, filepath.FromSlash(image.source)), image.data); rollback != nil {
+					err = errors.Join(err, fmt.Errorf("回滚图片原件失败: %w", rollback))
+				}
+			}
+		}
+		for _, image := range images {
+			if image.created {
+				if rollback := os.Remove(filepath.Join(v.root, filepath.FromSlash(image.target))); rollback != nil {
+					err = errors.Join(err, fmt.Errorf("撤回图片副本失败: %w", rollback))
+				}
+			}
+		}
+	}()
+	if isNote && path.Dir(from) != path.Dir(to) {
+		images, imageTargets, err = v.copyNoteImages(from, to)
+		if err != nil {
+			return false, err
+		}
+	}
 	// 笔记、目录和图片的移动都可能改变跨文件相对链接。
-	links, err := v.moveLinkChanges(from, to, info.IsDir(), srcAssets != "")
+	links, err := v.moveLinkChanges(from, to, info.IsDir(), srcAssets != "", imageTargets)
 	if err != nil {
 		return false, err
 	}
@@ -417,9 +444,15 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 		return false, err
 	}
 	writtenLinks := 0
+	assetsMoved := false
 	defer func() {
 		if err == nil {
 			return
+		}
+		if assetsMoved {
+			if rollback := os.Rename(dstAssets, srcAssets); rollback != nil {
+				err = errors.Join(err, fmt.Errorf("回滚旧附件目录失败: %w", rollback))
+			}
 		}
 		for _, change := range links[:writtenLinks] {
 			if rollback := atomicWrite(change.path, change.before); rollback != nil {
@@ -442,6 +475,15 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 	if srcAssets != "" {
 		if err := os.Rename(srcAssets, dstAssets); err != nil {
 			return false, fmt.Errorf("移动图片目录失败: %w", err)
+		}
+		assetsMoved = true
+	}
+	for i := range images {
+		if images[i].removeSource {
+			if err := os.Remove(filepath.Join(v.root, filepath.FromSlash(images[i].source))); err != nil {
+				return false, err
+			}
+			images[i].removed = true
 		}
 	}
 	return rewritten, err
@@ -638,13 +680,16 @@ func (v *Vault) Purge(id string) error {
 
 var extPattern = regexp.MustCompile(`^\.[a-z0-9]{1,8}$`)
 
-// SaveAsset 把上传的文件存入笔记的 .assets 目录，以内容哈希命名（相同内容只存一份），
+// SaveAsset 把上传的文件存入笔记同级的 assets 目录，以内容哈希命名（相同内容只存一份），
 // 返回可直接写入 Markdown 的相对链接
 func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (string, error) {
 	if !IsNote(note) {
 		return "", ErrInvalidPath
 	}
-	return v.saveAssetAt(AssetsDir(note), origName, r, limit)
+	if _, err := CleanPath(note); err != nil {
+		return "", err
+	}
+	return v.saveAssetAt(path.Join(path.Dir(note), "assets"), origName, r, limit)
 }
 
 // SaveFolderAsset 为图片管理上传到当前目录的共享 assets 目录，沿用哈希去重。
@@ -685,28 +730,48 @@ func (v *Vault) saveAssetAt(relativeDir, origName string, r io.Reader, limit int
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	// 管理界面允许替换图片，哈希名称不再保证内容未变；不能把旧内容上传误判为重复。
-	base := strings.TrimSuffix(name, path.Ext(name))
+	target, exists, err := v.assetDestination(relativeDir, name, data)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		if err := atomicWrite(filepath.Join(v.root, filepath.FromSlash(target)), data); err != nil {
+			return "", err
+		}
+	}
+	return "./" + EscapeLinkPath(path.Base(relativeDir)) + "/" + EscapeLinkPath(path.Base(target)), nil
+}
+
+// 管理界面允许替换图片，文件名不保证内容未变；只复用实际内容相同的普通文件。
+func (v *Vault) assetDestination(dir, name string, data []byte) (string, bool, error) {
+	base, ext := strings.TrimSuffix(name, path.Ext(name)), path.Ext(name)
 	for i := 0; ; i++ {
 		candidate := name
 		if i > 0 {
-			candidate = fmt.Sprintf("%s-%d%s", base, i, path.Ext(name))
+			candidate = fmt.Sprintf("%s-%d%s", base, i, ext)
 		}
-		target := filepath.Join(dir, candidate)
-		if err := v.checkInside(target); err != nil {
-			return "", err
+		rel := path.Join(dir, candidate)
+		full, err := v.abs(rel)
+		if err != nil {
+			return "", false, err
 		}
-		existing, err := os.ReadFile(target)
+		info, err := os.Lstat(full)
 		if errors.Is(err, fs.ErrNotExist) {
-			if err := atomicWrite(target, data); err != nil {
-				return "", err
-			}
-		} else if err != nil {
-			return "", err
-		} else if !bytes.Equal(existing, data) {
-			continue
+			return rel, false, nil
 		}
-		return EscapeLinkPath(path.Base(relativeDir)) + "/" + candidate, nil
+		if err != nil {
+			return "", false, err
+		}
+		if !info.Mode().IsRegular() {
+			return "", false, ErrInvalidPath
+		}
+		existing, err := os.ReadFile(full)
+		if err != nil {
+			return "", false, err
+		}
+		if bytes.Equal(existing, data) {
+			return rel, true, nil
+		}
 	}
 }
 

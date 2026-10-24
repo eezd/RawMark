@@ -18,6 +18,20 @@ func newVault(t *testing.T) *Vault {
 	return v
 }
 
+// 显式构造旧版独立附件，覆盖升级后的移动与回收站恢复。
+func legacyAsset(t *testing.T, v *Vault, note, name, content string) string {
+	t.Helper()
+	dir := filepath.Join(v.Root(), filepath.FromSlash(AssetsDir(note)))
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	file := assetName([]byte(content), name)
+	if err := os.WriteFile(filepath.Join(dir, file), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	return EscapeLinkPath(filepath.Base(dir)) + "/" + file
+}
+
 func TestCleanPathRejectsUnsafe(t *testing.T) {
 	for _, p := range []string{"", "/a.md", "../a.md", "a/../b.md", "a//b.md", "./a.md", ".rawmark/x.md", "a/.git/b.md", "a\\b.md", "a\x00.md"} {
 		if _, err := CleanPath(p); !errors.Is(err, ErrInvalidPath) {
@@ -48,7 +62,7 @@ func TestSymlinkEscapeRejected(t *testing.T) {
 func TestAssetSymlinkEscapeRejected(t *testing.T) {
 	v := newVault(t)
 	outside := t.TempDir()
-	if err := os.Symlink(outside, filepath.Join(v.Root(), "n.assets")); err != nil {
+	if err := os.Symlink(outside, filepath.Join(v.Root(), "assets")); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := v.SaveAsset("n.md", "x.png", strings.NewReader("image"), 100); !errors.Is(err, ErrInvalidPath) {
@@ -70,9 +84,7 @@ func TestMoveRollsBackWhenAssetDestinationIsTooLong(t *testing.T) {
 	if _, err := v.Write("refs.md", []byte(refs), Precondition{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := v.SaveAsset("n.md", "x.png", strings.NewReader("image"), 100); err != nil {
-		t.Fatal(err)
-	}
+	legacyAsset(t, v, "n.md", "x.png", "image")
 	// 笔记名可写入，但派生的 .assets 名超过文件系统的单段长度限制。
 	destination := strings.Repeat("a", 250) + ".md"
 	if _, err := v.Move("n.md", destination); err == nil {
@@ -96,9 +108,7 @@ func TestRestoreRollsBackWhenAssetsAreMissing(t *testing.T) {
 	if _, err := v.Write("n.md", []byte("原文"), Precondition{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := v.SaveAsset("n.md", "x.png", strings.NewReader("image"), 100); err != nil {
-		t.Fatal(err)
-	}
+	legacyAsset(t, v, "n.md", "x.png", "image")
 	item, err := v.Delete("n.md")
 	if err != nil {
 		t.Fatal(err)
@@ -118,9 +128,9 @@ func TestRestoreRollsBackWhenAssetsAreMissing(t *testing.T) {
 	}
 }
 
-func TestAssetLinksEncodeReservedURLCharacters(t *testing.T) {
+func TestAssetLinksWithReservedNotePath(t *testing.T) {
 	v := newVault(t)
-	link, err := v.SaveAsset("n#?%20.md", "x.png", strings.NewReader("image"), 100)
+	link, err := v.SaveAsset("目录 #?%20/n.md", "x.png", strings.NewReader("image"), 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,12 +138,12 @@ func TestAssetLinksEncodeReservedURLCharacters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file, _, err := v.OpenRaw(decoded)
+	file, _, err := v.OpenRaw(filepath.ToSlash(filepath.Join("目录 #?%20", decoded)))
 	if err != nil {
 		t.Fatalf("资源链接未指向实际文件: %s %v", link, err)
 	}
 	file.Close()
-	if strings.ContainsAny(link, "#?") || !strings.HasPrefix(link, "n%23%3F%2520.assets/") {
+	if strings.ContainsAny(link, "#?") || !strings.HasPrefix(link, "./assets/") {
 		t.Fatalf("链接未正确转义: %s", link)
 	}
 }
@@ -170,10 +180,7 @@ func TestMoveCarriesAssetsAndRewritesLinks(t *testing.T) {
 	if _, err := v.Write("dir/笔记 A.md", []byte(src), Precondition{}); err != nil {
 		t.Fatal(err)
 	}
-	link, err := v.SaveAsset("dir/笔记 A.md", "x.png", strings.NewReader("png"), 1<<20)
-	if err != nil {
-		t.Fatal(err)
-	}
+	link := legacyAsset(t, v, "dir/笔记 A.md", "x.png", "png")
 	if !strings.HasPrefix(link, "笔记%20A.assets/") {
 		t.Fatalf("资源链接不符: %s", link)
 	}
@@ -199,7 +206,7 @@ func TestMoveCarriesAssetsAndRewritesLinks(t *testing.T) {
 func TestDeleteRestore(t *testing.T) {
 	v := newVault(t)
 	v.Write("n.md", []byte("x"), Precondition{})
-	v.SaveAsset("n.md", "a.png", strings.NewReader("img"), 100)
+	legacyAsset(t, v, "n.md", "a.png", "img")
 	item, err := v.Delete("n.md")
 	if err != nil {
 		t.Fatal(err)
@@ -245,7 +252,7 @@ func TestTreeShowsImagesButHidesMeta(t *testing.T) {
 	for _, e := range entries {
 		paths = append(paths, e.Path)
 	}
-	if strings.Join(paths, ",") != "a.assets,"+link+",a.md,folder" {
+	if strings.Join(paths, ",") != "a.md,assets,"+strings.TrimPrefix(link, "./")+",folder" {
 		t.Fatalf("目录树不符: %v", paths)
 	}
 }

@@ -82,6 +82,7 @@ func TestReplaceImagePreservesPathAndUploadContents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	link = strings.TrimPrefix(link, "./")
 	if err := v.ReplaceImage(link, "replacement.PNG", strings.NewReader("replacement"), 100); err != nil {
 		t.Fatal(err)
 	}
@@ -89,8 +90,9 @@ func TestReplaceImagePreservesPathAndUploadContents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	newLink = strings.TrimPrefix(newLink, "./")
 	again, err := v.SaveAsset("a.md", "old.png", strings.NewReader("original"), 100)
-	if err != nil || again != newLink || newLink == link {
+	if err != nil || strings.TrimPrefix(again, "./") != newLink || newLink == link {
 		t.Fatalf("替换后的去重不符：%q %q %q %v", link, newLink, again, err)
 	}
 	for name, want := range map[string]string{link: "replacement", newLink: "original"} {

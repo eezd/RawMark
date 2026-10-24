@@ -48,7 +48,7 @@ func TestFolderUploadReusesDeduplication(t *testing.T) {
 		t.Fatal(err)
 	}
 	second, err := v.SaveFolderAsset("", "b.png", strings.NewReader("image"), 10)
-	if err != nil || first != second || !strings.HasPrefix(first, "assets/") {
+	if err != nil || first != second || !strings.HasPrefix(first, "./assets/") {
 		t.Fatalf("文件夹上传未去重：%s %s %v", first, second, err)
 	}
 	if _, err := v.SaveFolderAsset("missing", "a.png", strings.NewReader("image"), 10); !errors.Is(err, ErrNotFound) {
@@ -72,14 +72,14 @@ func TestCleanupProtectsLinkedImages(t *testing.T) {
 				t.Fatal(err)
 			}
 			metadata := Analyze("a.md", []byte(content))
-			if len(metadata.Assets) != 1 || metadata.Assets[0].Target != link {
+			if len(metadata.Assets) != 1 || metadata.Assets[0].Target != strings.TrimPrefix(link, "./") {
 				t.Fatalf("链接内图片未记录引用：%+v", metadata)
 			}
-			result, err := v.CleanupImages([]string{link})
+			result, err := v.CleanupImages([]string{strings.TrimPrefix(link, "./")})
 			if err != nil || len(result.Deleted) != 0 || len(result.Skipped) != 1 || result.Skipped[0].Reason != "仍被笔记引用" {
 				t.Fatalf("链接内图片未受保护：%+v %v", result, err)
 			}
-			if _, err := v.Stat(link); err != nil {
+			if _, err := v.Stat(strings.TrimPrefix(link, "./")); err != nil {
 				t.Fatal("正文引用的图片不应被移走", err)
 			}
 		})

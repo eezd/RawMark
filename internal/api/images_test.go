@@ -5,8 +5,40 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"testing"
 )
+
+func TestUploadsReturnSharedRelativeLinks(t *testing.T) {
+	f := newFixture(t)
+	f.write("notes/a.md", "正文")
+	f.write("notes/b.md", "正文")
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	file, err := form.CreateFormFile("file", "image.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(file, "image"); err != nil {
+		t.Fatal(err)
+	}
+	if err := form.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var previous string
+	for _, query := range []string{"note=notes/a.md", "note=notes/b.md", "folder=notes"} {
+		result := decode[struct{ Link string }](t, f.do(f.admin, "POST", "/api/v1/assets?"+query, body.String(), map[string]string{"Content-Type": form.FormDataContentType()}))
+		if !strings.HasPrefix(result.Link, "./assets/") || (previous != "" && previous != result.Link) {
+			t.Fatalf("上传链接或共享去重不符：%s", result.Link)
+		}
+		previous = result.Link
+		res := f.do(f.admin, "GET", "/api/v1/raw/notes/"+strings.TrimPrefix(result.Link, "./"), "", nil)
+		data, err := io.ReadAll(res.Body)
+		if res.StatusCode != 200 || err != nil || string(data) != "image" {
+			t.Fatalf("返回链接不能读取原图：%d %q %v", res.StatusCode, data, err)
+		}
+	}
+}
 
 func TestReplaceImageAPI(t *testing.T) {
 	f := newFixture(t)

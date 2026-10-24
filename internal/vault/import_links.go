@@ -3,7 +3,6 @@ package vault
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"html"
 	"net/url"
 	"os"
@@ -229,7 +228,7 @@ func importLinkSpans(content []byte) []importLink {
 	return spans
 }
 
-func (v *Vault) importLinks(ctx context.Context, note string, content []byte, total *int64) ([]byte, []string, error) {
+func (v *Vault) importLinks(ctx context.Context, note string, content []byte, total *int64, migrated map[string]bool) ([]byte, []string, error) {
 	missing := map[string]bool{}
 	replacements := map[string]string{}
 	spans := importLinkSpans(content)
@@ -279,15 +278,12 @@ func (v *Vault) importLinks(ctx context.Context, note string, content []byte, to
 				return nil, nil, err
 			}
 			// 只统计新生成的副本；已有同名附件必须与哈希对应的内容一致。
-			dest := filepath.Join(v.root, filepath.FromSlash(AssetsDir(note)), assetName(data, path.Base(rel)))
-			existing, readErr := os.ReadFile(dest)
-			if readErr != nil && !os.IsNotExist(readErr) {
-				return nil, nil, readErr
+			dir := path.Join(path.Dir(note), "assets")
+			dest, exists, err := v.assetDestination(dir, assetName(data, path.Base(rel)), data)
+			if err != nil {
+				return nil, nil, err
 			}
-			if readErr == nil && !bytes.Equal(data, existing) {
-				return nil, nil, fmt.Errorf("%w：附件名称与内容冲突", ErrInvalidImport)
-			}
-			if os.IsNotExist(readErr) {
+			if !exists {
 				if int64(len(data)) > maxImportExpanded-*total {
 					return nil, nil, ErrTooLarge
 				}
@@ -296,6 +292,9 @@ func (v *Vault) importLinks(ctx context.Context, note string, content []byte, to
 			replacement, err = v.SaveAsset(note, path.Base(rel), bytes.NewReader(data), importAssetLimit)
 			if err != nil {
 				return nil, nil, err
+			}
+			if dest != rel {
+				migrated[rel] = true
 			}
 			replacements[rel] = replacement
 		}

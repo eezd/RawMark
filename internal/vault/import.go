@@ -169,6 +169,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 		return result, fmt.Errorf("%w：没有可导入的 Markdown 笔记", ErrInvalidImport)
 	}
 	sort.Strings(notes)
+	migrated := map[string]bool{}
 	for _, note := range notes {
 		if err := ctx.Err(); err != nil {
 			return result, err
@@ -186,7 +187,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 			return result, fmt.Errorf("%w：Markdown 必须是 UTF-8 文本", ErrInvalidImport)
 		}
 		content = bytes.TrimPrefix(content, []byte{0xef, 0xbb, 0xbf})
-		updated, warnings, err := staged.importLinks(ctx, note, content, &total)
+		updated, warnings, err := staged.importLinks(ctx, note, content, &total, migrated)
 		if err != nil {
 			return result, err
 		}
@@ -199,8 +200,32 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 			return result, err
 		}
 	}
+	// 所有笔记改链完成后再清理已迁移的原图，避免后处理的笔记读取不到共享来源。
+	if len(migrated) > 0 {
+		used := map[string]bool{}
+		for _, note := range notes {
+			body, _, err := staged.Read(note)
+			if err != nil {
+				return result, err
+			}
+			metadata := Analyze(note, body)
+			if len(metadata.Warnings) > 0 {
+				return result, fmt.Errorf("%w：%s 的元数据异常，无法确认图片引用", ErrInvalidImport, note)
+			}
+			for _, ref := range metadata.Assets {
+				used[ref.Target] = true
+			}
+		}
+		for original := range migrated {
+			if !used[original] {
+				if err := os.Remove(filepath.Join(stage, filepath.FromSlash(original))); err != nil {
+					return result, err
+				}
+			}
+		}
+	}
 	result.Notes = len(notes)
-	// 附件数量包含原始附件及为各笔记生成的独立副本。
+	// 附件数量为最终保留的文件，包含目录共享图片与其他原始附件。
 	count := 0
 	err = filepath.WalkDir(stage, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {

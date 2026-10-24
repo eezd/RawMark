@@ -53,7 +53,7 @@ type linkChange struct {
 }
 
 // 调用方持有写锁；先计算全部改写，移动成功后再写入，出错时保留回滚依据。
-func (v *Vault) moveLinkChanges(from, to string, directory bool, ownAssets bool) ([]linkChange, error) {
+func (v *Vault) moveLinkChanges(from, to string, directory bool, ownAssets bool, images map[string]string) ([]linkChange, error) {
 	entries, err := v.Tree()
 	if err != nil {
 		return nil, err
@@ -68,7 +68,18 @@ func (v *Vault) moveLinkChanges(from, to string, directory bool, ownAssets bool)
 			return nil, err
 		}
 		next := movedPath(entry.Path, from, to, directory)
-		after, err := rewriteMovedLinks(before, entry.Path, next, from, to, directory, ownAssets)
+		after, err := rewriteLocalLinks(before, entry.Path, next, func(target string) string {
+			if entry.Path == from {
+				if image, ok := images[target]; ok {
+					return image
+				}
+			}
+			mapped := movedPath(target, from, to, directory)
+			if ownAssets {
+				mapped = movedPath(mapped, AssetsDir(from), AssetsDir(to), true)
+			}
+			return mapped
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +103,8 @@ func movedPath(p, from, to string, directory bool) string {
 	return p
 }
 
-func rewriteMovedLinks(content []byte, oldNote, newNote, from, to string, directory, ownAssets bool) ([]byte, error) {
+// 只替换链接地址，不重新序列化正文；移动和图片归位共用相同的代码/公式边界。
+func rewriteLocalLinks(content []byte, oldNote, newNote string, mapTarget func(string) string) ([]byte, error) {
 	var out []byte
 	last := 0
 	excluded := nonProseRanges(parseMetadata(content))
@@ -114,10 +126,7 @@ func rewriteMovedLinks(content []byte, oldNote, newNote, from, to string, direct
 		if !ok {
 			continue
 		}
-		mapped := movedPath(target, from, to, directory)
-		if ownAssets {
-			mapped = movedPath(mapped, AssetsDir(from), AssetsDir(to), true)
-		}
+		mapped := mapTarget(target)
 		if mapped == target && path.Dir(oldNote) == path.Dir(newNote) {
 			continue
 		}
@@ -126,6 +135,9 @@ func rewriteMovedLinks(content []byte, oldNote, newNote, from, to string, direct
 			return nil, err
 		}
 		replacement := EscapeLinkPath(filepath.ToSlash(rel))
+		if strings.HasPrefix(replacement, "assets/") {
+			replacement = "./" + replacement
+		}
 		if u.RawQuery != "" {
 			replacement += "?" + u.RawQuery
 		}
