@@ -354,6 +354,7 @@ button, input, select, textarea { font: inherit; }
 .cm-line:is(.cm-rm-h1,.cm-rm-h2,.cm-rm-h3,.cm-rm-h4,.cm-rm-h5,.cm-rm-h6) { font-family: var(--rm-font-heading); font-weight: 600; }
 .cm-line.cm-rm-h1 { font-size: 2.125em; line-height: 1.4; }
 .cm-line.cm-rm-h2 { font-size: 1.5em; line-height: 1.5; }
+.cm-rm-underline { text-decoration: underline; }
 .cm-editor .cm-content { padding-top: 16px; }
 .cm-rm-code-lang { font-family: var(--rm-font-mono); }
 .cm-line.cm-rm-code-begin::before { border-top: 1px solid var(--rm-divider); }

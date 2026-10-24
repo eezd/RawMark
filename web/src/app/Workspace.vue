@@ -7,7 +7,7 @@ import KnowledgePanel from './KnowledgePanel.vue'
 import TemplateDialog from './TemplateDialog.vue'
 import EditorChrome from './EditorChrome.vue'
 import Icon from './Icon.vue'
-import MobileToolbar from './MobileToolbar.vue'
+import SelectionToolbar from './SelectionToolbar.vue'
 import MoveDialog from './MoveDialog.vue'
 import ImportDialog from './ImportDialog.vue'
 import ImageGallery from './ImageGallery.vue'
@@ -124,7 +124,7 @@ onBeforeUnmount(() => {
       <EditorChrome />
       <NoteBanner />
       <EditorPane />
-      <MobileToolbar />
+      <SelectionToolbar />
       </div>
       <KnowledgePanel v-if="ws.view !== 'notes' && ws.images === null" />
       <ImageGallery v-if="ws.images !== null" :dir="ws.images" />

@@ -3,6 +3,7 @@ import { StateEffect, Facet, type EditorState, type Range } from '@codemirror/st
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
 import { codeContentRange, fenceLanguage, fencedCodeAt } from './codeblocks'
+import { inlineStyleText, stylesFromTag } from '../markdown/inlineStyles'
 import {
   BulletWidget,
   CheckboxWidget,
@@ -140,8 +141,19 @@ function buildDecorations(view: EditorView): DecorationSet {
           case 'SuperscriptMark':
           case 'SubscriptMark':
           case 'HighlightMark':
+          case 'UnderlineMark':
+          case 'InlineStyleMark':
             if (!touches(node.parent!)) hide(node.from, node.to)
             return
+          case 'Underline':
+            out.push(Decoration.mark({ class: 'cm-rm-underline' }).range(node.from, node.to))
+            return
+          case 'InlineStyle': {
+            const mark = node.getChild('InlineStyleMark')!
+            const styles = stylesFromTag(state.sliceDoc(mark.from, mark.to))!
+            out.push(Decoration.mark({ attributes: { style: inlineStyleText(styles) } }).range(mark.to, node.getChildren('InlineStyleMark').at(-1)!.from))
+            return
+          }
           case 'Highlight':
             out.push(highlightText.range(node.from, node.to))
             return

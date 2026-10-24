@@ -1,4 +1,4 @@
-// Markdown 格式命令：电脑上的快捷键与手机键盘上方的工具条共用
+// Markdown 格式命令：快捷键与选区工具栏共用
 import { EditorSelection, type ChangeSpec, type EditorState, type TransactionSpec } from '@codemirror/state'
 
 /** 只依赖状态与派发，便于在没有 DOM 的环境中测试 */

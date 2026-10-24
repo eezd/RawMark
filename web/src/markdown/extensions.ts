@@ -2,6 +2,7 @@
 // 上标 ^x^、下标 ~x~、:emoji: 由 @lezer/markdown 自带的扩展解析
 import { tags } from '@lezer/highlight'
 import type { BlockContext, LeafBlockParser, Line, MarkdownConfig } from '@lezer/markdown'
+import { inlineStyleSyntax } from './inlineStyles'
 
 const PUNCTUATION = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~\xA1‐-‧]/
 
@@ -195,4 +196,4 @@ const FrontMatter: MarkdownConfig = {
   ],
 }
 
-export const typoraExtensions: MarkdownConfig[] = [FrontMatter, Highlight, InlineMath, BlockMath, Footnote, TableOfContents]
+export const typoraExtensions: MarkdownConfig[] = [FrontMatter, Highlight, InlineMath, BlockMath, Footnote, TableOfContents, inlineStyleSyntax]

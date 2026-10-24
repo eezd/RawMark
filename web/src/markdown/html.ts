@@ -1,6 +1,7 @@
 import type { SyntaxNode } from '@lezer/common'
 import { Emoji, GFM, parser as commonmarkParser, Subscript, Superscript, type MarkdownParser } from '@lezer/markdown'
 import { typoraExtensions } from './extensions'
+import { inlineStyleText, stylesFromTag } from './inlineStyles'
 
 // 与编辑器一致的语法集（lang-markdown 的 markdownLanguage 加 Typora 扩展）
 export const markdownParser = commonmarkParser.configure([GFM, Subscript, Superscript, Emoji, ...typoraExtensions])
@@ -278,6 +279,13 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
         return `<sub>${innerOf(node, 'SubscriptMark')}</sub>`
       case 'Highlight':
         return `<mark>${innerOf(node, 'HighlightMark')}</mark>`
+      case 'Underline':
+        return `<u>${innerOf(node, 'UnderlineMark')}</u>`
+      case 'InlineStyle': {
+        const open = node.getChild('InlineStyleMark')!
+        const styles = stylesFromTag(text(open.from, open.to))!
+        return `<span style="${escapeAttr(inlineStyleText(styles))}">${innerOf(node, 'InlineStyleMark')}</span>`
+      }
       // 公式与 emoji 输出占位元素，由 render.ts 的 hydrate 按需加载依赖后填充
       case 'InlineMath': {
         const tex = text(node.from + 1, node.to - 1)
