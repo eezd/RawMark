@@ -8,7 +8,7 @@ import ShortcutSettings from './ShortcutSettings.vue'
 import { DEFAULTS, loadSettings, settings, settingsSave, SettingsAppearanceError, updateSettings } from './settings'
 import { searchSettings } from './settingsCatalog'
 import { ws } from './workspace'
-import { applyFontCatalog } from './fonts'
+import { applyFontCatalog, customFonts } from './fonts'
 
 let app: App | undefined
 let host: HTMLElement | undefined
@@ -191,6 +191,50 @@ describe('设置查找与重置', () => {
     await loadSettings()
     expect(settings.fontSize).toBe(24)
     expect(settings.lineHeight).toBe(DEFAULTS.lineHeight)
+  })
+})
+
+describe('设置同步顺序', () => {
+  it.each(['settings', 'fonts'] as const)('旧%s响应晚到时，不恢复已删除字体或覆盖新设置与缓存', async (delayed) => {
+    const font = { id: 'custom-' + 'c'.repeat(64), name: '已删除字体', format: 'woff2' as const }
+    const oldSettings = { uiFont: font.id, textFont: font.id, codeFont: font.id, fontSize: 18 }
+    let release!: () => void
+    const pending = new Promise<void>(resolve => { release = resolve })
+    vi.mocked(api.settings).mockImplementationOnce(async () => {
+      if (delayed === 'settings') await pending
+      return oldSettings
+    })
+    vi.mocked(api.fonts).mockImplementationOnce(async () => {
+      if (delayed === 'fonts') await pending
+      return [font]
+    })
+    const oldLoad = loadSettings()
+    vi.mocked(api.settings).mockResolvedValue({ uiFont: 'maple', textFont: 'maple', codeFont: 'maple', fontSize: 24 })
+    await loadSettings()
+    const cache = localStorage.getItem('rawmark.settings')
+    release()
+    await oldLoad
+    expect(settings).toMatchObject({ uiFont: 'maple', textFont: 'maple', codeFont: 'maple', fontSize: 24 })
+    expect(customFonts.value).toEqual([])
+    expect(document.querySelector('#rm-custom-fonts')!.textContent).not.toContain(font.id)
+    expect(document.documentElement.style.getPropertyValue('--rm-font-text')).not.toContain(font.id)
+    expect(document.documentElement.style.getPropertyValue('--rm-font-size')).toBe('24px')
+    expect(localStorage.getItem('rawmark.settings')).toBe(cache)
+  })
+
+  it('最新同步失败仍报告原错误，迟到旧响应不会覆盖当前状态，后续可重新同步', async () => {
+    let release!: (value: Record<string, unknown>) => void
+    vi.mocked(api.settings).mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+    const oldLoad = loadSettings()
+    const cause = new ApiError(503, '字体列表暂时不可用')
+    vi.mocked(api.fonts).mockRejectedValueOnce(cause)
+    await expect(loadSettings()).rejects.toBe(cause)
+    release({ fontSize: 18 })
+    await oldLoad
+    expect(settings.fontSize).toBe(DEFAULTS.fontSize)
+    vi.mocked(api.settings).mockResolvedValue({ fontSize: 24 })
+    await loadSettings()
+    expect(settings.fontSize).toBe(24)
   })
 })
 

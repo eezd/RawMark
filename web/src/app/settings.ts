@@ -94,8 +94,12 @@ applied({ ...settings })
 // 缓存只提前应用明暗模式；主题和片段等服务器确认后再应用。
 applyAppearance({ ...settings, theme: 'default', cssSnippets: [] }, '')
 
+let settingsRequest = 0
 export async function loadSettings() {
+  const request = ++settingsRequest
   const [raw, fonts] = await Promise.all([api.settings(), api.fonts()])
+  // 目录与设置作为一批应用，迟到旧响应不能恢复已删除字体或覆盖新设置。
+  if (request !== settingsRequest) return
   applyFontCatalog(parseFontCatalog(fonts))
   applied(sanitize(raw))
   await applySettingsAppearance()
