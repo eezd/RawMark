@@ -748,10 +748,11 @@ func (v *Vault) Restore(id string) (item TrashItem, err error) {
 func (v *Vault) Purge(id string) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if _, err := v.readTrashItem(id); err != nil {
+	metadata, err := v.readTrashMetadata(id)
+	if err != nil {
 		return err
 	}
-	return os.RemoveAll(filepath.Join(v.trash, id))
+	return v.purgeTrashItemLocked(metadata)
 }
 
 // ---- 资源 ----

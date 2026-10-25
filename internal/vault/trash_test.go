@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
@@ -9,6 +10,89 @@ import (
 	"testing"
 	"time"
 )
+
+func TestTrashPurgeFailurePreservesMetadata(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("目录写权限测试需以普通用户运行；root 可绕过文件权限")
+	}
+	for _, operation := range []string{"single", "all", "expired"} {
+		for _, blocked := range []string{"payload", "parent"} {
+			t.Run(operation+"/"+blocked, func(t *testing.T) {
+				v := newVault(t)
+				if _, err := v.Write("folder/locked/note.md", []byte("content"), Precondition{}); err != nil {
+					t.Fatal(err)
+				}
+				setIcon(t, v, "folder", &TreeIcon{Kind: "emoji", Value: "📚"})
+				item, err := v.Delete("folder")
+				if err != nil {
+					t.Fatal(err)
+				}
+				metaPath := filepath.Join(v.trash, item.ID, "meta.json")
+				data, err := os.ReadFile(metaPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var metadata trashMetadata
+				if err := json.Unmarshal(data, &metadata); err != nil {
+					t.Fatal(err)
+				}
+				metadata.DeletedAt = time.Now().Add(-40 * 24 * time.Hour).UnixMilli()
+				data, err = json.Marshal(metadata)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(metaPath, data, 0600); err != nil {
+					t.Fatal(err)
+				}
+				locked := filepath.Join(v.trash, item.ID, "folder", "locked")
+				if blocked == "parent" {
+					locked = v.trash
+				}
+				if err := os.Chmod(locked, 0500); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { os.Chmod(locked, 0755) })
+				purge := func() error {
+					if operation == "single" {
+						return v.Purge(item.ID)
+					}
+					days := int64(0)
+					if operation == "expired" {
+						days = 30
+					}
+					result, err := v.PurgeTrash(days, time.Now())
+					if err == nil && len(result.Failed) > 0 {
+						if len(result.Deleted) != 0 || len(result.Failed) != 1 || result.Failed[0].ID != item.ID {
+							t.Fatalf("部分失败结果错误: %+v", result)
+						}
+						return errors.New(result.Failed[0].Error)
+					}
+					return err
+				}
+				if err := purge(); err == nil {
+					t.Fatal("权限错误应报告失败")
+				}
+				after, err := os.ReadFile(metaPath)
+				if err != nil || !bytes.Equal(data, after) {
+					t.Fatalf("删除失败必须保留完整元数据: %v", err)
+				}
+				items, err := v.TrashList()
+				if err != nil || len(items) != 1 || items[0].ID != item.ID {
+					t.Fatalf("删除失败的条目必须仍可列出: %+v %v", items, err)
+				}
+				if err := os.Chmod(locked, 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := purge(); err != nil {
+					t.Fatalf("修复权限后应可继续清理: %v", err)
+				}
+				if _, err := os.Stat(filepath.Dir(metaPath)); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("成功清理后不应残留目录: %v", err)
+				}
+			})
+		}
+	}
+}
 
 func trashAt(t *testing.T, v *Vault, path string, when time.Time) TrashItem {
 	t.Helper()
