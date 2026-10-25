@@ -84,6 +84,12 @@ func run(addr string) error {
 	srv.ThemesDir = filepath.Join(dataDir, "themes")
 	srv.PluginsDir = filepath.Join(dataDir, "plugins")
 	srv.FontsDir = filepath.Join(dataDir, "fonts")
+	trashDone := make(chan struct{})
+	go func() {
+		defer close(trashDone)
+		srv.RunTrashCleanup(ctx)
+	}()
+	defer func() { stop(); <-trashDone }()
 	httpServer := &http.Server{
 		Addr:              addr,
 		Handler:           srv.Handler(web.Dist()),

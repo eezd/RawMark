@@ -349,14 +349,25 @@
             "cookie": []
           }
         ],
-        "description": "按顶层键合并：请求中的键覆盖原值，值为 null 的键被删除。成功后经 WebSocket 推送 settings 事件。",
+        "description": "按顶层键合并：请求中的键覆盖原值，值为 null 的键被删除。成功后经 WebSocket 推送 settings 事件。 trashRetentionDays 为非负安全整数（默认30，0为永不自动删除），null恢复默认。期限适用于已有和新回收站条目，服务启动及每小时按原删除时间永久清理。",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "additionalProperties": true
+                "additionalProperties": true,
+                "properties": {
+                  "trashRetentionDays": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "default": 30
+                  }
+                }
               }
             }
           }
@@ -374,7 +385,7 @@
             }
           },
           "400": {
-            "description": "不是 JSON 对象",
+            "description": "不是 JSON 对象，或自动删除期限无效",
             "content": {
               "application/json": {
                 "schema": {
@@ -1003,6 +1014,25 @@
                       }
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "清空回收站全部条目",
+        "description": "永久删除，不可恢复；结果逐项报告，失败条目保留。只读令牌禁止。",
+        "tags": [
+          "回收站"
+        ],
+        "responses": {
+          "200": {
+            "description": "包含成功及失败的逐项结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashPurgeResult"
                 }
               }
             }
@@ -2364,6 +2394,39 @@
           "value": {
             "type": "string",
             "description": "Emoji 字符或内置线性图标名称，最多64字节"
+          }
+        }
+      },
+      "TrashPurgeResult": {
+        "type": "object",
+        "required": [
+          "deleted",
+          "failed"
+        ],
+        "properties": {
+          "deleted": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "error"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       }

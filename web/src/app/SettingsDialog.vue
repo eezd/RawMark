@@ -30,7 +30,7 @@ const dialog = ref<HTMLElement>()
 const content = ref<HTMLElement>()
 const heading = ref<HTMLElement>()
 const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-const preferenceSection = computed(() => ['appearance', 'editor', 'shortcuts'].includes(section.value))
+const preferenceSection = computed(() => ['appearance', 'editor', 'shortcuts', 'trash'].includes(section.value))
 const saveLabel = computed(() => settingsSave.pending ? '保存中…' : settingsSave.result === 'error' ? '保存失败' : settingsSave.result === 'saved' ? '已保存' : '修改自动保存')
 
 async function open(id: SettingsSection) {

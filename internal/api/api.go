@@ -92,6 +92,7 @@ func (s *Server) routes() []route {
 		{"PUT /api/v1/assets/{path...}", authed, s.replaceImage},
 		{"GET /api/v1/raw/{path...}", authed, s.raw},
 		{"GET /api/v1/trash", authed, s.trashList},
+		{"DELETE /api/v1/trash", authed, s.trashClear},
 		{"POST /api/v1/trash/{id}/restore", authed, s.trashRestore},
 		{"DELETE /api/v1/trash/{id}", authed, s.trashPurge},
 		{"GET /api/v1/events", authed, s.events},

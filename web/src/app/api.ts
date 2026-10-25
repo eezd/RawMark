@@ -57,6 +57,11 @@ export interface TrashItem {
   deletedAt: number
 }
 
+export interface TrashPurgeResult {
+  deleted: string[]
+  failed: { id: string; error: string }[]
+}
+
 export interface SearchResult {
   path: string
   // 第一处匹配所在行（从 1 开始）及其摘录；只有路径匹配时 line 为 0
@@ -216,6 +221,7 @@ export const api = {
     json<{ token: string; info: ApiToken }>(request('POST', '/api/v1/tokens', { json: { name, scope } })),
   deleteToken: (id: string) => request('DELETE', '/api/v1/tokens/' + encodeURIComponent(id)),
 
+  clearTrash: () => json<TrashPurgeResult>(request('DELETE', '/api/v1/trash')),
   trash: async () => (await json<{ items: TrashItem[] }>(request('GET', '/api/v1/trash'))).items,
   restore: (id: string) => json<TrashItem>(request('POST', `/api/v1/trash/${id}/restore`)),
   purge: (id: string) => request('DELETE', `/api/v1/trash/${id}`),

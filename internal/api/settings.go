@@ -11,7 +11,7 @@ import (
 	"rawmark/internal/events"
 )
 
-// 应用设置：一份 JSON 对象，全部设备共用。内容由前端定义，服务端只做合并与保存
+// 应用设置：一份 JSON 对象，全部设备共用。内容由前端定义，服务端合并与保存，并校验由服务端执行的清理期限
 const settingsKey = "app.settings"
 
 func (s *Server) readSettings() (map[string]json.RawMessage, error) {
@@ -59,6 +59,10 @@ func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request) {
 		} else {
 			settings[k] = v
 		}
+	}
+	if _, err := trashRetentionDays(settings); err != nil {
+		writeError(w, 400, err.Error())
+		return
 	}
 	merged, err := json.Marshal(settings)
 	if err != nil {

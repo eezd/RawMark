@@ -29,6 +29,7 @@ afterEach(() => {
   cleanup.splice(0).forEach(fn => fn())
   ws.settings = null
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 function mount(component: typeof SettingsDialog | typeof ShortcutSettings) {
   host = document.createElement('div')
@@ -316,5 +317,50 @@ describe('快捷键查找', () => {
     await search('input[aria-label="搜索快捷键"]', '不存在的命令')
     expect(host!.querySelectorAll('.rm-shortcut-row')).toHaveLength(0)
     expect(host!.textContent).toContain('没有匹配的快捷键')
+  })
+})
+
+describe('回收站', () => {
+  it('清空必须确认；防止重复操作，部分失败后重读并保留错误详情', async () => {
+    const item = { id: 'one', path: 'broken.md', dir: false, deletedAt: Date.now() }
+    vi.spyOn(api, 'trash').mockResolvedValue([item])
+    let finish!: (value: { deleted: string[]; failed: { id: string; error: string }[] }) => void
+    const clear = vi.spyOn(api, 'clearTrash').mockImplementation(() => new Promise(done => { finish = done }))
+    const confirm = vi.fn().mockReturnValueOnce(false).mockReturnValue(true)
+    vi.stubGlobal('confirm', confirm)
+    ws.settings = 'trash'
+    mount(SettingsDialog)
+    await vi.waitFor(() => expect(host!.textContent).toContain('broken'))
+    const button = host!.querySelector<HTMLButtonElement>('#rm-setting-trash-clear button')!
+    button.click()
+    expect(clear).not.toHaveBeenCalled()
+    button.click()
+    await nextTick()
+    expect(confirm).toHaveBeenCalledTimes(2)
+    expect(button.disabled).toBe(true)
+    expect([...host!.querySelectorAll<HTMLButtonElement>('.rm-trash-list button')].every(b => b.disabled)).toBe(true)
+    button.click()
+    expect(clear).toHaveBeenCalledTimes(1)
+    finish({ deleted: [], failed: [{ id: item.id, error: '元数据损坏' }] })
+    await vi.waitFor(() => expect(host!.querySelector('[role="alert"]')?.textContent).toContain('元数据损坏'))
+    expect(api.trash).toHaveBeenCalledTimes(2)
+    expect(button.disabled).toBe(false)
+  })
+  it('保留天数支持0，拒绝负数和小数，不提交无效值', async () => {
+    vi.spyOn(api, 'trash').mockResolvedValue([])
+    ws.settings = 'trash'
+    mount(SettingsDialog)
+    const input = host!.querySelector<HTMLInputElement>('#rm-trash-retention')!
+    expect(input.value).toBe('30')
+    for (const value of ['-1', '1.5', '']) {
+      input.value = value
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+      expect(api.patchSettings).not.toHaveBeenCalled()
+      expect(input.value).toBe('30')
+    }
+    input.value = '0'
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    await vi.waitFor(() => expect(api.patchSettings).toHaveBeenCalledWith({ trashRetentionDays: 0 }))
+    expect(settings.trashRetentionDays).toBe(0)
   })
 })

@@ -18,7 +18,7 @@ export const CONTENT_WIDTHS = [
 
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
-export const DEFAULTS = { hiddenFonts: [] as string[], selectionToolbar: true, ...DISPLAY_DEFAULTS, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
+export const DEFAULTS = { trashRetentionDays: 30, hiddenFonts: [] as string[], selectionToolbar: true, ...DISPLAY_DEFAULTS, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
 export type Settings = typeof DEFAULTS & Appearance & { shortcuts: Record<string, string[]> }
 
 const CACHE_KEY = 'rawmark.settings'
@@ -39,6 +39,7 @@ function sanitize(raw: Record<string, unknown>): Settings {
   const hiddenFonts = Array.isArray(raw.hiddenFonts) ? raw.hiddenFonts.filter((id): id is string => typeof id === 'string' && id !== 'maple' && Object.hasOwn(FONT_PRESETS, id)) : []
   return {
     hiddenFonts,
+    trashRetentionDays: Number.isSafeInteger(raw.trashRetentionDays) && (raw.trashRetentionDays as number) >= 0 ? raw.trashRetentionDays as number : DEFAULTS.trashRetentionDays,
     ...sanitizeDisplaySettings(raw, customFonts.value.map(font => font.id), hiddenFonts),
     selectionToolbar: typeof raw.selectionToolbar === 'boolean' ? raw.selectionToolbar : true,
     shortcuts: sanitizeShortcuts(raw.shortcuts),

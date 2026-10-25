@@ -13,6 +13,8 @@ export const SETTINGS_SECTIONS: { id: SettingsSection; title: string; icon: Icon
 ]
 
 export const SETTING_ITEMS = {
+  'trash-retention': { section: 'trash', title: '自动删除期限', description: '按原删除时间计算，默认 30 天；0 表示永不自动删除。修改期限会影响已有条目，服务启动及每小时清理一次。', keywords: '回收站 天数 自动 清理 保留' },
+  'trash-clear': { section: 'trash', title: '清空全部', description: '永久删除回收站中的全部条目，无法撤销。', keywords: '回收站 清理 全部 删除' },
   'ui-font': { section: 'appearance', title: '界面字体', description: '用于菜单、侧栏与按钮；可导入或删除字体，Maple 为不可删除的默认字体。', keywords: 'UI 字体 导入 删除 TTF OTF WOFF' },
   'ui-font-size': { section: 'appearance', title: '界面字号', description: '调整菜单、侧栏与按钮文字，不影响正文和代码字号。', keywords: 'UI 大小' },
   'theme-select': { section: 'appearance', title: '主题', description: '使用内置主题，或从服务器数据目录的 themes 文件夹添加主题。', keywords: '白色 黑色 自定义' },

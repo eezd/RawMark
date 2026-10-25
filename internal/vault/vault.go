@@ -637,6 +637,9 @@ func (v *Vault) readTrashMetadata(id string) (trashMetadata, error) {
 	if err := json.Unmarshal(data, &metadata); err != nil {
 		return trashMetadata{}, fmt.Errorf("回收站条目 %s 元数据损坏: %w", id, err)
 	}
+	if _, err := CleanPath(metadata.Path); err != nil || metadata.ID != id || metadata.DeletedAt <= 0 || (metadata.Assets != "" && metadata.Assets != filepath.Base(AssetsDir(metadata.Path))) {
+		return trashMetadata{}, fmt.Errorf("回收站条目 %s 元数据无效", id)
+	}
 	for p, icon := range metadata.Icons {
 		if _, err := CleanPath(p); err != nil || !icon.valid() || !(p == metadata.Path || metadata.Dir && strings.HasPrefix(p, metadata.Path+"/") || metadata.Assets != "" && (p == AssetsDir(metadata.Path) || strings.HasPrefix(p, AssetsDir(metadata.Path)+"/"))) {
 			return trashMetadata{}, fmt.Errorf("回收站条目 %s 图标元数据损坏", id)
@@ -646,6 +649,8 @@ func (v *Vault) readTrashMetadata(id string) (trashMetadata, error) {
 }
 
 func (v *Vault) TrashList() ([]TrashItem, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
 	dirs, err := os.ReadDir(v.trash)
 	if err != nil {
 		return nil, err
@@ -666,6 +671,8 @@ func (v *Vault) TrashList() ([]TrashItem, error) {
 }
 
 func (v *Vault) Restore(id string) (item TrashItem, err error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
 	metadata, err := v.readTrashMetadata(id)
 	item = metadata.TrashItem
 	if err != nil {
@@ -675,8 +682,6 @@ func (v *Vault) Restore(id string) (item TrashItem, err error) {
 	if err != nil {
 		return TrashItem{}, err
 	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
 	icons, err := v.readTreeIcons()
 	if err != nil {
 		return TrashItem{}, err
@@ -741,6 +746,8 @@ func (v *Vault) Restore(id string) (item TrashItem, err error) {
 }
 
 func (v *Vault) Purge(id string) error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
 	if _, err := v.readTrashItem(id); err != nil {
 		return err
 	}
