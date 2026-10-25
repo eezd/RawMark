@@ -6,9 +6,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net"
@@ -16,6 +18,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"rawmark/internal/backup"
+	"sync"
 	"syscall"
 	"time"
 
@@ -53,71 +57,169 @@ func run(addr string) error {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return permissionHint(err)
 	}
-	v, err := vault.Open(vaultDir)
-	if err != nil {
-		return permissionHint(fmt.Errorf("打开笔记仓库失败: %w", err))
-	}
-	st, err := store.Open(filepath.Join(dataDir, "rawmark.db"))
+
+	dataDir, err := filepath.Abs(dataDir)
 	if err != nil {
 		return err
 	}
-	defer st.Close()
-	am := auth.New(st)
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	idx, err := search.Open(filepath.Join(dataDir, "index.db"), v)
+	vaultDir, err = filepath.Abs(vaultDir)
 	if err != nil {
 		return err
 	}
-	defer idx.Close()
-	hub := events.NewHub()
-	idx.OnIndexed = func() { hub.Broadcast(events.Event{Type: "indexed"}) }
-	go idx.Run(ctx)
-	if err := watch.Start(ctx, v, hub, idx.Update); err != nil {
-		return fmt.Errorf("启动文件监听失败: %w", err)
+	// 所有标准库上传、导出临时文件归本进程专属目录，不能清理宿主机 /tmp。
+	tempDir := filepath.Join(dataDir, "temp")
+	if err = os.MkdirAll(tempDir, 0700); err != nil {
+		return err
 	}
-	go cleanupSessions(ctx, st)
-
-	srv := api.New(v, am, st, hub, idx)
-	srv.DataDir = dataDir
-	srv.ThemesDir = filepath.Join(dataDir, "themes")
-	srv.PluginsDir = filepath.Join(dataDir, "plugins")
-	srv.FontsDir = filepath.Join(dataDir, "fonts")
+	if err = os.Setenv("TMPDIR", tempDir); err != nil {
+		return err
+	}
+	logs, err := backup.OpenLog(filepath.Join(dataDir, "logs"))
+	if err != nil {
+		return err
+	}
+	defer logs.Close()
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.MultiWriter(os.Stderr, logs), nil)))
 	fontsSize, err := web.FontStorage()
 	if err != nil {
 		return fmt.Errorf("读取内置字体统计失败: %w", err)
 	}
-	srv.BuiltinFontsSize = fontsSize
-	trashDone := make(chan struct{})
-	go func() {
-		defer close(trashDone)
-		srv.RunTrashCleanup(ctx)
-	}()
-	defer func() { stop(); <-trashDone }()
-	httpServer := &http.Server{
-		Addr:              addr,
-		Handler:           srv.Handler(web.Dist()),
-		ReadHeaderTimeout: 10 * time.Second,
-		IdleTimeout:       120 * time.Second,
+	// 构建标识与前端入口一致，不另建版本来源。
+	static := web.Dist()
+	html, err := fs.ReadFile(static, "index.html")
+	if err != nil {
+		return err
 	}
-	errCh := make(chan error, 1)
-	go func() { errCh <- httpServer.ListenAndServe() }()
-	slog.Info("RawMark 已启动", "addr", addr, "vault", v.Root())
+	buildVersion := ""
+	marker := []byte(`<meta name="rawmark-version" content="`)
+	if start := bytes.Index(html, marker); start >= 0 {
+		rest := html[start+len(marker):]
+		if end := bytes.IndexByte(rest, '"'); end >= 0 {
+			buildVersion = string(rest[:end])
+		}
+	}
+	if buildVersion == "" {
+		return fmt.Errorf("缺少构建版本")
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	for {
+		var restoreErr error
+		if restoreErr = backup.Recover(dataDir, vaultDir); restoreErr != nil {
+			pending, err := backup.Pending(dataDir)
+			if err != nil {
+				return err
+			}
+			if pending {
+				return restoreErr
+			}
+			slog.Error("实例恢复失败，已回退", "err", restoreErr)
+		}
+		restart, err := serve(ctx, addr, dataDir, vaultDir, buildVersion, fontsSize, logs, restoreErr)
+		if err != nil {
+			pending, pendingErr := backup.Pending(dataDir)
+			if pendingErr != nil {
+				return errors.Join(err, pendingErr)
+			}
+			if pending {
+				slog.Error("新实例初始化失败，回退原实例", "err", err)
+				continue
+			}
+			return err
+		}
+		if !restart {
+			return nil
+		}
+	}
+}
 
+func serve(parent context.Context, addr, dataDir, vaultDir, version string, fontSize int64, logs *backup.LogWriter, restoreErr error) (bool, error) {
+	v, err := vault.Open(vaultDir)
+	if err != nil {
+		return false, permissionHint(err)
+	}
+	st, err := store.Open(filepath.Join(dataDir, "rawmark.db"))
+	if err != nil {
+		return false, err
+	}
+	defer st.Close()
+	idx, err := search.Open(filepath.Join(dataDir, "index.db"), v)
+	if err != nil {
+		return false, err
+	}
+	defer idx.Close()
+	ctx, cancel := context.WithCancel(parent)
+	pending, err := backup.Pending(dataDir)
+	if err != nil {
+		cancel()
+		return false, err
+	}
+	if pending {
+		if err = idx.Rebuild(ctx); err != nil {
+			cancel()
+			return false, err
+		}
+	}
+	var workers sync.WaitGroup
+	defer func() { cancel(); workers.Wait() }()
+	hub := events.NewHub()
+	idx.OnIndexed = func() { hub.Broadcast(events.Event{Type: "indexed"}) }
+	workers.Go(func() { idx.Run(ctx) })
+	watchDone, err := watch.Start(ctx, v, hub, idx.Update)
+	if err != nil {
+		return false, err
+	}
+	defer func() { cancel(); <-watchDone }()
+	srv := api.New(v, auth.New(st), st, hub, idx)
+	srv.DataDir = dataDir
+	srv.ThemesDir = filepath.Join(dataDir, "themes")
+	srv.PluginsDir = filepath.Join(dataDir, "plugins")
+	srv.FontsDir = filepath.Join(dataDir, "fonts")
+	srv.BuiltinFontsSize = fontSize
+	srv.Logs = logs
+	srv.Version = version
+	if restoreErr != nil {
+		srv.SetRestoreFailure(restoreErr)
+	}
+	restart := make(chan struct{}, 1)
+	srv.Restart = func() {
+		select {
+		case restart <- struct{}{}:
+		default:
+		}
+	}
+	workers.Go(func() { srv.RunTrashCleanup(ctx) })
+	workers.Go(func() { cleanupSessions(ctx, st) })
+	server := &http.Server{Addr: addr, Handler: srv.Handler(web.Dist()), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second}
+	errorsCh := make(chan error, 1)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return false, err
+	}
+	if err = backup.FinishRecovery(dataDir); err != nil {
+		listener.Close()
+		return false, err
+	}
+	go func() { errorsCh <- server.Serve(listener) }()
+	slog.Info("RawMark 已启动", "addr", addr, "vault", v.Root())
+	requested := false
 	select {
-	case err := <-errCh:
-		return err
+	case err = <-errorsCh:
+		if !errors.Is(err, http.ErrServerClosed) {
+			return false, err
+		}
 	case <-ctx.Done():
+	case <-restart:
+		requested = true
 	}
-	slog.Info("正在关闭")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := httpServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return err
+	shutdown, done := context.WithTimeout(context.Background(), 15*time.Second)
+	defer done()
+	if err = server.Shutdown(shutdown); err != nil {
+		return false, err
 	}
-	return nil
+	srv.CloseEvents()
+	cancel()
+	return requested, nil
 }
 
 // permissionHint 为权限错误补充排查提示：Docker 绑定挂载的宿主机目录常常对容器内的非 root 用户不可写

@@ -2217,6 +2217,587 @@
           }
         }
       }
+    },
+    "/maintenance/status": {
+      "get": {
+        "summary": "维护状态",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          }
+        }
+      }
+    },
+    "/maintenance/export/{kind}": {
+      "post": {
+        "summary": "导出完整实例或设置包",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ZIP下载",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          }
+        },
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/maintenance/notes/export": {
+      "post": {
+        "summary": "导出普通 Markdown 笔记库",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ZIP下载",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          }
+        }
+      }
+    },
+    "/maintenance/uploads": {
+      "post": {
+        "summary": "创建备份上传，压缩上限2GiB，分块上限8MiB",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          },
+          "201": {
+            "description": "返回上传id"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "size"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "full",
+                      "settings"
+                    ]
+                  },
+                  "size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483648
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/maintenance/uploads/{id}": {
+      "put": {
+        "summary": "顺序追加备份分块",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Upload-Offset",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "取消当前会话的上传",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/maintenance/uploads/{id}/validate": {
+      "post": {
+        "summary": "校验归档并生成摘要，展开上限8GiB/100000项",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/maintenance/settings/import": {
+      "post": {
+        "summary": "确认后导入设置和资源，操作前备份",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "confirmed",
+                  "id"
+                ],
+                "properties": {
+                  "confirmed": {
+                    "type": "boolean",
+                    "const": true
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/maintenance/settings/reset": {
+      "post": {
+        "summary": "确认后重置偏好，保留插件存储",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "confirmed"
+                ],
+                "properties": {
+                  "confirmed": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/maintenance/restore": {
+      "post": {
+        "summary": "确认后恢复完整实例，操作前备份并重新登录",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          },
+          "202": {
+            "description": "已提交恢复；服务将短暂维护并要求重新登录"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "confirmed",
+                  "id"
+                ],
+                "properties": {
+                  "confirmed": {
+                    "type": "boolean",
+                    "const": true
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/maintenance/index/{operation}": {
+      "post": {
+        "summary": "优化或重建索引",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          }
+        },
+        "parameters": [
+          {
+            "name": "operation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/maintenance/temp/clear": {
+      "post": {
+        "summary": "清理本程序未使用临时文件",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          }
+        }
+      }
+    },
+    "/maintenance/logs/export": {
+      "post": {
+        "summary": "导出应用日志和运行摘要",
+        "tags": [
+          "维护"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ZIP下载",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "操作或输入无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "403": {
+            "description": "不接受API令牌"
+          },
+          "503": {
+            "description": "正在维护"
+          }
+        }
+      }
     }
   },
   "components": {

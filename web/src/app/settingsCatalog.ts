@@ -6,7 +6,7 @@ export const SETTINGS_SECTIONS: { id: SettingsSection; title: string; icon: Icon
   { id: 'editor', title: '编辑器', icon: 'edit', description: '正文排版、代码字体与编辑行为' },
   { id: 'shortcuts', title: '快捷键', icon: 'command', description: '查找命令，添加、移除或重置快捷键' },
   { id: 'plugins', title: '插件', icon: 'grid', description: '安装、启停和管理插件及其设置页' },
-  { id: 'storage', title: '存储空间', icon: 'grid', description: '笔记库、数据库、字体、主题与插件占用' },
+  { id: 'storage', title: '存储空间', icon: 'grid', description: '空间占用、备份迁移及维护工具' },
   { id: 'trash', title: '回收站', icon: 'trash', description: '恢复或永久删除已移入回收站的文件' },
   { id: 'account', title: '账户与安全', icon: 'user', description: '登录密码、API 令牌与退出登录' },
   { id: 'about', title: '关于', icon: 'info', description: '应用版本、安装应用与 API 文档' },
@@ -14,6 +14,14 @@ export const SETTINGS_SECTIONS: { id: SettingsSection; title: string; icon: Icon
 
 export const SETTING_ITEMS = {
   'storage': { section: 'storage', title: '空间占用', description: '自动统计笔记库、数据库、字体、主题、插件及其他文件；字体不包含默认 Maple。', keywords: '容量 占用 大小 附件 图片 回收站' },
+  'backup-full': { section: 'storage', title: '完整服务备份', description: '包含笔记、回收站、登录信息、设置和资源，用于恢复实例；恢复前备份当前数据，完成后重新登录。请妥善保管导出包。', keywords: 'Data 导入 导出 备份 恢复 迁移' },
+  'backup-notes': { section: 'storage', title: '笔记数据', description: '导出普通 Markdown 与附件 ZIP，保留目录和相对链接，缺失附件另附清单；导入到新文件夹，不覆盖现有笔记。', keywords: 'Data MD Markdown 导入 导出 迁移' },
+  'backup-settings': { section: 'storage', title: '设置与资源', description: '备份偏好、快捷键、插件数据及字体、主题、插件；不包含笔记或登录信息。导入前备份，同 ID 资源替换。', keywords: '设置 导入 导出 字体 主题 插件' },
+  'index-optimize': { section: 'storage', title: '优化索引', description: '整理全文索引并回收索引数据库空闲空间，不修改笔记。', keywords: '搜索 数据库 整理 VACUUM' },
+  'index-rebuild': { section: 'storage', title: '重建索引', description: '从当前 Markdown 笔记重新生成全文搜索和元数据索引。', keywords: '搜索 数据库 重建 修复' },
+  'temp-clear': { section: 'storage', title: '清理临时文件', description: '清理本程序不再使用的临时文件；保留活动上传、恢复备份与用户文件。', keywords: '临时 缓存 空间 清理' },
+  'settings-reset': { section: 'storage', title: '重置设置', description: '恢复全部 RawMark 偏好并停用插件，保留笔记、账户、已安装资源、插件存储和本机标签页／布局。', keywords: '重置 默认 恢复' },
+  'logs-export': { section: 'storage', title: '导出系统日志', description: '导出有限轮转的应用日志和运行环境摘要，不包含笔记正文及认证信息。历史未保存的日志无法补回。', keywords: '日志 系统 错误 排查' },
   'trash-retention': { section: 'trash', title: '自动删除期限', description: '按原删除时间计算，默认 30 天；0 表示永不自动删除。修改期限会影响已有条目，服务启动及每小时清理一次。', keywords: '回收站 天数 自动 清理 保留' },
   'trash-clear': { section: 'trash', title: '清空全部', description: '永久删除回收站中的全部条目，无法撤销。', keywords: '回收站 清理 全部 删除' },
   'ui-font': { section: 'appearance', title: '界面字体', description: '用于菜单、侧栏与按钮；可导入或删除字体，Maple 为不可删除的默认字体。', keywords: 'UI 字体 导入 删除 TTF OTF WOFF' },

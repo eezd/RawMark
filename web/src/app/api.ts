@@ -67,6 +67,10 @@ export interface StorageUsage {
   calculatedAt: number
 }
 
+export interface MaintenanceStatus { busy: boolean; operation: string; error: string; finishedAt: number; backup?: string }
+export interface BackupSummary { kind: 'full' | 'settings'; createdAt: number; entries: number; size: number }
+export type BackupKind = 'full' | 'settings'
+
 export interface TrashPurgeResult {
   deleted: string[]
   failed: { id: string; error: string }[]
@@ -142,6 +146,20 @@ export const api = {
   logout: () => request('POST', '/api/v1/auth/logout'),
 
   changePassword: (current: string, next: string) => request('POST', '/api/v1/auth/password', { json: { current, next } }),
+
+  maintenanceStatus: () => json<MaintenanceStatus>(request('GET', '/api/v1/maintenance/status')),
+  exportBackup: (kind: BackupKind) => request('POST', '/api/v1/maintenance/export/' + kind),
+  exportNotes: () => request('POST', '/api/v1/maintenance/notes/export'),
+  startBackupUpload: (kind: BackupKind, size: number) => json<{ id: string }>(request('POST', '/api/v1/maintenance/uploads', { json: { kind, size } })),
+  uploadBackupChunk: (id: string, offset: number, body: Blob) => json<{ offset: number }>(request('PUT', '/api/v1/maintenance/uploads/' + id, { body, headers: { 'Upload-Offset': String(offset) } })),
+  validateBackup: (id: string) => json<BackupSummary>(request('POST', '/api/v1/maintenance/uploads/' + id + '/validate')),
+  cancelBackupUpload: (id: string) => request('DELETE', '/api/v1/maintenance/uploads/' + id),
+  importSettings: (id: string) => request('POST', '/api/v1/maintenance/settings/import', { json: { id, confirmed: true } }),
+  restoreBackup: (id: string) => request('POST', '/api/v1/maintenance/restore', { json: { id, confirmed: true } }),
+  resetSettings: () => request('POST', '/api/v1/maintenance/settings/reset', { json: { confirmed: true } }),
+  maintainIndex: (operation: 'optimize' | 'rebuild') => request('POST', '/api/v1/maintenance/index/' + operation),
+  clearTemp: () => json<{ files: number; bytes: number; failed: string[] }>(request('POST', '/api/v1/maintenance/temp/clear')),
+  exportLogs: () => request('POST', '/api/v1/maintenance/logs/export'),
 
   settings: () => json<Record<string, unknown>>(request('GET', '/api/v1/settings')),
   fonts: async () => (await json<{ fonts: CustomFont[] }>(request('GET', '/api/v1/fonts'))).fonts,

@@ -35,6 +35,8 @@ func (s *Server) trashClear(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) cleanupTrash(now time.Time) error {
+	s.activity.RLock()
+	defer s.activity.RUnlock()
 	// 与设置写入串行，避免在“永不删除”已保存后使用旧期限开始清理。
 	s.settingsMu.Lock()
 	defer s.settingsMu.Unlock()

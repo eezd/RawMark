@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api, type StorageUsage } from './api'
+import MaintenancePanel from './MaintenancePanel.vue'
 import SettingRow from './SettingRow.vue'
 
 const usage = ref<StorageUsage | null>(null)
@@ -69,6 +70,7 @@ onMounted(scan)
         </template>
       </dl>
     </div>
+    <MaintenancePanel @changed="scan" />
   </div>
 </template>
 

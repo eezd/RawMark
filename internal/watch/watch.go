@@ -44,21 +44,23 @@ type Watcher struct {
 }
 
 // Start 开始监听。onScan 在首次扫描及之后每次有变化的扫描后调用，参数为全部笔记的路径 -> rev（用于更新搜索索引）
-func Start(ctx context.Context, v *vault.Vault, hub *events.Hub, onScan func(notes map[string]string)) error {
+// 返回退出通知，实例恢复须等文件监听停止后再替换笔记库。
+func Start(ctx context.Context, v *vault.Vault, hub *events.Hub, onScan func(notes map[string]string)) (<-chan struct{}, error) {
 	fw, err := fsnotify.NewWatcher()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	w := &Watcher{v: v, hub: hub, fw: fw, snap: map[string]fileState{}, watched: map[string]bool{}, onScan: onScan}
 	snap, err := w.scan()
 	if err != nil {
 		fw.Close()
-		return err
+		return nil, err
 	}
 	w.snap = snap
 	w.onScan(notes(snap))
-	go w.loop(ctx)
-	return nil
+	done := make(chan struct{})
+	go func() { defer close(done); w.loop(ctx) }()
+	return done, nil
 }
 
 func (w *Watcher) loop(ctx context.Context) {

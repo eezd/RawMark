@@ -12,6 +12,8 @@ import (
 
 // events 通过 WebSocket 推送仓库变更。websocket.Accept 默认校验 Origin 与 Host 一致
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
+	s.eventWG.Add(1)
+	defer s.eventWG.Done()
 	// 先订阅再完成握手，避免连接建立后首条变更落在订阅空窗中。
 	msgs, unsubscribe := s.hub.Subscribe()
 	defer unsubscribe()

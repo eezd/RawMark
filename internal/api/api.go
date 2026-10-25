@@ -11,8 +11,10 @@ import (
 	"net"
 	"net/http"
 	"path"
+	"rawmark/internal/backup"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"rawmark/internal/auth"
@@ -38,12 +40,22 @@ type Server struct {
 	// 串行化设置的"读取-合并-写入"
 	settingsMu sync.Mutex
 	// ThemesDir 指向数据目录中的主题目录；为空时只有内置主题。
-	DataDir          string
-	ThemesDir        string
-	PluginsDir       string
-	FontsDir         string
-	pluginsMu        sync.Mutex
-	BuiltinFontsSize int64
+	DataDir             string
+	ThemesDir           string
+	PluginsDir          string
+	FontsDir            string
+	pluginsMu           sync.Mutex
+	BuiltinFontsSize    int64
+	activity            sync.RWMutex
+	maintenanceMu       sync.Mutex
+	maintenanceBusy     atomic.Bool
+	restarting          atomic.Bool
+	maintenanceStatusMu sync.Mutex
+	maintenanceState    maintenanceStatus
+	Restart             func()
+	Logs                *backup.LogWriter
+	Version             string
+	eventWG             sync.WaitGroup
 }
 
 func New(v *vault.Vault, a *auth.Manager, st *store.Store, hub *events.Hub, index *search.Index) *Server {
@@ -96,6 +108,19 @@ func (s *Server) routes() []route {
 		{"GET /api/v1/trash", authed, s.trashList},
 		{"DELETE /api/v1/trash", authed, s.trashClear},
 		{"GET /api/v1/storage", sessionOnly, s.getStorage},
+		{"GET /api/v1/maintenance/status", sessionOnly, s.maintenanceInfo},
+		{"POST /api/v1/maintenance/export/{kind}", sessionOnly, s.exportBackup},
+		{"POST /api/v1/maintenance/notes/export", sessionOnly, s.exportNotes},
+		{"POST /api/v1/maintenance/uploads", sessionOnly, s.startMaintenanceUpload},
+		{"PUT /api/v1/maintenance/uploads/{id}", sessionOnly, s.appendMaintenanceUpload},
+		{"POST /api/v1/maintenance/uploads/{id}/validate", sessionOnly, s.validateMaintenanceUpload},
+		{"DELETE /api/v1/maintenance/uploads/{id}", sessionOnly, s.deleteMaintenanceUpload},
+		{"POST /api/v1/maintenance/settings/import", sessionOnly, s.applySettings},
+		{"POST /api/v1/maintenance/settings/reset", sessionOnly, s.resetSettings},
+		{"POST /api/v1/maintenance/restore", sessionOnly, s.restoreInstance},
+		{"POST /api/v1/maintenance/index/{operation}", sessionOnly, s.maintainIndex},
+		{"POST /api/v1/maintenance/temp/clear", sessionOnly, s.clearTemp},
+		{"POST /api/v1/maintenance/logs/export", sessionOnly, s.exportLogs},
 		{"POST /api/v1/trash/{id}/restore", authed, s.trashRestore},
 		{"DELETE /api/v1/trash/{id}", authed, s.trashPurge},
 		{"GET /api/v1/events", authed, s.events},
@@ -136,7 +161,7 @@ func (s *Server) Handler(static fs.FS) http.Handler {
 	}
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeError(w, 404, "接口不存在") })
 	mux.Handle("/", newStaticHandler(static))
-	return securityHeaders(sameOrigin(mux))
+	return securityHeaders(sameOrigin(s.guardAPI(mux)))
 }
 
 // ---- 中间件 ----

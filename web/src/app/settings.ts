@@ -143,3 +143,9 @@ function saveSettings(patch: Partial<Settings>) {
   saveQueue = pending.catch(() => {})
   return pending
 }
+
+/** 维护前等待现有设置保存；失败时不得继续替换配置。 */
+export async function flushSettings() {
+  await saveQueue
+  if (settingsSave.result === 'error') throw new Error('设置保存失败：' + settingsSave.error)
+}

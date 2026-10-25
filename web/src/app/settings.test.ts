@@ -20,6 +20,7 @@ beforeEach(() => {
   vi.spyOn(api, 'patchSettings').mockResolvedValue({})
   vi.spyOn(api, 'settings').mockResolvedValue({})
   vi.spyOn(api, 'fonts').mockResolvedValue([])
+  vi.spyOn(api, 'maintenanceStatus').mockResolvedValue({ busy: false, operation: '', error: '', finishedAt: 0 })
   vi.spyOn(api, 'themes').mockResolvedValue([{ id: 'default', name: '默认', version: '1' }])
 })
 afterEach(() => {
@@ -428,6 +429,18 @@ describe('应用存储与回收站', () => {
     expect(host!.textContent).toContain('1 KiB')
   })
 
+  it('维护重置取消时不发送请求，确认时等待保存并保留真实失败', async () => {
+    vi.spyOn(api, 'storage').mockResolvedValue(usage)
+    const reset = vi.spyOn(api, 'resetSettings').mockRejectedValue(new Error('backup disk full'))
+    vi.stubGlobal('confirm', vi.fn().mockReturnValueOnce(false).mockReturnValue(true))
+    ws.settings = 'storage'; mount(SettingsDialog)
+    const button = host!.querySelector<HTMLButtonElement>('#rm-setting-settings-reset button')!
+    button.click(); expect(reset).not.toHaveBeenCalled()
+    button.click()
+    await vi.waitFor(() => expect(host!.textContent).toContain('backup disk full'))
+    expect(reset).toHaveBeenCalledTimes(1)
+    expect(button.disabled).toBe(false)
+  })
   it('清空必须确认；防止重复操作，部分失败后重读并保留错误详情', async () => {
     const item = { id: 'one', path: 'broken.md', dir: false, deletedAt: Date.now() }
     vi.spyOn(api, 'trash').mockResolvedValue([item])

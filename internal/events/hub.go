@@ -24,6 +24,7 @@ type Event struct {
 type Hub struct {
 	mu      sync.Mutex
 	clients map[chan []byte]struct{}
+	closed  bool
 }
 
 func NewHub() *Hub { return &Hub{clients: map[chan []byte]struct{}{}} }
@@ -32,6 +33,11 @@ func NewHub() *Hub { return &Hub{clients: map[chan []byte]struct{}{}} }
 func (h *Hub) Subscribe() (<-chan []byte, func()) {
 	ch := make(chan []byte, 64)
 	h.mu.Lock()
+	if h.closed {
+		close(ch)
+		h.mu.Unlock()
+		return ch, func() {}
+	}
 	h.clients[ch] = struct{}{}
 	h.mu.Unlock()
 	return ch, func() {
@@ -62,5 +68,16 @@ func (h *Hub) Broadcast(events ...Event) {
 			delete(h.clients, ch)
 			close(ch)
 		}
+	}
+}
+
+// Close 禁止新订阅，并通知现有连接关闭，供实例恢复重新打开数据库使用。
+func (h *Hub) Close() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.closed = true
+	for ch := range h.clients {
+		delete(h.clients, ch)
+		close(ch)
 	}
 }
