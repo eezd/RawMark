@@ -69,6 +69,7 @@ scripts/dev.sh --host   # 前端监听所有网卡，手机访问 http://<电脑
 ```
 
 浏览器打开 http://localhost:5173 ，首次使用直接设置登录密码。端口与数据目录可用 `API_PORT`、`WEB_PORT`、`RAWMARK_DATA` 覆盖，详见 `scripts/dev.sh --help`。
+开发模式从源码统计可选字体，日志导出的版本标为 `dev`，不读取已有 `web/dist`；生产模式使用前端构建清单与页面构建版本。
 
 检查：
 

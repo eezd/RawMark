@@ -6,7 +6,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -18,13 +17,13 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"rawmark/internal/backup"
 	"sync"
 	"syscall"
 	"time"
 
 	"rawmark/internal/api"
 	"rawmark/internal/auth"
+	"rawmark/internal/backup"
 	"rawmark/internal/events"
 	"rawmark/internal/search"
 	"rawmark/internal/store"
@@ -84,22 +83,9 @@ func run(addr string) error {
 	if err != nil {
 		return fmt.Errorf("读取内置字体统计失败: %w", err)
 	}
-	// 构建标识与前端入口一致，不另建版本来源。
-	static := web.Dist()
-	html, err := fs.ReadFile(static, "index.html")
+	buildVersion, err := web.BuildVersion()
 	if err != nil {
 		return err
-	}
-	buildVersion := ""
-	marker := []byte(`<meta name="rawmark-version" content="`)
-	if start := bytes.Index(html, marker); start >= 0 {
-		rest := html[start+len(marker):]
-		if end := bytes.IndexByte(rest, '"'); end >= 0 {
-			buildVersion = string(rest[:end])
-		}
-	}
-	if buildVersion == "" {
-		return fmt.Errorf("缺少构建版本")
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
