@@ -15,7 +15,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"rawmark/internal/auth"
 	"rawmark/internal/events"
@@ -25,18 +24,18 @@ import (
 )
 
 const (
-	cookieName    = "rawmark_session"
 	maxNoteBytes  = 20 << 20
 	maxAssetBytes = 50 << 20
 	maxJSONBytes  = 1 << 20
 )
 
 type Server struct {
-	vault *vault.Vault
-	auth  *auth.Manager
-	store *store.Store
-	hub   *events.Hub
-	index *search.Index
+	vault    *vault.Vault
+	auth     *auth.Manager
+	captchas *captchaManager
+	store    *store.Store
+	hub      *events.Hub
+	index    *search.Index
 	// 串行化设置的"读取-合并-写入"
 	settingsMu sync.Mutex
 	// ThemesDir 指向数据目录中的主题目录；为空时只有内置主题。
@@ -59,7 +58,7 @@ type Server struct {
 }
 
 func New(v *vault.Vault, a *auth.Manager, st *store.Store, hub *events.Hub, index *search.Index) *Server {
-	return &Server{vault: v, auth: a, store: st, hub: hub, index: index}
+	return &Server{vault: v, auth: a, store: st, hub: hub, index: index, captchas: newCaptchas()}
 }
 
 // access 为接口的访问要求
@@ -87,7 +86,11 @@ func (s *Server) routes() []route {
 		{"GET /api/v1/auth/state", public, s.authState},
 		{"POST /api/v1/auth/setup", public, s.setup},
 		{"POST /api/v1/auth/login", public, s.login},
-		{"POST /api/v1/auth/logout", public, s.logout},
+		{"POST /api/v1/auth/logout", sessionOnly, s.logout},
+		{"GET /api/v1/auth/me", sessionOnly, s.me},
+		{"POST /api/v1/auth/captcha", public, s.createCaptcha},
+		{"POST /api/v1/auth/tickets", sessionOnly, s.createTicket},
+		{"GET /api/v1/resources/{ticket}/{kind}/{path...}", public, s.resource},
 		{"POST /api/v1/auth/password", sessionOnly, s.changePassword},
 
 		{"GET /api/v1/tree", authed, s.tree},
@@ -173,13 +176,13 @@ func securityHeaders(next http.Handler) http.Handler {
 			h.Set("Cache-Control", "no-store")
 		}
 		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("Referrer-Policy", "same-origin")
+		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("X-Frame-Options", "DENY")
 		next.ServeHTTP(w, r)
 	})
 }
 
-// sameOrigin 拒绝跨站的写请求（CSRF 防护的第二道防线，第一道是 SameSite=Strict Cookie）。
+// sameOrigin 保持写请求的同源边界；Bearer 鉴权不依赖浏览器 Cookie。
 // 没有 Origin 头的请求来自非浏览器客户端，放行
 func sameOrigin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -195,48 +198,6 @@ func sameOrigin(next http.Handler) http.Handler {
 	})
 }
 
-// requireAuth 校验登录会话；allowToken 时也接受 Authorization: Bearer 的 API 令牌
-func (s *Server) requireAuth(next http.Handler, allowToken bool) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
-			if !allowToken {
-				writeError(w, 403, "此接口只能在登录后使用，不接受 API 令牌")
-				return
-			}
-			scope, valid, err := s.auth.ValidateAPIToken(strings.TrimSpace(bearer))
-			if err != nil {
-				internalError(w, r, err)
-				return
-			}
-			if !valid {
-				writeError(w, 401, "API 令牌无效")
-				return
-			}
-			if scope != "write" && r.Method != http.MethodGet && r.Method != http.MethodHead && !(r.Method == http.MethodPost && r.URL.Path == "/api/v1/export") {
-				writeError(w, 403, "只读令牌不能修改数据")
-				return
-			}
-			next.ServeHTTP(w, r)
-			return
-		}
-		c, err := r.Cookie(cookieName)
-		if err != nil {
-			writeError(w, 401, "未登录")
-			return
-		}
-		ok, err := s.auth.Validate(c.Value)
-		if err != nil {
-			internalError(w, r, err)
-			return
-		}
-		if !ok {
-			writeError(w, 401, "登录已过期")
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
 // ---- 鉴权 ----
 
 func (s *Server) authState(w http.ResponseWriter, r *http.Request) {
@@ -245,14 +206,7 @@ func (s *Server) authState(w http.ResponseWriter, r *http.Request) {
 		internalError(w, r, err)
 		return
 	}
-	authed := false
-	if c, err := r.Cookie(cookieName); err == nil {
-		if authed, err = s.auth.Validate(c.Value); err != nil {
-			internalError(w, r, err)
-			return
-		}
-	}
-	writeJSON(w, 200, map[string]bool{"setUp": setUp, "authenticated": authed})
+	writeJSON(w, 200, map[string]bool{"setUp": setUp})
 }
 
 func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
@@ -268,50 +222,55 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		internalError(w, r, err)
 	default:
-		s.startSession(w, r, body.Password)
+		s.startSession(w, r, body.Password, nil)
 	}
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Password string }
+	var body struct {
+		Password    string
+		CaptchaID   string `json:"captchaId"`
+		CaptchaCode string `json:"captchaCode"`
+	}
 	if !readJSON(w, r, &body) {
 		return
 	}
-	s.startSession(w, r, body.Password)
+	s.startSession(w, r, body.Password, func() error { return s.captchas.consume(clientIP(r), body.CaptchaID, body.CaptchaCode) })
 }
 
-func (s *Server) startSession(w http.ResponseWriter, r *http.Request, password string) {
-	token, err := s.auth.Login(clientIP(r), password)
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, password string, challenge func() error) {
+	token, err := s.auth.AttemptLogin(clientIP(r), password, challenge)
 	switch {
 	case errors.Is(err, auth.ErrRateLimited):
 		writeError(w, 429, err.Error())
+	case errors.Is(err, errCaptchaInvalid):
+		writeFailure(w, 400, CodeCaptchaInvalid, err.Error(), nil)
+	case errors.Is(err, errCaptchaExpired):
+		writeFailure(w, 400, CodeCaptchaExpired, err.Error(), nil)
 	case errors.Is(err, auth.ErrBadCredentials):
-		writeError(w, 401, err.Error())
+		writeFailure(w, 401, CodeBadCredentials, err.Error(), nil)
 	case err != nil:
 		internalError(w, r, err)
 	default:
-		http.SetCookie(w, &http.Cookie{
-			Name:     cookieName,
-			Value:    token,
-			Path:     "/",
-			MaxAge:   int(auth.SessionTTL / time.Second),
-			HttpOnly: true,
-			Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
-			SameSite: http.SameSiteStrictMode,
-		})
-		writeJSON(w, 200, map[string]bool{"ok": true})
+		expires, _, err := s.auth.SessionExpiry(token)
+		if err != nil {
+			internalError(w, r, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"token": token, "expiresAt": expires})
 	}
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
-	if c, err := r.Cookie(cookieName); err == nil {
-		if err := s.auth.Logout(c.Value); err != nil {
-			internalError(w, r, err)
-			return
-		}
+	if err := s.auth.Logout(identity(r).Token); err != nil {
+		internalError(w, r, err)
+		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode})
-	writeJSON(w, 200, map[string]bool{"ok": true})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) me(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]any{"permissions": []string{"vault:read", "vault:write", "instance:manage"}, "expiresAt": identity(r).ExpiresAt})
 }
 
 // ---- 文件 ----
@@ -551,18 +510,8 @@ func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
-}
-
-func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
-}
-
 func internalError(w http.ResponseWriter, r *http.Request, err error) {
-	slog.Error("请求处理失败", "method", r.Method, "path", r.URL.Path, "err", err)
+	slog.Error("请求处理失败", "method", r.Method, "path", logPath(r.URL.Path), "err", err)
 	writeError(w, 500, "服务器内部错误")
 }
 
@@ -570,7 +519,7 @@ func vaultError(w http.ResponseWriter, r *http.Request, err error) {
 	var conflict *vault.ConflictError
 	switch {
 	case errors.As(err, &conflict):
-		writeJSON(w, 412, map[string]string{"error": err.Error(), "rev": conflict.Rev})
+		writeFailure(w, 412, CodeConflict, err.Error(), map[string]string{"rev": conflict.Rev})
 	case errors.Is(err, vault.ErrInvalidPath), errors.Is(err, vault.ErrInvalidImport), errors.Is(err, vault.ErrInvalidIcon):
 		writeError(w, 400, err.Error())
 	case errors.Is(err, vault.ErrNotFound):

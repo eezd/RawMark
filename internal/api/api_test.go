@@ -7,12 +7,12 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"net/http/cookiejar"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -27,11 +27,12 @@ import (
 )
 
 type fixture struct {
-	t     *testing.T
-	url   string
-	root  string
-	store *store.Store
-	hub   *events.Hub
+	server *Server
+	t      *testing.T
+	url    string
+	root   string
+	store  *store.Store
+	hub    *events.Hub
 	// 已登录的客户端
 	admin *http.Client
 }
@@ -71,7 +72,7 @@ func TestEventsRejectRevokedCredentials(t *testing.T) {
 			headers := http.Header{}
 			var tokenID string
 			if kind == "session" {
-				f.do(client, "POST", "/api/v1/auth/login", `{"password":"password123"}`, nil).Body.Close()
+				f.login(client, "password123").Body.Close()
 			} else {
 				created := decode[struct {
 					Token string
@@ -134,16 +135,59 @@ func newFixture(t *testing.T) *fixture {
 	server.FontsDir = filepath.Join(dir, "fonts")
 	srv := httptest.NewServer(server.Handler(fstest.MapFS{}))
 	t.Cleanup(srv.Close)
-	f := &fixture{t: t, url: srv.URL, root: v.Root(), store: st, hub: hub, admin: newClient()}
-	if res := f.do(f.admin, "POST", "/api/v1/auth/login", `{"password":"password123"}`, nil); res.StatusCode != 200 {
+	f := &fixture{t: t, url: srv.URL, root: v.Root(), store: st, hub: hub, admin: newClient(), server: server}
+	if res := f.login(f.admin, "password123"); res.StatusCode != 200 {
 		t.Fatalf("登录失败: %d", res.StatusCode)
 	}
 	return f
 }
 
-func newClient() *http.Client {
-	jar, _ := cookiejar.New(nil)
-	return &http.Client{Jar: jar}
+type bearerTransport struct {
+	mu    sync.Mutex
+	token string
+}
+
+func (b *bearerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	b.mu.Lock()
+	token := b.token
+	b.mu.Unlock()
+	if token != "" && r.Header.Get("Authorization") == "" {
+		r.Header.Set("Authorization", "Bearer "+token)
+	}
+	return http.DefaultTransport.RoundTrip(r)
+}
+func newClient() *http.Client { return &http.Client{Transport: &bearerTransport{}} }
+func setClientToken(c *http.Client, token string) {
+	b := c.Transport.(*bearerTransport)
+	b.mu.Lock()
+	b.token = token
+	b.mu.Unlock()
+}
+func (f *fixture) login(c *http.Client, password string) *http.Response {
+	challenge := decode[struct {
+		CaptchaID string `json:"captchaId"`
+	}](f.t, f.do(c, "POST", "/api/v1/auth/captcha", "{}", nil))
+	f.server.captchas.mu.Lock()
+	digits := f.server.captchas.challenges[challenge.CaptchaID].digits
+	f.server.captchas.mu.Unlock()
+	code := make([]byte, len(digits))
+	for i, digit := range digits {
+		code[i] = digit + '0'
+	}
+	body, _ := json.Marshal(map[string]string{"password": password, "captchaId": challenge.CaptchaID, "captchaCode": string(code)})
+	res := f.do(c, "POST", "/api/v1/auth/login", string(body), nil)
+	if res.StatusCode == 200 {
+		content, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		res.Body = io.NopCloser(strings.NewReader(string(content)))
+		var result struct{ Data struct{ Token string } }
+		if err := json.Unmarshal(content, &result); err != nil {
+			f.t.Fatal(err)
+		}
+		setClientToken(c, result.Data.Token)
+	}
+	return res
 }
 
 func (f *fixture) write(p, content string) {
@@ -180,11 +224,18 @@ func (f *fixture) status(c *http.Client, method, path, body string, headers map[
 
 func decode[T any](t *testing.T, res *http.Response) T {
 	t.Helper()
-	var v T
-	if err := json.NewDecoder(res.Body).Decode(&v); err != nil {
+	var envelope struct {
+		Code    int
+		Data    T
+		Message string
+	}
+	if err := json.NewDecoder(res.Body).Decode(&envelope); err != nil {
 		t.Fatal(err)
 	}
-	return v
+	if envelope.Code != 0 {
+		t.Fatalf("业务请求失败：HTTP %d，code=%d，message=%s", res.StatusCode, envelope.Code, envelope.Message)
+	}
+	return envelope.Data
 }
 
 // 文档与实际接口一一对应：新增接口忘记写文档、文档中残留已删除的接口都会失败
@@ -335,9 +386,9 @@ func TestSettingsMerge(t *testing.T) {
 func TestChangePassword(t *testing.T) {
 	f := newFixture(t)
 	other := newClient()
-	f.do(other, "POST", "/api/v1/auth/login", `{"password":"password123"}`, nil)
-	if code := f.status(f.admin, "POST", "/api/v1/auth/password", `{"current":"wrong","next":"new-password"}`, nil); code != 401 {
-		t.Errorf("当前密码错误应为 401，得到 %d", code)
+	f.login(other, "password123")
+	if code := f.status(f.admin, "POST", "/api/v1/auth/password", `{"current":"wrong","next":"new-password"}`, nil); code != 400 {
+		t.Errorf("当前密码错误应为 400，得到 %d", code)
 	}
 	if code := f.status(f.admin, "POST", "/api/v1/auth/password", `{"current":"password123","next":"short"}`, nil); code != 400 {
 		t.Errorf("新密码过短应为 400，得到 %d", code)
@@ -351,10 +402,10 @@ func TestChangePassword(t *testing.T) {
 	if code := f.status(other, "GET", "/api/v1/tree", "", nil); code != 401 {
 		t.Errorf("其他会话应失效，得到 %d", code)
 	}
-	if code := f.status(newClient(), "POST", "/api/v1/auth/login", `{"password":"password123"}`, nil); code != 401 {
+	if code := f.login(newClient(), "password123").StatusCode; code != 401 {
 		t.Errorf("旧密码应失效，得到 %d", code)
 	}
-	if code := f.status(newClient(), "POST", "/api/v1/auth/login", `{"password":"new-password"}`, nil); code != 200 {
+	if code := f.login(newClient(), "new-password").StatusCode; code != 200 {
 		t.Errorf("新密码登录，得到 %d", code)
 	}
 }
@@ -368,7 +419,7 @@ func TestSetupWithoutCode(t *testing.T) {
 	server := New(nil, auth.New(st), st, nil, nil)
 	srv := httptest.NewServer(server.Handler(fstest.MapFS{}))
 	t.Cleanup(srv.Close)
-	f := &fixture{t: t, url: srv.URL}
+	f := &fixture{t: t, url: srv.URL, server: server}
 	owner := newClient()
 	before := decode[struct{ SetUp, Authenticated bool }](t, f.do(owner, "GET", "/api/v1/auth/state", "", nil))
 	if before.SetUp || before.Authenticated {
@@ -377,11 +428,16 @@ func TestSetupWithoutCode(t *testing.T) {
 	if status := f.status(owner, "POST", "/api/v1/auth/setup", `{"password":"short"}`, nil); status != 400 {
 		t.Fatalf("弱密码应被拒绝: %d", status)
 	}
-	if status := f.status(owner, "POST", "/api/v1/auth/setup", `{"password":"password123"}`, nil); status != 200 {
+	setup := f.do(owner, "POST", "/api/v1/auth/setup", `{"password":"password123"}`, nil)
+	if status := setup.StatusCode; status != 200 {
 		t.Fatalf("无需启动码即可初始化: %d", status)
 	}
+	setClientToken(owner, decode[struct{ Token string }](t, setup).Token)
+	if res := f.do(owner, "GET", "/api/v1/auth/me", "", nil); res.StatusCode != 200 {
+		t.Fatal("初始化未签发有效会话")
+	}
 	after := decode[struct{ SetUp, Authenticated bool }](t, f.do(owner, "GET", "/api/v1/auth/state", "", nil))
-	if !after.SetUp || !after.Authenticated {
+	if !after.SetUp {
 		t.Fatal("初始化后应自动登录")
 	}
 	if status := f.status(newClient(), "POST", "/api/v1/auth/setup", `{"password":"replacement"}`, nil); status != 409 {

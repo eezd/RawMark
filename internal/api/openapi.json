@@ -3,7 +3,7 @@
   "info": {
     "title": "RawMark API",
     "version": "1",
-    "description": "RawMark 的 REST API。自动化调用请在「API 令牌」中创建令牌，以 `Authorization: Bearer <token>` 访问；只读令牌可使用 GET 和 POST /export（只读导出）。令牌的管理接口只接受登录会话。所有错误响应均为 `{\"error\": \"说明\"}`。"
+    "description": "RawMark单用户API。普通JSON统一{code,data,message}，code=0成功；保留HTTP语义。登录会话固定30天；API令牌保留read/write权限。受保护API只接受Bearer，不接受Cookie。文件、下载、事件、204与OpenAPI文档不包装。"
   },
   "servers": [
     {
@@ -13,9 +13,6 @@
   "security": [
     {
       "bearer": []
-    },
-    {
-      "cookie": []
     }
   ],
   "paths": {
@@ -34,7 +31,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -67,7 +80,7 @@
     },
     "/auth/state": {
       "get": {
-        "summary": "是否已初始化、当前是否已登录",
+        "summary": "是否已经初始化",
         "tags": [
           "登录"
         ],
@@ -76,17 +89,33 @@
         ],
         "responses": {
           "200": {
-            "description": "状态",
+            "description": "成功",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
                   "properties": {
-                    "setUp": {
-                      "type": "boolean"
+                    "code": {
+                      "const": 0
                     },
-                    "authenticated": {
-                      "type": "boolean"
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "setUp"
+                      ],
+                      "properties": {
+                        "setUp": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -98,7 +127,7 @@
     },
     "/auth/setup": {
       "post": {
-        "summary": "首次设置登录密码",
+        "summary": "首次设置密码并返回Bearer会话",
         "tags": [
           "登录"
         ],
@@ -111,14 +140,14 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "password"
+                ],
                 "properties": {
                   "password": {
                     "type": "string"
                   }
-                },
-                "required": [
-                  "password"
-                ]
+                }
               }
             }
           }
@@ -129,7 +158,36 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "token",
+                        "expiresAt"
+                      ],
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -160,7 +218,7 @@
     },
     "/auth/login": {
       "post": {
-        "summary": "登录，成功后设置会话 Cookie",
+        "summary": "验证码及密码登录，返回Bearer会话",
         "tags": [
           "登录"
         ],
@@ -173,14 +231,22 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "password",
+                  "captchaId",
+                  "captchaCode"
+                ],
                 "properties": {
                   "password": {
                     "type": "string"
+                  },
+                  "captchaId": {
+                    "type": "string"
+                  },
+                  "captchaCode": {
+                    "type": "string"
                   }
-                },
-                "required": [
-                  "password"
-                ]
+                }
               }
             }
           }
@@ -191,7 +257,36 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "token",
+                        "expiresAt"
+                      ],
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -215,6 +310,16 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "验证码错误、已使用或过期（40001/40002）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -226,18 +331,13 @@
           "登录"
         ],
         "security": [
-          {}
+          {
+            "bearer": []
+          }
         ],
         "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Ok"
-                }
-              }
-            }
+          "204": {
+            "description": "服务端会话已撤销"
           }
         }
       }
@@ -250,7 +350,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "requestBody": {
@@ -281,7 +381,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -332,7 +448,23 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -346,7 +478,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "description": "按顶层键合并：请求中的键覆盖原值，值为 null 的键被删除。成功后经 WebSocket 推送 settings 事件。 trashRetentionDays 为非负安全整数（默认30，0为永不自动删除），null恢复默认。期限适用于已有和新回收站条目，服务启动及每小时按原删除时间永久清理。",
@@ -379,7 +511,23 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -420,12 +568,28 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
                   "properties": {
-                    "entries": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Entry"
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Entry"
+                          }
+                        }
                       }
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -525,8 +689,24 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
                   "properties": {
-                    "rev": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "rev": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "message": {
                       "type": "string"
                     }
                   }
@@ -568,13 +748,30 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
                   "properties": {
-                    "error": {
-                      "type": "string"
+                    "code": {
+                      "type": "integer",
+                      "minimum": 1
                     },
-                    "rev": {
-                      "type": "string",
-                      "description": "服务器上的当前版本；为空表示已不存在"
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        },
+                        "rev": {
+                          "type": "string",
+                          "description": "服务器上的当前版本；为空表示已不存在"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -604,7 +801,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TrashItem"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TrashItem"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -657,7 +870,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -715,7 +944,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -784,8 +1029,24 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
                   "properties": {
-                    "link": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "link": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "message": {
                       "type": "string"
                     }
                   }
@@ -850,8 +1111,24 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
                   "properties": {
-                    "link": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "link": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "message": {
                       "type": "string"
                     }
                   }
@@ -978,12 +1255,28 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
                   "properties": {
-                    "results": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/SearchResult"
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "results": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/SearchResult"
+                          }
+                        }
                       }
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -1006,12 +1299,28 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
                   "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/TrashItem"
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/TrashItem"
+                          }
+                        }
                       }
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -1032,7 +1341,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TrashPurgeResult"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TrashPurgeResult"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -1062,7 +1387,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TrashItem"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TrashItem"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -1112,7 +1453,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -1152,7 +1509,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -1162,12 +1519,28 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
                   "properties": {
-                    "tokens": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/APIToken"
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "tokens": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/APIToken"
+                          }
+                        }
                       }
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -1183,7 +1556,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "requestBody": {
@@ -1219,12 +1592,28 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
                   "properties": {
-                    "token": {
-                      "type": "string"
+                    "code": {
+                      "const": 0
                     },
-                    "info": {
-                      "$ref": "#/components/schemas/APIToken"
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "info": {
+                          "$ref": "#/components/schemas/APIToken"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -1262,7 +1651,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -1271,7 +1660,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -1302,12 +1707,28 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
                   "properties": {
-                    "themes": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Theme"
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "themes": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Theme"
+                          }
+                        }
                       }
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -1339,19 +1760,35 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/Theme"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
                     },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "css": {
-                          "type": "string"
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Theme"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "css": {
+                              "type": "string"
+                            }
+                          }
                         }
-                      }
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
                     }
-                  ]
+                  }
                 }
               }
             }
@@ -1370,7 +1807,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -1380,12 +1817,28 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
                   "properties": {
-                    "plugins": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Plugin"
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "plugins": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Plugin"
+                          }
+                        }
                       }
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -1410,7 +1863,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -1419,7 +1872,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Plugin"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Plugin"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -1469,7 +1938,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -1478,7 +1947,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Plugin"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Plugin"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -1532,7 +2017,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -1572,7 +2057,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -1583,10 +2068,26 @@
                 "schema": {
                   "type": "object",
                   "required": [
-                    "data"
+                    "code",
+                    "data",
+                    "message"
                   ],
                   "properties": {
-                    "data": {}
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {}
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -1623,7 +2124,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -1634,10 +2135,26 @@
                 "schema": {
                   "type": "object",
                   "required": [
-                    "data"
+                    "code",
+                    "data",
+                    "message"
                   ],
                   "properties": {
-                    "data": {}
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {}
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -1692,7 +2209,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -1785,30 +2302,46 @@
                 "schema": {
                   "type": "object",
                   "required": [
-                    "paths",
-                    "notes",
-                    "assets",
-                    "warnings"
+                    "code",
+                    "data",
+                    "message"
                   ],
                   "properties": {
-                    "paths": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "paths",
+                        "notes",
+                        "assets",
+                        "warnings"
+                      ],
+                      "properties": {
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "notes": {
+                          "type": "integer"
+                        },
+                        "assets": {
+                          "type": "integer",
+                          "description": "附件文件总数，包含原始附件和独立副本"
+                        },
+                        "warnings": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
                       }
                     },
-                    "notes": {
-                      "type": "integer"
-                    },
-                    "assets": {
-                      "type": "integer",
-                      "description": "附件文件总数，包含原始附件和独立副本"
-                    },
-                    "warnings": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -1949,9 +2482,6 @@
         "summary": "读取笔记关系、标签与资源引用索引",
         "security": [
           {
-            "cookie": []
-          },
-          {
             "bearer": []
           }
         ],
@@ -2039,7 +2569,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -2061,7 +2607,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2083,7 +2629,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2136,7 +2682,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2170,7 +2716,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2195,7 +2741,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2204,7 +2750,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StorageUsage"
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/StorageUsage"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -2226,7 +2788,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2256,7 +2818,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2304,7 +2866,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2342,7 +2904,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2403,7 +2965,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2461,7 +3023,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2501,7 +3063,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2541,7 +3103,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2594,7 +3156,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2643,7 +3205,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2699,7 +3261,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2739,7 +3301,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2769,7 +3331,7 @@
         ],
         "security": [
           {
-            "cookie": []
+            "bearer": []
           }
         ],
         "responses": {
@@ -2798,6 +3360,291 @@
           }
         }
       }
+    },
+    "/auth/me": {
+      "get": {
+        "summary": "恢复登录会话身份与权限",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "permissions",
+                        "expiresAt"
+                      ],
+                      "properties": {
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录凭据无效或过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要登录会话，API令牌无权调用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/captcha": {
+      "post": {
+        "summary": "签发5分钟、单次登录验证码",
+        "security": [
+          {}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [],
+                "properties": {
+                  "replaceId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "captchaId",
+                        "imageDataUrl",
+                        "expiresAt"
+                      ],
+                      "properties": {
+                        "captchaId": {
+                          "type": "string"
+                        },
+                        "imageDataUrl": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "验证码签发频率或容量限制",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/tickets": {
+      "post": {
+        "summary": "签发绑定当前会话的资源读取或一次性事件票据",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "images",
+                      "fonts",
+                      "plugin",
+                      "events"
+                    ]
+                  },
+                  "pluginId": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "url",
+                        "expiresAt"
+                      ],
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "登录凭据无效或过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要登录会话，API令牌无权调用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/resources/{ticket}/{kind}/{path}": {
+      "get": {
+        "summary": "受限原生资源；事件票据60秒一次性，其余跟随父会话到期，每次检查父会话",
+        "security": [
+          {}
+        ],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "对应资源原始内容"
+          },
+          "101": {
+            "description": "WebSocket事件升级"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2806,25 +3653,31 @@
         "type": "http",
         "scheme": "bearer",
         "description": "API 令牌（rm_ 开头）"
-      },
-      "cookie": {
-        "type": "apiKey",
-        "in": "cookie",
-        "name": "rawmark_session",
-        "description": "浏览器登录会话"
       }
     },
     "schemas": {
       "Error": {
         "type": "object",
+        "required": [
+          "code",
+          "data",
+          "message"
+        ],
         "properties": {
-          "error": {
+          "code": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "data": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "message": {
             "type": "string"
           }
-        },
-        "required": [
-          "error"
-        ]
+        }
       },
       "Ok": {
         "type": "object",
@@ -3109,5 +3962,22 @@
         }
       }
     }
+  },
+  "x-business-codes": {
+    "0": "成功",
+    "40000": "参数无效",
+    "40001": "验证码错误或已使用",
+    "40002": "验证码过期",
+    "40003": "当前密码错误",
+    "40100": "认证无效",
+    "40101": "登录密码错误",
+    "40300": "权限不足",
+    "40400": "资源不存在",
+    "40900": "资源冲突",
+    "41200": "文档版本冲突，data.rev为最新版本",
+    "41300": "超过大小上限",
+    "42900": "请求过于频繁",
+    "50000": "服务端错误",
+    "50300": "维护中"
   }
 }

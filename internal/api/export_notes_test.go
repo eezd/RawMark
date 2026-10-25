@@ -60,8 +60,8 @@ func TestPortableNotesExcludeApplicationData(t *testing.T) {
 			server.DataDir = data
 			srv := httptest.NewServer(server.Handler(fstest.MapFS{}))
 			defer srv.Close()
-			f := &fixture{t: t, url: srv.URL, root: root, store: st, admin: newClient()}
-			res := f.do(f.admin, "POST", "/api/v1/auth/login", `{"password":"disposable-export-password"}`, nil)
+			f := &fixture{t: t, url: srv.URL, root: root, store: st, admin: newClient(), server: server}
+			res := f.login(f.admin, "disposable-export-password")
 			assertOK(t, res)
 			res.Body.Close()
 			f.write("note.md", "# portable note\n![](assets/a.png)")

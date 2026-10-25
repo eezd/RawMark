@@ -87,16 +87,11 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &body) {
 		return
 	}
-	c, err := r.Cookie(cookieName)
-	if err != nil {
-		writeError(w, 401, "未登录")
-		return
-	}
-	switch err := s.auth.ChangePassword(clientIP(r), c.Value, body.Current, body.Next); {
+	switch err := s.auth.ChangePassword(clientIP(r), identity(r).Token, body.Current, body.Next); {
 	case errors.Is(err, auth.ErrRateLimited):
 		writeError(w, 429, err.Error())
 	case errors.Is(err, auth.ErrBadCredentials):
-		writeError(w, 401, "当前密码错误")
+		writeFailure(w, 400, CodeCurrentPassword, "当前密码错误", nil)
 	case errors.Is(err, auth.ErrWeakPassword):
 		writeError(w, 400, err.Error())
 	case err != nil:

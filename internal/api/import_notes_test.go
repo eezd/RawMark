@@ -3,7 +3,6 @@ package api
 import (
 	"archive/zip"
 	"bytes"
-	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -67,10 +66,7 @@ func TestImportNotesAPI(t *testing.T) {
 	if res.StatusCode != 201 {
 		t.Fatalf("导入失败: %d", res.StatusCode)
 	}
-	var result vault.ImportResult
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		t.Fatal(err)
-	}
+	result := decode[vault.ImportResult](t, res)
 	res.Body.Close()
 	if result.Notes != 1 || len(result.Paths) != 1 || result.Paths[0] != "n.md" || result.Warnings == nil {
 		t.Fatalf("响应不符: %+v", result)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/coder/websocket"
@@ -23,17 +22,9 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.CloseNow()
 	reauthorize := func() bool {
-		var valid bool
-		var err error
-		if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
-			_, valid, err = s.auth.ValidateAPIToken(strings.TrimSpace(bearer))
-		} else {
-			var cookie *http.Cookie
-			cookie, err = r.Cookie(cookieName)
-			if err == nil {
-				valid, err = s.auth.Validate(cookie.Value)
-			}
-		}
+		principal := identity(r)
+		valid, err := s.validPrincipal(principal)
+
 		if err != nil {
 			slog.Error("事件连接鉴权失败", "err", err)
 			conn.Close(websocket.StatusInternalError, "鉴权失败")

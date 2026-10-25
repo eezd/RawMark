@@ -2,7 +2,6 @@ package api
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -33,9 +32,7 @@ type maintenanceUpload struct {
 }
 
 func uploadOwner(r *http.Request) string {
-	cookie, _ := r.Cookie(cookieName)
-	sum := sha256.Sum256([]byte(cookie.Value))
-	return hex.EncodeToString(sum[:])
+	return identity(r).SessionHash
 }
 func (s *Server) readUpload(r *http.Request, id string) (maintenanceUpload, string, error) {
 	var meta maintenanceUpload

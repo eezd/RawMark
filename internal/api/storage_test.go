@@ -95,10 +95,12 @@ func TestStorageIncludesOptionalAndImportedFontBytes(t *testing.T) {
 	s := &Server{DataDir: root, vault: v, BuiltinFontsSize: 456}
 	recorder := httptest.NewRecorder()
 	s.getStorage(recorder, httptest.NewRequest("GET", "/", nil))
+	var envelope struct{ Data storageUsage }
 	var usage storageUsage
-	if err = json.Unmarshal(recorder.Body.Bytes(), &usage); err != nil {
+	if err = json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
 		t.Fatal(err)
 	}
+	usage = envelope.Data
 	if usage.BuiltinFontsSize != 456 || usage.CustomFontsSize != 123 || usage.Categories[2].Size != 579 {
 		t.Fatalf("字体统计错误: %+v", usage)
 	}

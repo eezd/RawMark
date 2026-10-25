@@ -4,6 +4,7 @@ go 1.27.2
 
 require (
 	github.com/coder/websocket v1.8.15
+	github.com/dchest/captcha v1.1.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/yuin/goldmark/v2 v2.1.8
 	go.yaml.in/yaml/v3 v3.0.5

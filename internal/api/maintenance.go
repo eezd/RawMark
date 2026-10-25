@@ -38,7 +38,10 @@ func (s *Server) guardAPI(next http.Handler) http.Handler {
 			writeError(w, 503, "正在维护，请稍后重试")
 			return
 		}
-		if strings.HasPrefix(r.URL.Path, "/api/v1/maintenance/") || r.URL.Path == "/api/v1/events" {
+		resourcePath, resource := strings.CutPrefix(r.URL.Path, "/api/v1/resources/")
+		_, resourceTail, hasTicket := strings.Cut(resourcePath, "/")
+		eventResource := resource && hasTicket && resourceTail == "events/"
+		if strings.HasPrefix(r.URL.Path, "/api/v1/maintenance/") || r.URL.Path == "/api/v1/events" || eventResource {
 			next.ServeHTTP(w, r)
 			return
 		}

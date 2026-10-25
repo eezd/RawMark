@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,6 +16,38 @@ import (
 	"rawmark/internal/backup"
 	"rawmark/internal/store"
 )
+
+func TestGuardAPIOnlyEventsBypassActivityLock(t *testing.T) {
+	for _, tc := range []struct {
+		path   string
+		locked bool
+	}{
+		{"/api/v1/events", false},
+		{"/api/v1/resources/ticket/events/", false},
+		{"/api/v1/resources/ticket/plugins/demo/assets/revision/events/lib.js", true},
+		{"/api/v1/resources/ticket/images/events/picture.png", true},
+		{"/api/v1/files/note.md", true},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			s := &Server{}
+			called := false
+			handler := s.guardAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				lockFree := s.activity.TryLock()
+				if lockFree {
+					s.activity.Unlock()
+				}
+				if lockFree == tc.locked {
+					t.Errorf("activity lock: free=%v, want locked=%v", lockFree, tc.locked)
+				}
+			}))
+			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", tc.path, nil))
+			if !called {
+				t.Fatal("request was not served")
+			}
+		})
+	}
+}
 
 func exportedPackage(t *testing.T, f *fixture, kind string) []byte {
 	t.Helper()
@@ -186,7 +219,7 @@ func TestMaintenanceUploadsEnforceOwnershipOffsetsAndValidation(t *testing.T) {
 		t.Fatal("允许校验未完成上传")
 	}
 	other := newClient()
-	assertOK(t, f.do(other, "POST", "/api/v1/auth/login", `{"password":"password123"}`, nil))
+	assertOK(t, f.login(other, "password123"))
 	if code := f.status(other, "DELETE", "/api/v1/maintenance/uploads/"+id, "", nil); code != 400 {
 		t.Fatal("允许其他会话删除上传")
 	}
