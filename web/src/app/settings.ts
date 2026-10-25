@@ -98,6 +98,11 @@ applyAppearance({ ...settings, theme: 'default', cssSnippets: [] }, '')
 let settingsRequest = 0
 export async function loadSettings() {
   const request = ++settingsRequest
+  if (settingsSave.pending) {
+    // 推送可能先于 PATCH 响应到达；先等待现有写入，避免读取未保存的旧值。
+    await saveQueue
+    if (request !== settingsRequest) return
+  }
   const [raw, fonts] = await Promise.all([api.settings(), api.fonts()])
   // 目录与设置作为一批应用，迟到旧响应不能恢复已删除字体或覆盖新设置。
   if (request !== settingsRequest) return
@@ -113,6 +118,7 @@ export async function reloadTheme() {
 
 /** 修改设置：先在本地生效再保存，保存失败时由调用方提示并重新载入 */
 export async function updateSettings(patch: Partial<Settings>) {
+  ++settingsRequest
   applied({ ...settings, ...patch })
   // 设置请求串行提交，防止快速切换和片段编辑的旧请求覆盖新值。
   await saveSettings(patch)

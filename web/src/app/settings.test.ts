@@ -223,6 +223,109 @@ describe('设置同步顺序', () => {
     expect(localStorage.getItem('rawmark.settings')).toBe(cache)
   })
 
+  it.each(['settings', 'fonts'] as const)('旧%s响应晚到时，不恢复已删除字体或覆盖新设置与缓存', async (delayed) => {
+    const font = { id: 'custom-' + 'c'.repeat(64), name: '已删除字体', format: 'woff2' as const }
+    const oldSettings = { uiFont: font.id, textFont: font.id, codeFont: font.id, fontSize: 18 }
+    let release!: () => void
+    const pending = new Promise<void>(resolve => { release = resolve })
+    vi.mocked(api.settings).mockImplementationOnce(async () => {
+      if (delayed === 'settings') await pending
+      return oldSettings
+    })
+    vi.mocked(api.fonts).mockImplementationOnce(async () => {
+      if (delayed === 'fonts') await pending
+      return [font]
+    })
+    const oldLoad = loadSettings()
+    vi.mocked(api.settings).mockResolvedValue({ uiFont: 'maple', textFont: 'maple', codeFont: 'maple', fontSize: 24 })
+    await loadSettings()
+    const cache = localStorage.getItem('rawmark.settings')
+    release()
+    await oldLoad
+    expect(settings).toMatchObject({ uiFont: 'maple', textFont: 'maple', codeFont: 'maple', fontSize: 24 })
+    expect(customFonts.value).toEqual([])
+    expect(document.querySelector('#rm-custom-fonts')!.textContent).not.toContain(font.id)
+    expect(document.documentElement.style.getPropertyValue('--rm-font-text')).not.toContain(font.id)
+    expect(document.documentElement.style.getPropertyValue('--rm-font-size')).toBe('24px')
+    expect(localStorage.getItem('rawmark.settings')).toBe(cache)
+  })
+
+  it.each(['settings', 'fonts'] as const)('本地保存完成后，迟到的旧%s响应不覆盖界面、缓存或清理期限', async delayed => {
+    let release!: () => void
+    const pending = new Promise<void>(resolve => { release = resolve })
+    vi.mocked(api.settings).mockImplementationOnce(async () => {
+      if (delayed === 'settings') await pending
+      return { fontSize: 16, trashRetentionDays: 30 }
+    })
+    vi.mocked(api.fonts).mockImplementationOnce(async () => {
+      if (delayed === 'fonts') await pending
+      return []
+    })
+    const oldLoad = loadSettings()
+    await updateSettings({ fontSize: 24, trashRetentionDays: 0 })
+    const cache = localStorage.getItem('rawmark.settings')
+    release()
+    await oldLoad
+    expect(settings).toMatchObject({ fontSize: 24, trashRetentionDays: 0 })
+    expect(document.documentElement.style.getPropertyValue('--rm-font-size')).toBe('24px')
+    expect(localStorage.getItem('rawmark.settings')).toBe(cache)
+  })
+
+  it('保存排队期间的同步等待全部已有写入，不提前读取旧配置', async () => {
+    let finishFirst!: (value: Record<string, unknown>) => void
+    let finishSecond!: (value: Record<string, unknown>) => void
+    const pendingFirst = new Promise<Record<string, unknown>>(resolve => { finishFirst = resolve })
+    const pendingSecond = new Promise<Record<string, unknown>>(resolve => { finishSecond = resolve })
+    vi.mocked(api.patchSettings)
+      .mockImplementationOnce(() => pendingFirst)
+      .mockImplementationOnce(() => pendingSecond)
+    vi.mocked(api.settings).mockResolvedValue({ fontSize: 24, trashRetentionDays: 0 })
+    const first = updateSettings({ fontSize: 24 })
+    const second = updateSettings({ trashRetentionDays: 0 })
+    const sync = loadSettings()
+    try {
+      await vi.waitFor(() => expect(api.patchSettings).toHaveBeenCalledTimes(1))
+      expect(api.settings).not.toHaveBeenCalled()
+      finishFirst({})
+      await vi.waitFor(() => expect(api.patchSettings).toHaveBeenCalledTimes(2))
+      expect(api.settings).not.toHaveBeenCalled()
+    } finally {
+      finishFirst({})
+      finishSecond({})
+      await Promise.all([first, second, sync])
+    }
+    expect(api.settings).toHaveBeenCalledTimes(1)
+    expect(settings).toMatchObject({ fontSize: 24, trashRetentionDays: 0 })
+  })
+
+  it('等待保存中的读取被后续本地修改作废，不回写旧设置', async () => {
+    let finish!: (value: Record<string, unknown>) => void
+    vi.mocked(api.patchSettings).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const first = updateSettings({ fontSize: 22 })
+    const sync = loadSettings()
+    const second = updateSettings({ fontSize: 24 })
+    await vi.waitFor(() => expect(api.patchSettings).toHaveBeenCalledTimes(1))
+    finish({})
+    await Promise.all([first, second, sync])
+    expect(api.settings).not.toHaveBeenCalled()
+    expect(settings.fontSize).toBe(24)
+  })
+
+  it('等待中的保存失败后仍可读取服务端真值，保留原保存错误', async () => {
+    let fail!: (cause: Error) => void
+    vi.mocked(api.patchSettings).mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject }))
+    vi.mocked(api.settings).mockResolvedValue({ fontSize: 18 })
+    const cause = new ApiError(500, '保存未完成')
+    const write = updateSettings({ fontSize: 24 }).catch(error => error)
+    const sync = loadSettings()
+    await vi.waitFor(() => expect(fail).toBeTypeOf('function'))
+    fail(cause)
+    expect(await write).toBe(cause)
+    await sync
+    expect(settings.fontSize).toBe(18)
+    expect(settingsSave).toMatchObject({ pending: 0, result: 'error', error: cause.message })
+  })
+
   it('最新同步失败仍报告原错误，迟到旧响应不会覆盖当前状态，后续可重新同步', async () => {
     let release!: (value: Record<string, unknown>) => void
     vi.mocked(api.settings).mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
