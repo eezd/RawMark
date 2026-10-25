@@ -137,6 +137,9 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 			return result, ErrTooLarge
 		}
 		for _, f := range z.File {
+			if f.Name == ".rawmark-export/missing-assets.json" {
+				continue
+			} // 本程序笔记导出的缺失附件报告，不作为笔记导入。
 			if !f.Mode().IsRegular() && !f.Mode().IsDir() {
 				return result, fmt.Errorf("%w：ZIP 不允许符号链接或特殊文件", ErrInvalidImport)
 			}
