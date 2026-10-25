@@ -1,0 +1,26 @@
+<script setup lang="ts">
+import Toasts from '@@/components/Toasts.vue'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import { useUserStore } from '@/pinia/stores/user'
+import { navigationError, router } from '@/router'
+
+const user = useUserStore()
+function retry() {
+  const { path, query, hash } = router.resolve(navigationError.value!.path)
+  void router.replace({ path, query, hash, force: true }).catch(() => { /* 错误由路由错误界面展示。 */ })
+}
+</script>
+
+<template>
+  <el-config-provider :locale="zhCn">
+    <div v-if="navigationError" class="rm-splash" role="alert">
+      <p>{{ navigationError.message }}</p><el-button @click="retry">
+        重试
+      </el-button>
+    </div>
+    <router-view v-else v-slot="{ Component, route }">
+      <component :is="Component" :key="route.meta.anonymous ? route.name : user.sessionVersion" />
+    </router-view>
+    <Toasts />
+  </el-config-provider>
+</template>

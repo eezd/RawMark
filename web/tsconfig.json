@@ -1,17 +1,40 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "paths": { "@rawmark/api": ["./src/plugin-api/index.d.ts"] },
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@@/*": [
+        "./src/common/*"
+      ],
+      "@rawmark/api": [
+        "./src/common/plugin-api/index.d.ts"
+      ]
+    },
+    "types": [
+      "vite/client",
+      "element-plus/global",
+      "node"
+    ],
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "noEmit": true,
     "isolatedModules": true,
-    "skipLibCheck": true,
-    "noEmit": true
+    "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "vite.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "vite.config.ts",
+    "types/**/*.d.ts"
+  ]
 }

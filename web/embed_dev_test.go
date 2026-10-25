@@ -11,7 +11,7 @@ import (
 func TestDevelopmentMetadataDoesNotRequireBuild(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)
-	themes := filepath.Join("web", "src", "themes")
+	themes := filepath.Join("web", "src", "common", "appearance")
 	if err := os.MkdirAll(filepath.Join(themes, "fonts"), 0700); err != nil {
 		t.Fatal(err)
 	}

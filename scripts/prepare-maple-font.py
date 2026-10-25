@@ -11,7 +11,7 @@ import zipfile
 from fontTools import subset
 from fontTools.ttLib import TTFont
 
-root = Path(__file__).resolve().parents[1] / 'web/src/themes'
+root = Path(__file__).resolve().parents[1] / 'web/src/common/appearance'
 output = root / 'fonts/maple'
 output.mkdir(exist_ok=True)
 family = 'Maple Mono Normal NL NF CN'

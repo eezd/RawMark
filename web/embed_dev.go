@@ -20,7 +20,7 @@ func BuildVersion() (string, error) { return "dev", nil }
 
 // FontStorage 按 Vite 构建使用的 fonts.css 统计可选字体，不包含 Maple 与 KaTeX。
 func FontStorage() (int64, error) {
-	root := filepath.Join("web", "src", "themes")
+	root := filepath.Join("web", "src", "common", "appearance")
 	css, err := os.ReadFile(filepath.Join(root, "fonts.css"))
 	if err != nil {
 		return 0, err

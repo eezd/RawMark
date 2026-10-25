@@ -42,7 +42,7 @@ fail() {
 
 command -v go >/dev/null || fail "未找到 go，请安装 Go 1.27 或更高版本"
 command -v node >/dev/null || fail "未找到 node，请安装 Node.js 24 或更高版本"
-command -v npm >/dev/null || fail "未找到 npm"
+command -v pnpm >/dev/null || fail "未找到 pnpm，请启用 pnpm 12.11.2"
 
 port_in_use() {
   if command -v ss >/dev/null; then
@@ -54,11 +54,9 @@ port_in_use() {
 port_in_use "$API_PORT" && fail "端口 $API_PORT 已被占用（后端）"
 port_in_use "$WEB_PORT" && fail "端口 $WEB_PORT 已被占用（前端）"
 
-# 依赖缺失或 package-lock.json 有更新时才安装
-if [[ ! -d web/node_modules || web/package-lock.json -nt web/node_modules/.package-lock.json ]]; then
-  echo "==> 安装前端依赖"
-  (cd web && npm install --no-fund --no-audit)
-fi
+# 由 pnpm 核对锁定依赖；已有依赖时复用本地缓存。
+echo "==> 核对前端依赖"
+pnpm -C web install --frozen-lockfile
 
 # 退出时结束本脚本启动的所有子进程（包括 go run 编译出的服务进程）
 cleanup() {
@@ -83,7 +81,7 @@ done
 curl -fs "http://127.0.0.1:$API_PORT/api/v1/health" >/dev/null 2>&1 || fail "后端 60 秒内未就绪，请查看上方 [server] 日志"
 
 echo "==> 启动前端 http://localhost:$WEB_PORT"
-(cd web && exec npx vite "${VITE_ARGS[@]}") 2>&1 | prefix web &
+(cd web && exec pnpm exec vite "${VITE_ARGS[@]}") 2>&1 | prefix web &
 
 # 任一进程退出（如后端崩溃）即整体停止
 wait -n

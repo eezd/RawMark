@@ -1,0 +1,43 @@
+:root {
+  --el-font-family: var(--rm-font-text);
+  --el-font-size-base: var(--rm-ui-font-size);
+  --el-color-primary: var(--rm-accent);
+  --el-bg-color: var(--rm-bg);
+  --el-bg-color-overlay: var(--rm-panel);
+  --el-text-color-primary: var(--rm-text);
+  --el-border-color: var(--rm-border);
+  --el-border-radius-base: 8px;
+}
+.el-button {
+  font-family: inherit;
+}
+.el-input__inner {
+  font-family: inherit;
+}
+.rm-btn.el-button + .rm-btn.el-button {
+  margin-left: 0;
+}
+.rm-icon-btn.el-button {
+  padding: 0;
+  min-width: 28px;
+}
+.rm-auth-card > .el-button {
+  width: 100%;
+}
+@media (pointer: coarse) {
+  .el-button {
+    min-height: 44px;
+  }
+}
+
+.rm-settings .el-select {
+  width: 120px;
+}
+.el-button + .el-button {
+  margin-left: 0;
+}
+.rm-btn.el-button > span {
+  display: inline-flex;
+  align-items: center;
+  gap: inherit;
+}

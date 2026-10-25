@@ -3,10 +3,11 @@
 # ---- 前端 ----
 FROM node:24-alpine AS web
 WORKDIR /src/web
-COPY web/package.json web/package-lock.json ./
-RUN npm ci
+RUN corepack enable && corepack prepare pnpm@12.11.2 --activate
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml web/.npmrc ./
+RUN pnpm install --frozen-lockfile
 COPY web/ ./
-RUN npm run build
+RUN pnpm build
 
 # ---- 服务端（前端产物嵌入二进制） ----
 FROM golang:1-alpine AS server

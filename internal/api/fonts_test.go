@@ -40,7 +40,7 @@ func uploadTestFont(t *testing.T, f *fixture, client *http.Client, name string, 
 
 func testFontData(t *testing.T) []byte {
 	t.Helper()
-	data, err := os.ReadFile("../../web/src/themes/fonts/maple/regular-00.woff2")
+	data, err := os.ReadFile("../../web/src/common/appearance/fonts/maple/regular-00.woff2")
 	if err != nil {
 		t.Fatal(err)
 	}

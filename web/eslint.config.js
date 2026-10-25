@@ -1,0 +1,47 @@
+import antfu from '@antfu/eslint-config'
+
+// 更多自定义配置可查阅仓库：https://github.com/antfu/eslint-config
+export default antfu(
+  {
+    // 使用外部格式化程序格式化 css、html、markdown 等文件
+    formatters: true,
+    // 启用样式规则
+    stylistic: {
+      // 缩进级别
+      indent: 2,
+      // 引号风格 'single' | 'double'
+      quotes: 'single',
+      // 是否启用分号
+      semi: false,
+    },
+    // 忽略文件
+    ignores: ['dist/**', 'types/auto/**', 'public/**', 'src/common/appearance/fonts/**', 'src/common/appearance/maple-font.css', 'LICENSE'],
+  },
+  {
+    // 对所有文件都生效的规则
+    rules: {
+      // 保留项目现有紧凑分支及浏览器原生危险操作确认。
+      'style/max-statements-per-line': 'off',
+      'no-alert': 'off',
+      // vue
+      'vue/block-order': ['error', { order: ['script', 'template', 'style'] }],
+      'vue/attributes-order': 'off',
+      // ts
+      'ts/no-use-before-define': 'off',
+      // node
+      'node/prefer-global/process': 'off',
+      // style
+      'style/comma-dangle': ['error', 'always-multiline'],
+      'style/brace-style': ['error', '1tbs'],
+      // regexp
+      'regexp/no-unused-capturing-group': 'off',
+      // other
+      'no-console': 'off',
+      'no-debugger': 'off',
+      'symbol-description': 'off',
+      'antfu/if-newline': 'off',
+      'unicorn/no-instanceof-builtins': 'off',
+    },
+  },
+  { files: ['src/service-worker.js'], languageOptions: { globals: { __PRECACHE__: 'readonly' } } },
+)
