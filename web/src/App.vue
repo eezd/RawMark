@@ -19,7 +19,7 @@ function retry() {
       </el-button>
     </div>
     <router-view v-else v-slot="{ Component, route }">
-      <component :is="Component" :key="route.meta.anonymous ? route.name : user.sessionVersion" />
+      <component :is="Component" v-if="route.meta.anonymous || user.isGotUserInfo" :key="route.meta.anonymous ? route.name : user.sessionVersion" />
     </router-view>
     <Toasts />
   </el-config-provider>
