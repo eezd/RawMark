@@ -38,11 +38,12 @@ type Server struct {
 	// 串行化设置的"读取-合并-写入"
 	settingsMu sync.Mutex
 	// ThemesDir 指向数据目录中的主题目录；为空时只有内置主题。
-	DataDir    string
-	ThemesDir  string
-	PluginsDir string
-	FontsDir   string
-	pluginsMu  sync.Mutex
+	DataDir          string
+	ThemesDir        string
+	PluginsDir       string
+	FontsDir         string
+	pluginsMu        sync.Mutex
+	BuiltinFontsSize int64
 }
 
 func New(v *vault.Vault, a *auth.Manager, st *store.Store, hub *events.Hub, index *search.Index) *Server {

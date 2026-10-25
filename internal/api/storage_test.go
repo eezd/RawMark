@@ -2,9 +2,12 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"rawmark/internal/vault"
 	"testing"
 )
 
@@ -77,5 +80,33 @@ func TestStorageDoesNotReturnPartialSuccess(t *testing.T) {
 	cancel()
 	if _, err := scanStorage(ctx, root, root); !errors.Is(err, context.Canceled) {
 		t.Fatalf("请求取消应停止扫描: %v", err)
+	}
+}
+
+func TestStorageIncludesOptionalAndImportedFontBytes(t *testing.T) {
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, "vault"), 0700)
+	os.MkdirAll(filepath.Join(root, "fonts/custom"), 0700)
+	os.WriteFile(filepath.Join(root, "fonts/custom/font.woff2"), make([]byte, 123), 0600)
+	v, err := vault.Open(filepath.Join(root, "vault"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{DataDir: root, vault: v, BuiltinFontsSize: 456}
+	recorder := httptest.NewRecorder()
+	s.getStorage(recorder, httptest.NewRequest("GET", "/", nil))
+	var usage storageUsage
+	if err = json.Unmarshal(recorder.Body.Bytes(), &usage); err != nil {
+		t.Fatal(err)
+	}
+	if usage.BuiltinFontsSize != 456 || usage.CustomFontsSize != 123 || usage.Categories[2].Size != 579 {
+		t.Fatalf("字体统计错误: %+v", usage)
+	}
+	var sum int64
+	for _, category := range usage.Categories {
+		sum += category.Size
+	}
+	if sum != usage.TotalSize {
+		t.Fatal("分类与总量不一致")
 	}
 }

@@ -2469,7 +2469,9 @@
           "categories",
           "assetsSize",
           "trashSize",
-          "calculatedAt"
+          "calculatedAt",
+          "builtinFontsSize",
+          "customFontsSize"
         ],
         "properties": {
           "totalSize": {
@@ -2514,6 +2516,14 @@
                 }
               }
             }
+          },
+          "builtinFontsSize": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "customFontsSize": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api, type StorageUsage } from './api'
 import SettingRow from './SettingRow.vue'
 
@@ -38,12 +38,14 @@ async function scan() {
     if (mounted) error.value = '统计失败：' + String(cause)
   } finally { if (mounted) busy.value = false }
 }
+onMounted(scan)
 </script>
 
 <template>
   <div>
-    <SettingRow id="storage"><button class="rm-btn" :disabled="busy" @click="scan">{{ busy ? '统计中…' : usage ? '刷新' : '查看' }}</button></SettingRow>
-    <p class="rm-share-note">统计普通文件实际字节；附件与回收站已包含在笔记库内。不跟随内部符号链接，不包含数据目录外的运维备份。</p>
+    <h3 class="rm-settings-group-title">空间占用</h3>
+    <SettingRow id="storage"><button class="rm-btn" :disabled="busy" @click="scan">{{ busy ? '统计中…' : '刷新' }}</button></SettingRow>
+    <p class="rm-share-note">统计应用数据与内置可选字体，不包含默认 Maple 和程序本体；附件与回收站已包含在笔记库内。不跟随内部符号链接，不包含数据目录外的运维备份。</p>
     <p v-if="error" class="rm-auth-error" role="alert">{{ error }}</p>
     <div v-if="usage" class="rm-storage" :aria-busy="busy">
       <div class="rm-storage-summary">
@@ -56,6 +58,10 @@ async function scan() {
       <dl class="rm-storage-list">
         <template v-for="segment in segments" :key="segment.id">
           <div><dt><i :style="{ background: segment.color }" />{{ names[segment.id] }}</dt><dd :title="`${segment.size} 字节`">{{ size(segment.size) }} <small>{{ segment.percent.toFixed(1) }}%</small></dd></div>
+          <template v-if="segment.id === 'fonts'">
+            <div class="rm-storage-sub"><dt>内置可选字体</dt><dd>{{ size(usage.builtinFontsSize) }}</dd></div>
+            <div class="rm-storage-sub"><dt>导入字体</dt><dd>{{ size(usage.customFontsSize) }}</dd></div>
+          </template>
           <template v-if="segment.id === 'vault'">
             <div class="rm-storage-sub"><dt>附件</dt><dd :title="`${usage.assetsSize} 字节`">{{ size(usage.assetsSize) }} <small>{{ (usage.totalSize ? usage.assetsSize / usage.totalSize * 100 : 0).toFixed(1) }}%</small></dd></div>
             <div class="rm-storage-sub"><dt>回收站</dt><dd :title="`${usage.trashSize} 字节`">{{ size(usage.trashSize) }} <small>{{ (usage.totalSize ? usage.trashSize / usage.totalSize * 100 : 0).toFixed(1) }}%</small></dd></div>

@@ -2,19 +2,18 @@ import type { IconName } from './Icon.vue'
 import type { SettingsSection } from './workspace'
 
 export const SETTINGS_SECTIONS: { id: SettingsSection; title: string; icon: IconName; description: string }[] = [
-  { id: 'application', title: '应用', icon: 'grid', description: '查看存储空间及各类文件占用' },
   { id: 'appearance', title: '外观', icon: 'palette', description: '界面字号、主题、明暗模式与 CSS 片段' },
   { id: 'editor', title: '编辑器', icon: 'edit', description: '正文排版、代码字体与编辑行为' },
   { id: 'shortcuts', title: '快捷键', icon: 'command', description: '查找命令，添加、移除或重置快捷键' },
   { id: 'plugins', title: '插件', icon: 'grid', description: '安装、启停和管理插件及其设置页' },
-  { id: 'tokens', title: 'API 令牌', icon: 'key', description: '创建或撤销 REST API 访问令牌' },
+  { id: 'storage', title: '存储空间', icon: 'grid', description: '笔记库、数据库、字体、主题与插件占用' },
   { id: 'trash', title: '回收站', icon: 'trash', description: '恢复或永久删除已移入回收站的文件' },
-  { id: 'account', title: '账户与安全', icon: 'user', description: '修改登录密码与退出登录' },
+  { id: 'account', title: '账户与安全', icon: 'user', description: '登录密码、API 令牌与退出登录' },
   { id: 'about', title: '关于', icon: 'info', description: '应用版本、安装应用与 API 文档' },
 ]
 
 export const SETTING_ITEMS = {
-  'storage': { section: 'application', title: '存储空间', description: '按需统计笔记库、数据库、字体、主题、插件及其他文件的大小；包含外置笔记库。', keywords: '容量 占用 大小 附件 图片 回收站' },
+  'storage': { section: 'storage', title: '空间占用', description: '自动统计笔记库、数据库、字体、主题、插件及其他文件；字体不包含默认 Maple。', keywords: '容量 占用 大小 附件 图片 回收站' },
   'trash-retention': { section: 'trash', title: '自动删除期限', description: '按原删除时间计算，默认 30 天；0 表示永不自动删除。修改期限会影响已有条目，服务启动及每小时清理一次。', keywords: '回收站 天数 自动 清理 保留' },
   'trash-clear': { section: 'trash', title: '清空全部', description: '永久删除回收站中的全部条目，无法撤销。', keywords: '回收站 清理 全部 删除' },
   'ui-font': { section: 'appearance', title: '界面字体', description: '用于菜单、侧栏与按钮；可导入或删除字体，Maple 为不可删除的默认字体。', keywords: 'UI 字体 导入 删除 TTF OTF WOFF' },
@@ -34,11 +33,12 @@ export const SETTING_ITEMS = {
   'spellcheck': { section: 'editor', title: '拼写检查', description: '使用浏览器的拼写检查，检查语言取决于浏览器设置。', keywords: '语言 拼写' },
   'tab-size': { section: 'editor', title: '制表符宽度', description: '仅调整 Tab 字符的显示宽度，不改写正文；Tab 键仍按两个空格缩进。', keywords: 'Tab 缩进 空格' },
   'typography-preview': { section: 'editor', title: '排版预览', description: '查看当前正文与代码字体的显示效果。', keywords: '字号 行高 段距 预览' },
+  'tokens': { section: 'account', title: 'API 令牌', description: '创建或撤销 REST API 访问令牌。', keywords: 'API REST 接口 自动化 安全' },
   'password': { section: 'account', title: '修改登录密码', description: '修改后其他设备需要重新登录。', keywords: '账户 安全 鉴权' },
   'logout': { section: 'account', title: '退出登录', description: '退出当前设备的登录会话。', keywords: '账户 会话' },
   'install': { section: 'about', title: '安装应用', description: '浏览器支持安装时，可将 RawMark 添加到桌面或主屏幕。', keywords: 'PWA 安装' },
   'version': { section: 'about', title: '构建版本', description: '当前页面加载的应用版本。', keywords: 'RawMark 关于' },
-  'openapi': { section: 'about', title: 'API 文档', description: '在「API 令牌」创建令牌后，通过 REST API 读取或写入笔记。', keywords: 'OpenAPI 接口 自动化' },
+  'openapi': { section: 'about', title: 'API 文档', description: '在「账户与安全 → API 令牌」创建令牌后，通过 REST API 读取或写入笔记。', keywords: 'OpenAPI 接口 自动化' },
 } satisfies Record<string, { section: SettingsSection; title: string; description: string; keywords: string }>
 
 export type SettingId = keyof typeof SETTING_ITEMS

@@ -199,13 +199,14 @@ async function changePassword() {
                 <p v-if="pwError" class="rm-auth-error" role="alert">{{ pwError }}</p>
                 <button class="rm-btn rm-btn-primary" type="submit" :disabled="pwBusy">修改密码</button>
               </form>
+              <section id="rm-setting-tokens" tabindex="-1"><h3 class="rm-settings-group-title">API 令牌</h3><TokensPanel /></section>
               <SettingRow id="logout"><button class="rm-btn" @click="close(), runCommand('app.logout')"><Icon name="logout" />退出</button></SettingRow>
             </template>
 
             <ShortcutSettings v-else-if="section === 'shortcuts'" />
-            <TokensPanel v-else-if="section === 'tokens'" />
+
             <TrashPanel v-else-if="section === 'trash'" />
-            <StoragePanel v-else-if="section === 'application'" />
+            <StoragePanel v-else-if="section === 'storage'" />
             <template v-else-if="section === 'about'">
               <p class="rm-share-note">RawMark · 纯 Markdown 笔记编辑器，文件即真源。</p>
               <SettingRow id="version"><code>{{ buildVersion }}</code></SettingRow>

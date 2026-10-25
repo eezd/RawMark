@@ -45,6 +45,15 @@ async function search(selector: string, query: string) {
 }
 
 describe('设置查找与重置', () => {
+  it('分类按约定排序，令牌归入账户与安全', async () => {
+    ws.settings = 'account'
+    vi.spyOn(api, 'tokens').mockResolvedValue([])
+    mount(SettingsDialog)
+    expect([...host!.querySelectorAll('.rm-settings-tab')].map(el => el.textContent)).toEqual(['外观','编辑器','快捷键','插件','存储空间','回收站','账户与安全','关于'])
+    await vi.waitFor(() => expect(host!.querySelector('#rm-setting-tokens')).not.toBeNull())
+    expect(searchSettings('API 令牌')).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'tokens', section: 'account' })]))
+  })
+
   it('编辑器字号在输入时立即生效，无需回车或失焦', async () => {
     ws.settings = 'editor'
     mount(SettingsDialog)
@@ -150,14 +159,14 @@ describe('设置查找与重置', () => {
     expect(allCommands().map(command => command.id)).not.toContain('app.shares')
     ws.settings = 'appearance'
     mount(SettingsDialog)
-    expect(host!.querySelectorAll('.rm-settings-tab')).toHaveLength(9)
+    expect(host!.querySelectorAll('.rm-settings-tab')).toHaveLength(8)
     expect(host!.textContent).not.toContain('分享')
   })
 
   it('按名称、关键词及多词匹配，只索引静态说明', () => {
     expect(searchSettings('   ')).toEqual([])
     expect(searchSettings('CSS 高级')).toEqual([expect.objectContaining({ id: 'css-snippets', section: 'appearance' })])
-    expect(searchSettings('api')).toEqual(expect.arrayContaining([expect.objectContaining({ section: 'tokens', title: 'API 令牌' }), expect.objectContaining({ id: 'openapi' })]))
+    expect(searchSettings('api')).toEqual(expect.arrayContaining([expect.objectContaining({ section: 'account', title: 'API 令牌' }), expect.objectContaining({ id: 'openapi' })]))
     settings.cssSnippets = [{ id: 'private', name: 'private-snippet-name', enabled: true, css: ':root { --private: 1 }' }]
     expect(searchSettings('private')).toEqual([])
   })
@@ -196,33 +205,6 @@ describe('设置查找与重置', () => {
 })
 
 describe('设置同步顺序', () => {
-  it.each(['settings', 'fonts'] as const)('旧%s响应晚到时，不恢复已删除字体或覆盖新设置与缓存', async (delayed) => {
-    const font = { id: 'custom-' + 'c'.repeat(64), name: '已删除字体', format: 'woff2' as const }
-    const oldSettings = { uiFont: font.id, textFont: font.id, codeFont: font.id, fontSize: 18 }
-    let release!: () => void
-    const pending = new Promise<void>(resolve => { release = resolve })
-    vi.mocked(api.settings).mockImplementationOnce(async () => {
-      if (delayed === 'settings') await pending
-      return oldSettings
-    })
-    vi.mocked(api.fonts).mockImplementationOnce(async () => {
-      if (delayed === 'fonts') await pending
-      return [font]
-    })
-    const oldLoad = loadSettings()
-    vi.mocked(api.settings).mockResolvedValue({ uiFont: 'maple', textFont: 'maple', codeFont: 'maple', fontSize: 24 })
-    await loadSettings()
-    const cache = localStorage.getItem('rawmark.settings')
-    release()
-    await oldLoad
-    expect(settings).toMatchObject({ uiFont: 'maple', textFont: 'maple', codeFont: 'maple', fontSize: 24 })
-    expect(customFonts.value).toEqual([])
-    expect(document.querySelector('#rm-custom-fonts')!.textContent).not.toContain(font.id)
-    expect(document.documentElement.style.getPropertyValue('--rm-font-text')).not.toContain(font.id)
-    expect(document.documentElement.style.getPropertyValue('--rm-font-size')).toBe('24px')
-    expect(localStorage.getItem('rawmark.settings')).toBe(cache)
-  })
-
   it.each(['settings', 'fonts'] as const)('旧%s响应晚到时，不恢复已删除字体或覆盖新设置与缓存', async (delayed) => {
     const font = { id: 'custom-' + 'c'.repeat(64), name: '已删除字体', format: 'woff2' as const }
     const oldSettings = { uiFont: font.id, textFont: font.id, codeFont: font.id, fontSize: 18 }
@@ -424,13 +406,13 @@ describe('快捷键查找', () => {
 })
 
 describe('应用存储与回收站', () => {
-  const usage = { totalSize: 1024, categories: [{ id: 'vault' as const, size: 1024 }], assetsSize: 512, trashSize: 256, calculatedAt: 1700000000000 }
-  it('按需统计，防重复请求，刷新失败保留上次结果并展示错误', async () => {
+  const usage = { totalSize: 1024, categories: [{ id: 'vault' as const, size: 1024 }], builtinFontsSize: 0, customFontsSize: 0, assetsSize: 512, trashSize: 256, calculatedAt: 1700000000000 }
+  it('进入页面自动统计，防重复请求，刷新失败保留上次结果并展示错误', async () => {
     let resolve!: (value: typeof usage) => void
     const storage = vi.spyOn(api, 'storage').mockImplementationOnce(() => new Promise(done => { resolve = done }))
-    ws.settings = 'application'
+    ws.settings = 'storage'
     mount(SettingsDialog)
-    expect(storage).not.toHaveBeenCalled()
+    expect(storage).toHaveBeenCalledTimes(1)
     const button = host!.querySelector<HTMLButtonElement>('#rm-setting-storage button')!
     button.click()
     await nextTick()
@@ -445,6 +427,7 @@ describe('应用存储与回收站', () => {
     await vi.waitFor(() => expect(host!.querySelector('[role="alert"]')?.textContent).toContain('磁盘读取错误'))
     expect(host!.textContent).toContain('1 KiB')
   })
+
   it('清空必须确认；防止重复操作，部分失败后重读并保留错误详情', async () => {
     const item = { id: 'one', path: 'broken.md', dir: false, deletedAt: Date.now() }
     vi.spyOn(api, 'trash').mockResolvedValue([item])

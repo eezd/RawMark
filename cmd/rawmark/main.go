@@ -85,6 +85,11 @@ func run(addr string) error {
 	srv.ThemesDir = filepath.Join(dataDir, "themes")
 	srv.PluginsDir = filepath.Join(dataDir, "plugins")
 	srv.FontsDir = filepath.Join(dataDir, "fonts")
+	fontsSize, err := web.FontStorage()
+	if err != nil {
+		return fmt.Errorf("读取内置字体统计失败: %w", err)
+	}
+	srv.BuiltinFontsSize = fontsSize
 	trashDone := make(chan struct{})
 	go func() {
 		defer close(trashDone)

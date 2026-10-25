@@ -15,7 +15,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
-COPY web/embed.go ./web/
+COPY web/embed.go web/font_storage.go ./web/
 COPY --from=web /src/web/dist ./web/dist
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/rawmark ./cmd/rawmark && mkdir -p /out/data
 

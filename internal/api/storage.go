@@ -17,11 +17,13 @@ type storageCategory struct {
 }
 
 type storageUsage struct {
-	TotalSize    int64             `json:"totalSize"`
-	Categories   []storageCategory `json:"categories"`
-	AssetsSize   int64             `json:"assetsSize"`
-	TrashSize    int64             `json:"trashSize"`
-	CalculatedAt int64             `json:"calculatedAt"`
+	TotalSize        int64             `json:"totalSize"`
+	Categories       []storageCategory `json:"categories"`
+	AssetsSize       int64             `json:"assetsSize"`
+	TrashSize        int64             `json:"trashSize"`
+	BuiltinFontsSize int64             `json:"builtinFontsSize"`
+	CustomFontsSize  int64             `json:"customFontsSize"`
+	CalculatedAt     int64             `json:"calculatedAt"`
 }
 
 func (s *Server) getStorage(w http.ResponseWriter, r *http.Request) {
@@ -30,6 +32,10 @@ func (s *Server) getStorage(w http.ResponseWriter, r *http.Request) {
 		internalError(w, r, err)
 		return
 	}
+	usage.BuiltinFontsSize = s.BuiltinFontsSize
+	usage.CustomFontsSize = usage.Categories[2].Size
+	usage.Categories[2].Size += s.BuiltinFontsSize
+	usage.TotalSize += s.BuiltinFontsSize
 	writeJSON(w, http.StatusOK, usage)
 }
 

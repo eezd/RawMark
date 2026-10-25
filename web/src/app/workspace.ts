@@ -36,7 +36,7 @@ export interface Tab {
   conflictRev?: string
 }
 
-export type SettingsSection = 'appearance' | 'editor' | 'account' | 'shortcuts' | 'tokens' | 'trash' | 'plugins' | 'about' | 'application'
+export type SettingsSection = 'appearance' | 'editor' | 'account' | 'shortcuts' | 'trash' | 'plugins' | 'about' | 'storage'
 
 export interface Toast {
   id: number
@@ -1104,7 +1104,7 @@ function registerBuiltinCommands() {
     { id: 'view.focus', title: '开启/关闭专注写作', when: hasNote, run: () => (ws.focusMode = !ws.focusMode) },
     { id: 'app.trash', title: '打开回收站', run: () => (ws.settings = 'trash') },
     { id: 'app.images', title: '管理根目录图片', run: () => { ws.imagesAll = false; ws.images = '' } },
-    { id: 'app.tokens', title: 'API 令牌', run: () => (ws.settings = 'tokens') },
+    { id: 'app.tokens', title: 'API 令牌', run: () => (ws.settings = 'account') },
   ]) {
     registerCommand({ ...cmd, keys: typoraKeys(cmd.id) })
   }

@@ -11,6 +11,13 @@ export default defineConfig({
       apply: 'build',
       enforce: 'post',
       generateBundle(_options, bundle) {
+        // 只统计应用内可选字体；Maple 与 KaTeX 不在 fonts.css 内。
+        const fontCSS = readFileSync(new URL('./src/themes/fonts.css', import.meta.url), 'utf8')
+        const fontPaths = new Set([...fontCSS.matchAll(/url\(['"]?(\.?\/?fonts\/[^)'"]+)/g)].map(match => match[1]!))
+        const size = [...fontPaths].reduce((total, path) => total + readFileSync(new URL('./src/themes/' + path, import.meta.url)).byteLength, 0)
+        const manifest = JSON.stringify({ optionalFontsSize: size })
+        this.emitFile({ type: 'asset', fileName: 'font-storage.json', source: manifest })
+
         // 缓存列表由产物生成，覆盖懒加载资源，旧页面更新后仍能加载其依赖。
         const files = Object.keys(bundle).filter((name) => name === 'index.html' || name.startsWith('assets/')).sort()
         const version = createHash('sha256')
@@ -22,6 +29,8 @@ export default defineConfig({
           version.update(readFileSync(new URL('./public/' + name, import.meta.url)))
           files.push(name)
         }
+        version.update(manifest)
+        files.push('font-storage.json')
         const buildVersion = version.digest('hex').slice(0, 16)
         const entry = bundle['index.html']
         if (!entry || entry.type !== 'asset' || typeof entry.source !== 'string') throw new Error('缺少应用入口 HTML，无法写入构建版本')
