@@ -71,3 +71,46 @@
 - 仅在已授权执行且交接信息无法从代码、Git 历史或已有文档恢复时，创建或更新 `CONTEXT.md`；简单修改无需记录。
 - 交接内容原位更新，保留有效目标、决策及理由、未完成事项和风险，标注未验证信息，删除过时状态；当前状态不超过 100 行，全文不超过 500 行。
 - 保留 `CONTEXT.md` 原有跟踪策略：本地专用文件继续忽略，不擅自停止跟踪已纳入版本控制的文件。
+
+## 项目定位与工具链
+
+RawMark 是单用户 Markdown 网页笔记编辑器。文件是真源；Go 标准库 HTTP、SQLite 与文件系统负责服务端，CodeMirror 6 保留原文与 Live Preview，highlight.js 使用固定 Atom One Dark。保留现有明暗主题、排版、插件、图片与备份能力，不引入模板后台示例或虚构角色。
+前端采用 Vue 3.5、Router 5、Pinia 3、Element Plus、Axios、TypeScript 6、Vite 8、SCSS、UnoCSS，使用 pnpm 12.11.2；依赖以锁文件为准，不顺手升级。
+
+## 目录与依赖边界
+
+- `web/src/pages/<module>/`：页面入口及模块私有的组件、API、类型、业务状态、编辑器和资源；按实际需要建子目录，不建空目录或转发层。
+- `web/src/common/`：确实跨模块复用的 API、外观与字体、Markdown、高亮、插件 SDK、组件和工具。不得依赖页面私有代码；模块入口可提供明确的 props/emits 契约供应用装配。
+- `web/src/http/`：Axios、认证头、统一响应与请求错误；`router/`：路由与守卫；`pinia/`：实例及共享认证、权限、设置状态。工作区临时状态不强制放入全局 store。
+- `web/types/auto/`：由 Vite 自动导入插件生成；修改源配置并重新构建，不手改声明。业务类型就近定义，测试随模块存放。
+- `internal/api/` 定义路由、授权和 HTTP 契约，`internal/auth/` 管理密码与凭据，`internal/store/` 管理应用 SQLite；`internal/vault/` 管理真源文件，搜索索引可重建。`web/*.go` 保留生产嵌入与开发模式边界。
+- 模块内部优先相对导入，跨职责使用 `@`（`web/src`）和 `@@`（`web/src/common`）。Vue 组件使用 PascalCase，其他文件使用 kebab-case；SFC 使用 Composition API 与 TypeScript。既有编辑器主题、全局 CSS 和专用 DOM 控件按业务保留，普通表单优先 Element Plus。
+- 外部未知数据使用 unknown，在实际边界验证；不以 any、类型忽略或假数据掩盖契约。沿用 ESLint/Antfu，不增加另一套格式化工具。
+
+## 认证与接口契约
+
+- 登录是密码加后端六位图片验证码，首次初始化设置密码；无用户名、注册或角色系统。验证码有效五分钟，绑定挑战及来源，每次登录提交一次性消费，失败必须刷新；保留签发和登录限流。
+- 浏览器会话 Token 为 `rms_`，保存在 localStorage `rawmark.token`，固定三十天，不滑动续期；服务端只存哈希。退出请求撤销服务端会话，成功才清理本地身份，不以只删本地 Token 代替注销。
+- 受保护 API 只接受 `Authorization: Bearer <token>`，不保留 Cookie 兜底。既有 `rm_` API 令牌及 read/write 权限保留；管理接口仅会话可用，只读令牌允许只读 POST 导出，不能给自己扩权。
+- 身份与权限来自 `/auth/me`。401 清理当前认证、权限和动态路由，403 保留身份；匿名跳登录、初始化与登录回跳由守卫负责，拒绝外部及循环回跳。
+- 每次替换或退出会话更新代号并取消旧请求；异步响应、用户信息、路由安装和排队写入必须核对所属会话。旧结果按 Axios 取消语义拒绝，不提示、不覆盖或注销新会话。
+- 普通 JSON 为 `{ code, data, message }`，成功 code=0；错误 code 非零、message 为可展示原因，保留 HTTP 状态。文件、下载、事件、204 与 OpenAPI 文档保持各自原语义，不叠 JSON。412 的当前版本在 data.rev，当前密码错误为 400，不清理身份。
+- 同一错误由一个责任层展示。请求默认提示；已有行内状态、保存重试或批量汇总的 API 明确使用 errorOwner=caller。失败仍 reject，不以空列表或默认值伪装成功。
+- 原生图片、字体与插件模块通过受限资源票据读取，主 Token 不进入 URL。票据持久保存哈希、每次检查父会话；事件握手票据一分钟且一次性消费，已连接事件继续核对父凭据。插件票据绑定 ID/版本并支持相对导入；API 与私有资源不进入 PWA 静态缓存。
+
+## 命令与验证
+
+```bash
+pnpm -C web install --frozen-lockfile
+scripts/dev.sh                  # 隔离开发数据默认 .dev-data，API_PORT/WEB_PORT 控制端口
+pnpm -C web lint:check
+pnpm -C web typecheck
+pnpm -C web test
+pnpm -C web build
+/usr/local/go/bin/go vet -tags dev ./...
+/usr/local/go/bin/go test ./internal/...
+/usr/local/go/bin/go test -tags dev ./web
+```
+
+按实际风险补充 Go race、Docker 构建和隔离浏览器验证。只用合成数据测试初始化、导入、恢复与删除，不对生产数据执行迁移或维护；生产部署、重启、数据库迁移执行及 commit/push 均需另行明确授权。
+本文件为规范唯一来源，`CLAUDE.md`、`.cursor/rules/`、`.trae/rules/` 仅指回本文件；`.agents/skills/v3-*` 仅提供对应任务的操作入口，不复制第二套规则。
