@@ -75,3 +75,27 @@ func TestRateLimitWindow(t *testing.T) {
 		t.Fatalf("清零后再失败 30 次应封禁: %v", err)
 	}
 }
+
+func TestSessionFixedExpiry(t *testing.T) {
+	m, clock := newManager(t)
+	token, err := m.Login("test", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	expires, ok, err := m.SessionExpiry(token)
+	if err != nil || !ok {
+		t.Fatal("未创建会话")
+	}
+	*clock = clock.Add(29 * 24 * time.Hour)
+	if valid, err := m.Validate(token); err != nil || !valid {
+		t.Fatal("提前过期")
+	}
+	again, ok, err := m.SessionExpiry(token)
+	if err != nil || !ok || !again.Equal(expires) {
+		t.Fatal("校验延长了有效期")
+	}
+	*clock = expires
+	if valid, err := m.Validate(token); err != nil || valid {
+		t.Fatal("固定期限后仍有效")
+	}
+}

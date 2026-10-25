@@ -22,6 +22,15 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS resource_tickets (
+  token_hash TEXT PRIMARY KEY,
+  session_hash TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  resource TEXT NOT NULL,
+  revision TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS resource_tickets_expiry ON resource_tickets(expires_at);
 CREATE TABLE IF NOT EXISTS api_tokens (
   id           TEXT PRIMARY KEY,
   name         TEXT NOT NULL,
@@ -76,15 +85,14 @@ func (s *Store) CreateSession(tokenHash string, expires time.Time) error {
 	return err
 }
 
-// SessionValid 校验会话未过期，并顺延有效期（滑动过期）
-func (s *Store) SessionValid(tokenHash string, extendTo time.Time) (bool, error) {
-	res, err := s.db.Exec(`UPDATE sessions SET expires_at = ? WHERE token_hash = ? AND expires_at > ?`,
-		extendTo.Unix(), tokenHash, time.Now().Unix())
-	if err != nil {
-		return false, err
+// SessionExpiry 只读取有效会话，不延长固定有效期。
+func (s *Store) SessionExpiry(tokenHash string, now time.Time) (time.Time, bool, error) {
+	var expires int64
+	err := s.db.QueryRow(`SELECT expires_at FROM sessions WHERE token_hash = ? AND expires_at > ?`, tokenHash, now.Unix()).Scan(&expires)
+	if errors.Is(err, sql.ErrNoRows) {
+		return time.Time{}, false, nil
 	}
-	n, err := res.RowsAffected()
-	return n == 1, err
+	return time.Unix(expires, 0).UTC(), err == nil, err
 }
 
 func (s *Store) DeleteSession(tokenHash string) error {
@@ -100,6 +108,10 @@ func (s *Store) DeleteOtherSessions(keepHash string) error {
 
 func (s *Store) DeleteExpiredSessions() error {
 	_, err := s.db.Exec(`DELETE FROM sessions WHERE expires_at <= ?`, time.Now().Unix())
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`DELETE FROM resource_tickets WHERE expires_at <= ? OR NOT EXISTS (SELECT 1 FROM sessions WHERE sessions.token_hash = resource_tickets.session_hash)`, time.Now().Unix())
 	return err
 }
 

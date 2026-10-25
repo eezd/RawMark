@@ -21,6 +21,7 @@ import (
 const (
 	passwordKey    = "auth.password"
 	apiTokenPrefix = "rm_"
+	SessionPrefix  = "rms_"
 	SessionTTL     = 30 * 24 * time.Hour
 	MinPasswordLen = 8
 
@@ -86,8 +87,19 @@ func (m *Manager) Setup(password string) error {
 
 // Login 校验密码并创建会话，返回明文令牌（仅存哈希）
 func (m *Manager) Login(ip, password string) (string, error) {
+	return m.AttemptLogin(ip, password, nil)
+}
+
+// AttemptLogin 在同一限流边界校验登录挑战与密码；初始化无需挑战。
+func (m *Manager) AttemptLogin(ip, password string, challenge func() error) (string, error) {
 	if !m.allow(ip) {
 		return "", ErrRateLimited
+	}
+	if challenge != nil {
+		if err := challenge(); err != nil {
+			m.recordFailure(ip)
+			return "", err
+		}
 	}
 	encoded, ok, err := m.store.Setting(passwordKey)
 	if err != nil {
@@ -105,18 +117,23 @@ func (m *Manager) Login(ip, password string) (string, error) {
 		return "", ErrBadCredentials
 	}
 	m.clearFailures(ip)
-	token := randomToken()
-	if err := m.store.CreateSession(hashToken(token), time.Now().Add(SessionTTL)); err != nil {
+	token := SessionPrefix + randomToken()
+	if err := m.store.CreateSession(hashToken(token), m.now().Add(SessionTTL)); err != nil {
 		return "", err
 	}
 	return token, nil
 }
 
 func (m *Manager) Validate(token string) (bool, error) {
-	if token == "" {
-		return false, nil
+	_, ok, err := m.SessionExpiry(token)
+	return ok, err
+}
+
+func (m *Manager) SessionExpiry(token string) (time.Time, bool, error) {
+	if !strings.HasPrefix(token, SessionPrefix) {
+		return time.Time{}, false, nil
 	}
-	return m.store.SessionValid(hashToken(token), time.Now().Add(SessionTTL))
+	return m.store.SessionExpiry(hashToken(token), m.now())
 }
 
 func (m *Manager) Logout(token string) error { return m.store.DeleteSession(hashToken(token)) }
