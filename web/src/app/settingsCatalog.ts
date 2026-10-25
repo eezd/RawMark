@@ -36,7 +36,6 @@ export const SETTING_ITEMS = {
   'font-size': { section: 'editor', title: '编辑器字号', description: '调整正文与代码的基础字号，不影响界面字号。', keywords: '正文 大小' },
   'content-width': { section: 'editor', title: '正文宽度', description: '限制正文最大宽度，或使用可用空间的全宽。', keywords: '窄 标准 宽 全宽' },
   'line-height': { section: 'editor', title: '正文行高', description: '调整正文各行之间的距离。', keywords: '行距 排版' },
-  'paragraph-spacing': { section: 'editor', title: '段落间距', description: '调整相邻段落之间的距离。', keywords: '段距 排版' },
   'selection-toolbar': { section: 'editor', title: '选中文本浮动工具栏', description: '选中文字后显示常用格式操作。', keywords: '格式 编辑' },
   'spellcheck': { section: 'editor', title: '拼写检查', description: '使用浏览器的拼写检查，检查语言取决于浏览器设置。', keywords: '语言 拼写' },
   'tab-size': { section: 'editor', title: '制表符宽度', description: '仅调整 Tab 字符的显示宽度，不改写正文；Tab 键仍按两个空格缩进。', keywords: 'Tab 缩进 空格' },

@@ -30,7 +30,6 @@
   --rm-header-height: calc(var(--rm-ui-font-size) + 48px);
   --rm-line-height: 1.75;
   --rm-content-width: 760px;
-  --rm-paragraph-spacing: 16px;
   --rm-glass-opacity: 0.75;
   --rm-bg: #faf8ff;
   --rm-sidebar-bg: #f2f3ff;
@@ -114,7 +113,6 @@ button, input, select, textarea { font: inherit; }
 
 .cm-editor {
   font-size: var(--rm-font-size);
-  line-height: var(--rm-line-height);
   background: var(--rm-bg);
   color: var(--rm-text);
 }
@@ -123,6 +121,7 @@ button, input, select, textarea { font: inherit; }
 }
 .cm-editor .cm-scroller {
   font-family: var(--rm-font-editor, var(--rm-font-text));
+  line-height: var(--rm-line-height);
 }
 .cm-editor .cm-content {
   max-width: var(--rm-content-width);
@@ -348,7 +347,6 @@ button, input, select, textarea { font: inherit; }
 .cm-rm-code-lang { font-family: var(--rm-font-mono); }
 .cm-line.cm-rm-code-begin::before { border-top: 1px solid var(--rm-divider); }
 .cm-line.cm-rm-code-end::before { border-bottom: 1px solid var(--rm-divider); }
-.cm-line.cm-rm-paragraph-end { padding-bottom: var(--rm-paragraph-spacing); }
 @media (max-width: 767px) {
   .cm-line.cm-rm-h1 { font-size: 1.75em; }
 }

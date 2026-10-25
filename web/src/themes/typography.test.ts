@@ -9,6 +9,21 @@ describe('界面与正文排版设置', () => {
     expect(sanitizeDisplaySettings({ fontSize: 24 })).toMatchObject({ uiFontSize: 14, fontSize: 24 })
   })
 
+  it('旧段间距设置不再进入正文排版，保留已设置的字号和行距', () => {
+    const display = sanitizeDisplaySettings({ paragraphSpacing: 40, fontSize: 24, lineHeight: 2 })
+    expect(display).not.toHaveProperty('paragraphSpacing')
+    applyDisplaySettings(display)
+    expect(document.documentElement.style.getPropertyValue('--rm-font-size')).toBe('24px')
+    expect(document.documentElement.style.getPropertyValue('--rm-line-height')).toBe('2')
+  })
+
+  it.each([1.2, 1.75, 2.5])('保留并应用允许的正文行距 %s', lineHeight => {
+    const display = sanitizeDisplaySettings({ lineHeight })
+    expect(display.lineHeight).toBe(lineHeight)
+    applyDisplaySettings(display)
+    expect(document.documentElement.style.getPropertyValue('--rm-line-height')).toBe(String(lineHeight))
+  })
+
   it.each([14, 16, 20])('接受范围内的整数界面字号 %s', uiFontSize => {
     expect(sanitizeDisplaySettings({ uiFontSize }).uiFontSize).toBe(uiFontSize)
   })

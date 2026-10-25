@@ -125,9 +125,6 @@ function buildDecorations(view: EditorView): DecorationSet {
           return
         }
         switch (name) {
-          case 'Paragraph':
-            if (!node.parent || !['ListItem', 'Blockquote'].includes(node.parent.name)) out.push(lineDeco('cm-rm-paragraph-end').range(doc.lineAt(node.to).from))
-            return
           case 'HeaderMark': {
             if (isActive(node.from)) return
             const parent = node.parent!

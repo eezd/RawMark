@@ -13,10 +13,10 @@ export const CODE_FONTS = {
 }
 export const UI_FONT_SIZE = { min: 14, max: 20, default: 14 }
 export const FONT_PRESETS: Record<string, { label: string; css: string }> = { ...TEXT_FONTS, jetbrains: CODE_FONTS.jetbrains }
-export const DISPLAY_DEFAULTS = { uiFont: 'maple', uiFontSize: UI_FONT_SIZE.default, fontSize: 16, contentWidth: 760, textFont: 'maple', codeFont: 'maple', lineHeight: 1.75, paragraphSpacing: 16, glassOpacity: .75 }
+export const DISPLAY_DEFAULTS = { uiFont: 'maple', uiFontSize: UI_FONT_SIZE.default, fontSize: 16, contentWidth: 760, textFont: 'maple', codeFont: 'maple', lineHeight: 1.75, glassOpacity: .75 }
 export type DisplaySettings = typeof DISPLAY_DEFAULTS
 export function sanitizeDisplaySettings(raw: Record<string, unknown>, customIDs: string[] = [], hiddenFonts: string[] = []): DisplaySettings {
-  const ranged = (key: 'lineHeight' | 'paragraphSpacing' | 'glassOpacity', min: number, max: number) => typeof raw[key] === 'number' && Number.isFinite(raw[key]) && raw[key] >= min && raw[key] <= max ? raw[key] : DISPLAY_DEFAULTS[key]
+  const ranged = (key: 'lineHeight' | 'glassOpacity', min: number, max: number) => typeof raw[key] === 'number' && Number.isFinite(raw[key]) && raw[key] >= min && raw[key] <= max ? raw[key] : DISPLAY_DEFAULTS[key]
   const font = (value: unknown) => typeof value === 'string' && !hiddenFonts.includes(value) && (Object.hasOwn(FONT_PRESETS, value) || customIDs.includes(value)) ? value : 'maple'
   return {
     uiFont: font(raw.uiFont),
@@ -25,7 +25,7 @@ export function sanitizeDisplaySettings(raw: Record<string, unknown>, customIDs:
     contentWidth: typeof raw.contentWidth === 'number' && [0, 680, 760, 960].includes(raw.contentWidth) ? raw.contentWidth : 760,
     textFont: font(raw.textFont),
     codeFont: font(raw.codeFont),
-    lineHeight: ranged('lineHeight', 1.2, 2.5), paragraphSpacing: ranged('paragraphSpacing', 0, 40), glassOpacity: ranged('glassOpacity', .4, 1),
+    lineHeight: ranged('lineHeight', 1.2, 2.5), glassOpacity: ranged('glassOpacity', .4, 1),
   }
 }
 export function applyDisplaySettings(settings: DisplaySettings) {
@@ -38,6 +38,5 @@ export function applyDisplaySettings(settings: DisplaySettings) {
   root.setProperty('--rm-font-editor', css(settings.textFont))
   root.setProperty('--rm-font-mono', css(settings.codeFont, true))
   root.setProperty('--rm-line-height', String(settings.lineHeight))
-  root.setProperty('--rm-paragraph-spacing', settings.paragraphSpacing + 'px')
   root.setProperty('--rm-glass-opacity', String(settings.glassOpacity))
 }

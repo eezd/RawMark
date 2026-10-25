@@ -465,7 +465,8 @@ button {
 .rm-settings :is(.rm-setting, .rm-settings-details, .rm-settings-form):focus { outline: 2px solid var(--rm-accent); outline-offset: -2px; border-radius: 6px; }
 .rm-typography-preview { margin: 8px 0 0; padding: 16px; border: 1px solid var(--rm-divider); border-radius: 8px; background: var(--rm-sidebar-bg); font: var(--rm-font-size)/var(--rm-line-height) var(--rm-font-editor, var(--rm-font-text)); overflow-wrap: anywhere; }
 .rm-typography-preview h2 { margin-top: 0; font-family: var(--rm-font-heading); font-size: 1.5em; }
-.rm-typography-preview p { margin-bottom: var(--rm-paragraph-spacing); }
+.rm-typography-preview p { margin: 0; }
+.rm-typography-preview p + p { margin-top: 1lh; }
 .rm-typography-preview code { font-family: var(--rm-font-mono); font-size: .9em; color: var(--rm-inline-code-text); }
 .rm-settings .rm-share-note, .rm-settings .rm-appearance-note { margin: 12px 0; overflow-wrap: anywhere; }
 .rm-settings .rm-share-form { flex-wrap: wrap; padding: 16px 0 0; }
