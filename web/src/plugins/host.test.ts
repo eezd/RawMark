@@ -1,13 +1,14 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from 'vitest'
 import { api } from '../app/api'
-import { allCommands } from '../app/commands'
+import { settings } from '../app/settings'
+import { allCommands, commandKeys } from '../app/commands'
 import type { PluginAPI } from '../plugin-api'
 import { pluginState, startPlugins, stopPlugins } from './host'
 
 const { cause } = vi.hoisted(() => ({ cause: new Error('插件命令的原始原因') }))
 vi.mock('/api/v1/plugins/fault/assets/rev/main.js', () => ({
-  default: (sdk: PluginAPI) => sdk.addCommand({ id: 'fail', title: '失败命令', run() { throw cause } }),
+  default: (sdk: PluginAPI) => sdk.addCommand({ id: 'fail', title: '失败命令', keys: ['Mod+B'], run() { throw cause } }),
 }))
 afterEach(() => { stopPlugins(); vi.restoreAllMocks() })
 
@@ -16,7 +17,12 @@ it('命令失败保留原始异常并清理注册，正常插件列表读取不�
   const notices: string[] = []
   startPlugins({ notice: (message) => notices.push(message), getActiveNote: () => null, openNote: async () => {}, writeNote: async () => ({ rev: 'r1' }) })
   await vi.waitFor(() => expect(pluginState.status.fault?.phase).toBe('active'))
-  allCommands().find((command) => command.id === 'plugin:fault:fail')!.run()
+  const command = allCommands().find((command) => command.id === 'plugin:fault:fail')!
+  expect(commandKeys(command)).toEqual([])
+  settings.shortcuts[command.id] = ['Mod+Alt+F']
+  expect(commandKeys(command)).toEqual(['Mod+Alt+F'])
+  delete settings.shortcuts[command.id]
+  command.run()
   await vi.waitFor(() => expect(pluginState.status.fault?.cause).toBe(cause))
   expect(pluginState.status.fault?.phase).toBe('error')
   expect(allCommands().some((command) => command.id === 'plugin:fault:fail')).toBe(false)

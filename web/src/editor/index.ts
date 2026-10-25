@@ -1,4 +1,4 @@
-import { defaultKeymap, history, selectAll } from '@codemirror/commands'
+import { defaultKeymap, history, indentLess, indentMore, selectAll, selectParentSyntax, toggleComment } from '@codemirror/commands'
 import { markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown'
 import { Language } from '@codemirror/language'
 import { Compartment, EditorState, Prec, type Extension } from '@codemirror/state'
@@ -64,7 +64,7 @@ export function createEditorState(opts: EditorStateOptions): EditorState {
     editorFocus,
     previewCompartment.of(previewExtensions(opts.sourceMode ?? false)),
     // 可配置操作不再通过 CM 的默认绑定重复注册。
-    keymap.of(defaultKeymap.filter((binding) => binding.run !== selectAll)),
+    keymap.of(defaultKeymap.filter((binding) => binding.run !== selectAll && binding.run !== indentLess && binding.run !== indentMore && binding.run !== selectParentSyntax && binding.run !== toggleComment)),
     preferencesCompartment.of([
       EditorState.tabSize.of(opts.tabSize ?? 4),
       EditorView.contentAttributes.of({ spellcheck: String(opts.spellcheck ?? false) }),

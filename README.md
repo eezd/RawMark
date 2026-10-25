@@ -14,6 +14,8 @@ docker compose --env-file /docker/main/.env up -d --build --wait
 
 持久化数据位于 `deploy/data/`，与 `.dev-data/` 独立。首次打开网页时直接设置登录密码。
 升级已有实例移除分享时，先备份数据与旧镜像、停止旧服务，再对 `rawmark.db` 执行一次 `scripts/remove-sharing.sql`，然后启动新版本。脚本删除分享表、专用密钥及分享快捷键；不会删除笔记或图片。旧分享页面和接口返回 404。回滚必须配套恢复数据库和旧镜像，不能只恢复旧程序。
+
+升级到 Typora 默认快捷键时，先停止服务并备份数据与旧镜像，再对 `rawmark.db` 执行一次 `scripts/reset-shortcuts.sql`。该脚本按本次需求清空已有快捷键覆盖，其他设置保留；程序启动不会再次重置快捷键。
 宿主机 Nginx 配置为 `deploy/nginx/raw.134333.xyz.conf`，复用现有通配证书及 WebSocket 升级映射；安装到 `/etc/nginx/conf.d/134333.xyz/` 后，先执行 `nginx -t` 再重载。
 域名 `raw.134333.xyz` 在 DNSPod 设置 CNAME 指向 `cdn.134333.xyz`（与 AlphaPulse 一致）；还需在 Cloudflare for SaaS 的 `unino.top` 区域添加该自定义域名，并等待域名与托管证书均为 `active`。仅设置 CNAME 或旧区域中的 A 记录不足以完成 CDN 接入。访问地址为 `https://raw.134333.xyz`。修改端口时需同步端口登记和 Nginx 上游。
 
@@ -40,7 +42,7 @@ docker run -d --name rawmark \
 - 请通过 HTTPS 反向代理（Caddy、Nginx 等）访问，并转发 WebSocket（`/api/v1/events`）。
 - 多选与导出：Ctrl/Cmd 点击切换选择，Shift 点击选择可见范围；右键批量删除、移动或导出 Markdown。单篇无附件直接下载 `.md`，其他情况下载包含 Markdown 与本地附件的 ZIP；重名目标不会被覆盖，批量操作会汇报单项失败。
 - 设置：桌面使用居中窗口，手机使用分类与内容两级布局；支持搜索设置并定位、常用排版项单独重置，自动保存状态与失败提示可见。外观与编辑器分别管理，安装入口位于「关于」。
-- 快捷键：支持按命令名称、ID 或组合键搜索，添加、逐条移除和单项/全部重置，并拒绝冲突绑定。默认 Ctrl+Alt+1～6 设置对应级别标题，同级再次触发恢复正文；字号可直接输入，编辑器字号随有效输入即时生效。
+- 快捷键：支持按命令名称、ID 或组合键搜索，添加、逐条移除和单项/全部重置，并拒绝冲突绑定。默认跟随 [Typora](https://support.typora.io/Shortcut-Keys/) 的 Windows/Linux 或 macOS 组合，无对应项和插件默认留空；浏览器保留键可自行重新绑定。Ctrl/Cmd+1～6 设置标题，同级再次触发恢复正文；字号可直接输入，编辑器字号随有效输入即时生效。
 - 文件目录操作：右键「文件目录」标题或目录空白处，可搜索、打开标签索引、新建笔记、新建目录、导入文档及管理图片；也可点击标题打开菜单。文件夹右键操作以所选文件夹为目标。
 - 导入：文件目录或文件夹右键菜单选择「导入」，支持多选 UTF-8 `.md` 文件或单个 ZIP（总上传上限 100 MB）。ZIP 新建同名文件夹并保留笔记层级，本地图片归入各笔记同级 `assets/`；全部改链后移除已迁移且无引用的重复原图，其他附件和未使用图片保留。同名不同内容不覆盖，缺失的本地链接会提示，外部图片不会自动下载。
 - 自动化：「API 令牌」中创建只读或读写令牌，以 `Authorization: Bearer <令牌>` 调用 REST API，接口说明见 `/api/v1/openapi.json`。

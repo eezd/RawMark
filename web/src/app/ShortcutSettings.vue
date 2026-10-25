@@ -62,7 +62,8 @@ async function reset(command: Command) {
 <template>
   <div class="rm-shortcut-settings">
     <div class="rm-shortcut-toolbar"><input v-model="query" type="search" aria-label="搜索快捷键" placeholder="搜索命令或快捷键" /><button class="rm-btn" :disabled="busy" @click="recording = null; error = ''; save({})">重置全部快捷键</button></div>
-    <p class="rm-share-note">点击添加后按下组合键，Esc 取消；× 移除绑定，重置恢复默认。设置在所有设备间同步。</p>
+    <p class="rm-share-note">点击添加后按下组合键，Esc 取消；× 移除绑定，重置恢复默认。默认跟随 Typora；无对应项（含插件）留空。自定义设置在所有设备间同步。</p>
+    <p class="rm-share-note">浏览器可能保留 Ctrl/Cmd+N、W、数字键等组合，网页无法保证拦截；可自行重新绑定。</p>
     <p class="rm-settings-result-count" role="status">{{ filteredCommands.length }} / {{ commands.length }} 个命令{{ filteredCommands.length ? '' : '，没有匹配的快捷键。' }}</p>
     <p v-if="error" role="alert" class="rm-auth-error">{{ error }}</p>
     <div v-for="command in filteredCommands" :key="command.id" class="rm-shortcut-row">

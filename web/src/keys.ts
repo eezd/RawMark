@@ -1,6 +1,14 @@
 // 应用、编辑器和快捷键录入共用同一套按键表示。
-const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
+export const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
+const punctuation: Record<string, string> = { BracketLeft: '[', BracketRight: ']', Backquote: '`' }
 const modifiers = ['Mod', 'Ctrl', 'Meta', 'Alt', 'Shift']
+
+function physicalCharacter(event: KeyboardEvent): string | undefined {
+  if (/^Digit[0-9]$/.test(event.code)) return event.code.slice(5)
+  // macOS Option 会把 Q/O/U 等变成其他字符，快捷键仍按原物理字母匹配。
+  if (isMac && event.altKey && /^Key[A-Z]$/.test(event.code)) return event.code.slice(3)
+  return punctuation[event.code]
+}
 
 export function normalizeKeys(value: string): string {
   const parts = value.split('+')
@@ -18,8 +26,7 @@ export function matchKeys(event: KeyboardEvent, value: string): boolean {
   const parts = physicalKeys(value).split('+')
   const key = parts.pop()!
   const actual = event.key === ' ' ? 'Space' : event.key === '+' ? 'Plus' : event.key
-  const digit = /^Digit[0-9]$/.test(event.code) ? event.code.slice(5) : null
-  return (actual.toUpperCase() === key.toUpperCase() || digit === key) &&
+  return (actual.toUpperCase() === key.toUpperCase() || physicalCharacter(event) === key) &&
     event.ctrlKey === parts.includes('Ctrl') && event.metaKey === parts.includes('Meta') &&
     event.altKey === parts.includes('Alt') && event.shiftKey === parts.includes('Shift')
 }
@@ -32,7 +39,7 @@ export function recordedKeys(event: KeyboardEvent): string | null {
   if (event.metaKey) parts.push(!isMac || event.ctrlKey ? 'Meta' : 'Mod')
   if (event.altKey) parts.push('Alt')
   if (event.shiftKey) parts.push('Shift')
-  const key = /^Digit[0-9]$/.test(event.code) ? event.code.slice(5) : event.key === ' ' ? 'Space' : event.key === '+' ? 'Plus' : event.key
+  const key = physicalCharacter(event) ?? (event.key === ' ' ? 'Space' : event.key === '+' ? 'Plus' : event.key)
   return normalizeKeys([...parts, key].join('+'))
 }
 

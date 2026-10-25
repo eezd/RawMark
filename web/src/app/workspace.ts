@@ -4,6 +4,7 @@ import { decodeLinkDestination } from '../markdown/links'
 import { Annotation, EditorState, Transaction } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { nextTick, reactive, watch } from 'vue'
+import { typoraKeys } from '../typoraKeys'
 import { editorCommands } from '../editor/shortcuts'
 import { refreshImages } from '../editor/livepreview'
 import { createEditorState, insertImageFiles, pasteImages, languageCompartment, pluginCompartment, pluginEditorExtensions, pluginLanguage, preferencesCompartment, previewCompartment, previewExtensions } from '../editor'
@@ -1085,28 +1086,27 @@ function registerBuiltinCommands() {
     ws.switcher = ws.switcher === null ? initial : null
   }
   for (const cmd of [
-    // Mod+P 覆盖浏览器的打印；Firefox 不允许网页覆盖 Ctrl+Shift+P（隐私窗口），F1 作为通用的替代
-    { id: 'app.quickOpen', title: '快速打开笔记', keys: ['Mod+P'], run: () => toggleSwitcher('') },
-    { id: 'app.commandPalette', title: '命令面板', keys: ['Mod+Shift+P', 'F1'], run: () => toggleSwitcher('>') },
-    { id: 'app.search', title: '全文搜索', keys: ['Mod+Shift+F'], run: openSearch },
+    { id: 'app.quickOpen', title: '快速打开笔记', run: () => toggleSwitcher('') },
+    { id: 'app.commandPalette', title: '命令面板', run: () => toggleSwitcher('>') },
+    { id: 'app.search', title: '全文搜索', run: openSearch },
     { id: 'note.new', title: '新建笔记', run: () => withSidebar(() => createNote('')) },
     { id: 'folder.new', title: '新建文件夹', run: () => withSidebar(() => createFolder('')) },
-    { id: 'note.save', title: '保存当前笔记', keys: ['Mod+S'], when: hasNote, run: () => void flush(ws.active!) },
+    { id: 'note.save', title: '保存当前笔记', when: hasNote, run: () => void flush(ws.active!) },
     { id: 'note.rename', title: '重命名当前笔记', when: hasNote, run: () => withSidebar(() => (ws.renaming = ws.active)) },
     { id: 'note.move', title: '移动当前笔记到…', when: hasNote, run: () => (ws.moving = ws.active) },
     { id: 'note.delete', title: '删除当前笔记', when: hasNote, run: () => void remove(ws.active!) },
     { id: 'note.insertImage', title: '插入图片…', when: hasNote, run: insertImagesFromPicker },
-    // 浏览器不允许网页覆盖 Ctrl+W
     { id: 'tab.close', title: '关闭当前标签页', when: hasNote, run: () => void closeTab(ws.active!) },
-    { id: 'app.settings', title: '设置', keys: ['Mod+,'], run: () => (ws.settings = 'index') },
-    { id: 'view.sidebar', title: '显示/隐藏侧栏', keys: ['Mod+\\'], run: toggleSidebar },
-    { id: 'view.outline', title: '显示/隐藏大纲', keys: ['Mod+Shift+O'], when: hasNote, run: () => (ws.outlineOpen = !ws.outlineOpen) },
+    { id: 'app.settings', title: '设置', run: () => (ws.settings = 'index') },
+    { id: 'view.sidebar', title: '显示/隐藏侧栏', run: toggleSidebar },
+    { id: 'view.outline', title: '显示/隐藏大纲', when: hasNote, run: () => (ws.outlineOpen = !ws.outlineOpen) },
     { id: 'view.source', title: '开启/关闭源码编辑', when: hasNote, run: toggleSourceMode },
+    { id: 'view.focus', title: '开启/关闭专注写作', when: hasNote, run: () => (ws.focusMode = !ws.focusMode) },
     { id: 'app.trash', title: '打开回收站', run: () => (ws.settings = 'trash') },
     { id: 'app.images', title: '管理根目录图片', run: () => { ws.imagesAll = false; ws.images = '' } },
     { id: 'app.tokens', title: 'API 令牌', run: () => (ws.settings = 'tokens') },
   ]) {
-    registerCommand(cmd)
+    registerCommand({ ...cmd, keys: typoraKeys(cmd.id) })
   }
 }
 
