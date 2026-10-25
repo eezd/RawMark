@@ -20,7 +20,7 @@ func TestExportNotesKeepsMarkdownAndReportsMissingAssets(t *testing.T) {
 	}
 	v.Delete("other.md")
 	v.SaveAsset("note.md", "a.png", strings.NewReader("image"), 50<<20)
-	file, err := v.ExportNotes(context.Background())
+	file, err := v.ExportNotes(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,5 +56,30 @@ func TestExportNotesKeepsMarkdownAndReportsMissingAssets(t *testing.T) {
 	target := newVault(t)
 	if _, err = target.Import(context.Background(), "", "restored", []ImportFile{{Name: "notes.zip", Reader: file, Size: info.Size()}}); err != nil {
 		t.Fatalf("导出包不能导回: %v", err)
+	}
+}
+
+func TestExportNotesExcludesItsOwnOutputInsideVault(t *testing.T) {
+	v := newVault(t)
+	t.Setenv("TMPDIR", v.Root())
+	if _, err := v.Write("note.md", []byte("source"), Precondition{}); err != nil {
+		t.Fatal(err)
+	}
+	file, err := v.ExportNotes(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(file.Name())
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	z, err := zip.NewReader(file, info.Size())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(z.File) != 1 || z.File[0].Name != "note.md" {
+		t.Fatal("导出包含自身临时文件")
 	}
 }

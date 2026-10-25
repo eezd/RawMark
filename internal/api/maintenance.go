@@ -209,7 +209,13 @@ func (s *Server) exportBackup(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) exportNotes(w http.ResponseWriter, r *http.Request) {
 	err := s.maintain("导出笔记数据", func() error {
-		file, err := s.vault.ExportNotes(r.Context())
+		dataRoot, err := filepath.EvalSymlinks(s.DataDir)
+		if err != nil {
+			return err
+		}
+		file, err := s.vault.ExportNotes(r.Context(), func(rel string) bool {
+			return backup.VaultExcluded(dataRoot, s.vault.Root(), rel)
+		})
 		if err != nil {
 			return err
 		}

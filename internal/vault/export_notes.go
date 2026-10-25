@@ -17,7 +17,8 @@ type MissingAsset struct {
 	Path string `json:"path"`
 }
 
-func (v *Vault) ExportNotes(ctx context.Context) (result *os.File, err error) {
+// exclude 由应用层提供，笔记库不持有数据库和资源目录的配置。
+func (v *Vault) ExportNotes(ctx context.Context, exclude func(string) bool) (result *os.File, err error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	f, err := os.CreateTemp("", "rawmark-notes-*.zip")
@@ -47,6 +48,12 @@ func (v *Vault) ExportNotes(ctx context.Context) (result *os.File, err error) {
 			return nil
 		}
 		rel = filepath.ToSlash(rel)
+		if full == f.Name() || (exclude != nil && exclude(rel)) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 		for _, p := range strings.Split(rel, "/") {
 			if strings.HasPrefix(p, ".") {
 				if d.IsDir() {
