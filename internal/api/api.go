@@ -38,6 +38,7 @@ type Server struct {
 	// 串行化设置的"读取-合并-写入"
 	settingsMu sync.Mutex
 	// ThemesDir 指向数据目录中的主题目录；为空时只有内置主题。
+	DataDir    string
 	ThemesDir  string
 	PluginsDir string
 	FontsDir   string
@@ -93,6 +94,7 @@ func (s *Server) routes() []route {
 		{"GET /api/v1/raw/{path...}", authed, s.raw},
 		{"GET /api/v1/trash", authed, s.trashList},
 		{"DELETE /api/v1/trash", authed, s.trashClear},
+		{"GET /api/v1/storage", sessionOnly, s.getStorage},
 		{"POST /api/v1/trash/{id}/restore", authed, s.trashRestore},
 		{"DELETE /api/v1/trash/{id}", authed, s.trashPurge},
 		{"GET /api/v1/events", authed, s.events},

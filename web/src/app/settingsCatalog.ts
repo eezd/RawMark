@@ -2,6 +2,7 @@ import type { IconName } from './Icon.vue'
 import type { SettingsSection } from './workspace'
 
 export const SETTINGS_SECTIONS: { id: SettingsSection; title: string; icon: IconName; description: string }[] = [
+  { id: 'application', title: '应用', icon: 'grid', description: '查看存储空间及各类文件占用' },
   { id: 'appearance', title: '外观', icon: 'palette', description: '界面字号、主题、明暗模式与 CSS 片段' },
   { id: 'editor', title: '编辑器', icon: 'edit', description: '正文排版、代码字体与编辑行为' },
   { id: 'shortcuts', title: '快捷键', icon: 'command', description: '查找命令，添加、移除或重置快捷键' },
@@ -13,6 +14,7 @@ export const SETTINGS_SECTIONS: { id: SettingsSection; title: string; icon: Icon
 ]
 
 export const SETTING_ITEMS = {
+  'storage': { section: 'application', title: '存储空间', description: '按需统计笔记库、数据库、字体、主题、插件及其他文件的大小；包含外置笔记库。', keywords: '容量 占用 大小 附件 图片 回收站' },
   'trash-retention': { section: 'trash', title: '自动删除期限', description: '按原删除时间计算，默认 30 天；0 表示永不自动删除。修改期限会影响已有条目，服务启动及每小时清理一次。', keywords: '回收站 天数 自动 清理 保留' },
   'trash-clear': { section: 'trash', title: '清空全部', description: '永久删除回收站中的全部条目，无法撤销。', keywords: '回收站 清理 全部 删除' },
   'ui-font': { section: 'appearance', title: '界面字体', description: '用于菜单、侧栏与按钮；可导入或删除字体，Maple 为不可删除的默认字体。', keywords: 'UI 字体 导入 删除 TTF OTF WOFF' },

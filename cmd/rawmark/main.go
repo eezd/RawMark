@@ -81,6 +81,7 @@ func run(addr string) error {
 	go cleanupSessions(ctx, st)
 
 	srv := api.New(v, am, st, hub, idx)
+	srv.DataDir = dataDir
 	srv.ThemesDir = filepath.Join(dataDir, "themes")
 	srv.PluginsDir = filepath.Join(dataDir, "plugins")
 	srv.FontsDir = filepath.Join(dataDir, "fonts")

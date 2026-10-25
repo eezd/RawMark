@@ -34,13 +34,16 @@ func TestTrashRetentionSettingsValidation(t *testing.T) {
 	}
 }
 
-func TestTrashClearAuthorization(t *testing.T) {
+func TestStorageAndTrashClearAuthorization(t *testing.T) {
 	f := newFixture(t)
 	f.write("a.md", "content")
 	decode[vault.TrashItem](t, f.do(f.admin, "DELETE", "/api/v1/files/a.md", "", nil))
 	for _, scope := range []string{"read", "write"} {
 		token := decode[struct{ Token string }](t, f.do(f.admin, "POST", "/api/v1/tokens", `{"name":"test","scope":"`+scope+`"}`, nil)).Token
 		headers := map[string]string{"Authorization": "Bearer " + token}
+		if code := f.status(&http.Client{}, "GET", "/api/v1/storage", "", headers); code != 403 {
+			t.Fatalf("存储统计仅接受会话: %d", code)
+		}
 		if scope == "read" {
 			if code := f.status(&http.Client{}, "DELETE", "/api/v1/trash", "", headers); code != 403 {
 				t.Fatalf("只读不能清空: %d", code)
@@ -51,6 +54,13 @@ func TestTrashClearAuthorization(t *testing.T) {
 				t.Fatalf("写令牌清空结果异常: %+v", result)
 			}
 		}
+	}
+	usage := decode[storageUsage](t, f.do(f.admin, "GET", "/api/v1/storage", "", nil))
+	if usage.TotalSize <= 0 || len(usage.Categories) != 6 {
+		t.Fatalf("会话统计: %+v", usage)
+	}
+	if code := f.status(&http.Client{}, "GET", "/api/v1/storage", "", nil); code != 401 {
+		t.Fatalf("匿名不能查看: %d", code)
 	}
 }
 

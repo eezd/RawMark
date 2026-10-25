@@ -57,6 +57,14 @@ export interface TrashItem {
   deletedAt: number
 }
 
+export interface StorageUsage {
+  totalSize: number
+  categories: { id: 'vault' | 'databases' | 'fonts' | 'themes' | 'plugins' | 'other'; size: number }[]
+  assetsSize: number
+  trashSize: number
+  calculatedAt: number
+}
+
 export interface TrashPurgeResult {
   deleted: string[]
   failed: { id: string; error: string }[]
@@ -221,6 +229,7 @@ export const api = {
     json<{ token: string; info: ApiToken }>(request('POST', '/api/v1/tokens', { json: { name, scope } })),
   deleteToken: (id: string) => request('DELETE', '/api/v1/tokens/' + encodeURIComponent(id)),
 
+  storage: () => json<StorageUsage>(request('GET', '/api/v1/storage')),
   clearTrash: () => json<TrashPurgeResult>(request('DELETE', '/api/v1/trash')),
   trash: async () => (await json<{ items: TrashItem[] }>(request('GET', '/api/v1/trash'))).items,
   restore: (id: string) => json<TrashItem>(request('POST', `/api/v1/trash/${id}/restore`)),

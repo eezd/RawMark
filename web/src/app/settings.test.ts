@@ -150,7 +150,7 @@ describe('设置查找与重置', () => {
     expect(allCommands().map(command => command.id)).not.toContain('app.shares')
     ws.settings = 'appearance'
     mount(SettingsDialog)
-    expect(host!.querySelectorAll('.rm-settings-tab')).toHaveLength(8)
+    expect(host!.querySelectorAll('.rm-settings-tab')).toHaveLength(9)
     expect(host!.textContent).not.toContain('分享')
   })
 
@@ -320,7 +320,28 @@ describe('快捷键查找', () => {
   })
 })
 
-describe('回收站', () => {
+describe('应用存储与回收站', () => {
+  const usage = { totalSize: 1024, categories: [{ id: 'vault' as const, size: 1024 }], assetsSize: 512, trashSize: 256, calculatedAt: 1700000000000 }
+  it('按需统计，防重复请求，刷新失败保留上次结果并展示错误', async () => {
+    let resolve!: (value: typeof usage) => void
+    const storage = vi.spyOn(api, 'storage').mockImplementationOnce(() => new Promise(done => { resolve = done }))
+    ws.settings = 'application'
+    mount(SettingsDialog)
+    expect(storage).not.toHaveBeenCalled()
+    const button = host!.querySelector<HTMLButtonElement>('#rm-setting-storage button')!
+    button.click()
+    await nextTick()
+    expect(button.disabled).toBe(true)
+    button.click()
+    expect(storage).toHaveBeenCalledTimes(1)
+    resolve(usage)
+    await vi.waitFor(() => expect(host!.textContent).toContain('1 KiB'))
+    expect(host!.textContent).toContain('附件')
+    storage.mockRejectedValueOnce(new Error('磁盘读取错误'))
+    button.click()
+    await vi.waitFor(() => expect(host!.querySelector('[role="alert"]')?.textContent).toContain('磁盘读取错误'))
+    expect(host!.textContent).toContain('1 KiB')
+  })
   it('清空必须确认；防止重复操作，部分失败后重读并保留错误详情', async () => {
     const item = { id: 'one', path: 'broken.md', dir: false, deletedAt: Date.now() }
     vi.spyOn(api, 'trash').mockResolvedValue([item])

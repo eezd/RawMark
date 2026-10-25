@@ -2185,6 +2185,38 @@
           }
         }
       }
+    },
+    "/storage": {
+      "get": {
+        "summary": "按需统计存储空间",
+        "description": "只接受登录会话。统计数据目录和实际笔记库的普通文件字节，嵌套去重，不跟随内部符号链接；附件/回收站是笔记库的子项，totalSize不重复累加。calculatedAt为统计完成时间（Unix毫秒）。扫描失败返回错误，不返回部分结果。",
+        "tags": [
+          "设置"
+        ],
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "统计结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageUsage"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "只接受登录会话"
+          },
+          "500": {
+            "description": "扫描失败"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2424,6 +2456,61 @@
                 },
                 "error": {
                   "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "StorageUsage": {
+        "type": "object",
+        "required": [
+          "totalSize",
+          "categories",
+          "assetsSize",
+          "trashSize",
+          "calculatedAt"
+        ],
+        "properties": {
+          "totalSize": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "assetsSize": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "trashSize": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "calculatedAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "size"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "vault",
+                    "databases",
+                    "fonts",
+                    "themes",
+                    "plugins",
+                    "other"
+                  ]
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0
                 }
               }
             }

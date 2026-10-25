@@ -128,6 +128,7 @@ func newFixture(t *testing.T) *fixture {
 	t.Cleanup(func() { idx.Close() })
 	hub := events.NewHub()
 	server := New(v, am, st, hub, idx)
+	server.DataDir = dir
 	server.ThemesDir = filepath.Join(dir, "themes")
 	server.PluginsDir = filepath.Join(dir, "plugins")
 	server.FontsDir = filepath.Join(dir, "fonts")

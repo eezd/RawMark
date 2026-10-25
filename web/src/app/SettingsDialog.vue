@@ -14,6 +14,7 @@ import { SETTINGS_SECTIONS, searchSettings, type SettingSearchResult } from './s
 import ShortcutSettings from './ShortcutSettings.vue'
 import TokensPanel from './TokensPanel.vue'
 import TrashPanel from './TrashPanel.vue'
+import StoragePanel from './StoragePanel.vue'
 import { toast, ws, type SettingsSection } from './workspace'
 
 const buildVersion = import.meta.env.DEV ? '开发版' : document.querySelector<HTMLMetaElement>('meta[name="rawmark-version"]')?.content
@@ -204,6 +205,7 @@ async function changePassword() {
             <ShortcutSettings v-else-if="section === 'shortcuts'" />
             <TokensPanel v-else-if="section === 'tokens'" />
             <TrashPanel v-else-if="section === 'trash'" />
+            <StoragePanel v-else-if="section === 'application'" />
             <template v-else-if="section === 'about'">
               <p class="rm-share-note">RawMark · 纯 Markdown 笔记编辑器，文件即真源。</p>
               <SettingRow id="version"><code>{{ buildVersion }}</code></SettingRow>
