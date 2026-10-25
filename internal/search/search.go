@@ -58,10 +58,12 @@ type Index struct {
 	db        *sql.DB
 	v         *vault.Vault
 
-	mu      sync.Mutex
-	pending map[string]string // 待同步的最新快照（路径 -> rev）
-	wake    chan struct{}
+	mu             sync.Mutex
+	pending        map[string]string // 待同步的最新快照（路径 -> rev）
+	wake           chan struct{}
+	pendingVersion uint64
 
+	work  sync.Mutex     // 串行化同步、重建和数据库维护
 	known map[string]doc // 已索引的笔记，仅由同步协程访问
 }
 
@@ -113,6 +115,7 @@ func (x *Index) Close() error { return x.db.Close() }
 func (x *Index) Update(files map[string]string) {
 	x.mu.Lock()
 	x.pending = files
+	x.pendingVersion++
 	x.mu.Unlock()
 	select {
 	case x.wake <- struct{}{}:
@@ -127,10 +130,7 @@ func (x *Index) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-x.wake:
-			x.mu.Lock()
-			files := x.pending
-			x.mu.Unlock()
-			if err := x.sync(files); err != nil {
+			if err := x.syncPending(); err != nil {
 				x.mu.Lock()
 				x.lastError = err
 				x.mu.Unlock()
@@ -144,6 +144,12 @@ func (x *Index) Run(ctx context.Context) {
 
 // sync 让索引与快照一致：只读取新增或 rev 变化的笔记
 func (x *Index) sync(files map[string]string) error {
+	x.work.Lock()
+	defer x.work.Unlock()
+	return x.syncLocked(files)
+}
+
+func (x *Index) syncLocked(files map[string]string) error {
 	tx, err := x.db.Begin()
 	if err != nil {
 		return err
@@ -178,19 +184,8 @@ func (x *Index) sync(files map[string]string) error {
 				return err
 			}
 		}
-		metadata, err := json.Marshal(vault.Analyze(p, content))
+		id, err := insert(tx, p, rev, content)
 		if err != nil {
-			return err
-		}
-		res, err := tx.Exec(`INSERT INTO docs (path, rev, metadata) VALUES (?, ?, ?)`, p, rev, string(metadata))
-		if err != nil {
-			return err
-		}
-		id, err := res.LastInsertId()
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(`INSERT INTO docs_fts (rowid, path, body) VALUES (?, ?, ?)`, id, p, string(content)); err != nil {
 			return err
 		}
 		next[p] = doc{id: id, rev: rev}
