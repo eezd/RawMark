@@ -1,35 +1,35 @@
-# RawMark 原型
+# RawMark Demo
 
-这是 **M0 原型**，用来验证 _Live Preview_ 的手感。光标所在的行显示 Markdown 源码，其余行显示渲染效果。
+Write in **Markdown** with _Live Preview_. The line under your cursor shows its source; other lines display the formatted result.
 
-## 行内语法
+## Inline formatting
 
-支持 **粗体**、_斜体_、~~删除线~~、`行内代码`、[链接](https://vuejs.org/guide/introduction.html) 和自动链接 <https://example.com>。
-按住 Ctrl/Cmd 点击链接可以打开。转义字符 \*不会变成斜体\*。
+Try **bold**, _italic_, ~~strikethrough~~, `inline code`, [links](https://vuejs.org/guide/introduction.html), and automatic links <https://example.com>.
+Hold Ctrl/Cmd and click a link to open it. Escaped characters \*stay as plain text\*.
 
-## 列表
+## Lists
 
-- 无序列表第一项
-- 第二项，包含 `code`
-  - 嵌套项
+- Capture an idea
+- Add a detail with `code`
+  - Keep related thoughts together
 
-1. 有序列表
-2. 第二项
+1. Make a plan
+2. Take the next step
 
-- [ ] 待办事项（点击复选框切换）
-- [x] 已完成事项
+- [ ] Write a new note (click the checkbox to toggle)
+- [x] Organize your workspace
 
-> 引用块：纯粹的 Markdown，不做格式转换。
-> 第二行引用
+> Your notes are ordinary Markdown files.
+> Keep writing with the tools you already know.
 
 ---
 
-## 代码块
+## Code blocks
 
 ```ts
 import { computed, ref } from 'vue'
 
-// 计数器
+// A simple counter
 const count = ref(0)
 const double = computed(() => count.value * 2)
 
@@ -40,7 +40,7 @@ export function increment(step: number = 1): void {
 
 ```python
 def fib(n: int) -> int:
-    """返回第 n 个斐波那契数"""
+    """Return the nth Fibonacci number."""
     return n if n < 2 else fib(n - 1) + fib(n - 2)
 ```
 
@@ -50,13 +50,15 @@ func main() {
 }
 ```
 
-## 图片
+## Images
 
-![示例图片](https://vuejs.org/images/logo.png)
+![Sample image](https://vuejs.org/images/logo.png)
 
-## 表格（点击单元格直接编辑，Tab 跳格，悬停显示工具栏）
+## Tables
 
-| 功能         | 状态 |
-| ------------ | ---- |
-| Live Preview | 原型 |
-| 表格         | M2   |
+Click a cell to edit, press Tab to move between cells, and hover over the table to show its toolbar.
+
+| Feature      | Try it               |
+| ------------ | -------------------- |
+| Live Preview | Move your cursor     |
+| Tables       | Edit a cell directly |
