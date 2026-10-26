@@ -2022,7 +2022,30 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "description": "需要登录会话"
@@ -2408,7 +2431,30 @@
         },
         "responses": {
           "200": {
-            "description": "替换成功"
+            "description": "替换成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "description": "非法路径、空文件或扩展名不一致"
@@ -2487,7 +2533,45 @@
         ],
         "responses": {
           "200": {
-            "description": "索引就绪状态与元数据列表，不含笔记正文"
+            "description": "索引就绪状态与元数据列表，不含笔记正文",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "notes",
+                        "ready"
+                      ],
+                      "properties": {
+                        "notes": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/NoteMetadata"
+                          }
+                        },
+                        "ready": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -2520,7 +2604,30 @@
         },
         "responses": {
           "200": {
-            "description": "已移入回收站的图片及跳过原因"
+            "description": "已移入回收站的图片及跳过原因",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CleanupImagesResult"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "description": "请求无效，或笔记元数据异常，无法确认引用"
@@ -2612,7 +2719,41 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "fonts"
+                      ],
+                      "properties": {
+                        "fonts": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CustomFont"
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "description": "未登录"
@@ -2634,13 +2775,62 @@
         ],
         "responses": {
           "201": {
-            "description": "成功"
+            "description": "新字体已导入",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CustomFont"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "description": "未登录"
           },
           "403": {
             "description": "只接受登录会话"
+          },
+          "200": {
+            "description": "相同内容的字体已存在，返回原字体",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CustomFont"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -2687,7 +2877,30 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "description": "未登录"
@@ -2793,19 +3006,50 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
-          },
-          "400": {
-            "description": "操作或输入无效"
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MaintenanceStatus"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
-          },
-          "503": {
-            "description": "正在维护"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -2834,16 +3078,54 @@
             }
           },
           "400": {
-            "description": "操作或输入无效"
+            "description": "操作或输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
-            "description": "正在维护"
+            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件系统、数据库或其他内部故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -2882,16 +3164,54 @@
             }
           },
           "400": {
-            "description": "操作或输入无效"
+            "description": "操作或输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
-            "description": "正在维护"
+            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件系统、数据库或其他内部故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -2908,23 +3228,89 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "成功"
-          },
           "400": {
-            "description": "操作或输入无效"
+            "description": "操作或输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
-            "description": "正在维护"
+            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "201": {
-            "description": "返回上传id"
+            "description": "返回上传id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "id"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件系统、数据库或其他内部故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -2970,19 +3356,88 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "offset"
+                      ],
+                      "properties": {
+                        "offset": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
-            "description": "操作或输入无效"
+            "description": "操作或输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
-            "description": "正在维护"
+            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件系统、数据库或其他内部故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -3028,19 +3483,80 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
-            "description": "操作或输入无效"
+            "description": "操作或输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
-            "description": "正在维护"
+            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件系统、数据库或其他内部故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -3068,19 +3584,80 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BackupSummary"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
-            "description": "操作或输入无效"
+            "description": "操作或输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
-            "description": "正在维护"
+            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件系统、数据库或其他内部故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -3108,19 +3685,80 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
-            "description": "操作或输入无效"
+            "description": "操作或输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
-            "description": "正在维护"
+            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件系统、数据库或其他内部故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -3161,19 +3799,80 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
-            "description": "操作或输入无效"
+            "description": "操作或输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
-            "description": "正在维护"
+            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件系统、数据库或其他内部故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -3209,23 +3908,89 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "成功"
-          },
           "400": {
-            "description": "操作或输入无效"
+            "description": "操作或输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
-            "description": "正在维护"
+            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "202": {
-            "description": "已提交恢复；服务将短暂维护并要求重新登录"
+            "description": "已提交恢复；服务将短暂维护并要求重新登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "restarting"
+                      ],
+                      "properties": {
+                        "restarting": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件系统、数据库或其他内部故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -3266,19 +4031,80 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ok"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
-            "description": "操作或输入无效"
+            "description": "操作或输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
-            "description": "正在维护"
+            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件系统、数据库或其他内部故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -3306,19 +4132,80 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "data",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ClearTempResult"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
-            "description": "操作或输入无效"
+            "description": "操作或输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
-            "description": "正在维护"
+            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件系统、数据库或其他内部故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -3347,16 +4234,54 @@
             }
           },
           "400": {
-            "description": "操作或输入无效"
+            "description": "操作或输入无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未登录"
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "403": {
-            "description": "不接受API令牌"
+            "description": "不接受API令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "503": {
-            "description": "正在维护"
+            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件系统、数据库或其他内部故障",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -3685,7 +4610,10 @@
           "ok": {
             "type": "boolean"
           }
-        }
+        },
+        "required": [
+          "ok"
+        ]
       },
       "Entry": {
         "type": "object",
@@ -3724,8 +4652,18 @@
           "deletedAt": {
             "type": "integer",
             "description": "Unix 毫秒"
+          },
+          "assets": {
+            "type": "string",
+            "description": "随条目保存的旧图片目录，可省略"
           }
-        }
+        },
+        "required": [
+          "id",
+          "path",
+          "dir",
+          "deletedAt"
+        ]
       },
       "SearchResult": {
         "type": "object",
@@ -3958,6 +4896,201 @@
           "customFontsSize": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      },
+      "NoteReference": {
+        "type": "object",
+        "required": [
+          "target",
+          "line"
+        ],
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          }
+        }
+      },
+      "NoteMetadata": {
+        "type": "object",
+        "required": [
+          "path",
+          "rev",
+          "title",
+          "tags",
+          "links",
+          "assets",
+          "warnings"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "rev": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoteReference"
+            }
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoteReference"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CleanupImagesResult": {
+        "type": "object",
+        "required": [
+          "deleted",
+          "skipped"
+        ],
+        "properties": {
+          "deleted": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrashItem"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "path",
+                "reason"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CustomFont": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "format"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "ttf",
+              "otf",
+              "woff",
+              "woff2"
+            ]
+          }
+        }
+      },
+      "MaintenanceStatus": {
+        "type": "object",
+        "required": [
+          "busy",
+          "operation",
+          "error",
+          "finishedAt"
+        ],
+        "properties": {
+          "busy": {
+            "type": "boolean"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "finishedAt": {
+            "type": "integer"
+          },
+          "backup": {
+            "type": "string"
+          }
+        }
+      },
+      "BackupSummary": {
+        "type": "object",
+        "required": [
+          "kind",
+          "createdAt",
+          "entries",
+          "size"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "full",
+              "settings"
+            ]
+          },
+          "createdAt": {
+            "type": "integer"
+          },
+          "entries": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          }
+        }
+      },
+      "ClearTempResult": {
+        "type": "object",
+        "required": [
+          "files",
+          "bytes",
+          "failed"
+        ],
+        "properties": {
+          "files": {
+            "type": "integer"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }
