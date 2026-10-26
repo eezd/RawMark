@@ -79,8 +79,10 @@ RawMark 是单用户 Markdown 网页笔记编辑器。文件是真源；Go 标�
 
 ## 目录与依赖边界
 
-- `web/src/pages/<module>/`：页面入口及模块私有的组件、API、类型、业务状态、编辑器和资源；按实际需要建子目录，不建空目录或转发层。
-- `web/src/common/`：确实跨模块复用的 API、外观与字体、Markdown、高亮、插件 SDK、组件和工具。不得依赖页面私有代码；模块入口可提供明确的 props/emits 契约供应用装配。
+- `web/src/pages/<module>/`：页面入口及模块私有的组件、类型、组合函数、业务状态、编辑器和资源；按实际需要建子目录，不建空目录或转发层。
+- `web/src/common/`：统一的资源 API、确实跨模块复用的外观与字体、Markdown、高亮、插件 SDK、组件和工具。不得依赖页面私有代码；模块入口可提供明确的 props/emits 契约供应用装配。
+- 公共组件使用 `web/src/common/components/<ComponentName>/index.vue`，目录名使用 PascalCase；引用直接指向该入口，不添加转发文件。
+- 全部 API 集中在 `web/src/common/apis/<resource>/index.ts` 与 `type.ts`，按后端资源命名；`index.ts` 导出独立的 `*Api` 函数，使用 `import type * as Resource from './type'` 与 `request<ResponseData>({ url, method, data, params })`，不建立 API 聚合对象、转发层或页面私有请求。请求/响应类型在对应 `type.ts`，普通响应使用全局 `ApiResponseData<T>`，调用方显式读取 `.data`；原文/下载需要响应头时使用 `returnResponse: true` 返回 Axios 原始响应，204 返回 void，事件连接也归对应资源目录。
 - `web/src/http/`：Axios、认证头、统一响应与请求错误；`router/`：路由与守卫；`pinia/`：实例及共享认证、权限、设置状态。工作区临时状态不强制放入全局 store。
 - `web/types/auto/`：由 Vite 自动导入插件生成；修改源配置并重新构建，不手改声明。业务类型就近定义，测试随模块存放。
 - `internal/api/` 定义路由、授权和 HTTP 契约，`internal/auth/` 管理密码与凭据，`internal/store/` 管理应用 SQLite；`internal/vault/` 管理真源文件，搜索索引可重建。`web/*.go` 保留生产嵌入与开发模式边界。

@@ -88,7 +88,7 @@ go test -tags dev ./web
 
 ## 前端结构与接口升级
 
-前端以 [vue3-starter](https://github.com/eezd/vue3-starter/tree/fd41d62ce3f1c8338a478e0be3e2f31b53b7ea5e) 为结构基线，保留 RawMark 的编辑器、主题与布局；模板许可在 `web/LICENSE`。`web/src/pages/workspace/` 管理笔记、目录、编辑器与图片，`pages/settings/` 管理设置及维护，`pages/login/` 管理初始化与验证码登录；私有 API 和类型跟随模块。实际共享的外观、Markdown、插件 SDK 与 API 位于 `common/`；请求、路由、共享状态分别由 `http/`、`router/`、`pinia/` 管理。唯一前端构建入口为 `web/`，使用 pnpm 锁文件。
+前端以 [vue3-starter](https://github.com/eezd/vue3-starter/tree/fd41d62ce3f1c8338a478e0be3e2f31b53b7ea5e) 为结构基线，保留 RawMark 的编辑器、主题与布局；模板许可在 `web/LICENSE`。`web/src/pages/workspace/` 管理笔记、目录、编辑器与图片，`pages/settings/` 管理设置及维护，`pages/login/` 管理初始化与验证码登录；页面私有组件、类型和组合函数跟随模块。全部资源 API 统一位于 `common/apis/<resource>/index.ts` 与 `type.ts`，API 函数直接调用 `request<ResponseData>({ url, method, data, params })` 并返回完整 `{ code, data, message }`，调用方读取 `.data`；原文及下载用 `returnResponse: true` 保留 Axios 响应和响应头，204 为 void，事件连接也归资源 API。实际共享的外观、Markdown、插件 SDK 位于 `common/`；请求、路由、共享状态分别由 `http/`、`router/`、`pinia/` 管理。唯一前端构建入口为 `web/`，使用 pnpm 锁文件。此次 API 目录与普通页面调整复用已部署的统一后端协议，不新增数据库迁移。
 
 本次协议升级需前后端一起发布，旧页面与旧 Cookie 会话不能继续使用，需要重新登录。升级前备份数据库和旧镜像；启动新程序时沿用现有 SQLite 初始化流程新增 `resource_tickets` 表及过期索引，保留笔记、设置、密码和 API 令牌。生产迁移与部署须另行授权，不手动运行历史清理 SQL。回滚使用配套数据库和旧镜像；新前端不能连接旧后端。
 
