@@ -92,7 +92,7 @@
   margin-top: 12px;
 }
 .el-message-box {
-  max-width: calc(100vw - 32px);
+  max-width: min(var(--el-messagebox-width), calc(100vw - 32px));
 }
 @media (max-width: 767px), (pointer: coarse) {
   .el-input__inner,
