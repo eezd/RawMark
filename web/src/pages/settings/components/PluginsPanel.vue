@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { InstalledPlugin } from '@@/apis/plugins/type'
-import { installPluginApi, togglePluginApi, uninstallPluginApi } from '@@/apis/plugins'
 
+import { installPluginApi, togglePluginApi, uninstallPluginApi } from '@@/apis/plugins'
 import PluginMount from '@@/components/PluginMount/index.vue'
+
+import { t as translate } from '@@/i18n/runtime'
 
 import { pluginState, refreshPlugins, retryPlugin } from '@@/plugins/host'
 import { pluginsPaused, settingTabs } from '@@/plugins/registry'
@@ -15,7 +17,17 @@ const error = ref('')
 const fileInput = ref<HTMLInputElement>()
 const selected = ref('')
 const currentTab = computed(() => settingTabs.get(selected.value))
-const labels: Record<string, string> = { loading: '加载中', active: '运行中', error: '故障停用', disabled: '已停用', paused: '临时跳过' }
+const labels: Record<string, string> = { get loading() {
+  return translate('settings.loading_d04fcb')
+}, get active() {
+  return translate('settings.running_1f0eb9')
+}, get error() {
+  return translate('settings.disabled_after_an_error_e8b7b5')
+}, get disabled() {
+  return translate('settings.disabled_a8c369')
+}, get paused() {
+  return translate('settings.temporarily_skipped_9f45ce')
+} }
 
 async function perform(operation: () => Promise<unknown> = refreshPlugins, confirmation?: string) {
   if (busy.value) return
@@ -39,13 +51,13 @@ async function install(event: Event) {
   if (!file) return
   await perform(async () => {
     await installPluginApi(file); await refreshPlugins()
-  }, '插件在页面内拥有完整权限，可读取和修改全部笔记及账户数据。仅安装你信任的插件。确认安装？')
+  }, translate('settings.plugins_have_full_access_to_7743b6'))
 }
 
 async function remove(plugin: InstalledPlugin) {
   await perform(async () => {
     await uninstallPluginApi(plugin.id); await refreshPlugins()
-  }, `卸载插件“${plugin.name}”？将停用并删除插件文件，保留插件数据。`)
+  }, translate('settings.uninstall_plugin_the_plugin_will_6aa869', { p0: plugin.name }))
 }
 
 function toggle(plugin: InstalledPlugin) {
@@ -58,60 +70,60 @@ onMounted(() => perform())
 
 <template>
   <p v-if="pluginsPaused" class="rm-appearance-note">
-    已临时跳过外部插件。可停用问题插件后，移除地址中的 disable-plugins 参数重新打开。
+    {{ translate('settings.external_plugins_are_temporarily_skipped_f85ce0') }}
   </p>
   <div class="rm-setting">
-    <span class="rm-setting-label">已安装插件</span>
+    <span class="rm-setting-label">{{ translate('settings.installed_plugins_e476c3') }}</span>
     <el-button class="rm-btn" :disabled="busy" @click="perform()">
-      刷新列表
+      {{ translate('settings.refresh_list_e28be7') }}
     </el-button>
     <el-button class="rm-btn" :disabled="busy" @click="fileInput?.click()">
-      安装 ZIP
+      {{ translate('settings.install_zip_4f1723') }}
     </el-button>
     <input ref="fileInput" type="file" accept=".zip,application/zip" hidden @change="install">
   </div>
   <p class="rm-appearance-note">
-    插件拥有页面内完整权限，请只安装可信来源。安装后默认停用；启用状态在所有设备同步。
+    {{ translate('settings.plugins_have_full_access_to_0cee40') }}
   </p>
   <p v-if="error || pluginState.error" class="rm-appearance-note rm-auth-error">
     {{ error || pluginState.error }}
   </p>
   <p v-if="!pluginState.installed.length && !pluginState.error" class="rm-appearance-note">
-    尚未安装插件。
+    {{ translate('settings.no_plugins_installed_eaaa06') }}
   </p>
-  <el-table :data="pluginState.installed" row-key="id" empty-text="尚未安装插件" :aria-busy="busy">
+  <el-table :data="pluginState.installed" row-key="id" :empty-text="translate('settings.no_plugins_installed_9d17e5')" :aria-busy="busy">
     <!-- @vue-generic {InstalledPlugin} -->
-    <el-table-column label="插件" min-width="170">
+    <el-table-column :label="translate('settings.plugins_e806fb')" min-width="170">
       <template #default="{ row: plugin }">
-        <strong>{{ plugin.name }}</strong><small class="rm-plugin-version">{{ plugin.version }} · {{ labels[pluginState.status[plugin.id]?.phase] ?? (plugin.enabled ? '等待加载' : '已停用') }}</small><p v-if="pluginState.status[plugin.id]?.error" class="rm-auth-error">
+        <strong>{{ plugin.name }}</strong><small class="rm-plugin-version">{{ plugin.version }} · {{ labels[pluginState.status[plugin.id]?.phase] ?? (plugin.enabled ? translate('settings.waiting_to_load_e1cfcb') : translate('settings.disabled_a8c369')) }}</small><p v-if="pluginState.status[plugin.id]?.error" class="rm-auth-error">
           {{ pluginState.status[plugin.id].error }}
         </p>
       </template>
     </el-table-column>
     <!-- @vue-generic {InstalledPlugin} -->
-    <el-table-column label="启用" width="72">
+    <el-table-column :label="translate('settings.enable_f4f0ea')" width="72">
       <template #default="{ row: plugin }">
-        <el-switch :model-value="plugin.enabled" :disabled="busy" :aria-label="`启用 ${plugin.name}`" @change="toggle(plugin)" />
+        <el-switch :model-value="plugin.enabled" :disabled="busy" :aria-label="translate('settings.enable_2a670f', { p0: plugin.name })" @change="toggle(plugin)" />
       </template>
     </el-table-column>
     <!-- @vue-generic {InstalledPlugin} -->
-    <el-table-column label="操作" width="130">
+    <el-table-column :label="translate('settings.actions_ed31fb')" width="130">
       <template #default="{ row: plugin }">
         <el-button v-if="plugin.enabled && pluginState.status[plugin.id]?.phase === 'error'" text :disabled="busy || pluginsPaused" @click="perform(() => retryPlugin(plugin.id))">
-          重试
+          {{ translate('common.retry_b8784c') }}
         </el-button><el-button text type="danger" :disabled="busy" @click="remove(plugin)">
-          卸载
+          {{ translate('settings.uninstall_06bc14') }}
         </el-button>
       </template>
     </el-table-column>
   </el-table>
   <p class="rm-appearance-note">
-    若插件导致界面无法操作，在应用地址末尾加 <code>?disable-plugins</code> 可跳过加载并打开此页。卸载保留插件数据。
+    {{ translate('settings.if_a_plugin_makes_the_46626f') }} <code>?disable-plugins</code> {{ translate('settings.to_the_app_url_to_db1658') }}
   </p>
   <template v-if="settingTabs.size">
     <div class="rm-setting">
-      <label for="rm-plugin-tab" class="rm-setting-label">插件设置</label>
-      <el-select id="rm-plugin-tab" v-model="selected" clearable placeholder="选择插件设置页">
+      <label for="rm-plugin-tab" class="rm-setting-label">{{ translate('settings.plugin_settings_b1bc55') }}</label>
+      <el-select id="rm-plugin-tab" v-model="selected" clearable :placeholder="translate('settings.choose_a_plugin_settings_page_7171ad')">
         <el-option v-for="[id, tab] in settingTabs" :key="id" :value="id" :label="tab.title" />
       </el-select>
     </div>

@@ -6,12 +6,12 @@ import (
 	"compress/flate"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"sort"
 	"strings"
 	"syscall"
@@ -26,7 +26,7 @@ const (
 	importAssetLimit  = 50 << 20
 )
 
-var ErrInvalidImport = errors.New("导入内容无效")
+var ErrInvalidImport = i18n.New("invalid_import_contents_ed556a")
 
 // ImportFile 的读取范围是单个上传文件，ZIP 与普通 Markdown 共用这一输入边界。
 type ImportFile struct {
@@ -36,25 +36,26 @@ type ImportFile struct {
 }
 
 type ImportResult struct {
-	Paths    []string `json:"paths"`
-	Notes    int      `json:"notes"`
-	Assets   int      `json:"assets"`
-	Warnings []string `json:"warnings"`
+	Paths           []string      `json:"paths"`
+	Notes           int           `json:"notes"`
+	Assets          int           `json:"assets"`
+	Warnings        []string      `json:"warnings"`
+	WarningMessages []*i18n.Error `json:"-"`
 }
 
 // Import 在隐藏目录内整理完整内容，提交前统一检查冲突，绝不覆盖已有文件。
 func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFile) (result ImportResult, err error) {
 	result = ImportResult{Paths: []string{}, Warnings: []string{}}
 	if len(files) == 0 || len(files) > maxImportEntries {
-		return result, fmt.Errorf("%w：请选择 Markdown 文件或一个 ZIP", ErrInvalidImport)
+		return result, i18n.New("w_choose_markdown_files_or_bcaa52", ErrInvalidImport)
 	}
 	zipped := len(files) == 1 && strings.EqualFold(path.Ext(files[0].Name), ".zip")
 	if zipped {
 		if _, err := CleanPath(folder); err != nil || strings.Contains(folder, "/") || strings.HasSuffix(folder, AssetsExt) {
-			return result, fmt.Errorf("%w：导入文件夹名称无效", ErrInvalidImport)
+			return result, i18n.New("w_invalid_import_folder_name_a10885", ErrInvalidImport)
 		}
 	} else if folder != "" {
-		return result, fmt.Errorf("%w：普通 Markdown 不使用外层文件夹", ErrInvalidImport)
+		return result, i18n.New("w_plain_markdown_files_do_08b920", ErrInvalidImport)
 	}
 	if dir != "" {
 		if _, err := CleanPath(dir); err != nil {
@@ -74,7 +75,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 	}
 	defer func() {
 		if cleanup := os.RemoveAll(stage); cleanup != nil {
-			err = errors.Join(err, fmt.Errorf("清理导入临时目录失败：%w", cleanup))
+			err = errors.Join(err, i18n.New("could_not_clean_the_temporary_212214", cleanup))
 		}
 	}()
 	staged := &Vault{root: stage}
@@ -87,30 +88,30 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 			return err
 		}
 		if _, err := CleanPath(name); err != nil || !utf8.ValidString(name) {
-			return fmt.Errorf("%w：ZIP 含有非法路径", ErrInvalidImport)
+			return i18n.New("w_zip_contains_an_invalid_7bcf46", ErrInvalidImport)
 		}
 		if _, exists := entries[name]; exists {
-			return fmt.Errorf("%w：存在重复路径", ErrInvalidImport)
+			return i18n.New("w_duplicate_path_408694", ErrInvalidImport)
 		}
 		entries[name] = struct{}{}
 		dest := filepath.Join(stage, filepath.FromSlash(name))
 		if isDir {
 			err := os.MkdirAll(dest, 0o755)
 			if errors.Is(err, fs.ErrExist) || errors.Is(err, syscall.ENOTDIR) {
-				return fmt.Errorf("%w：文件与目录路径冲突", ErrInvalidImport)
+				return i18n.New("w_file_and_directory_paths_eb0b28", ErrInvalidImport)
 			}
 			return err
 		}
 		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 			if errors.Is(err, syscall.ENOTDIR) || errors.Is(err, fs.ErrExist) {
-				return fmt.Errorf("%w：文件与目录路径冲突", ErrInvalidImport)
+				return i18n.New("w_file_and_directory_paths_eb0b28", ErrInvalidImport)
 			}
 			return err
 		}
 		f, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 		if err != nil {
 			if errors.Is(err, fs.ErrExist) || errors.Is(err, syscall.ENOTDIR) {
-				return fmt.Errorf("%w：文件与目录路径冲突", ErrInvalidImport)
+				return i18n.New("w_file_and_directory_paths_eb0b28", ErrInvalidImport)
 			}
 			return err
 		}
@@ -131,7 +132,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 	if zipped {
 		z, err := zip.NewReader(files[0].Reader, files[0].Size)
 		if err != nil {
-			return result, fmt.Errorf("%w：无法读取 ZIP：%w", ErrInvalidImport, err)
+			return result, i18n.New("w_could_not_read_zip_d4a777", ErrInvalidImport, err)
 		}
 		if len(z.File) > maxImportEntries {
 			return result, ErrTooLarge
@@ -141,19 +142,19 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 				continue
 			} // 本程序笔记导出的缺失附件报告，不作为笔记导入。
 			if !f.Mode().IsRegular() && !f.Mode().IsDir() {
-				return result, fmt.Errorf("%w：ZIP 不允许符号链接或特殊文件", ErrInvalidImport)
+				return result, i18n.New("w_zip_cannot_contain_symlinks_5f596f", ErrInvalidImport)
 			}
 			name := strings.TrimSuffix(f.Name, "/")
 			r, err := f.Open()
 			if err != nil {
-				return result, fmt.Errorf("%w：无法读取 ZIP 条目：%w", ErrInvalidImport, err)
+				return result, i18n.New("w_could_not_read_zip_8158b9", ErrInvalidImport, err)
 			}
 			err = write(name, f.FileInfo().IsDir(), r)
 			err = errors.Join(err, r.Close())
 			if err != nil {
 				var corrupt flate.CorruptInputError
 				if errors.Is(err, zip.ErrChecksum) || errors.Is(err, io.ErrUnexpectedEOF) || errors.As(err, &corrupt) {
-					err = fmt.Errorf("%w：ZIP 内容损坏：%w", ErrInvalidImport, err)
+					err = i18n.New("w_zip_content_is_damaged_6323c7", ErrInvalidImport, err)
 				}
 				return result, err
 			}
@@ -161,7 +162,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 	} else {
 		for _, f := range files {
 			if !IsNote(f.Name) || strings.Contains(f.Name, "/") {
-				return result, fmt.Errorf("%w：只接受 .md 文件或单个 ZIP", ErrInvalidImport)
+				return result, i18n.New("w_only_md_files_or_6f1a4f", ErrInvalidImport)
 			}
 			if err := write(f.Name, false, io.NewSectionReader(f.Reader, 0, f.Size)); err != nil {
 				return result, err
@@ -169,7 +170,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 		}
 	}
 	if len(notes) == 0 {
-		return result, fmt.Errorf("%w：没有可导入的 Markdown 笔记", ErrInvalidImport)
+		return result, i18n.New("w_no_importable_markdown_notes_3ad0b8", ErrInvalidImport)
 	}
 	sort.Strings(notes)
 	migrated := map[string]bool{}
@@ -179,7 +180,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 		}
 		for _, seg := range strings.Split(path.Dir(note), "/") {
 			if strings.HasSuffix(seg, AssetsExt) {
-				return result, fmt.Errorf("%w：笔记不能放在 .assets 附件目录内", ErrInvalidImport)
+				return result, i18n.New("w_notes_cannot_be_inside_744972", ErrInvalidImport)
 			}
 		}
 		content, _, err := staged.Read(note)
@@ -187,14 +188,17 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 			return result, err
 		}
 		if !utf8.Valid(content) || bytes.IndexByte(content, 0) >= 0 {
-			return result, fmt.Errorf("%w：Markdown 必须是 UTF-8 文本", ErrInvalidImport)
+			return result, i18n.New("w_markdown_must_be_utf_ce0d80", ErrInvalidImport)
 		}
 		content = bytes.TrimPrefix(content, []byte{0xef, 0xbb, 0xbf})
 		updated, warnings, err := staged.importLinks(ctx, note, content, &total, migrated)
 		if err != nil {
 			return result, err
 		}
-		result.Warnings = append(result.Warnings, warnings...)
+		result.WarningMessages = append(result.WarningMessages, warnings...)
+		for _, warning := range warnings {
+			result.Warnings = append(result.Warnings, warning.Error())
+		}
 		if len(updated) > importNoteLimit || total+int64(len(updated)-len(content)) > maxImportExpanded {
 			return result, ErrTooLarge
 		}
@@ -213,7 +217,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 			}
 			metadata := Analyze(note, body)
 			if len(metadata.Warnings) > 0 {
-				return result, fmt.Errorf("%w：%s 的元数据异常，无法确认图片引用", ErrInvalidImport, note)
+				return result, i18n.New("w_invalid_metadata_in_s_cc1d10", ErrInvalidImport, note)
 			}
 			for _, ref := range metadata.Assets {
 				used[ref.Target] = true
@@ -275,7 +279,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 		return result, err
 	}
 	if !info.IsDir() {
-		return result, fmt.Errorf("%w：目标不是文件夹", ErrInvalidImport)
+		return result, i18n.New("w_destination_is_not_a_f9de1c", ErrInvalidImport)
 	}
 	for _, target := range targets {
 		dest, err := v.abs(target)
@@ -283,7 +287,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 			return result, err
 		}
 		if _, err := os.Lstat(dest); err == nil {
-			return result, fmt.Errorf("%w：%s，请修改名称", ErrExists, target)
+			return result, i18n.New("w_s_choose_a_different_ac4d15", ErrExists, target)
 		} else if !errors.Is(err, fs.ErrNotExist) {
 			return result, err
 		}
@@ -301,7 +305,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 			if err = os.Rename(filepath.Join(stage, name), filepath.Join(parent, name)); err != nil {
 				for _, prev := range published {
 					if rollback := os.Rename(filepath.Join(parent, prev), filepath.Join(stage, prev)); rollback != nil {
-						err = errors.Join(err, fmt.Errorf("回滚导入失败：%w", rollback))
+						err = errors.Join(err, i18n.New("import_rollback_failed_w_50748f", rollback))
 					}
 				}
 				break

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { TrashItem } from '@@/apis/trash/type'
-import { clearTrashApi, getTrashApi, purgeTrashApi } from '@@/apis/trash'
 
+import { clearTrashApi, getTrashApi, purgeTrashApi } from '@@/apis/trash'
 import Icon from '@@/components/Icon/index.vue'
+
+import { locale, t as translate } from '@@/i18n/runtime'
 
 import { confirmAction } from '@@/utils/confirm'
 import { toast } from '@@/utils/notifications'
@@ -35,7 +37,7 @@ async function load() {
     items.value = (await getTrashApi()).data.items
     error.value = ''
   } catch (cause) {
-    error.value = `读取回收站失败：${String(cause)}`
+    error.value = translate('settings.could_not_load_trash_0d559f', { p0: String(cause) })
   }
 }
 
@@ -43,7 +45,7 @@ async function retention(value: string) {
   const days = value.trim() ? Number(value) : NaN
   if (!Number.isSafeInteger(days) || days < 0) {
     retentionInput.value = String(settings.trashRetentionDays)
-    toast('请输入非负整数天数，0 表示永不自动删除')
+    toast(translate('settings.enter_a_non_negative_number_aff4a0'))
     return
   }
   if (days === settings.trashRetentionDays) return
@@ -52,10 +54,10 @@ async function retention(value: string) {
     await updateSettings({ trashRetentionDays: days })
   } catch (cause) {
     if (isCancel(cause)) return
-    toast(`保存自动删除期限失败：${String(cause)}`)
+    toast(translate('settings.could_not_save_trash_retention_db584b', { p0: String(cause) }))
     if (!(cause instanceof SettingsAppearanceError)) {
       await loadSettings().catch((cause) => {
-        if (!isCancel(cause)) toast(`重新读取设置失败：${String(cause)}`)
+        if (!isCancel(cause)) toast(translate('settings.could_not_reload_settings_744b6a', { p0: String(cause) }))
       })
     }
   } finally {
@@ -80,7 +82,7 @@ async function purge(item?: TrashItem) {
   failures.value = []
   let attempted = false
   try {
-    if (!await confirmAction(item ? `彻底删除“${item.path}”？此操作无法撤销。` : '清空回收站全部条目？此操作无法撤销。')) return
+    if (!await confirmAction(item ? translate('settings.permanently_delete_this_cannot_be_8a3d3f', { p0: item.path }) : translate('settings.empty_all_trash_this_cannot_cf818b'))) return
     user.assertSession(version)
     attempted = true
     if (item) {
@@ -88,34 +90,36 @@ async function purge(item?: TrashItem) {
     } else {
       const result = (await clearTrashApi()).data
       failures.value = result.failed
-      toast(`已永久删除 ${result.deleted.length} 项${result.failed.length ? `，${result.failed.length} 项失败` : ''}`)
+      toast(result.failed.length
+        ? translate('settings.permanently_deleted_with_failures', { count: result.deleted.length, failed: result.failed.length })
+        : translate('settings.permanently_deleted_items_4712cc', { count: result.deleted.length }))
     }
   } catch (cause) {
     if (isCancel(cause)) return
-    toast(`删除失败：${String(cause)}`)
+    toast(translate('common.could_not_delete_9619d7', { p0: String(cause) }))
   } finally {
     if (attempted && version === user.getSessionVersion()) await load()
     busy.value = false
   }
 }
 
-const fmt = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
+const fmt = computed(() => new Intl.DateTimeFormat(locale.value, { dateStyle: 'short', timeStyle: 'short' }))
 onMounted(load)
 </script>
 
 <template>
   <div>
     <SettingRow id="trash-retention" control="rm-trash-retention">
-      <el-input id="rm-trash-retention" v-model="retentionInput" type="number" min="0" step="1" :disabled="saving" aria-label="自动删除天数" @change="retention" /><span>天</span>
+      <el-input id="rm-trash-retention" v-model="retentionInput" type="number" min="0" step="1" :disabled="saving" :aria-label="translate('settings.trash_retention_days_f4ee2a')" @change="retention" /><span>{{ translate('settings.days_49da61') }}</span>
     </SettingRow>
     <SettingRow id="trash-clear">
       <el-button class="rm-btn rm-btn-danger" :disabled="busy || items?.length === 0" @click="purge()">
-        清空全部
+        {{ translate('settings.empty_trash_1b5909') }}
       </el-button>
     </SettingRow>
     <p v-if="error" role="alert" class="rm-auth-error">
       {{ error }} <el-button class="rm-btn" :disabled="busy" @click="load">
-        重试
+        {{ translate('common.retry_b8784c') }}
       </el-button>
     </p>
     <ul v-if="failures.length" role="alert">
@@ -124,14 +128,14 @@ onMounted(load)
       </li>
     </ul>
     <p v-if="items && !items.length" class="rm-tree-empty">
-      回收站是空的
+      {{ translate('settings.trash_is_empty_9c6705') }}
     </p>
     <p v-else-if="items === null && !error" class="rm-tree-empty" role="status">
-      读取中…
+      {{ translate('settings.loading_346ff6') }}
     </p>
-    <el-table v-else :data="items ?? []" row-key="id" :aria-busy="busy" empty-text="回收站是空的">
+    <el-table v-else :data="items ?? []" row-key="id" :aria-busy="busy" :empty-text="translate('settings.trash_is_empty_9c6705')">
       <!-- @vue-generic {TrashItem} -->
-      <el-table-column label="项目" min-width="170">
+      <el-table-column :label="translate('settings.item_79f326')" min-width="170">
         <template #default="{ row: item }">
           <div class="rm-trash-name">
             <Icon :name="item.dir ? 'folder' : isImage(item.path) ? 'image' : 'note'" /><span>{{ item.path.replace(/\.md$/, '') }}</span>
@@ -139,12 +143,12 @@ onMounted(load)
         </template>
       </el-table-column>
       <!-- @vue-generic {TrashItem} -->
-      <el-table-column label="操作" width="160">
+      <el-table-column :label="translate('settings.actions_ed31fb')" width="160">
         <template #default="{ row: item }">
           <el-button text :disabled="busy" @click="doRestore(item)">
-            恢复
+            {{ translate('common.restore_e0534b') }}
           </el-button><el-button text type="danger" :disabled="busy" @click="purge(item)">
-            彻底删除
+            {{ translate('settings.delete_permanently_7aa6d0') }}
           </el-button>
         </template>
       </el-table-column>

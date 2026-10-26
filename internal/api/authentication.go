@@ -33,7 +33,7 @@ func (s *Server) requireAuth(next http.Handler, allowAPI bool) http.Handler {
 		header := r.Header.Get("Authorization")
 		token, ok := strings.CutPrefix(header, "Bearer ")
 		if !ok || token == "" || strings.ContainsAny(token, " \t\r\n") {
-			writeError(w, 401, "请先登录")
+			writeError(w, 401, message(w, "please_sign_in_48144f"))
 			return
 		}
 		p := principal{Token: token}
@@ -50,16 +50,16 @@ func (s *Server) requireAuth(next http.Handler, allowAPI bool) http.Handler {
 			return
 		}
 		if !valid {
-			writeError(w, 401, "登录凭据无效或已过期")
+			writeError(w, 401, message(w, "credentials_are_invalid_or_expired_e1f63b"))
 			return
 		}
 		if p.SessionHash == "" {
 			if !allowAPI {
-				writeError(w, 403, "此接口需要登录会话")
+				writeError(w, 403, message(w, "this_endpoint_requires_a_login_d34b96"))
 				return
 			}
 			if p.Scope != "write" && r.Method != http.MethodGet && r.Method != http.MethodHead && !(r.Method == http.MethodPost && r.URL.Path == "/api/v1/export") {
-				writeError(w, 403, "只读令牌不能修改数据")
+				writeError(w, 403, message(w, "read_only_tokens_cannot_modify_6cf8e2"))
 				return
 			}
 		}

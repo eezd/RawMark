@@ -3,6 +3,8 @@ import type { Settings } from '@/pinia/stores/settings'
 
 import { deleteFontApi, importFontApi } from '@@/apis/fonts'
 
+import { t as translate } from '@@/i18n/runtime'
+
 import { toast } from '@@/utils/notifications'
 import { isCancel } from 'axios'
 import { computed, ref } from 'vue'
@@ -48,7 +50,7 @@ async function save(patch: Partial<Settings>) {
     try {
       await loadSettings()
     } catch (reload) {
-      error.value += `；重新读取设置失败：${String(reload)}`
+      error.value += translate('common.could_not_reload_settings_86605a', { p0: String(reload) })
     }
     return false
   }
@@ -63,21 +65,21 @@ async function importFont(event: Event) {
   busy.value = true
   error.value = ''
   try {
-    if (file.size > 30 * 1024 * 1024) throw new Error('字体文件超过 30 MB')
-    if (!/\.(ttf|otf|woff2?)$/i.test(file.name)) throw new Error('请选择 TTF、OTF、WOFF 或 WOFF2 字体')
+    if (file.size > 30 * 1024 * 1024) throw new Error(translate('common.font_files_must_not_exceed_cc001c'))
+    if (!/\.(ttf|otf|woff2?)$/i.test(file.name)) throw new Error(translate('common.choose_a_ttf_otf_woff_eb6ab7'))
     // 让浏览器校验实际字体；无效字体不会上传或进入页面的字体加载集合。
     const data = await file.arrayBuffer()
     try {
       await new FontFace('rawmark-import-check', data).load()
     } catch (cause) {
-      throw new Error('无法解析字体文件，请选择有效的字体。', { cause })
+      throw new Error(translate('common.could_not_read_this_font_ecc62f'), { cause })
     }
     user.assertSession(version)
     const font = (await importFontApi(file)).data
     await loadFonts()
     user.assertSession(version)
     if (!await save({ [props.setting]: font.id })) return
-    toast('字体已导入')
+    toast(translate('common.font_imported_3dc232'))
   } catch (cause) {
     if (isCancel(cause)) return
     error.value = cause instanceof Error ? cause.message : String(cause)
@@ -100,7 +102,7 @@ async function remove(id: string) {
       await deleteFontApi(id)
       await loadSettings()
     }
-    toast('字体已删除，使用它的位置已恢复 Maple')
+    toast(translate('common.font_deleted_its_uses_have_b83e92'))
   } catch (cause) {
     if (isCancel(cause)) return
     error.value = cause instanceof Error ? cause.message : String(cause)
@@ -115,22 +117,22 @@ async function remove(id: string) {
     <el-select :id="id" :model-value="settings[setting]" :disabled="busy" :loading="busy" filterable popper-class="rm-font-options" @change="choose">
       <el-option v-for="font in fonts" :key="font.id" :label="font.name" :value="font.id">
         <div class="rm-font-option">
-          <span>{{ font.name }}</span><small v-if="font.id === 'maple'">默认</small>
-          <el-button v-else text size="small" :aria-label="`删除字体 ${font.name}`" :disabled="busy" @mousedown.prevent.stop @click.stop="remove(font.id)">
+          <span>{{ font.name }}</span><small v-if="font.id === 'maple'">{{ translate('common.default_844b8c') }}</small>
+          <el-button v-else text size="small" :aria-label="translate('common.delete_font_3a6b32', { p0: font.name })" :disabled="busy" @mousedown.prevent.stop @click.stop="remove(font.id)">
             <Icon name="trash" />
           </el-button>
         </div>
       </el-option>
       <template #footer>
         <el-button class="rm-font-import" :disabled="busy" @click="fileInput!.click()">
-          <Icon name="import" />导入字体
+          <Icon name="import" />{{ translate('common.import_font_50751a') }}
         </el-button>
         <p class="rm-share-note">
-          TTF、OTF、WOFF、WOFF2，最多 30 MB。
+          {{ translate('common.ttf_otf_woff_or_woff_0cc484') }}
         </p>
       </template>
     </el-select>
-    <input ref="fileInput" type="file" accept=".ttf,.otf,.woff,.woff2" hidden :aria-label="`导入字体 ${id}`" @change="importFont">
+    <input ref="fileInput" type="file" accept=".ttf,.otf,.woff,.woff2" hidden :aria-label="translate('common.import_font_183cd9', { p0: id })" @change="importFont">
     <p v-if="error" class="rm-auth-error" role="alert">
       {{ error }}
     </p>

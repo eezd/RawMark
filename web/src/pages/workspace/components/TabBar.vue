@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Tab } from '../workspace'
+
 import Icon from '@@/components/Icon/index.vue'
+import { t as translate } from '@@/i18n/runtime'
 import { commandTitle } from '@@/utils/commands'
 import { noteTitle } from '@@/utils/paths'
 import { nextTick, ref } from 'vue'
@@ -98,30 +100,30 @@ function closeRight(path: string) {
       @drop="onDrop"
       @dragend="onDragEnd"
     >
-      <span v-if="tab.pinned" class="rm-tab-pin" title="已固定"><Icon name="pin" :size="16" /></span>
+      <span v-if="tab.pinned" class="rm-tab-pin" :title="translate('workspace.pinned_317c1a')"><Icon name="pin" :size="16" /></span>
       <span class="rm-tab-title">{{ noteTitle(tab.path) }}</span>
-      <button class="rm-tab-close" :class="{ dirty: tab.dirty }" title="关闭" @click.stop="closeTab(tab.path)">
+      <button class="rm-tab-close" :class="{ dirty: tab.dirty }" :title="translate('workspace.close_3fd47e')" @click.stop="closeTab(tab.path)">
         <span class="rm-dirty-dot" />
         <Icon name="close" :size="16" />
       </button>
     </div>
-    <button class="rm-icon-btn rm-tab-add" title="新建笔记" @click="createNote('')">
+    <button class="rm-icon-btn rm-tab-add" :title="translate('workspace.new_note_d3d2d9')" @click="createNote('')">
       <Icon name="plus" />
     </button>
     <template v-if="menu">
       <div class="rm-menu-backdrop" @click="menu = null" @contextmenu.prevent="menu = null" />
       <div ref="menuElement" class="rm-menu rm-tab-menu" :style="{ left: `${menu.x}px`, top: `${menu.y}px` }">
         <button @click="menu.tab.pinned = !menu.tab.pinned; menu = null">
-          {{ menu.tab.pinned ? '取消固定' : '固定' }}
+          {{ menu.tab.pinned ? translate('workspace.unpin_20590a') : translate('workspace.pin_d4b3f4') }}
         </button>
         <button @click="closeTab(menu.tab.path); menu = null">
-          关闭
+          {{ translate('workspace.close_3fd47e') }}
         </button>
         <button @click="closeOthers(menu.tab.path)">
-          关闭其他标签页
+          {{ translate('workspace.close_other_tabs_701003') }}
         </button>
         <button @click="closeRight(menu.tab.path)">
-          关闭右侧标签页
+          {{ translate('workspace.close_tabs_to_the_right_5fcad9') }}
         </button>
       </div>
     </template>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { SettingId } from '../settings-catalog'
+
 import Icon from '@@/components/Icon/index.vue'
+import { t as translate } from '@@/i18n/runtime'
 import { computed } from 'vue'
 import { SETTING_ITEMS } from '../settings-catalog'
 
@@ -19,7 +21,7 @@ const item = computed(() => SETTING_ITEMS[props.id])
     </div>
     <div class="rm-setting-control">
       <slot />
-      <button v-if="resettable" class="rm-icon-btn rm-setting-reset" :title="`重置${item.title}`" :aria-label="`重置${item.title}`" @click="$emit('reset')">
+      <button v-if="resettable" class="rm-icon-btn rm-setting-reset" :title="translate('settings.reset_6b6fa6', { p0: item.title })" :aria-label="translate('settings.reset_6b6fa6', { p0: item.title })" @click="$emit('reset')">
         <Icon name="restore" />
       </button>
     </div>

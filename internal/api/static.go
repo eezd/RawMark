@@ -38,13 +38,13 @@ func newStaticHandler(fsys fs.FS) http.Handler {
 
 func (h *staticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		writeError(w, 405, "不支持的请求方法")
+		writeError(w, 405, message(w, "unsupported_request_method_bc2f08"))
 		return
 	}
 	name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
 	// 已移除的公开入口不能回退到应用首页。
 	if name == "s" || strings.HasPrefix(name, "s/") || name == "share.html" {
-		writeError(w, 404, "页面不存在")
+		writeError(w, 404, message(w, "page_not_found_e75737"))
 		return
 	}
 	f, err := h.load(name)
@@ -52,7 +52,7 @@ func (h *staticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// 前端路由：未知路径一律返回入口页面
 		name = "index.html"
 		if f, err = h.load(name); err != nil {
-			writeError(w, 404, "前端资源缺失")
+			writeError(w, 404, message(w, "frontend_resources_are_missing_2c9b3e"))
 			return
 		}
 	}

@@ -1,4 +1,5 @@
 import type { Entry, TreeIcon } from '@@/apis/tree/type'
+import { locale } from '@@/i18n/runtime'
 import { basename, dirname, hiddenAssetPath } from '@@/utils/paths'
 import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import { rangePaths } from './selection'
@@ -12,7 +13,7 @@ export interface TreeNode {
   children: TreeNode[]
 }
 
-const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' })
+const collator = computed(() => new Intl.Collator(locale.value, { numeric: true, sensitivity: 'base' }))
 
 function build(entries: Entry[]): TreeNode[] {
   const root: TreeNode[] = []
@@ -24,7 +25,7 @@ function build(entries: Entry[]): TreeNode[] {
     ;(dirs.get(dirname(e.path))?.children ?? root).push(node)
   }
   const sort = (nodes: TreeNode[]) => {
-    nodes.sort((a, b) => (a.dir !== b.dir ? (a.dir ? -1 : 1) : collator.compare(a.name, b.name)))
+    nodes.sort((a, b) => (a.dir !== b.dir ? (a.dir ? -1 : 1) : collator.value.compare(a.name, b.name)))
     nodes.forEach(n => sort(n.children))
   }
   sort(root)

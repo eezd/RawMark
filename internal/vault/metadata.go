@@ -2,10 +2,10 @@ package vault
 
 import (
 	"bytes"
-	"fmt"
 	"html"
 	"net/url"
 	"path"
+	"rawmark/internal/i18n"
 	"regexp"
 	"sort"
 	"strings"
@@ -22,11 +22,12 @@ type Reference struct {
 }
 
 type Metadata struct {
-	Title    string      `json:"title"`
-	Tags     []string    `json:"tags"`
-	Links    []Reference `json:"links"`
-	Assets   []Reference `json:"assets"`
-	Warnings []string    `json:"warnings"`
+	Title       string        `json:"title"`
+	Tags        []string      `json:"tags"`
+	Links       []Reference   `json:"links"`
+	Assets      []Reference   `json:"assets"`
+	Warnings    []string      `json:"warnings"`
+	Diagnostics []*i18n.Error `json:"-"`
 }
 
 var inlineTag = regexp.MustCompile(`#[\p{L}\p{N}_][\p{L}\p{N}_/-]*`)
@@ -48,6 +49,11 @@ func LocalTarget(note, raw string) (string, *url.URL, bool) {
 // Analyze 提取语义关系而不重新序列化正文；源位置保留为原文行号。
 func Analyze(note string, content []byte) Metadata {
 	m := Metadata{Title: strings.TrimSuffix(path.Base(note), NoteExt), Tags: []string{}, Links: []Reference{}, Assets: []Reference{}, Warnings: []string{}}
+	addWarning := func(key string, args ...any) {
+		diagnostic := i18n.New(key, args...)
+		m.Diagnostics = append(m.Diagnostics, diagnostic)
+		m.Warnings = append(m.Warnings, diagnostic.Error())
+	}
 	tags := map[string]bool{}
 	addTag := func(s string) {
 		s = strings.TrimPrefix(strings.TrimSpace(s), "#")
@@ -68,7 +74,7 @@ func Analyze(note string, content []byte) Metadata {
 			offset += len(lines[i])
 		}
 		if end < 0 {
-			m.Warnings = append(m.Warnings, "YAML 元数据未闭合")
+			addWarning("metadata_unclosed")
 			end = len(source)
 		} else {
 			var front struct {
@@ -76,7 +82,7 @@ func Analyze(note string, content []byte) Metadata {
 				Title string    `yaml:"title"`
 			}
 			if err := yaml.Unmarshal(source[len(lines[0]):bodyEnd], &front); err != nil {
-				m.Warnings = append(m.Warnings, fmt.Sprintf("YAML 元数据无效：%v", err))
+				addWarning("metadata_invalid", err)
 			} else {
 				if front.Title != "" {
 					m.Title = front.Title
@@ -89,18 +95,18 @@ func Analyze(note string, content []byte) Metadata {
 							addTag(tag)
 						}
 					} else {
-						m.Warnings = append(m.Warnings, "YAML tags 必须是字符串或字符串列表")
+						addWarning("metadata_tags")
 					}
 				case yaml.SequenceNode:
 					for _, tag := range front.Tags.Content {
 						if tag.Kind != yaml.ScalarNode || tag.Tag != "!!str" {
-							m.Warnings = append(m.Warnings, "YAML tags 必须是字符串列表")
+							addWarning("metadata_tag_list")
 							break
 						}
 						addTag(tag.Value)
 					}
 				default:
-					m.Warnings = append(m.Warnings, "YAML tags 必须是字符串或字符串列表")
+					addWarning("metadata_tags")
 				}
 			}
 		}

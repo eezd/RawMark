@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"regexp"
 	"sort"
 	"strings"
@@ -23,16 +24,16 @@ import (
 )
 
 var (
-	ErrInvalidPath = errors.New("非法路径")
-	ErrNotFound    = errors.New("文件不存在")
-	ErrExists      = errors.New("目标已存在")
-	ErrTooLarge    = errors.New("文件过大")
+	ErrInvalidPath = i18n.New("invalid_path_ec93bf")
+	ErrNotFound    = i18n.New("file_not_found_3703e4")
+	ErrExists      = i18n.New("destination_already_exists_9511c3")
+	ErrTooLarge    = i18n.New("file_is_too_large_5bfcab")
 )
 
 // ConflictError 表示 If-Match 校验失败，Rev 为服务端当前版本（文件不存在时为空）
 type ConflictError struct{ Rev string }
 
-func (e *ConflictError) Error() string { return "版本冲突" }
+func (e *ConflictError) Error() string { return i18n.New("version_conflict").Error() }
 
 const (
 	NoteExt   = ".md"
@@ -438,14 +439,14 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 		for _, image := range images {
 			if image.removed {
 				if rollback := atomicWrite(filepath.Join(v.root, filepath.FromSlash(image.source)), image.data); rollback != nil {
-					err = errors.Join(err, fmt.Errorf("回滚图片原件失败: %w", rollback))
+					err = errors.Join(err, i18n.New("could_not_roll_back_the_d7c4fc", rollback))
 				}
 			}
 		}
 		for _, image := range images {
 			if image.created {
 				if rollback := os.Remove(filepath.Join(v.root, filepath.FromSlash(image.target))); rollback != nil {
-					err = errors.Join(err, fmt.Errorf("撤回图片副本失败: %w", rollback))
+					err = errors.Join(err, i18n.New("could_not_remove_the_copied_e96efd", rollback))
 				}
 			}
 		}
@@ -475,16 +476,16 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 		}
 		if assetsMoved {
 			if rollback := os.Rename(dstAssets, srcAssets); rollback != nil {
-				err = errors.Join(err, fmt.Errorf("回滚旧附件目录失败: %w", rollback))
+				err = errors.Join(err, i18n.New("could_not_roll_back_the_f89084", rollback))
 			}
 		}
 		for _, change := range links[:writtenLinks] {
 			if rollback := atomicWrite(change.path, change.before); rollback != nil {
-				err = errors.Join(err, fmt.Errorf("回滚笔记引用失败: %w", rollback))
+				err = errors.Join(err, i18n.New("could_not_roll_back_note_8554a3", rollback))
 			}
 		}
 		if rollback := os.Rename(dst, src); rollback != nil {
-			err = errors.Join(err, fmt.Errorf("回滚笔记移动失败: %w", rollback))
+			err = errors.Join(err, i18n.New("could_not_roll_back_the_36ec22", rollback))
 		}
 	}()
 	for _, change := range links {
@@ -498,7 +499,7 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 	}
 	if srcAssets != "" {
 		if err := os.Rename(srcAssets, dstAssets); err != nil {
-			return false, fmt.Errorf("移动图片目录失败: %w", err)
+			return false, i18n.New("could_not_move_image_folder_c39928", err)
 		}
 		assetsMoved = true
 	}
@@ -580,13 +581,13 @@ func (v *Vault) deleteLocked(rel string) (item TrashItem, err error) {
 		rollbackFailed := false
 		if assetsMoved {
 			if rollback := os.Rename(filepath.Join(dir, item.Assets), AssetsDir(p)); rollback != nil {
-				err = errors.Join(err, fmt.Errorf("回滚回收站图片失败: %w", rollback))
+				err = errors.Join(err, i18n.New("could_not_roll_back_trashed_b37d4f", rollback))
 				rollbackFailed = true
 			}
 		}
 		if noteMoved {
 			if rollback := os.Rename(filepath.Join(dir, filepath.Base(p)), p); rollback != nil {
-				err = errors.Join(err, fmt.Errorf("回滚回收站笔记失败: %w", rollback))
+				err = errors.Join(err, i18n.New("could_not_roll_back_trashed_3758a4", rollback))
 				rollbackFailed = true
 			}
 		}
@@ -607,7 +608,7 @@ func (v *Vault) deleteLocked(rel string) (item TrashItem, err error) {
 	noteMoved = true
 	if item.Assets != "" {
 		if err = os.Rename(AssetsDir(p), filepath.Join(dir, item.Assets)); err != nil {
-			return item, fmt.Errorf("移动图片目录到回收站失败: %w", err)
+			return item, i18n.New("could_not_move_image_folder_7c4620", err)
 		}
 	}
 	assetsMoved = item.Assets != ""
@@ -635,14 +636,14 @@ func (v *Vault) readTrashMetadata(id string) (trashMetadata, error) {
 	}
 	var metadata trashMetadata
 	if err := json.Unmarshal(data, &metadata); err != nil {
-		return trashMetadata{}, fmt.Errorf("回收站条目 %s 元数据损坏: %w", id, err)
+		return trashMetadata{}, i18n.New("trash_item_s_has_damaged_ba382a", id, err)
 	}
 	if _, err := CleanPath(metadata.Path); err != nil || metadata.ID != id || metadata.DeletedAt <= 0 || (metadata.Assets != "" && metadata.Assets != filepath.Base(AssetsDir(metadata.Path))) {
-		return trashMetadata{}, fmt.Errorf("回收站条目 %s 元数据无效", id)
+		return trashMetadata{}, i18n.New("trash_item_s_has_invalid_006492", id)
 	}
 	for p, icon := range metadata.Icons {
 		if _, err := CleanPath(p); err != nil || !icon.valid() || !(p == metadata.Path || metadata.Dir && strings.HasPrefix(p, metadata.Path+"/") || metadata.Assets != "" && (p == AssetsDir(metadata.Path) || strings.HasPrefix(p, AssetsDir(metadata.Path)+"/"))) {
-			return trashMetadata{}, fmt.Errorf("回收站条目 %s 图标元数据损坏", id)
+			return trashMetadata{}, i18n.New("trash_item_s_has_damaged_856237", id)
 		}
 	}
 	return metadata, nil
@@ -722,16 +723,16 @@ func (v *Vault) Restore(id string) (item TrashItem, err error) {
 		}
 		if assetsMoved {
 			if rollback := os.Rename(AssetsDir(dst), filepath.Join(dir, item.Assets)); rollback != nil {
-				err = errors.Join(err, fmt.Errorf("回滚恢复图片失败: %w", rollback))
+				err = errors.Join(err, i18n.New("could_not_roll_back_restored_952073", rollback))
 			}
 		}
 		if rollback := os.Rename(dst, filepath.Join(dir, filepath.Base(dst))); rollback != nil {
-			err = errors.Join(err, fmt.Errorf("回滚恢复笔记失败: %w", rollback))
+			err = errors.Join(err, i18n.New("could_not_roll_back_restored_16b803", rollback))
 		}
 	}()
 	if item.Assets != "" {
 		if err := os.Rename(filepath.Join(dir, item.Assets), AssetsDir(dst)); err != nil {
-			return item, fmt.Errorf("恢复图片目录失败: %w", err)
+			return item, i18n.New("could_not_restore_image_folder_f6e087", err)
 		}
 		assetsMoved = true
 	}
@@ -774,7 +775,7 @@ func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (stri
 // SaveFolderAsset 为图片管理上传到当前目录的共享 assets 目录，沿用哈希去重。
 func (v *Vault) SaveFolderAsset(folder, origName string, r io.Reader, limit int64) (string, error) {
 	if !IsImage(origName) {
-		return "", fmt.Errorf("%w：请选择图片文件", ErrInvalidPath)
+		return "", i18n.New("w_choose_an_image_file_544069", ErrInvalidPath)
 	}
 	if folder != "" {
 		info, err := v.Stat(folder)

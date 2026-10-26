@@ -1,4 +1,5 @@
 import type { AxiosRequestConfig, AxiosResponse } from 'axios'
+import { locale, t as translate } from '@@/i18n/runtime'
 import { reportError } from '@@/utils/notifications'
 import axios, { AxiosHeaders, CanceledError, isAxiosError, isCancel } from 'axios'
 import { pinia } from '@/pinia'
@@ -19,7 +20,7 @@ const instance = axios.create({ baseURL: '/api/v1', adapter: 'fetch', withCreden
 function envelope(value: unknown, status: number): ApiResponseData<unknown> {
   if (!value || typeof value !== 'object' || !('code' in value) || typeof value.code !== 'number'
     || !Number.isInteger(value.code) || !('data' in value) || !('message' in value) || typeof value.message !== 'string') {
-    throw new ApiError(status, '服务器响应协议无效')
+    throw new ApiError(status, translate('common.invalid_server_response_protocol_194dc7'))
   }
   return value as ApiResponseData<unknown>
 }
@@ -27,7 +28,7 @@ function errorData(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 }
 async function failure(error: unknown): Promise<ApiError> {
-  if (!isAxiosError(error) || !error.response) return error instanceof ApiError ? error : new ApiError(0, error instanceof Error ? error.message : '请求失败')
+  if (!isAxiosError(error) || !error.response) return error instanceof ApiError ? error : new ApiError(0, error instanceof Error ? error.message : translate('common.request_failed_126fbf'))
   const response = error.response
   let body: unknown = response.data
   if (body instanceof Blob) body = await body.text()
@@ -35,7 +36,7 @@ async function failure(error: unknown): Promise<ApiError> {
     try {
       body = JSON.parse(body)
     } catch {
-      return new ApiError(response.status, `请求失败（HTTP ${response.status}）`)
+      return new ApiError(response.status, translate('common.request_failed_http_f21a09', { p0: response.status }))
     }
   }
   try {
@@ -53,6 +54,7 @@ export async function request<T>(config: RequestConfig): Promise<T | AxiosRespon
   const version = user.getSessionVersion()
   const token = config.anonymous === true ? '' : user.token
   const headers = new AxiosHeaders(config.headers as ConstructorParameters<typeof AxiosHeaders>[0])
+  headers.set('Accept-Language', locale.value)
   headers.set('Authorization', token ? `Bearer ${token}` : undefined)
   try {
     const response = await instance.request<T, AxiosResponse<T, unknown, AxiosHeaders>>({
@@ -70,7 +72,7 @@ export async function request<T>(config: RequestConfig): Promise<T | AxiosRespon
     return config.returnResponse ? response : response.data
   } catch (cause) {
     if (isCancel(cause)) throw cause
-    if (version !== user.getSessionVersion()) throw new CanceledError('会话已变化')
+    if (version !== user.getSessionVersion()) throw new CanceledError(translate('common.session_changed_073f28'))
     const error = await failure(cause)
     user.assertSession(version)
     if (error.status === 401 && token) user.invalidate(version)

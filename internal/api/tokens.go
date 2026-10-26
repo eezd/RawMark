@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"errors"
 	"net/http"
+	"rawmark/internal/i18n"
 	"strings"
 
 	"rawmark/internal/auth"
@@ -26,12 +27,12 @@ func (s *Server) createToken(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.TrimSpace(body.Name)
 	if name == "" || len([]rune(name)) > 100 {
-		writeError(w, 400, "名称不能为空且不超过 100 个字符")
+		writeError(w, 400, message(w, "name_must_contain_between_and_7c157b"))
 		return
 	}
 	plain, t, err := s.auth.CreateAPIToken(name, body.Scope)
 	if errors.Is(err, auth.ErrBadScope) {
-		writeError(w, 400, err.Error())
+		writeError(w, 400, i18n.RenderError(err, responseLocale(w)))
 		return
 	}
 	if err != nil {
@@ -48,7 +49,7 @@ func (s *Server) deleteToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !ok {
-		writeError(w, 404, "令牌不存在")
+		writeError(w, 404, message(w, "token_not_found_da59eb"))
 		return
 	}
 	writeJSON(w, 200, map[string]bool{"ok": true})

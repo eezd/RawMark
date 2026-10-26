@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { EditorState } from '@codemirror/state'
+
 import Icon from '@@/components/Icon/index.vue'
+import { t as translate } from '@@/i18n/runtime'
 import { ensureSyntaxTree, syntaxTree } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -26,7 +28,7 @@ function collect(state: EditorState): Heading[] {
       if (!m) return
       const line = state.doc.lineAt(n.from)
       const text = m[1] === 'ATX' ? line.text.replace(/^\s*#{1,6}\s*/, '').replace(/\s+#+\s*$/, '') : line.text.trim()
-      out.push({ level: Number(m[2]), text: text || '（无标题）', from: n.from })
+      out.push({ level: Number(m[2]), text, from: n.from })
       return false
     },
   })
@@ -84,10 +86,10 @@ const minLevel = () => Math.min(...headings.value.map(h => h.level))
 
 <template>
   <div class="rm-outline-backdrop" @click.self="ws.outlineOpen = false">
-    <aside class="rm-outline" aria-label="大纲">
+    <aside class="rm-outline" :aria-label="translate('workspace.outline_79fadb')">
       <div class="rm-outline-head">
-        <span>大纲</span>
-        <button class="rm-icon-btn" title="关闭大纲" @click="ws.outlineOpen = false">
+        <span>{{ translate('workspace.outline_79fadb') }}</span>
+        <button class="rm-icon-btn" :title="translate('workspace.close_outline_1b401a')" @click="ws.outlineOpen = false">
           <Icon name="close" />
         </button>
       </div>
@@ -100,11 +102,11 @@ const minLevel = () => Math.min(...headings.value.map(h => h.level))
           @mousedown.prevent
           @click="jump(h)"
         >
-          {{ h.text }}
+          {{ h.text || translate('workspace.untitled_7633ed') }}
         </li>
       </ul>
       <p v-else class="rm-tree-empty">
-        没有标题
+        {{ translate('workspace.no_headings_c76538') }}
       </p>
     </aside>
   </div>

@@ -1,4 +1,5 @@
 import { createResourceTicketApi } from '@@/apis/auth'
+import { t as translate } from '@@/i18n/runtime'
 import { pinia } from '@/pinia'
 import { useUserStore } from '@/pinia/stores/user'
 
@@ -28,11 +29,11 @@ export async function prepareResources() {
   user.assertSession(current)
 }
 export function imageResourceRoot(): string {
-  if (!imageRoot || version !== useUserStore(pinia).getSessionVersion()) throw new Error('图片资源认证尚未就绪')
+  if (!imageRoot || version !== useUserStore(pinia).getSessionVersion()) throw new Error(translate('common.image_resource_authentication_is_not_73d285'))
   return imageRoot
 }
 export function fontResourceRoot(): string {
-  if (!fontRoot || version !== useUserStore(pinia).getSessionVersion()) throw new Error('字体资源认证尚未就绪')
+  if (!fontRoot || version !== useUserStore(pinia).getSessionVersion()) throw new Error(translate('common.font_resource_authentication_is_not_796b9b'))
   return fontRoot
 }
 export async function pluginResourceURL(pluginId: string, revision: string): Promise<string> {

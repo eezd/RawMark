@@ -4,7 +4,7 @@ package store
 import (
 	"database/sql"
 	"errors"
-	"fmt"
+	"rawmark/internal/i18n"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -48,7 +48,7 @@ func Open(path string) (*Store, error) {
 	}
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("初始化数据库失败: %w", err)
+		return nil, i18n.New("could_not_initialize_database_w_208f9e", err)
 	}
 	return &Store{db: db}, nil
 }

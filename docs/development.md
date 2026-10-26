@@ -97,3 +97,11 @@ python3 scripts/prepare-maple-font.py /path/to/MapleMonoNormalNL-NF-CN.zip
 先阅读 [AGENTS.md](../AGENTS.md)，聚焦实际需求，保留必要契约，不机械照搬模板示例。前端目录以 [vue3-starter 固定基线](https://github.com/eezd/vue3-starter/tree/fd41d62ce3f1c8338a478e0be3e2f31b53b7ea5e) 为参考，RawMark 的编辑器、主题和专用交互按业务保留。
 
 提交前运行适用检查，说明实际验证与未验证范围。Commit 使用清晰英文，按功能拆分；不要提交真实笔记、账户数据、密钥或本地交接文件。
+
+## 多语言
+
+使用 Vue I18n Composition API，支持 `en` 与 `zh-CN`，默认英文。公共字典位于 `web/src/common/i18n/`，模块私有字典位于 `pages/<module>/locales/`，应用 `src/i18n.ts` 装配字典；不要用中文原文作为运行时查找键，也不要从公共模块导入页面字典。模板及命令、设置搜索等长期对象在使用时翻译；日期、数字和排序读取当前语言。
+
+账户语言沿用 settings store 的串行写入、服务器设置与事件同步；登录页仅更新本机启动缓存，认证后读取服务器值。CodeMirror 使用 locale Compartment 更新控件，不替换文档、选区或撤销历史。用户正文、现有路径和插件提供的文字保持原样。
+
+后端 `internal/i18n/` 保存消息 ID 与参数，错误在 HTTP 边界根据 `Accept-Language` 渲染，并保留 `errors.Is/As` 及原始诊断；日志遵循原有语言。既有索引警告只在需要时重新分析源笔记生成译文，同时更新该条目的完整元数据和版本，不改索引格式；已删除或移动的过期条目跳过，其他读取错误明确返回。新增文案同时补充中英字典与参数，运行字典完整性、设置同步、编辑器和 API 的相应测试。

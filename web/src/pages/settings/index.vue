@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { SettingSearchResult } from './settings-catalog'
+
 import type { SettingsSection } from '@/pinia/stores/settings'
 import Icon from '@@/components/Icon/index.vue'
+import { t as translate } from '@@/i18n/runtime'
 import { runCommand } from '@@/utils/commands'
 import { installApp, installPrompt } from '@@/utils/pwa'
 import { computed, nextTick, ref } from 'vue'
@@ -19,8 +21,8 @@ import { searchSettings, SETTINGS_SECTIONS } from './settings-catalog'
 const props = defineProps<{ prepareMaintenance: () => Promise<void>, restoreNote: (id: string) => Promise<void> }>()
 const emit = defineEmits<{ importNotes: [] }>()
 const { settingsSave } = useSettingsStore()
-const buildVersion = import.meta.env.DEV ? '开发版' : document.querySelector<HTMLMetaElement>('meta[name="rawmark-version"]')?.content
-if (!buildVersion) throw new Error('缺少应用构建版本信息')
+const buildVersion = import.meta.env.DEV ? translate('settings.development_0d1c11') : document.querySelector<HTMLMetaElement>('meta[name="rawmark-version"]')?.content
+if (!buildVersion) throw new Error(translate('settings.application_build_information_is_missing_6b04f9'))
 const model = defineModel<SettingsSection | 'index' | null>({ required: true })
 const section = computed(() => model.value === 'index' || model.value === null ? 'appearance' : model.value)
 const showList = ref(model.value === 'index')
@@ -31,7 +33,7 @@ const results = computed(() => searchSettings(query.value))
 const content = ref<HTMLElement>()
 const heading = ref<HTMLElement>()
 const preferenceSection = computed(() => ['appearance', 'editor', 'shortcuts', 'trash'].includes(section.value))
-const saveLabel = computed(() => settingsSave.pending ? '保存中…' : settingsSave.result === 'error' ? '保存失败' : settingsSave.result === 'saved' ? '已保存' : '修改自动保存')
+const saveLabel = computed(() => settingsSave.pending ? translate('settings.saving_ff509c') : settingsSave.result === 'error' ? translate('settings.save_failed_6309a3') : settingsSave.result === 'saved' ? translate('settings.saved_1bd91a') : translate('settings.changes_save_automatically_b88990'))
 async function open(id: SettingsSection) {
   query.value = ''; model.value = id; showList.value = false
   await nextTick()
@@ -58,16 +60,16 @@ function close() {
 </script>
 
 <template>
-  <el-dialog :model-value="model !== null" class="rm-settings-modal" title="设置" :show-close="false" :close-on-click-modal="true" align-center destroy-on-close @close="close">
+  <el-dialog :model-value="model !== null" class="rm-settings-modal" :title="translate('common.settings_df3d58')" :show-close="false" :close-on-click-modal="true" align-center destroy-on-close @close="close">
     <div class="rm-settings" :class="{ 'show-list': showList, searching }">
-      <nav class="rm-settings-nav" aria-label="设置分类">
+      <nav class="rm-settings-nav" :aria-label="translate('settings.settings_categories_dfb699')">
         <div class="rm-dialog-head">
-          <h2>设置</h2>
-          <button class="rm-icon-btn rm-settings-close-list" title="关闭设置" @click="close">
+          <h2>{{ translate('common.settings_df3d58') }}</h2>
+          <button class="rm-icon-btn rm-settings-close-list" :title="translate('settings.close_settings_77b17f')" @click="close">
             <Icon name="close" />
           </button>
         </div>
-        <el-input v-model="query" class="rm-settings-search" type="search" clearable aria-label="搜索设置" placeholder="搜索设置">
+        <el-input v-model="query" class="rm-settings-search" type="search" clearable :aria-label="translate('settings.search_settings_287415')" :placeholder="translate('settings.search_settings_287415')">
           <template #prefix>
             <Icon name="search" />
           </template>
@@ -83,21 +85,21 @@ function close() {
       </nav>
       <section class="rm-settings-body">
         <div class="rm-dialog-head">
-          <button class="rm-icon-btn rm-settings-back" title="返回设置分类" @click="back">
+          <button class="rm-icon-btn rm-settings-back" :title="translate('settings.back_to_settings_categories_2b3f9b')" @click="back">
             <Icon name="chevron" class="flip" />
           </button>
           <h2 ref="heading" tabindex="-1">
-            {{ searching ? '搜索结果' : current.title }}
+            {{ searching ? translate('common.search_results_88d72e') : current.title }}
           </h2>
-          <span v-if="preferenceSection && !searching" class="rm-settings-save" :class="{ error: settingsSave.result === 'error' && !settingsSave.pending }" :title="settingsSave.error || '偏好设置保存在服务器上，所有设备共用'" role="status" aria-live="polite">{{ saveLabel }}</span>
-          <button class="rm-icon-btn" title="关闭设置" @click="close">
+          <span v-if="preferenceSection && !searching" class="rm-settings-save" :class="{ error: settingsSave.result === 'error' && !settingsSave.pending }" :title="settingsSave.error || translate('settings.preferences_are_saved_on_the_adf9bd')" role="status" aria-live="polite">{{ saveLabel }}</span>
+          <button class="rm-icon-btn" :title="translate('settings.close_settings_77b17f')" @click="close">
             <Icon name="close" />
           </button>
         </div>
         <div ref="content" class="rm-settings-content">
           <div v-if="searching" class="rm-settings-results">
             <p class="rm-settings-result-count" role="status">
-              {{ results.length ? `找到 ${results.length} 项设置` : '没有匹配的设置，试试其他关键词。' }}
+              {{ results.length ? translate('settings.found_settings_24ca43', { count: results.length }) : translate('settings.no_matching_settings_try_different_3747bc') }}
             </p>
             <button v-for="result in results" :key="result.id || result.section" class="rm-settings-result" @click="locate(result)">
               <span><strong>{{ result.title }}</strong><small>{{ result.description }}</small></span><small>{{ SETTINGS_SECTIONS.find(s => s.id === result.section)!.title }}</small><Icon name="chevron" />
@@ -115,18 +117,18 @@ function close() {
             <StoragePanel v-else-if="section === 'storage'" :prepare-maintenance="props.prepareMaintenance" @import-notes="emit('importNotes')" />
             <template v-else-if="section === 'about'">
               <p class="rm-share-note">
-                RawMark · 纯 Markdown 笔记编辑器，文件即真源。
+                {{ translate('settings.rawmark_a_markdown_note_editor_66b52a') }}
               </p>
               <SettingRow id="version">
                 <code>{{ buildVersion }}</code>
               </SettingRow>
               <SettingRow id="install">
                 <el-button v-if="installPrompt" class="rm-btn" @click="installApp">
-                  安装 RawMark
-                </el-button><span v-else class="rm-settings-unavailable">当前浏览器暂未提供安装入口</span>
+                  {{ translate('settings.install_rawmark_8ccabe') }}
+                </el-button><span v-else class="rm-settings-unavailable">{{ translate('settings.this_browser_does_not_currently_d6d77a') }}</span>
               </SettingRow>
               <SettingRow id="openapi">
-                <a class="rm-btn" href="/api/v1/openapi.json" target="_blank" rel="noopener">查看 OpenAPI 文档</a>
+                <a class="rm-btn" href="/api/v1/openapi.json" target="_blank" rel="noopener">{{ translate('settings.view_openapi_documentation_4f11fd') }}</a>
               </SettingRow>
             </template>
           </div>

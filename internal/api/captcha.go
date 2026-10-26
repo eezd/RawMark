@@ -5,8 +5,8 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
-	"errors"
 	"net/http"
+	"rawmark/internal/i18n"
 	"sync"
 	"time"
 
@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	errCaptchaInvalid = errors.New("验证码错误或已使用，请刷新后重试")
-	errCaptchaExpired = errors.New("验证码已过期，请刷新后重试")
+	errCaptchaInvalid = i18n.New("the_verification_code_is_incorrect_6e789b")
+	errCaptchaExpired = i18n.New("the_verification_code_has_expired_0b3384")
 )
 
 type loginChallenge struct {
@@ -113,7 +113,7 @@ func (s *Server) createCaptcha(w http.ResponseWriter, r *http.Request) {
 	}
 	id, item, err := s.captchas.create(clientIP(r), body.ReplaceID)
 	if err != nil {
-		writeError(w, 429, err.Error())
+		writeError(w, 429, i18n.RenderError(err, responseLocale(w)))
 		return
 	}
 	var png bytes.Buffer

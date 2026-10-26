@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { InputInstance } from 'element-plus'
+
 import Icon from '@@/components/Icon/index.vue'
+import { locale, t as translate } from '@@/i18n/runtime'
 import { basename, dirname, inAssetDir, joinPath, noteTitle } from '@@/utils/paths'
 import { isCancel } from 'axios'
 import { computed, ref, watch } from 'vue'
@@ -20,7 +22,7 @@ const selected = ref(0)
 const busy = ref(false)
 const error = ref('')
 const paths = computed(() => minimalPaths(typeof props.path === 'string' ? [props.path] : props.path))
-const title = computed(() => paths.value.length > 1 ? `${paths.value.length} 项` : noteTitle(paths.value[0]))
+const title = computed(() => paths.value.length > 1 ? translate('workspace.items_980fda', { count: paths.value.length }) : noteTitle(paths.value[0]))
 
 const targets = computed(() => {
   const inside = (dir: string) => paths.value.some(path => ws.entries.some(entry => entry.path === path && entry.dir) && (dir === path || dir.startsWith(`${path}/`)))
@@ -30,7 +32,7 @@ const targets = computed(() => {
 
 const items = computed(() => {
   const q = query.value.trim()
-  if (!q) return [...targets.value].sort((a, b) => a.localeCompare(b, 'zh-CN')).map(path => ({ path, hits: new Set<number>() }))
+  if (!q) return [...targets.value].sort((a, b) => a.localeCompare(b, locale.value)).map(path => ({ path, hits: new Set<number>() }))
   return targets.value
     .filter(p => p !== '')
     .map(path => ({ path, m: fuzzyMatch(q, path, path.lastIndexOf('/') + 1) }))
@@ -53,7 +55,7 @@ async function choose(i: number) {
         error.value = result.error; return
       }
     } else if (!await batchFiles('move', paths.value, target.path)) {
-      error.value = '部分项目移动失败，请核对目录后重试'; return
+      error.value = translate('workspace.some_items_could_not_be_8f48b2'); return
     }
     emit('close')
   } catch (cause) {
@@ -80,8 +82,8 @@ function onKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <el-dialog :model-value="true" :title="`移动“${title}”`" width="560px" class="rm-picker-dialog" :show-close="!busy" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :before-close="close" @close="close" @opened="opened">
-    <el-input ref="input" v-model="query" :disabled="busy" :placeholder="`把“${title}”移动到…`" aria-label="搜索目标文件夹" enterkeyhint="go" @keydown="onKeydown($event as KeyboardEvent)">
+  <el-dialog :model-value="true" :title="translate('workspace.move_e3e7e7', { p0: title })" width="560px" class="rm-picker-dialog" :show-close="!busy" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :before-close="close" @close="close" @opened="opened">
+    <el-input ref="input" v-model="query" :disabled="busy" :placeholder="translate('workspace.move_to_d652dc', { p0: title })" :aria-label="translate('workspace.search_destination_folders_95ab69')" enterkeyhint="go" @keydown="onKeydown($event as KeyboardEvent)">
       <template #prefix>
         <Icon name="folder" />
       </template>
@@ -100,13 +102,13 @@ function onKeydown(e: KeyboardEvent) {
       >
         <Icon name="folder" />
         <span class="rm-switcher-title">
-          <template v-if="item.path === ''">根目录</template>
+          <template v-if="item.path === ''">{{ translate('workspace.root_folder_42ee28') }}</template>
           <span v-for="(s, j) in segments(item.path, item.hits)" v-else :key="j" :class="{ 'rm-search-hit': s.hit }">{{ s.text }}</span>
         </span>
       </li>
     </ul>
     <p v-else class="rm-tree-empty">
-      没有可移动到的文件夹
+      {{ translate('workspace.no_available_destination_folders_d4d0c2') }}
     </p>
   </el-dialog>
 </template>

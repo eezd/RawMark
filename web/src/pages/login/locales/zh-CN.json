@@ -1,0 +1,19 @@
+{
+  "enter_your_password_728a7b": "请输入密码",
+  "password_must_contain_at_least_8c1f11": "密码至少 8 位",
+  "passwords_do_not_match_588077": "两次输入的密码不一致",
+  "enter_the_six_digit_verification_d746b8": "请输入六位数字验证码",
+  "invalid_login_response_b83520": "登录响应格式错误",
+  "welcome_set_a_password_to_cb8457": "首次使用，请设置登录密码。",
+  "sign_in_to_your_markdown_4bb381": "登录你的 Markdown 知识库",
+  "password_a621ab": "密码",
+  "confirm_password_81b17b": "确认密码",
+  "verification_code_bb015c": "验证码",
+  "enter_the_six_digits_in_bb5543": "输入图片中的六位数字",
+  "refresh_verification_code_bc5b83": "刷新验证码",
+  "login_verification_code_3060b7": "登录验证码",
+  "loading_verification_code_8a7493": "正在加载验证码…",
+  "click_to_reload_the_verification_97c218": "点击重新加载验证码",
+  "refresh_code_fa28ea": "换一张",
+  "finish_setup_fda1eb": "完成设置"
+}

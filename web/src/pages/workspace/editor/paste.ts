@@ -1,4 +1,5 @@
 import type { EditorState, Extension, TransactionSpec } from '@codemirror/state'
+import { t as translate } from '@@/i18n/runtime'
 import { isolateHistory } from '@codemirror/commands'
 import { Facet, StateEffect, StateField } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
@@ -78,7 +79,7 @@ function insertHTML(view: EditorView, html: string, text: string, opts: PasteIma
     })
   }
   void import('./html-paste').then(({ htmlToMarkdown }) => htmlToMarkdown(html, opts.importImage, opts.onError)).catch((error) => {
-    opts.onError(new Error('网页转换失败，已保留剪贴板纯文本', { cause: error }))
+    opts.onError(new Error(translate('workspace.could_not_convert_the_web_4f0e6a'), { cause: error }))
     return text
   }).then(insert).catch(opts.onError).finally(() => opts.onPending(-1))
 }

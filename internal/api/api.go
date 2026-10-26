@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"path"
 	"rawmark/internal/backup"
+	"rawmark/internal/i18n"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -162,9 +163,11 @@ func (s *Server) Handler(static fs.FS) http.Handler {
 		}
 		mux.Handle(rt.pattern, h)
 	}
-	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { writeError(w, 404, "接口不存在") })
+	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, 404, message(w, "api_endpoint_not_found_c49d86"))
+	})
 	mux.Handle("/", newStaticHandler(static))
-	return securityHeaders(sameOrigin(s.guardAPI(mux)))
+	return localized(securityHeaders(sameOrigin(s.guardAPI(mux))))
 }
 
 // ---- 中间件 ----
@@ -189,7 +192,7 @@ func sameOrigin(next http.Handler) http.Handler {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			if origin := r.Header.Get("Origin"); origin != "" {
 				if host := strings.TrimPrefix(strings.TrimPrefix(origin, "https://"), "http://"); host != r.Host {
-					writeError(w, 403, "跨站请求被拒绝")
+					writeError(w, 403, message(w, "cross_site_request_rejected_5e7a50"))
 					return
 				}
 			}
@@ -216,9 +219,9 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	}
 	switch err := s.auth.Setup(body.Password); {
 	case errors.Is(err, auth.ErrWeakPassword):
-		writeError(w, 400, err.Error())
+		writeError(w, 400, i18n.RenderError(err, responseLocale(w)))
 	case errors.Is(err, auth.ErrAlreadySetUp):
-		writeError(w, 409, err.Error())
+		writeError(w, 409, i18n.RenderError(err, responseLocale(w)))
 	case err != nil:
 		internalError(w, r, err)
 	default:
@@ -242,13 +245,13 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, password s
 	token, err := s.auth.AttemptLogin(clientIP(r), password, challenge)
 	switch {
 	case errors.Is(err, auth.ErrRateLimited):
-		writeError(w, 429, err.Error())
+		writeError(w, 429, i18n.RenderError(err, responseLocale(w)))
 	case errors.Is(err, errCaptchaInvalid):
-		writeFailure(w, 400, CodeCaptchaInvalid, err.Error(), nil)
+		writeFailure(w, 400, CodeCaptchaInvalid, i18n.RenderError(err, responseLocale(w)), nil)
 	case errors.Is(err, errCaptchaExpired):
-		writeFailure(w, 400, CodeCaptchaExpired, err.Error(), nil)
+		writeFailure(w, 400, CodeCaptchaExpired, i18n.RenderError(err, responseLocale(w)), nil)
 	case errors.Is(err, auth.ErrBadCredentials):
-		writeFailure(w, 401, CodeBadCredentials, err.Error(), nil)
+		writeFailure(w, 401, CodeBadCredentials, i18n.RenderError(err, responseLocale(w)), nil)
 	case err != nil:
 		internalError(w, r, err)
 	default:
@@ -294,7 +297,7 @@ func (s *Server) setTreeIcon(w http.ResponseWriter, r *http.Request) {
 	}
 	var icon *vault.TreeIcon
 	if len(body.Icon) == 0 || json.Unmarshal(body.Icon, &icon) != nil {
-		writeError(w, 400, "请求格式错误：需要 icon（null 恢复默认）")
+		writeError(w, 400, message(w, "invalid_request_icon_is_required_16149e"))
 		return
 	}
 	if err := s.vault.SetTreeIcon(body.Path, icon); err != nil {
@@ -332,7 +335,7 @@ func (s *Server) readFile(w http.ResponseWriter, r *http.Request) {
 func (s *Server) writeFile(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxNoteBytes))
 	if err != nil {
-		writeError(w, 413, "笔记过大")
+		writeError(w, 413, message(w, "note_is_too_large_86d890"))
 		return
 	}
 	pre := vault.Precondition{
@@ -394,14 +397,14 @@ func (s *Server) uploadAsset(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxAssetBytes+1<<20)
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		writeError(w, 400, "缺少上传文件")
+		writeError(w, 400, message(w, "upload_file_is_missing_a2be00"))
 		return
 	}
 	defer file.Close()
 	var link string
 	if r.URL.Query().Has("folder") {
 		if r.URL.Query().Has("note") {
-			writeError(w, 400, "不能同时指定笔记和文件夹")
+			writeError(w, 400, message(w, "a_note_and_a_folder_8b62b5"))
 			return
 		}
 		link, err = s.vault.SaveFolderAsset(r.URL.Query().Get("folder"), header.Filename, file, maxAssetBytes)
@@ -421,16 +424,16 @@ func (s *Server) replaceImage(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(1 << 20); err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
-			writeError(w, 413, "图片不能超过 50 MB")
+			writeError(w, 413, message(w, "images_must_not_exceed_mb_61d721"))
 		} else {
-			writeError(w, 400, "无法读取上传文件")
+			writeError(w, 400, message(w, "could_not_read_uploaded_file_4f04cc"))
 		}
 		return
 	}
 	defer r.MultipartForm.RemoveAll()
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		writeError(w, 400, "缺少上传文件")
+		writeError(w, 400, message(w, "upload_file_is_missing_a2be00"))
 		return
 	}
 	defer file.Close()
@@ -504,7 +507,7 @@ func clientIP(r *http.Request) string {
 
 func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxJSONBytes)).Decode(v); err != nil {
-		writeError(w, 400, "请求格式错误")
+		writeError(w, 400, message(w, "invalid_request_format_2529b1"))
 		return false
 	}
 	return true
@@ -512,22 +515,22 @@ func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 
 func internalError(w http.ResponseWriter, r *http.Request, err error) {
 	slog.Error("请求处理失败", "method", r.Method, "path", logPath(r.URL.Path), "err", err)
-	writeError(w, 500, "服务器内部错误")
+	writeError(w, 500, message(w, "internal_server_error_036549"))
 }
 
 func vaultError(w http.ResponseWriter, r *http.Request, err error) {
 	var conflict *vault.ConflictError
 	switch {
 	case errors.As(err, &conflict):
-		writeFailure(w, 412, CodeConflict, err.Error(), map[string]string{"rev": conflict.Rev})
+		writeFailure(w, 412, CodeConflict, message(w, "version_conflict"), map[string]string{"rev": conflict.Rev})
 	case errors.Is(err, vault.ErrInvalidPath), errors.Is(err, vault.ErrInvalidImport), errors.Is(err, vault.ErrInvalidIcon):
-		writeError(w, 400, err.Error())
+		writeError(w, 400, i18n.RenderError(err, responseLocale(w)))
 	case errors.Is(err, vault.ErrNotFound):
-		writeError(w, 404, err.Error())
+		writeError(w, 404, i18n.RenderError(err, responseLocale(w)))
 	case errors.Is(err, vault.ErrExists):
-		writeError(w, 409, err.Error())
+		writeError(w, 409, i18n.RenderError(err, responseLocale(w)))
 	case errors.Is(err, vault.ErrTooLarge):
-		writeError(w, 413, err.Error())
+		writeError(w, 413, i18n.RenderError(err, responseLocale(w)))
 	default:
 		internalError(w, r, err)
 	}
@@ -539,5 +542,27 @@ func (s *Server) metadata(w http.ResponseWriter, r *http.Request) {
 		internalError(w, r, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"notes": notes, "ready": ready})
+	// Older derived indexes store rendered warnings. Reanalyze only affected notes
+	// and keep each returned note at one revision while the index catches up.
+	currentNotes := notes[:0]
+	for _, note := range notes {
+		if len(note.Warnings) > 0 {
+			content, rev, err := s.vault.Read(note.Path)
+			if errors.Is(err, vault.ErrNotFound) {
+				continue
+			}
+			if err != nil {
+				vaultError(w, r, err)
+				return
+			}
+			note.Metadata = vault.Analyze(note.Path, content)
+			note.Rev = rev
+			note.Warnings = []string{}
+			for _, warning := range note.Diagnostics {
+				note.Warnings = append(note.Warnings, i18n.RenderError(warning, responseLocale(w)))
+			}
+		}
+		currentNotes = append(currentNotes, note)
+	}
+	writeJSON(w, 200, map[string]any{"notes": currentNotes, "ready": ready})
 }

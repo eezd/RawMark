@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import Icon from '@@/components/Icon/index.vue'
+
 import PluginMount from '@@/components/PluginMount/index.vue'
+import { t as translate } from '@@/i18n/runtime'
 import { sidebarViews } from '@@/plugins/registry'
 import { commandTitle } from '@@/utils/commands'
 import { basename } from '@@/utils/paths'
@@ -112,16 +114,16 @@ onUnmounted(() => {
 <template>
   <div class="rm-sidebar-inner">
     <div class="rm-vault-heading">
-      <button class="rm-icon-btn" title="折叠目录" aria-label="折叠目录" @click="ws.sidebarCollapsed = true; ws.sidebarOpen = false">
+      <button class="rm-icon-btn" :title="translate('workspace.collapse_sidebar_7b4c4c')" :aria-label="translate('workspace.collapse_sidebar_7b4c4c')" @click="ws.sidebarCollapsed = true; ws.sidebarOpen = false">
         <Icon name="menu" />
       </button>
-      <button class="rm-tree-label" title="文件目录操作" aria-haspopup="true" :aria-expanded="rootMenu !== null" @click="rootContext" @contextmenu="rootContext">
-        文件目录
+      <button class="rm-tree-label" :title="translate('workspace.file_tree_actions_ac6020')" aria-haspopup="true" :aria-expanded="rootMenu !== null" @click="rootContext" @contextmenu="rootContext">
+        {{ translate('workspace.files_ef81f8') }}
       </button>
     </div>
-    <nav v-if="sidebarViews.size" class="rm-plugin-tabs" aria-label="侧栏视图">
+    <nav v-if="sidebarViews.size" class="rm-plugin-tabs" :aria-label="translate('workspace.sidebar_view_3d4d03')">
       <el-button class="rm-btn" :class="{ on: !currentView }" @click="selectedView = ''">
-        文件
+        {{ translate('workspace.files_39932f') }}
       </el-button>
       <el-button v-for="[id, pluginView] in sidebarViews" :key="id" class="rm-btn" :class="{ on: selectedView === id }" @click="selectedView = id">
         {{ pluginView.title }}
@@ -134,39 +136,39 @@ onUnmounted(() => {
         <TreeNode v-for="node in tree" :key="node.path" :node="node" :depth="0" />
       </ul>
       <p v-if="!tree.length" class="rm-tree-empty">
-        还没有笔记
+        {{ translate('workspace.no_notes_yet_871745') }}
       </p>
     </div>
     <Teleport v-if="rootMenu" to="body">
       <div class="rm-menu-backdrop rm-context-menu-backdrop" @click="rootMenu = null" @contextmenu.prevent="rootMenu = null" />
       <div ref="menuElement" class="rm-menu rm-context-menu" :style="{ left: `${rootMenu.x}px`, top: `${rootMenu.y}px` }">
         <button :title="commandTitle('app.search')" @click="runRootMenu('search')">
-          <Icon name="search" />搜索
+          <Icon name="search" />{{ translate('workspace.search_44ce7a') }}
         </button>
         <button @click="runRootMenu('tags')">
-          <Icon name="tag" />标签索引
+          <Icon name="tag" />{{ translate('workspace.tags_02b344') }}
         </button>
         <button @click="runRootMenu('note')">
-          <Icon name="noteAdd" />新建笔记
+          <Icon name="noteAdd" />{{ translate('workspace.new_note_d3d2d9') }}
         </button>
         <button @click="runRootMenu('folder')">
-          <Icon name="folderAdd" />新建目录
+          <Icon name="folderAdd" />{{ translate('workspace.new_folder_d5f6f6') }}
         </button>
         <button @click="runRootMenu('import')">
-          <Icon name="import" />导入文档
+          <Icon name="import" />{{ translate('workspace.import_documents_8b1183') }}
         </button>
         <button @click="runRootMenu('images')">
-          <Icon name="image" />图片管理
+          <Icon name="image" />{{ translate('workspace.image_manager_07c502') }}
         </button>
       </div>
     </Teleport>
     <TreeIconPicker v-if="treeIconTarget" :key="treeIconTarget.path" :target="treeIconTarget" />
     <div class="rm-sidebar-foot">
       <button class="rm-foot-btn" :title="commandTitle('app.settings')" @click="ws.settings = 'index'">
-        <Icon name="settings" />设置
+        <Icon name="settings" />{{ translate('common.settings_df3d58') }}
       </button>
       <button class="rm-foot-btn" @click="emit('logout')">
-        <Icon name="logout" />退出
+        <Icon name="logout" />{{ translate('common.sign_out_498e1d') }}
       </button>
     </div>
   </div>

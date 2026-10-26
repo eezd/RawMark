@@ -1,3 +1,4 @@
+import { t as translate } from '@@/i18n/runtime'
 /* eslint-disable no-control-regex -- 粘贴链接必须识别并移除协议中的控制字符。 */
 import TurndownService from 'turndown'
 
@@ -14,7 +15,7 @@ export async function htmlToMarkdown(html: string, importImage: (url: string) =>
       try {
         node.setAttribute(attribute, new URL(node.getAttribute(attribute)!, base).href)
       } catch (error) {
-        onError(new Error('来源基址无效，已保留原链接', { cause: error }))
+        onError(new Error(translate('workspace.invalid_source_base_url_original_f0ec05'), { cause: error }))
       }
     }
   }

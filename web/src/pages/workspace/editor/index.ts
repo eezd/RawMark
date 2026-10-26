@@ -1,6 +1,7 @@
 import type { Extension } from '@codemirror/state'
 import type { KeyBinding, ViewUpdate } from '@codemirror/view'
 import type { MarkdownParser } from '@lezer/markdown'
+import { locale } from '@@/i18n/runtime'
 import { typoraExtensions } from '@@/markdown/extensions'
 import { editorExtensions, markdownSyntax, reportEditorFailure } from '@@/plugins/registry'
 import { defaultKeymap, history, indentLess, indentMore, selectAll, selectParentSyntax, toggleComment } from '@codemirror/commands'
@@ -12,6 +13,7 @@ import { renderedBlocks } from './blocks'
 import { codeBlockHighlight } from './codeblocks'
 import { editorFocus } from './focus'
 import { livePreview, openLink, resolveImageUrl } from './livepreview'
+import { editorLocale, localeCompartment } from './locale'
 import { defaultEditorKeys } from './shortcuts'
 import { tableEditing } from './table'
 import { markdownTheme } from './theme'
@@ -56,6 +58,7 @@ export interface EditorStateOptions {
 export function createEditorState(opts: EditorStateOptions): EditorState {
   const extensions: Extension[] = [
     history(),
+    localeCompartment.of(editorLocale.of(locale.value)),
     drawSelection(),
     EditorView.lineWrapping,
     // 不用 lang-markdown 的 markdown()：它会静态引入 lang-html/css/javascript 用于嵌套 HTML 高亮，

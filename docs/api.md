@@ -27,7 +27,7 @@ curl --fail-with-body \
 {
   "code": 0,
   "data": { "ok": true },
-  "message": "成功"
+  "message": "Success"
 }
 ```
 
@@ -44,6 +44,12 @@ curl --fail-with-body \
 401 表示需要重新认证；403 表示当前身份没有权限，不能据此注销用户。维护输入或备份内容无效返回 400，占用或空间不足返回 503，文件系统/数据库内部故障返回 500。
 
 **文件原文、下载、WebSocket、204 及 OpenAPI 文档不包 JSON 外壳**。`GET /files/{path}` 返回 Markdown 原文和 `ETag`；`PUT /files/{path}` 接收原文，成功返回包含 `rev` 的 JSON。用 `If-Match: "rev"` 防止覆盖新版本，或 `If-None-Match: *` 要求目标不存在；都不带会直接覆盖，不适合需要冲突保护的写入。
+
+## 响应语言
+
+发送 `Accept-Language: en` 或 `Accept-Language: zh-CN` 选择应用提示的语言，未指定或不支持的语言默认英文。服务端按质量权重选择支持的语言，并在 API 响应的 `Content-Language` 中返回实际语言；API 继续 `Cache-Control: no-store`。`message`、导入警告、维护状态及清理跳过原因会本地化，HTTP 状态、业务码、字段、笔记正文及用户资源名称保持不变。客户端应按状态和 `code` 判断结果，不能匹配翻译后的文案。
+
+账户语言位于 `/settings` 的 `locale` 字段，仅支持 `en`、`zh-CN`；PATCH 传 `null` 删除覆盖，恢复默认英文。该字段与其他设置一同导出、导入和同步；登录页的临时选择不写入账户。请求头只影响当前响应，不修改账户语言。
 
 ## 浏览器登录
 

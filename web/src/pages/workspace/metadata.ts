@@ -1,5 +1,6 @@
 import type { NoteMetadata } from '@@/apis/metadata/type'
 import { getMetadataApi } from '@@/apis/metadata'
+import { t as translate } from '@@/i18n/runtime'
 import { isCancel } from 'axios'
 import { reactive } from 'vue'
 
@@ -15,6 +16,6 @@ export async function refreshMetadata() {
     metadata.error = ''
   } catch (error) {
     if (isCancel(error)) return
-    if (current === request) metadata.error = error instanceof Error ? error.message : '关系索引读取失败'
+    if (current === request) metadata.error = error instanceof Error ? error.message : translate('workspace.could_not_load_the_relationship_15e3ca')
   }
 }

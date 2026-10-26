@@ -29,7 +29,7 @@ Notes are ordinary `.md` files, with images stored in an `assets/` folder alongs
 - **Keep things organized.** Folders, tags, full-text search, and document outlines, with drag-and-drop moves, bulk actions, and custom file icons.
 - **Continue where you left off.** Multiple tabs and pinned notes survive refreshes and browser restarts. Changes save automatically, and external file edits sync to the page.
 - **Keep images with your notes.** Paste, upload, or import images in bulk. View references, rename, move, replace, and clean up unreferenced images in the image manager.
-- **Make it feel familiar.** Light and dark modes, separate interface, text, and code fonts, font imports, customizable shortcuts, themes, and CSS snippets.
+- **Make it feel familiar.** English and Simplified Chinese, light and dark modes, separate interface, text, and code fonts, font imports, customizable shortcuts, themes, and CSS snippets.
 - **Take your data with you.** Import Markdown or ZIP archives and export notes with attachments. Use the recycle bin, full-instance backups, settings migration, API automation, and frontend plugins.
 
 RawMark is built for **single-user, self-hosted use**. It currently does not offer collaboration or public sharing.

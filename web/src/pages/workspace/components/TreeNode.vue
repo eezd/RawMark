@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { TreeNode } from '../tree'
+
 import Icon from '@@/components/Icon/index.vue'
+import { t as translate } from '@@/i18n/runtime'
 import { basename, dirname, inAssetDir, isImage, joinPath } from '@@/utils/paths'
 import { computed, nextTick, ref, watch } from 'vue'
 import { batchFiles, exportFiles } from '../batch'
@@ -184,7 +186,7 @@ function onDrop(e: DragEvent) {
       @drop="onDrop"
     >
       <span class="rm-tree-chevron" :class="{ open: isOpen, hidden: !node.dir }"><Icon name="chevron" :size="16" /></span>
-      <button v-if="!isRenaming" type="button" class="rm-tree-icon" :class="{ 'rm-emoji': node.icon?.kind === 'emoji' || (!node.icon && !image) }" :aria-label="`修改图标：${node.name}`" title="修改图标" @click.stop="editIcon" @touchstart.stop @contextmenu.prevent.stop="editIcon">
+      <button v-if="!isRenaming" type="button" class="rm-tree-icon" :class="{ 'rm-emoji': node.icon?.kind === 'emoji' || (!node.icon && !image) }" :aria-label="translate('workspace.change_icon_2fad4d', { p0: node.name })" :title="translate('workspace.change_icon_252d1f')" @click.stop="editIcon" @touchstart.stop @contextmenu.prevent.stop="editIcon">
         <Icon v-if="node.icon?.kind === 'builtin'" :name="node.icon.value" :size="18" />
         <template v-else-if="node.icon?.kind === 'emoji'">
           {{ node.icon.value }}
@@ -205,7 +207,7 @@ function onDrop(e: DragEvent) {
         @blur="commitRename"
       >
       <span v-if="!isRenaming" class="rm-tree-name">{{ node.dir ? node.name : node.name.replace(/\.md$/, '') }}</span>
-      <button v-if="!isRenaming" class="rm-icon-btn rm-tree-more" title="更多操作" @click.stop="menuOpen ? (menuOpen = false) : showMenu()">
+      <button v-if="!isRenaming" class="rm-icon-btn rm-tree-more" :title="translate('workspace.more_actions_9f07d2')" @click.stop="menuOpen ? (menuOpen = false) : showMenu()">
         <Icon name="more" />
       </button>
     </div>
@@ -214,35 +216,35 @@ function onDrop(e: DragEvent) {
       <div v-if="menuOpen" ref="menuElement" class="rm-menu rm-tree-menu" :style="{ left: `${menuPosition.left}px`, top: `${menuPosition.top}px` }" @click.stop>
         <template v-if="node.dir && !assetDir && selectedPaths.size === 1">
           <button @click="runMenu('note')">
-            <Icon name="noteAdd" />新建笔记
+            <Icon name="noteAdd" />{{ translate('workspace.new_note_d3d2d9') }}
           </button>
           <button @click="runMenu('folder')">
-            <Icon name="folderAdd" />新建文件夹
+            <Icon name="folderAdd" />{{ translate('workspace.new_folder_84244a') }}
           </button>
           <button @click="runMenu('images')">
-            <Icon name="image" />图片管理
+            <Icon name="image" />{{ translate('workspace.image_manager_07c502') }}
           </button>
           <button @click="runMenu('import')">
-            <Icon name="import" />导入
+            <Icon name="import" />{{ translate('common.import_576d81') }}
           </button>
         </template>
         <button v-if="image && selectedPaths.size === 1" @click="menuOpen = false; ws.image = node.path">
-          <Icon name="image" />预览 / 替换图片
+          <Icon name="image" />{{ translate('workspace.preview_replace_image_bb9187') }}
         </button>
         <button v-if="selectedPaths.size === 1" @click="runMenu('icon')">
-          <Icon name="palette" />修改图标
+          <Icon name="palette" />{{ translate('workspace.change_icon_252d1f') }}
         </button>
         <button v-if="!assetDir && selectedPaths.size === 1" @click="runMenu('rename')">
-          <Icon name="edit" />重命名
+          <Icon name="edit" />{{ translate('workspace.rename_0d0cba') }}
         </button>
         <button v-if="!assetDir" @click="runMenu('move')">
-          <Icon name="folder" />移动到…
+          <Icon name="folder" />{{ translate('workspace.move_to_0bee16') }}
         </button>
         <button @click="runMenu('export')">
-          <Icon name="note" />导出 Markdown
+          <Icon name="note" />{{ translate('workspace.export_markdown_ac8b02') }}
         </button>
         <button v-if="!assetDir" class="danger" @click="runMenu('delete')">
-          <Icon name="trash" />删除
+          <Icon name="trash" />{{ translate('common.delete_2f9daa') }}
         </button>
       </div>
     </Teleport>

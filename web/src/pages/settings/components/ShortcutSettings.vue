@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Command } from '@@/utils/commands'
+
 import Icon from '@@/components/Icon/index.vue'
+import { t as translate } from '@@/i18n/runtime'
 import { allCommands, commandKeys, formatKeys, shortcutConflict } from '@@/utils/commands'
 import { recordedKeys } from '@@/utils/keys'
 import { toast } from '@@/utils/notifications'
@@ -35,8 +37,8 @@ async function save(shortcuts: Record<string, string[]>) {
     if (cause instanceof SettingsAppearanceError) {
       toast(cause.message); return
     }
-    toast(`保存快捷键失败：${cause instanceof Error ? cause.message : String(cause)}`)
-    await loadSettings().catch(cause => toast(`重新读取设置失败：${String(cause)}`))
+    toast(translate('settings.could_not_save_shortcuts_d58683', { p0: cause instanceof Error ? cause.message : String(cause) }))
+    await loadSettings().catch(cause => toast(translate('settings.could_not_reload_settings_744b6a', { p0: String(cause) })))
   } finally {
     busy.value = false
   }
@@ -57,7 +59,7 @@ async function capture(event: KeyboardEvent, command: Command) {
   if (!key) return
   const conflict = shortcutConflict(command.id, [key])
   if (conflict) {
-    error.value = `与“${conflict.title}”冲突，请换一个快捷键`; return
+    error.value = translate('settings.conflicts_with_choose_a_different_b5848b', { p0: conflict.title }); return
   }
   const keys = [...new Set([...commandKeys(command), key])]
   recording.value = null
@@ -67,7 +69,7 @@ async function capture(event: KeyboardEvent, command: Command) {
 async function reset(command: Command) {
   const conflict = shortcutConflict(command.id, command.keys ?? [])
   if (conflict) {
-    error.value = `默认快捷键与“${conflict.title}”冲突，请先调整该命令`; return
+    error.value = translate('settings.the_default_shortcut_conflicts_with_a89537', { p0: conflict.title }); return
   }
   const next = { ...settings.shortcuts }
   delete next[command.id]
@@ -79,18 +81,18 @@ async function reset(command: Command) {
 <template>
   <div class="rm-shortcut-settings">
     <div class="rm-shortcut-toolbar">
-      <el-input v-model="query" type="search" clearable aria-label="搜索快捷键" placeholder="搜索命令或快捷键" /><el-button class="rm-btn" :disabled="busy" @click="recording = null; error = ''; save({})">
-        重置全部快捷键
+      <el-input v-model="query" type="search" clearable :aria-label="translate('settings.search_shortcuts_49504f')" :placeholder="translate('settings.search_commands_or_shortcuts_890754')" /><el-button class="rm-btn" :disabled="busy" @click="recording = null; error = ''; save({})">
+        {{ translate('settings.reset_all_shortcuts_1853c7') }}
       </el-button>
     </div>
     <p class="rm-share-note">
-      点击添加后按下组合键，Esc 取消；× 移除绑定，重置恢复默认。默认跟随 Typora；无对应项（含插件）留空。自定义设置在所有设备间同步。
+      {{ translate('settings.click_add_then_press_a_cf4a60') }}
     </p>
     <p class="rm-share-note">
-      浏览器可能保留 Ctrl/Cmd+N、W、数字键等组合，网页无法保证拦截；可自行重新绑定。
+      {{ translate('settings.browsers_may_reserve_ctrl_cmd_8d4bc8') }}
     </p>
     <p class="rm-settings-result-count" role="status">
-      {{ filteredCommands.length }} / {{ commands.length }} 个命令{{ filteredCommands.length ? '' : '，没有匹配的快捷键。' }}
+      {{ filteredCommands.length }} / {{ commands.length }} {{ translate('settings.commands_6aa9ce') }}{{ filteredCommands.length ? '' : translate('settings.no_matching_shortcuts_7e3955') }}
     </p>
     <p v-if="error" role="alert" class="rm-auth-error">
       {{ error }}
@@ -100,14 +102,14 @@ async function reset(command: Command) {
       <div class="rm-shortcut-bindings">
         <span v-for="(key, index) in commandKeys(command)" :key="key" class="rm-shortcut-chip">
           <kbd>{{ formatKeys(key) }}</kbd>
-          <button class="rm-icon-btn" :disabled="busy" :aria-label="`移除${command.title}的${formatKeys(key)}`" @click="save({ ...settings.shortcuts, [command.id]: commandKeys(command).filter((_, i) => i !== index) })"><Icon name="close" :size="16" /></button>
+          <button class="rm-icon-btn" :disabled="busy" :aria-label="translate('settings.remove_from_6909d6', { p0: command.title, p1: formatKeys(key) })" @click="save({ ...settings.shortcuts, [command.id]: commandKeys(command).filter((_, i) => i !== index) })"><Icon name="close" :size="16" /></button>
         </span>
-        <input v-if="recording === command.id" :ref="(el) => { recorder = el as HTMLInputElement }" data-shortcut-recorder readonly aria-label="按下快捷键" placeholder="按下快捷键…" @keydown.prevent.stop="capture($event, command)" @blur="recording = null">
+        <input v-if="recording === command.id" :ref="(el) => { recorder = el as HTMLInputElement }" data-shortcut-recorder readonly :aria-label="translate('settings.press_a_shortcut_662b79')" :placeholder="translate('settings.press_a_shortcut_652436')" @keydown.prevent.stop="capture($event, command)" @blur="recording = null">
         <el-button v-else class="rm-btn" :disabled="busy" @click="record(command.id)">
-          添加
+          {{ translate('settings.add_7a8a11') }}
         </el-button>
         <el-button class="rm-btn" :disabled="busy" @click="reset(command)">
-          重置
+          {{ translate('settings.reset_cb5d68') }}
         </el-button>
       </div>
     </div>

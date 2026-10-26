@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"rawmark/internal/i18n"
 
 	"rawmark/internal/auth"
 	"rawmark/internal/events"
@@ -38,12 +39,12 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxJSONBytes))
 	if err != nil {
-		writeError(w, 413, "设置过大")
+		writeError(w, 413, message(w, "settings_are_too_large_8a580f"))
 		return
 	}
 	var patch map[string]json.RawMessage
 	if err := json.Unmarshal(data, &patch); err != nil || patch == nil {
-		writeError(w, 400, "设置必须是 JSON 对象")
+		writeError(w, 400, message(w, "settings_must_be_a_json_45b36b"))
 		return
 	}
 	s.settingsMu.Lock()
@@ -60,8 +61,12 @@ func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request) {
 			settings[k] = v
 		}
 	}
+	if err := validateLocale(settings); err != nil {
+		writeError(w, 400, i18n.RenderError(err, responseLocale(w)))
+		return
+	}
 	if _, err := trashRetentionDays(settings); err != nil {
-		writeError(w, 400, err.Error())
+		writeError(w, 400, i18n.RenderError(err, responseLocale(w)))
 		return
 	}
 	merged, err := json.Marshal(settings)
@@ -70,7 +75,7 @@ func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(merged) > maxJSONBytes {
-		writeError(w, 413, "设置过大")
+		writeError(w, 413, message(w, "settings_are_too_large_8a580f"))
 		return
 	}
 	if err := s.store.SetSetting(settingsKey, string(merged)); err != nil {
@@ -89,11 +94,11 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	switch err := s.auth.ChangePassword(clientIP(r), identity(r).Token, body.Current, body.Next); {
 	case errors.Is(err, auth.ErrRateLimited):
-		writeError(w, 429, err.Error())
+		writeError(w, 429, i18n.RenderError(err, responseLocale(w)))
 	case errors.Is(err, auth.ErrBadCredentials):
-		writeFailure(w, 400, CodeCurrentPassword, "当前密码错误", nil)
+		writeFailure(w, 400, CodeCurrentPassword, message(w, "current_password_is_incorrect_e0f0aa"), nil)
 	case errors.Is(err, auth.ErrWeakPassword):
-		writeError(w, 400, err.Error())
+		writeError(w, 400, i18n.RenderError(err, responseLocale(w)))
 	case err != nil:
 		internalError(w, r, err)
 	default:

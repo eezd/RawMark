@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
+	"rawmark/internal/i18n"
 	"syscall"
 	"time"
 
@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	errImageAddress = errors.New("图片地址必须是公网 HTTP 或 HTTPS 地址")
-	errImageType    = errors.New("仅支持导入 PNG、JPEG、GIF 和 WebP 图片")
+	errImageAddress = i18n.New("image_url_must_be_a_391763")
+	errImageType    = i18n.New("only_png_jpeg_gif_and_a413cf")
 )
 
 var blockedImageNetworks = []netip.Prefix{
@@ -98,7 +98,7 @@ var remoteImageClient = &http.Client{
 	},
 	CheckRedirect: func(r *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
-			return errors.New("图片来源重定向次数过多")
+			return i18n.New("too_many_redirects_from_the_6738ba")
 		}
 		r.Header.Del("Referer")
 		return checkImageURL(r.URL)
@@ -137,12 +137,12 @@ func (s *Server) importAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := url.Parse(body.URL)
 	if err != nil || checkImageURL(u) != nil {
-		writeError(w, 400, errImageAddress.Error())
+		writeError(w, 400, i18n.RenderError(errImageAddress, responseLocale(w)))
 		return
 	}
 	note := r.URL.Query().Get("note")
 	if !vault.IsNote(note) {
-		writeError(w, 400, "所属笔记路径无效")
+		writeError(w, 400, message(w, "invalid_note_path_be69bd"))
 		return
 	}
 	if _, err := s.vault.Stat(note); err != nil {
@@ -161,7 +161,7 @@ func (s *Server) importAsset(w http.ResponseWriter, r *http.Request) {
 		}
 		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, u.String(), nil)
 		if err != nil {
-			writeError(w, 400, errImageAddress.Error())
+			writeError(w, 400, i18n.RenderError(errImageAddress, responseLocale(w)))
 			return
 		}
 		res, err := remoteImageClient.Do(req)
@@ -171,7 +171,7 @@ func (s *Server) importAsset(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			if errors.Is(err, errImageAddress) {
-				writeError(w, 400, errImageAddress.Error())
+				writeError(w, 400, i18n.RenderError(errImageAddress, responseLocale(w)))
 				return
 			}
 			// url.Error 含完整来源 URL，其中可能有临时签名，日志只保留底层原因。
@@ -180,7 +180,7 @@ func (s *Server) importAsset(w http.ResponseWriter, r *http.Request) {
 				err = urlError.Err
 			}
 			slog.Error("下载图片失败", "err", err)
-			writeError(w, 502, "下载图片失败")
+			writeError(w, 502, message(w, "could_not_download_image_b4a293"))
 			return
 		}
 		if res.StatusCode < 200 || res.StatusCode >= 300 {
@@ -188,7 +188,7 @@ func (s *Server) importAsset(w http.ResponseWriter, r *http.Request) {
 			if attempt == 0 && (res.StatusCode == 429 || res.StatusCode >= 500 && res.StatusCode < 600) {
 				continue
 			}
-			writeError(w, 502, fmt.Sprintf("图片来源返回 HTTP %d", res.StatusCode))
+			writeError(w, 502, message(w, "image_source_http", res.StatusCode))
 			return
 		}
 		data, ext, err := readImageDownload(res.Body)
@@ -201,10 +201,10 @@ func (s *Server) importAsset(w http.ResponseWriter, r *http.Request) {
 			if errors.Is(err, vault.ErrTooLarge) {
 				vaultError(w, r, err)
 			} else if errors.Is(err, errImageType) {
-				writeError(w, 422, err.Error())
+				writeError(w, 422, i18n.RenderError(err, responseLocale(w)))
 			} else {
 				slog.Error("读取下载图片失败", "err", err)
-				writeError(w, 502, "读取下载图片失败")
+				writeError(w, 502, message(w, "could_not_read_downloaded_image_4b7fdf"))
 			}
 			return
 		}
@@ -215,7 +215,7 @@ func (s *Server) importAsset(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if info.IsDir() {
-			writeError(w, 400, "所属路径必须是笔记文件")
+			writeError(w, 400, message(w, "the_owning_path_must_be_867b53"))
 			return
 		}
 		link, err := s.vault.SaveAsset(note, "image"+ext, bytes.NewReader(data), maxAssetBytes)

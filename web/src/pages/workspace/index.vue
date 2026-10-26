@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import AppStatus from '@@/components/AppStatus/index.vue'
+
 import Icon from '@@/components/Icon/index.vue'
+import { t as translate } from '@@/i18n/runtime'
 import { registerCommand } from '@@/utils/commands'
 import { toast } from '@@/utils/notifications'
 import { noteTitle } from '@@/utils/paths'
@@ -37,7 +39,7 @@ async function prepareReload() {
 const user = useUserStore()
 const router = useRouter()
 async function prepareMaintenance() {
-  await flushAll(); if (!readyToReload()) throw new Error('仍有未保存内容或正在上传、操作文件，请完成后再试')
+  await flushAll(); if (!readyToReload()) throw new Error(translate('workspace.finish_saving_uploading_or_working_352bc6'))
 }
 const title = computed(() => (ws.active ? noteTitle(ws.active) : 'RawMark'))
 const resizingSidebar = ref(false)
@@ -65,7 +67,7 @@ function startResize(e: PointerEvent) {
     if (version !== user.getSessionVersion()) return
     if (width !== startWidth) {
       updateSettings({ sidebarWidth: width }).catch((error) => {
-        if (!isCancel(error)) toast(error instanceof SettingsAppearanceError ? error.message : '保存侧栏宽度失败')
+        if (!isCancel(error)) toast(error instanceof SettingsAppearanceError ? error.message : translate('workspace.could_not_save_sidebar_width_8621fe'))
       })
     }
   }
@@ -80,7 +82,7 @@ async function logout() {
     await flushAll()
     user.assertSession(version)
     if (!readyToReload()) {
-      toast('仍有未保存内容或正在处理粘贴、上传与文件操作，请完成后再退出')
+      toast(translate('workspace.finish_saving_pasting_uploading_or_670f95'))
       return
     }
     await user.logout()
@@ -117,13 +119,15 @@ function onTouchMove(e: TouchEvent) {
   }
 }
 
-const unregisterLogout = registerCommand({ id: 'app.logout', title: '退出登录', run: () => void logout() })
+const unregisterLogout = registerCommand({ id: 'app.logout', get title() {
+  return translate('common.sign_out_3ab8cc')
+}, run: () => void logout() })
 
 onMounted(async () => {
   try {
     await startWorkspace()
   } catch (err) {
-    if (isCancel(err)) return; toast(`工作区初始化失败，请重新加载：${err instanceof ApiError ? err.message : '网络或本地存储错误'}`)
+    if (isCancel(err)) return; toast(translate('workspace.workspace_initialization_failed_reload_the_880958', { p0: err instanceof ApiError ? err.message : translate('common.network_or_local_storage_error') }))
   } finally {
     initializing.value = false
   }
@@ -147,21 +151,21 @@ onBeforeUnmount(() => {
     <div class="rm-workspace">
       <aside class="rm-sidebar">
         <Sidebar @logout="logout" />
-        <div class="rm-sidebar-resize" title="拖动调整宽度" @pointerdown.prevent="startResize" />
+        <div class="rm-sidebar-resize" :title="translate('workspace.drag_to_resize_b51545')" @pointerdown.prevent="startResize" />
       </aside>
       <div class="rm-backdrop" @click="ws.sidebarOpen = false" />
       <main class="rm-main">
         <header class="rm-mobile-bar">
-          <button class="rm-icon-btn" title="目录" @click="ws.sidebarOpen = true">
+          <button class="rm-icon-btn" :title="translate('workspace.folders_52daa7')" @click="ws.sidebarOpen = true">
             <Icon name="menu" />
           </button>
-          <button class="rm-mobile-title" title="切换笔记" @click="ws.switcher = ''">
+          <button class="rm-mobile-title" :title="translate('workspace.switch_note_649e31')" @click="ws.switcher = ''">
             {{ title }}
           </button>
-          <button class="rm-icon-btn" title="快速打开" @click="ws.switcher = ''">
+          <button class="rm-icon-btn" :title="translate('workspace.quick_open_13e215')" @click="ws.switcher = ''">
             <Icon name="search" />
           </button>
-          <button class="rm-icon-btn" title="命令" @click="ws.switcher = '>'">
+          <button class="rm-icon-btn" :title="translate('common.command_928f87')" @click="ws.switcher = '>'">
             <Icon name="command" />
           </button>
         </header>

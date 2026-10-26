@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"rawmark/internal/i18n"
 	"strings"
 	"sync"
 	"unicode"
@@ -75,7 +76,7 @@ func Open(path string, v *vault.Vault) (*Index, error) {
 	x := &Index{db: db, v: v, wake: make(chan struct{}, 1), known: map[string]doc{}}
 	if err := x.init(); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("初始化搜索索引失败: %w", err)
+		return nil, i18n.New("could_not_initialize_search_index_9155c3", err)
 	}
 	return x, nil
 }

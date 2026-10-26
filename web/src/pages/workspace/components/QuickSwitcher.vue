@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { InputInstance } from 'element-plus'
+
 import Icon from '@@/components/Icon/index.vue'
+import { t as translate } from '@@/i18n/runtime'
 import { availableCommands, commandKeys, formatKeys } from '@@/utils/commands'
 import { dirname, NOTE_EXT, noteTitle } from '@@/utils/paths'
 import { computed, ref, watch } from 'vue'
@@ -87,7 +89,9 @@ function noteItems(q: string): Item[] {
     items.push({
       key: '\0create',
       icon: 'noteAdd',
-      title: `新建笔记“${name}”`,
+      get title() {
+        return translate('workspace.create_note_8148f2', { p0: name })
+      },
       detail: '',
       titleHits: new Set(),
       detailHits: new Set(),
@@ -155,8 +159,8 @@ function opened() {
 </script>
 
 <template>
-  <el-dialog :model-value="true" :title="commandMode ? '命令面板' : '快速打开'" width="560px" class="rm-picker-dialog" @close="cancel" @opened="opened">
-    <el-input ref="input" v-model="query" :placeholder="commandMode ? '输入命令名称' : '输入笔记名称，回车打开或新建；输入 > 执行命令'" :aria-label="commandMode ? '搜索命令' : '搜索笔记'" enterkeyhint="go" @keydown="onKeydown($event as KeyboardEvent)">
+  <el-dialog :model-value="true" :title="commandMode ? translate('workspace.command_palette_4b495d') : translate('workspace.quick_open_13e215')" width="560px" class="rm-picker-dialog" @close="cancel" @opened="opened">
+    <el-input ref="input" v-model="query" :placeholder="commandMode ? translate('workspace.enter_a_command_name_305f5a') : translate('workspace.enter_a_note_name_to_90941b')" :aria-label="commandMode ? translate('workspace.search_commands_a72832') : translate('workspace.search_notes_d8912a')" enterkeyhint="go" @keydown="onKeydown($event as KeyboardEvent)">
       <template #prefix>
         <Icon :name="commandMode ? 'command' : 'search'" />
       </template>
@@ -180,7 +184,7 @@ function opened() {
       </li>
     </ul>
     <p v-else class="rm-tree-empty">
-      {{ commandMode ? '没有匹配的命令' : '还没有笔记' }}
+      {{ commandMode ? translate('workspace.no_matching_commands_556513') : translate('workspace.no_notes_yet_871745') }}
     </p>
   </el-dialog>
 </template>

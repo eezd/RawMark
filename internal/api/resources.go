@@ -24,7 +24,7 @@ func (s *Server) createTicket(w http.ResponseWriter, r *http.Request) {
 	switch body.Kind {
 	case "images", "fonts":
 		if body.PluginID != "" || body.Revision != "" {
-			writeError(w, 400, "资源票据范围无效")
+			writeError(w, 400, message(w, "invalid_resource_ticket_scope_7abece"))
 			return
 		}
 	case "events":
@@ -40,13 +40,13 @@ func (s *Server) createTicket(w http.ResponseWriter, r *http.Request) {
 		}
 		dir.Close()
 		if info.Revision != body.Revision {
-			writeError(w, 409, "插件版本已改变，请刷新")
+			writeError(w, 409, message(w, "plugin_version_changed_refresh_the_9fab75"))
 			return
 		}
 		t.Resource, t.Revision = body.PluginID, body.Revision
 		suffix = "plugins/" + body.PluginID + "/assets/" + body.Revision + "/"
 	default:
-		writeError(w, 400, "资源票据用途无效")
+		writeError(w, 400, message(w, "invalid_resource_ticket_purpose_e266b8"))
 		return
 	}
 	plain := opaqueToken()
@@ -66,7 +66,7 @@ func (s *Server) resource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !ok {
-		writeError(w, 401, "资源票据已失效")
+		writeError(w, 401, message(w, "resource_ticket_has_expired_309b64"))
 		return
 	}
 	parent := principal{SessionHash: t.SessionHash, ExpiresAt: t.ExpiresAt}
@@ -76,7 +76,7 @@ func (s *Server) resource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !valid {
-		writeError(w, 401, "登录已失效")
+		writeError(w, 401, message(w, "login_session_has_expired_075903"))
 		return
 	}
 	r = withIdentity(r, parent)
@@ -84,14 +84,14 @@ func (s *Server) resource(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case kind == "images" && t.Kind == "images":
 		if !vault.IsImage(name) {
-			writeError(w, 403, "票据仅允许读取图片")
+			writeError(w, 403, message(w, "this_ticket_only_permits_reading_f26030"))
 			return
 		}
 		s.raw(w, r)
 	case kind == "fonts" && t.Kind == "fonts":
 		id, ok := strings.CutSuffix(name, "/file")
 		if !ok || strings.Contains(id, "/") {
-			writeError(w, 403, "字体票据范围不匹配")
+			writeError(w, 403, message(w, "font_ticket_scope_does_not_95339a"))
 			return
 		}
 		r.SetPathValue("id", id)
@@ -99,7 +99,7 @@ func (s *Server) resource(w http.ResponseWriter, r *http.Request) {
 	case kind == "plugins" && t.Kind == "plugin":
 		parts := strings.SplitN(name, "/", 4)
 		if len(parts) != 4 || parts[0] != t.Resource || parts[1] != "assets" || parts[2] != t.Revision {
-			writeError(w, 403, "插件票据范围不匹配")
+			writeError(w, 403, message(w, "plugin_ticket_scope_does_not_349049"))
 			return
 		}
 		r.SetPathValue("id", t.Resource)
@@ -109,6 +109,6 @@ func (s *Server) resource(w http.ResponseWriter, r *http.Request) {
 	case kind == "events" && t.Kind == "events" && name == "":
 		s.events(w, r)
 	default:
-		writeError(w, 403, "资源票据用途不匹配")
+		writeError(w, 403, message(w, "resource_ticket_purpose_does_not_1f573e"))
 	}
 }

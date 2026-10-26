@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"rawmark/internal/i18n"
 
 	"rawmark/internal/vault"
 )
@@ -13,16 +14,16 @@ func (s *Server) importNotes(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
 		var limit *http.MaxBytesError
 		if errors.As(err, &limit) {
-			writeError(w, 413, "导入文件总量不能超过 100 MB")
+			writeError(w, 413, message(w, "total_import_size_must_not_23ac37"))
 		} else {
-			writeError(w, 400, "无法读取导入表单")
+			writeError(w, 400, message(w, "could_not_read_import_form_69f1c3"))
 		}
 		return
 	}
 	defer r.MultipartForm.RemoveAll()
 	headers := r.MultipartForm.File["files"]
 	if len(headers) == 0 || len(headers) > 10_000 {
-		writeError(w, 400, "请选择 Markdown 文件或一个 ZIP")
+		writeError(w, 400, message(w, "choose_markdown_files_or_a_bea10e"))
 		return
 	}
 	files := make([]vault.ImportFile, 0, len(headers))
@@ -39,6 +40,9 @@ func (s *Server) importNotes(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		vaultError(w, r, err)
 		return
+	}
+	for i, warning := range result.WarningMessages {
+		result.Warnings[i] = i18n.RenderError(warning, responseLocale(w))
 	}
 	writeJSON(w, http.StatusCreated, result)
 }

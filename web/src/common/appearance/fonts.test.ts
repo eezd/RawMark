@@ -5,7 +5,7 @@ import { applyFontCatalog, parseFontCatalog } from './fonts'
 describe('导入字体资源边界', () => {
   it('拒绝可插入CSS的标识和不支持的格式', () => {
     for (const value of [null, {}, [{}], [{ id: 'custom-\');}body{color:red}', name: 'bad', format: 'woff2' }], [{ id: `custom-${'a'.repeat(64)}`, name: 'bad', format: 'exe' }]]) {
-      expect(() => parseFontCatalog(value)).toThrow('字体列表格式无效')
+      expect(() => parseFontCatalog(value)).toThrow('Invalid font catalog')
     }
   })
   it('字体名称只供界面显示，不进入CSS；设置同步不重复替换相同字体声明', () => {

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { TreeIcon } from '@@/apis/tree/type'
+
 import type { IconName } from '@@/utils/icons'
 import type { Gemoji } from 'gemoji'
 import Icon from '@@/components/Icon/index.vue'
+import { t as translate } from '@@/i18n/runtime'
 import { iconPaths } from '@@/utils/icons'
 import { basename } from '@@/utils/paths'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -73,7 +75,7 @@ async function loadEmojis() {
   try {
     emojis.value = (await import('gemoji')).gemoji
   } catch (err) {
-    loadError.value = `表情加载失败：${err instanceof Error ? err.message : String(err)}`
+    loadError.value = translate('workspace.could_not_load_emoji_ec4192', { p0: err instanceof Error ? err.message : String(err) })
   } finally {
     loading.value = false
   }
@@ -96,7 +98,7 @@ async function save(icon: TreeIcon | null) {
     busy.value = false
     close()
   } catch (err) {
-    error.value = `图标保存失败：${err instanceof Error ? err.message : String(err)}`
+    error.value = translate('workspace.could_not_save_icon_110c4c', { p0: err instanceof Error ? err.message : String(err) })
   } finally {
     busy.value = false
   }
@@ -127,31 +129,31 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <div class="rm-menu-backdrop rm-tree-icon-backdrop" @click="close" @contextmenu.prevent="close" />
-    <section ref="panel" class="rm-tree-icon-picker" role="dialog" aria-modal="true" aria-label="修改图标" :aria-busy="busy" :style="{ left: `${position.left}px`, top: `${position.top}px` }">
+    <section ref="panel" class="rm-tree-icon-picker" role="dialog" aria-modal="true" :aria-label="translate('workspace.change_icon_252d1f')" :aria-busy="busy" :style="{ left: `${position.left}px`, top: `${position.top}px` }">
       <header>
-        <span class="rm-tree-icon-title" :title="target.path">{{ basename(target.path) }}</span><button class="rm-icon-btn" title="关闭图标选择" aria-label="关闭图标选择" :disabled="busy" @click="close">
+        <span class="rm-tree-icon-title" :title="target.path">{{ basename(target.path) }}</span><button class="rm-icon-btn" :title="translate('workspace.close_icon_picker_a76f13')" :aria-label="translate('workspace.close_icon_picker_a76f13')" :disabled="busy" @click="close">
           <Icon name="close" />
         </button>
       </header>
-      <div class="rm-tree-icon-tabs" role="tablist" aria-label="图标类型">
+      <div class="rm-tree-icon-tabs" role="tablist" :aria-label="translate('workspace.icon_type_5e85b1')">
         <button role="tab" :aria-selected="tab === 'emoji'" :disabled="busy" @click="tab = 'emoji'">
-          表情
+          {{ translate('workspace.emoji_c762ed') }}
         </button>
         <button role="tab" :aria-selected="tab === 'builtin'" :disabled="busy" @click="tab = 'builtin'">
-          线性图标
+          {{ translate('workspace.line_icons_5948d6') }}
         </button>
       </div>
-      <input ref="search" v-model="query" class="rm-input" placeholder="搜索图标（中文 / English）" aria-label="搜索图标" :disabled="busy">
-      <nav v-if="tab === 'emoji'" class="rm-tree-icon-categories" aria-label="表情分类">
+      <input ref="search" v-model="query" class="rm-input" :placeholder="translate('workspace.search_icons_chinese_english_653965')" :aria-label="translate('workspace.search_icons_ebb240')" :disabled="busy">
+      <nav v-if="tab === 'emoji'" class="rm-tree-icon-categories" :aria-label="translate('workspace.emoji_category_8c37bd')">
         <button v-for="item in emojiCategories" :key="item.id" class="rm-emoji" :title="item.label" :aria-label="item.label" :aria-pressed="category === item.id && !query" :disabled="busy" @click="category = item.id; query = ''">
           {{ item.icon }}
         </button>
       </nav>
       <div class="rm-tree-icon-results">
         <template v-if="!query && visibleRecent.length">
-          <p>最近使用</p>
+          <p>{{ translate('workspace.recent_39a904') }}</p>
           <div class="rm-tree-icon-grid">
-            <button v-for="icon in visibleRecent" :key="chosen(icon)" :class="{ 'rm-emoji': icon.kind === 'emoji' }" :title="icon.kind === 'builtin' ? iconLabels[icon.value] : icon.value" :aria-label="`最近：${icon.kind === 'builtin' ? iconLabels[icon.value] : icon.value}`" :disabled="busy" @click="save(icon)">
+            <button v-for="icon in visibleRecent" :key="chosen(icon)" :class="{ 'rm-emoji': icon.kind === 'emoji' }" :title="icon.kind === 'builtin' ? iconLabels[icon.value] : icon.value" :aria-label="translate('workspace.recent_9793c5', { p0: icon.kind === 'builtin' ? iconLabels[icon.value] : icon.value })" :disabled="busy" @click="save(icon)">
               <Icon v-if="icon.kind === 'builtin'" :name="icon.value" :size="20" /><template v-else>
                 {{ icon.value }}
               </template>
@@ -160,34 +162,34 @@ onBeforeUnmount(() => {
         </template>
         <template v-if="tab === 'emoji'">
           <p v-if="loading">
-            正在加载表情…
+            {{ translate('workspace.loading_emoji_f7826c') }}
           </p>
           <div v-else-if="loadError" role="alert">
             {{ loadError }} <el-button class="rm-btn" @click="loadEmojis">
-              重试
+              {{ translate('common.retry_b8784c') }}
             </el-button>
           </div>
           <template v-else>
-            <p>{{ query ? '搜索结果' : emojiCategories.find(c => c.id === category)?.label }}</p>
+            <p>{{ query ? translate('common.search_results_88d72e') : emojiCategories.find(c => c.id === category)?.label }}</p>
             <div class="rm-tree-icon-grid">
               <button v-for="emoji in filtered" :key="emoji.emoji" class="rm-emoji" :title="emojiLabel(emoji)" :aria-label="emojiLabel(emoji)" :disabled="busy" @click="save({ kind: 'emoji', value: emoji.emoji })">
                 {{ emoji.emoji }}
               </button>
             </div>
             <p v-if="!filtered.length">
-              没有找到图标，试试其他关键词
+              {{ translate('workspace.no_icons_found_try_different_14e89f') }}
             </p>
           </template>
         </template>
         <template v-else>
-          <p>线性图标</p>
+          <p>{{ translate('workspace.line_icons_5948d6') }}</p>
           <div class="rm-tree-icon-grid">
             <button v-for="name in linear" :key="name" :title="iconLabels[name]" :aria-label="iconLabels[name]" :disabled="busy" @click="save({ kind: 'builtin', value: name })">
               <Icon :name="name" :size="20" />
             </button>
           </div>
           <p v-if="!linear.length">
-            没有找到图标，试试其他关键词
+            {{ translate('workspace.no_icons_found_try_different_14e89f') }}
           </p>
         </template>
       </div>
@@ -196,7 +198,7 @@ onBeforeUnmount(() => {
       </p>
       <footer>
         <el-button class="rm-btn" :disabled="busy" @click="save(null)">
-          {{ busy ? '正在保存…' : '恢复默认图标' }}
+          {{ busy ? translate('common.saving_6bdb44') : translate('workspace.reset_icon_0ed903') }}
         </el-button>
       </footer>
     </section>

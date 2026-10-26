@@ -7,6 +7,7 @@ import { StateField } from '@codemirror/state'
 import { Decoration, EditorView } from '@codemirror/view'
 import { codeContentRange, fenceLanguage } from './codeblocks'
 import { editorFocused, setEditorFocus } from './focus'
+import { editorLocale } from './locale'
 import { CodeRendererWidget, MathWidget } from './widgets'
 
 // 公式块与 Mermaid 图表：未编辑时整块替换为渲染结果；光标在块内时显示源码，并在下方实时预览。
@@ -50,7 +51,8 @@ export const renderedBlocks = StateField.define<DecorationSet>({
   create: buildBlocks,
   update(value, tr) {
     if (
-      tr.docChanged
+      tr.startState.facet(editorLocale) !== tr.state.facet(editorLocale)
+      || tr.docChanged
       || tr.selection
       || tr.effects.some(e => e.is(setEditorFocus) || e.is(pluginRefresh))
       || syntaxTree(tr.startState) !== syntaxTree(tr.state)

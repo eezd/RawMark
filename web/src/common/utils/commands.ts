@@ -1,3 +1,4 @@
+import { t as translate } from '@@/i18n/runtime'
 // 命令注册表：命令面板列出的操作与全局快捷键都来自这里；插件也通过 registerCommand 添加命令
 import { shallowReactive } from 'vue'
 import { pinia } from '@/pinia'
@@ -55,7 +56,7 @@ export function commandKeys(command: Command): string[] {
 
 export function commandTitle(id: string): string {
   const command = commands.get(id)
-  if (!command) throw new Error(`命令不存在：${id}`)
+  if (!command) throw new Error(translate('common.command_not_found_1cdb0c', { p0: id }))
   const keys = commandKeys(command)
   return command.title + (keys.length ? `（${keys.map(formatKeys).join(' / ')}）` : '')
 }

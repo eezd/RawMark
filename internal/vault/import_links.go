@@ -8,9 +8,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -228,7 +228,7 @@ func importLinkSpans(content []byte) []importLink {
 	return spans
 }
 
-func (v *Vault) importLinks(ctx context.Context, note string, content []byte, total *int64, migrated map[string]bool) ([]byte, []string, error) {
+func (v *Vault) importLinks(ctx context.Context, note string, content []byte, total *int64, migrated map[string]bool) ([]byte, []*i18n.Error, error) {
 	missing := map[string]bool{}
 	replacements := map[string]string{}
 	spans := importLinkSpans(content)
@@ -312,9 +312,9 @@ func (v *Vault) importLinks(ctx context.Context, note string, content []byte, to
 		last = span.end
 	}
 	updated := append(out, content[last:]...)
-	warnings := []string{}
+	warnings := []*i18n.Error{}
 	if len(missing) > 0 {
-		warnings = append(warnings, note+"："+strconv.Itoa(len(missing))+" 个本地链接的目标不在导入内容中，已保留原链接")
+		warnings = append(warnings, i18n.New("import_missing_links", note, len(missing)))
 	}
 	return updated, warnings, nil
 }

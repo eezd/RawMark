@@ -1,3 +1,4 @@
+import { t as translate } from '@@/i18n/runtime'
 // 应用、编辑器和快捷键录入共用同一套按键表示。
 export const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
 const punctuation: Record<string, string> = { BracketLeft: '[', BracketRight: ']', Backquote: '`' }
@@ -13,7 +14,7 @@ function physicalCharacter(event: KeyboardEvent): string | undefined {
 export function normalizeKeys(value: string): string {
   const parts = value.split('+')
   const key = parts.pop()
-  if (!key || parts.some(part => !modifiers.includes(part)) || new Set(parts).size !== parts.length || modifiers.includes(key)) throw new Error('快捷键格式无效')
+  if (!key || parts.some(part => !modifiers.includes(part)) || new Set(parts).size !== parts.length || modifiers.includes(key)) throw new Error(translate('common.invalid_shortcut_format_5e48e7'))
   return [...modifiers.filter(part => parts.includes(part)), key.length === 1 ? key.toUpperCase() : key].join('+')
 }
 
@@ -44,5 +45,7 @@ export function recordedKeys(event: KeyboardEvent): string | null {
 }
 
 export function formatKeys(value: string): string {
-  return value.split('+').map(part => ({ Mod: isMac ? '⌘' : 'Ctrl', Meta: isMac ? '⌘' : 'Win', Ctrl: isMac ? '⌃' : 'Ctrl', Alt: isMac ? '⌥' : 'Alt', Shift: isMac ? '⇧' : 'Shift', Space: '空格', Plus: '+' })[part] ?? part).join(isMac ? '' : '+')
+  return value.split('+').map(part => ({ Mod: isMac ? '⌘' : 'Ctrl', Meta: isMac ? '⌘' : 'Win', Ctrl: isMac ? '⌃' : 'Ctrl', Alt: isMac ? '⌥' : 'Alt', Shift: isMac ? '⇧' : 'Shift', get Space() {
+    return translate('common.space_bfa4a6')
+  }, Plus: '+' })[part] ?? part).join(isMac ? '' : '+')
 }

@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"mime"
@@ -15,6 +14,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"regexp"
 	"strings"
 
@@ -48,7 +48,7 @@ func validPluginID(id string) bool {
 func parsePluginManifest(data []byte) (pluginManifest, error) {
 	var m pluginManifest
 	if len(data) > 16<<10 || json.Unmarshal(data, &m) != nil || !validPluginID(m.ID) || strings.TrimSpace(m.Name) == "" || strings.TrimSpace(m.Version) == "" || m.APIVersion != 1 {
-		return m, fmt.Errorf("插件 manifest 无效，必须包含合法的 id、name、version 和 apiVersion: 1")
+		return m, i18n.New("invalid_plugin_manifest_a_valid_121d94")
 	}
 	return m, nil
 }
@@ -82,14 +82,14 @@ func (s *Server) openPlugin(id string) (*os.Root, pluginInfo, error) {
 		return nil, info, err
 	}
 	if m.ID != id {
-		return nil, info, fmt.Errorf("插件目录与 manifest id 不一致")
+		return nil, info, i18n.New("plugin_directory_does_not_match_0eda90")
 	}
 	rev, err := dir.ReadFile(".rawmark-revision")
 	if err != nil {
 		return nil, info, err
 	}
 	if !pluginRevisionPattern.Match(rev) {
-		return nil, info, fmt.Errorf("插件安装信息无效")
+		return nil, info, i18n.New("invalid_plugin_installation_information_3e7873")
 	}
 	info.pluginManifest, info.Revision = m, string(rev)
 	ok = true
@@ -106,7 +106,7 @@ func (s *Server) enabledPlugins() (map[string]bool, error) {
 		err = json.Unmarshal([]byte(value), &enabled)
 	}
 	if enabled == nil && err == nil {
-		err = fmt.Errorf("插件启用配置无效")
+		err = i18n.New("invalid_plugin_enabled_configuration_26d4bb")
 	}
 	return enabled, err
 }
@@ -130,7 +130,7 @@ func (s *Server) setPluginEnabled(id string, enabled bool) error {
 
 func (s *Server) pluginError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, fs.ErrNotExist) {
-		writeError(w, 404, "插件不存在或安装不完整")
+		writeError(w, 404, message(w, "plugin_not_found_or_installation_f577c6"))
 	} else {
 		internalError(w, r, err)
 	}
@@ -172,28 +172,28 @@ func unpackPlugin(data []byte, destination string) (pluginInfo, error) {
 	var info pluginInfo
 	archive, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		return info, fmt.Errorf("无法读取插件 ZIP")
+		return info, i18n.New("could_not_read_plugin_zip_922fd9")
 	}
 	if len(archive.File) > 128 {
-		return info, fmt.Errorf("插件最多包含 128 个文件或目录")
+		return info, i18n.New("a_plugin_may_contain_at_41c105")
 	}
 	seen := map[string]bool{}
 	var total int64
 	for _, file := range archive.File {
 		name := strings.TrimSuffix(file.Name, "/")
 		if !fs.ValidPath(name) || strings.ContainsAny(name, "\\:\x00") || strings.HasPrefix(name, ".") || name != path.Clean(name) || seen[name] || (!file.FileInfo().IsDir() && !file.Mode().IsRegular()) {
-			return info, fmt.Errorf("插件包含非法路径、重复路径或特殊文件")
+			return info, i18n.New("plugin_contains_invalid_paths_duplicate_6a1e05")
 		}
 		seen[name] = true
 		if file.FileInfo().IsDir() {
 			continue
 		}
 		if file.UncompressedSize64 > maxPluginExpanded || total+int64(file.UncompressedSize64) > maxPluginExpanded {
-			return info, fmt.Errorf("插件解压后超过 20 MiB")
+			return info, i18n.New("expanded_plugin_exceeds_mib_e06d7b")
 		}
 		src, err := file.Open()
 		if err != nil {
-			return info, fmt.Errorf("无法读取插件文件：%w", err)
+			return info, i18n.New("could_not_read_plugin_file_016a17", err)
 		}
 		content, readErr := io.ReadAll(io.LimitReader(src, maxPluginExpanded-total+1))
 		closeErr := src.Close()
@@ -205,7 +205,7 @@ func unpackPlugin(data []byte, destination string) (pluginInfo, error) {
 		}
 		total += int64(len(content))
 		if total > maxPluginExpanded {
-			return info, fmt.Errorf("插件解压后超过 20 MiB")
+			return info, i18n.New("expanded_plugin_exceeds_mib_e06d7b")
 		}
 		if name == "manifest.json" {
 			info.pluginManifest, err = parsePluginManifest(content)
@@ -222,11 +222,11 @@ func unpackPlugin(data []byte, destination string) (pluginInfo, error) {
 		}
 	}
 	if info.ID == "" || !seen["main.js"] {
-		return info, fmt.Errorf("ZIP 根目录必须包含 manifest.json 和 main.js")
+		return info, i18n.New("the_zip_root_must_contain_ee8588")
 	}
 	main, err := os.Stat(filepath.Join(destination, "main.js"))
 	if err != nil || !main.Mode().IsRegular() {
-		return info, fmt.Errorf("main.js 必须为普通文件")
+		return info, i18n.New("main_js_must_be_a_e84ee8")
 	}
 	hash := sha256.Sum256(data)
 	info.Revision = hex.EncodeToString(hash[:])
@@ -236,18 +236,18 @@ func unpackPlugin(data []byte, destination string) (pluginInfo, error) {
 
 func (s *Server) installPlugin(w http.ResponseWriter, r *http.Request) {
 	if s.PluginsDir == "" {
-		writeError(w, 503, "插件目录未配置")
+		writeError(w, 503, message(w, "plugin_directory_is_not_configured_5e0928"))
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxPluginZip+(64<<10))
 	if err := r.ParseMultipartForm(maxPluginZip); err != nil {
-		writeError(w, 400, "无法读取插件上传，请使用不超过 10 MiB 的 ZIP")
+		writeError(w, 400, message(w, "could_not_read_plugin_upload_5fd8bc"))
 		return
 	}
 	defer r.MultipartForm.RemoveAll()
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		writeError(w, 400, "请选择插件 ZIP 文件")
+		writeError(w, 400, message(w, "choose_a_plugin_zip_file_7360c5"))
 		return
 	}
 	defer file.Close()
@@ -257,7 +257,7 @@ func (s *Server) installPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(data) > maxPluginZip {
-		writeError(w, 413, "插件 ZIP 超过 10 MiB")
+		writeError(w, 413, message(w, "plugin_zip_exceeds_mib_046e37"))
 		return
 	}
 	s.pluginsMu.Lock()
@@ -274,12 +274,12 @@ func (s *Server) installPlugin(w http.ResponseWriter, r *http.Request) {
 	defer os.RemoveAll(stage)
 	info, err := unpackPlugin(data, stage)
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeError(w, 400, i18n.RenderError(err, responseLocale(w)))
 		return
 	}
 	target := filepath.Join(s.PluginsDir, info.ID)
 	if _, err := os.Lstat(target); err == nil {
-		writeError(w, 409, "同名插件已安装，请先卸载")
+		writeError(w, 409, message(w, "a_plugin_with_this_id_1551cb"))
 		return
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		internalError(w, r, err)
@@ -305,7 +305,7 @@ func (s *Server) togglePlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Enabled == nil {
-		writeError(w, 400, "必须指定 enabled")
+		writeError(w, 400, message(w, "enabled_must_be_specified_12873c"))
 		return
 	}
 	s.pluginsMu.Lock()
@@ -358,7 +358,7 @@ func (s *Server) pluginAsset(w http.ResponseWriter, r *http.Request) {
 	defer dir.Close()
 	name := r.PathValue("path")
 	if r.PathValue("revision") != info.Revision || !fs.ValidPath(name) || strings.ContainsAny(name, "\\:") || strings.HasPrefix(name, ".") {
-		writeError(w, 404, "插件资源不存在")
+		writeError(w, 404, message(w, "plugin_resource_not_found_8e73f3"))
 		return
 	}
 	file, err := dir.Open(name)
@@ -373,7 +373,7 @@ func (s *Server) pluginAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !stat.Mode().IsRegular() {
-		writeError(w, 404, "插件资源不存在")
+		writeError(w, 404, message(w, "plugin_resource_not_found_8e73f3"))
 		return
 	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -420,7 +420,7 @@ func (s *Server) putPluginData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(body.Data) == 0 {
-		writeError(w, 400, "必须提供 data")
+		writeError(w, 400, message(w, "data_must_be_provided_0dc1bc"))
 		return
 	}
 	s.pluginsMu.Lock()

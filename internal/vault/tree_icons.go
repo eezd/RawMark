@@ -3,10 +3,10 @@ package vault
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -18,7 +18,7 @@ type TreeIcon struct {
 	Value string `json:"value"`
 }
 
-var ErrInvalidIcon = errors.New("非法图标")
+var ErrInvalidIcon = i18n.New("invalid_icon_59d610")
 
 const builtinIcons = " plus eye expand graph calendar tag copy task quote undo redo print grid menu noteAdd import folderAdd folder image note chevron more close pin trash logout restore edit search link key settings palette user outline source command info "
 
@@ -46,14 +46,14 @@ func (v *Vault) readTreeIcons() (map[string]TreeIcon, error) {
 	}
 	var icons map[string]TreeIcon
 	if err := json.Unmarshal(data, &icons); err != nil {
-		return nil, fmt.Errorf("文件树图标元数据损坏: %w", err)
+		return nil, i18n.New("file_tree_icon_metadata_is_49b5aa", err)
 	}
 	if icons == nil {
-		return nil, errors.New("文件树图标元数据必须是对象")
+		return nil, i18n.New("file_tree_icon_metadata_must_54f104")
 	}
 	for p, icon := range icons {
 		if _, err := CleanPath(p); err != nil || !icon.valid() {
-			return nil, errors.New("文件树图标元数据含非法路径或图标")
+			return nil, i18n.New("file_tree_icon_metadata_contains_eb66b6")
 		}
 	}
 	return icons, nil

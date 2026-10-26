@@ -1,3 +1,4 @@
+import { t as translate } from '@@/i18n/runtime'
 // 未成功保存到服务器的内容暂存在 IndexedDB，供下次启动时恢复
 
 export interface Draft {
@@ -25,7 +26,7 @@ async function tx<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => ID
   return new Promise((resolve, reject) => {
     const req = fn(transaction.objectStore('drafts'))
     transaction.oncomplete = () => resolve(req.result)
-    transaction.onabort = () => reject(transaction.error ?? new Error('本地草稿事务已中止'))
+    transaction.onabort = () => reject(transaction.error ?? new Error(translate('workspace.local_draft_transaction_aborted_67d8fb')))
     req.onerror = () => reject(req.error)
   })
 }
@@ -46,7 +47,7 @@ export const drafts = {
         for (const draft of moving) store.add({ ...draft, path: to + draft.path.slice(from.length) })
       }
       transaction.oncomplete = () => resolve()
-      transaction.onabort = () => reject(new Error('迁移本地草稿事务失败', { cause: transaction.error }))
+      transaction.onabort = () => reject(new Error(translate('workspace.could_not_migrate_the_local_3ac936'), { cause: transaction.error }))
     })
   },
 }

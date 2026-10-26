@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { UI_FONT_SIZE } from '@@/appearance/typography'
 import FontPicker from '@@/components/FontPicker/index.vue'
+import LocaleSelect from '@@/components/LocaleSelect/index.vue'
 import { DEFAULTS, useSettingsStore } from '@/pinia/stores/settings'
 import { useSettingsChange } from '../composables/use-settings-change'
 import AppearanceSettings from './AppearanceSettings.vue'
@@ -11,6 +12,9 @@ const change = useSettingsChange()
 </script>
 
 <template>
+  <SettingRow id="locale" control="rm-locale">
+    <LocaleSelect id="rm-locale" @change="change({ locale: $event })" />
+  </SettingRow>
   <SettingRow id="ui-font" control="rm-ui-font" resettable @reset="change({ uiFont: DEFAULTS.uiFont })">
     <FontPicker id="rm-ui-font" setting="uiFont" />
   </SettingRow>

@@ -1,5 +1,6 @@
 import type { CustomFont } from '@@/apis/fonts/type'
 import { getFontsApi } from '@@/apis/fonts'
+import { t as translate } from '@@/i18n/runtime'
 import { fontResourceRoot, prepareResources } from '@@/utils/resource-tickets'
 
 import { shallowRef } from 'vue'
@@ -18,7 +19,7 @@ export function applyFontCatalog(fonts: CustomFont[]) {
 }
 
 export function parseFontCatalog(value: unknown): CustomFont[] {
-  if (!Array.isArray(value) || value.some(font => !font || typeof font !== 'object' || !/^custom-[a-f0-9]{64}$/.test(font.id) || typeof font.name !== 'string' || !['ttf', 'otf', 'woff', 'woff2'].includes(font.format))) throw new Error('字体列表格式无效')
+  if (!Array.isArray(value) || value.some(font => !font || typeof font !== 'object' || !/^custom-[a-f0-9]{64}$/.test(font.id) || typeof font.name !== 'string' || !['ttf', 'otf', 'woff', 'woff2'].includes(font.format))) throw new Error(translate('common.invalid_font_catalog_b577df'))
   return value
 }
 

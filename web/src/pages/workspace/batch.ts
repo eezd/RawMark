@@ -1,4 +1,5 @@
 import { exportFilesApi } from '@@/apis/files'
+import { t as translate } from '@@/i18n/runtime'
 
 import { confirmAction } from '@@/utils/confirm'
 import { toast } from '@@/utils/notifications'
@@ -14,7 +15,7 @@ export async function batchFiles(action: 'move' | 'delete', paths: string[], des
   const user = useUserStore(pinia)
   const version = user.getSessionVersion()
   const subjects = minimalPaths(paths)
-  if (action === 'delete' && !await confirmAction(`将选中的 ${subjects.length} 项移入回收站？文件夹内的内容也会一起删除。`)) return
+  if (action === 'delete' && !await confirmAction(translate('workspace.move_the_selected_items_to_3d5e79', { p0: subjects.length }))) return
   const failures: string[] = []
   let succeeded = 0
   for (const path of subjects) {
@@ -34,9 +35,9 @@ export async function batchFiles(action: 'move' | 'delete', paths: string[], des
     user.assertSession(version)
   } catch (cause) {
     if (isCancel(cause)) return
-    toast(`刷新目录失败：${String(cause)}`)
+    toast(translate('workspace.could_not_refresh_the_file_b5f68b', { p0: String(cause) }))
   }
-  toast(`${action === 'move' ? '移动' : '删除'}完成：成功 ${succeeded} 项，失败 ${failures.length} 项${failures.length ? `；${failures.join('；')}` : ''}`)
+  toast(translate('workspace.finished_succeeded_failed_dbc164', { p0: action === 'move' ? translate('common.move') : translate('common.delete_2f9daa'), p1: succeeded, p2: failures.length, p3: failures.length ? `；${failures.join('；')}` : '' }))
   return failures.length === 0
 }
 
@@ -48,14 +49,14 @@ export async function exportFiles(paths: string[]) {
   try {
     await Promise.all(tabs.map(tab => flush(tab.path)))
     user.assertSession(version)
-    if (tabs.some(tab => tab.dirty || tab.status !== 'ready')) throw new Error('请先保存笔记并解决冲突，再导出')
+    if (tabs.some(tab => tab.dirty || tab.status !== 'ready')) throw new Error(translate('workspace.save_your_notes_and_resolve_377e42'))
     const response = await exportFilesApi({ paths: subjects })
     const blob = response.data
     user.assertSession(version)
     const disposition = String(response.headers.get('content-disposition') ?? '')
     const encoded = /filename\*=utf-8''([^;]+)/i.exec(disposition)?.[1]
     const plain = /filename="([^"]+)"|filename=([^;]+)/i.exec(disposition)
-    const filename = encoded ? decodeURIComponent(encoded) : plain?.[1] ?? plain?.[2] ?? '导出.zip'
+    const filename = encoded ? decodeURIComponent(encoded) : plain?.[1] ?? plain?.[2] ?? translate('workspace.export_zip_9cdf3e')
     const url = URL.createObjectURL(blob)
     const link = Object.assign(document.createElement('a'), { href: url, download: filename })
     document.body.append(link)
@@ -64,6 +65,6 @@ export async function exportFiles(paths: string[]) {
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   } catch (cause) {
     if (isCancel(cause)) return
-    toast(`导出失败：${cause instanceof Error ? cause.message : String(cause)}`)
+    toast(translate('workspace.export_failed_a53238', { p0: cause instanceof Error ? cause.message : String(cause) }))
   }
 }

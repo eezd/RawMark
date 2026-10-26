@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import { t as translate } from '@@/i18n/runtime'
+</script>
+
 <template>
   <div class="error">
     <div class="error-svg">
@@ -5,7 +9,7 @@
     </div>
     <router-link to="/">
       <el-button type="primary">
-        回到首页
+        {{ translate('error.back_to_home_6774a7') }}
       </el-button>
     </router-link>
   </div>

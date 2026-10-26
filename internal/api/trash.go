@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
+	"rawmark/internal/i18n"
 	"time"
 )
 
@@ -20,7 +20,7 @@ func trashRetentionDays(settings map[string]json.RawMessage) (int64, error) {
 	}
 	var days int64
 	if err := json.Unmarshal(raw, &days); err != nil || days < 0 || days > maxRetentionDays {
-		return 0, fmt.Errorf("回收站保留天数必须为非负安全整数，0 表示永不自动删除")
+		return 0, i18n.New("trash_retention_must_be_a_d6bd8f")
 	}
 	return days, nil
 }
@@ -30,6 +30,9 @@ func (s *Server) trashClear(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		internalError(w, r, err)
 		return
+	}
+	for i := range result.Failed {
+		result.Failed[i].Error = i18n.RenderError(result.Failed[i].Cause, responseLocale(w))
 	}
 	writeJSON(w, http.StatusOK, result)
 }
@@ -53,7 +56,7 @@ func (s *Server) cleanupTrash(now time.Time) error {
 		return err
 	}
 	if len(result.Failed) > 0 {
-		return fmt.Errorf("回收站清理部分失败: %v", result.Failed)
+		return i18n.New("some_trash_items_could_not_0a4ca6", result.Failed)
 	}
 	if len(result.Deleted) > 0 {
 		slog.Info("已清理过期回收站条目", "count", len(result.Deleted))

@@ -3,13 +3,13 @@ package vault
 import (
 	"archive/zip"
 	"context"
-	"fmt"
 	"html"
 	"io"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"sort"
 	"strings"
 )
@@ -18,7 +18,7 @@ import (
 // ZIP 保留仓库相对路径，正文不改写；只导出原始文件，不解析或下载外部资源。
 func (v *Vault) Export(ctx context.Context, paths []string) (result *os.File, name string, err error) {
 	if len(paths) == 0 {
-		return nil, "", fmt.Errorf("%w：请选择导出内容", ErrInvalidPath)
+		return nil, "", i18n.New("w_choose_content_to_export_170d5e", ErrInvalidPath)
 	}
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -70,7 +70,7 @@ func (v *Vault) Export(ctx context.Context, paths []string) (result *os.File, na
 			}
 			u, e := url.Parse(target)
 			if e != nil {
-				return nil, "", fmt.Errorf("%w：附件地址无效 %s", ErrInvalidPath, target)
+				return nil, "", i18n.New("w_invalid_attachment_address_s_8b6ace", ErrInvalidPath, target)
 			}
 			if u.IsAbs() || u.Host != "" || strings.HasPrefix(target, "/") || u.Path == "" {
 				continue
@@ -80,11 +80,11 @@ func (v *Vault) Export(ctx context.Context, paths []string) (result *os.File, na
 				continue
 			}
 			if e = v.exportPath(rel); e != nil {
-				return nil, "", fmt.Errorf("附件 %s：%w", rel, e)
+				return nil, "", i18n.New("attachment_s_w_7bc269", rel, e)
 			}
 			info, e := v.Stat(rel)
 			if e != nil {
-				return nil, "", fmt.Errorf("附件 %s：%w", rel, e)
+				return nil, "", i18n.New("attachment_s_w_7bc269", rel, e)
 			}
 			if !info.IsDir() {
 				files[rel] = false

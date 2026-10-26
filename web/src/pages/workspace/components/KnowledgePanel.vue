@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import Icon from '@@/components/Icon/index.vue'
+
+import { locale, t as translate } from '@@/i18n/runtime'
 import { computed, ref, watch } from 'vue'
 import { metadata, refreshMetadata } from '../metadata'
 import { openNote, openReference, ws } from '../workspace'
@@ -13,7 +15,7 @@ const tags = computed(() => {
   for (const note of metadata.notes) {
     for (const name of note.tags) counts.set(name, (counts.get(name) ?? 0) + 1)
   }
-  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN'))
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], locale.value))
 })
 const visibleNotes = computed(() => {
   const nearby = new Set([ws.active])
@@ -69,52 +71,52 @@ watch(() => ws.view, () => {
 <template>
   <section class="rm-knowledge-panel">
     <header class="rm-knowledge-heading">
-      <div><span class="rm-eyebrow">KNOWLEDGE CONNECTIONS</span><h1>{{ ws.view === 'graph' ? '让知识自然连接' : '标签索引' }}</h1><p>{{ metadata.notes.length }} 篇笔记，以标准 Markdown 链接与标签连接你的想法。</p></div><el-button class="rm-btn" @click="ws.view = 'notes'">
-        返回笔记
+      <div><span class="rm-eyebrow">KNOWLEDGE CONNECTIONS</span><h1>{{ ws.view === 'graph' ? translate('workspace.let_knowledge_connect_22f6c5') : translate('workspace.tags_02b344') }}</h1><p>{{ metadata.notes.length }} {{ translate('workspace.notes_connect_your_ideas_with_9f4998') }}</p></div><el-button class="rm-btn" @click="ws.view = 'notes'">
+        {{ translate('workspace.back_to_notes_38461a') }}
       </el-button>
     </header>
     <div class="rm-knowledge-tools">
-      <label><Icon name="search" /><input v-model="query" type="search" placeholder="搜索笔记…" aria-label="搜索笔记"></label><el-select v-model="tag" aria-label="筛选标签">
-        <el-option value="" label="全部标签" /><el-option v-for="[name, count] in tags" :key="name" :value="name" :label="`#${name} · ${count}`" />
-      </el-select><label v-if="ws.view === 'graph'"><input v-model="local" type="checkbox" :disabled="!ws.active">仅当前笔记关联</label>
+      <label><Icon name="search" /><input v-model="query" type="search" :placeholder="translate('workspace.search_notes_21919c')" :aria-label="translate('workspace.search_notes_d8912a')"></label><el-select v-model="tag" :aria-label="translate('workspace.filter_tags_2d8b5c')">
+        <el-option value="" :label="translate('workspace.all_tags_b709cb')" /><el-option v-for="[name, count] in tags" :key="name" :value="name" :label="`#${name} · ${count}`" />
+      </el-select><label v-if="ws.view === 'graph'"><input v-model="local" type="checkbox" :disabled="!ws.active">{{ translate('workspace.only_related_to_this_note_d6f457') }}</label>
     </div>
     <p v-if="metadata.error" role="alert">
       {{ metadata.error }} <el-button class="rm-btn" @click="refreshMetadata">
-        重试
+        {{ translate('common.retry_b8784c') }}
       </el-button>
     </p>
     <p v-else-if="!metadata.ready" class="rm-tree-empty">
-      关系索引准备中…
+      {{ translate('workspace.preparing_relationship_index_1d8bb5') }}
     </p>
     <template v-else-if="ws.view === 'graph'">
       <div class="rm-graph-canvas">
-        <svg :viewBox="`${camera.x} ${camera.y} ${camera.width} ${camera.width * .69}`" role="img" aria-label="笔记关系图谱，可点击节点打开笔记" @pointerdown="start" @pointermove="pan" @pointerup="drag = undefined" @pointercancel="drag = undefined" @wheel.prevent="zoom($event.deltaY > 0 ? 1.12 : .89)">
+        <svg :viewBox="`${camera.x} ${camera.y} ${camera.width} ${camera.width * .69}`" role="img" :aria-label="translate('workspace.note_relationship_graph_click_a_5a4781')" @pointerdown="start" @pointermove="pan" @pointerup="drag = undefined" @pointercancel="drag = undefined" @wheel.prevent="zoom($event.deltaY > 0 ? 1.12 : .89)">
           <line v-for="edge in graph.edges" :key="`${edge.from.path}\0${edge.to.path}`" :x1="edge.from.x" :y1="edge.from.y" :x2="edge.to.x" :y2="edge.to.y" />
           <g v-for="node in graph.nodes" :key="node.path" :transform="`translate(${node.x} ${node.y})`" data-note tabindex="0" role="button" :aria-label="node.title" :class="{ current: node.path === ws.active }" @click="openNote(node.path)" @keydown.enter.prevent="openNote(node.path)" @keydown.space.prevent="openNote(node.path)"><title>{{ node.path }}</title><circle :r="Math.min(13, 5 + node.degree * 1.5)" /><text y="27" text-anchor="middle">{{ node.title.length > 16 ? `${node.title.slice(0, 16)}…` : node.title }}</text></g>
         </svg>
         <p v-if="!graph.nodes.length" class="rm-graph-empty">
-          没有符合条件的笔记
+          {{ translate('workspace.no_matching_notes_215bb5') }}
         </p>
         <div class="rm-graph-controls">
-          <span>{{ graph.nodes.length }} 节点 · {{ graph.edges.length }} 关系</span><button class="rm-icon-btn" title="放大" @click="zoom(.8)">
+          <span>{{ graph.nodes.length }} {{ translate('workspace.nodes_09c858') }} {{ graph.edges.length }} {{ translate('workspace.links_253aaf') }}</span><button class="rm-icon-btn" :title="translate('workspace.zoom_in_80f8fb')" @click="zoom(.8)">
             +
-          </button><button class="rm-icon-btn" title="缩小" @click="zoom(1.25)">
+          </button><button class="rm-icon-btn" :title="translate('workspace.zoom_out_290f68')" @click="zoom(1.25)">
             −
-          </button><button class="rm-icon-btn" title="重置视图" @click="camera = { x: -420, y: -290, width: 840 }">
+          </button><button class="rm-icon-btn" :title="translate('workspace.reset_view_764aba')" @click="camera = { x: -420, y: -290, width: 840 }">
             <Icon name="expand" />
           </button>
         </div>
       </div>
       <details v-if="missing.length" class="rm-missing-links">
-        <summary>{{ missing.length }} 个链接目标尚不存在</summary><button v-for="link in missing" :key="link.path + link.line + link.target" @click="openReference(link.path, link.line)">
-          {{ link.path }} → {{ link.target }} · 第 {{ link.line }} 行
+        <summary>{{ missing.length }} {{ translate('workspace.link_targets_do_not_exist_074109') }}</summary><button v-for="link in missing" :key="link.path + link.line + link.target" @click="openReference(link.path, link.line)">
+          {{ link.path }} → {{ link.target }} {{ translate('workspace.line_ca0b53') }} {{ link.line }} {{ translate('workspace.line_4cc7b0') }}
         </button>
       </details>
     </template>
     <template v-else>
       <div class="rm-tags-cloud">
         <button :class="{ on: !tag }" @click="tag = ''">
-          全部
+          {{ translate('workspace.all_5c55a6') }}
         </button><button v-for="[name, count] in tags" :key="name" :class="{ on: tag === name }" @click="tag = name">
           #{{ name }} <small>{{ count }}</small>
         </button>
@@ -123,7 +125,7 @@ watch(() => ws.view, () => {
         <button v-for="note in visibleNotes" :key="note.path" @click="openNote(note.path)">
           <Icon name="note" /><div><strong>{{ note.title }}</strong><small>{{ note.path }}</small></div><span>{{ note.tags.map(tag => `#${tag}`).join('  ') }}</span>
         </button><p v-if="!visibleNotes.length">
-          没有符合条件的笔记
+          {{ translate('workspace.no_matching_notes_215bb5') }}
         </p>
       </div>
     </template>

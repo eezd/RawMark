@@ -2,6 +2,8 @@
 import type { StorageUsage } from '@@/apis/storage/type'
 
 import { getStorageApi } from '@@/apis/storage'
+
+import { locale, t as translate } from '@@/i18n/runtime'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import MaintenancePanel from './MaintenancePanel.vue'
@@ -18,7 +20,19 @@ onBeforeUnmount(() => {
   mounted = false
 })
 
-const names: Record<StorageUsage['categories'][number]['id'], string> = { vault: '笔记库', databases: '数据库', fonts: '字体', themes: '主题', plugins: '插件', other: '其他' }
+const names: Record<StorageUsage['categories'][number]['id'], string> = { get vault() {
+  return translate('settings.vault_7e16a8')
+}, get databases() {
+  return translate('settings.databases_263200')
+}, get fonts() {
+  return translate('common.font_078838')
+}, get themes() {
+  return translate('settings.themes_788db1')
+}, get plugins() {
+  return translate('settings.plugins_e806fb')
+}, get other() {
+  return translate('settings.other_d2909f')
+} }
 const colors = ['var(--rm-accent)', '#56a89c', '#bd9364', '#a88ac2', '#d57e8d', '#8d99a8']
 const segments = computed(() => {
   let offset = 0
@@ -33,9 +47,9 @@ const segments = computed(() => {
 function size(value: number): string {
   const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
   const unit = value > 0 ? Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1) : 0
-  return `${(value / 1024 ** unit).toLocaleString('zh-CN', { maximumFractionDigits: unit ? 2 : 0 })} ${units[unit]}`
+  return `${(value / 1024 ** unit).toLocaleString(locale.value, { maximumFractionDigits: unit ? 2 : 0 })} ${units[unit]}`
 }
-const updated = computed(() => usage.value ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'medium' }).format(usage.value.calculatedAt) : '')
+const updated = computed(() => usage.value ? new Intl.DateTimeFormat(locale.value, { dateStyle: 'short', timeStyle: 'medium' }).format(usage.value.calculatedAt) : '')
 async function scan() {
   if (busy.value) return
   busy.value = true
@@ -44,7 +58,7 @@ async function scan() {
     const next = (await getStorageApi()).data
     if (mounted) usage.value = next
   } catch (cause) {
-    if (mounted) error.value = `统计失败：${String(cause)}`
+    if (mounted) error.value = translate('settings.could_not_calculate_storage_usage_6db82c', { p0: String(cause) })
   } finally {
     if (mounted) busy.value = false
   }
@@ -55,50 +69,50 @@ onMounted(scan)
 <template>
   <div>
     <h3 class="rm-settings-group-title">
-      空间占用
+      {{ translate('settings.storage_usage_37ac17') }}
     </h3>
     <SettingRow id="storage">
       <el-button class="rm-btn" :disabled="busy" @click="scan">
-        {{ busy ? '统计中…' : '刷新' }}
+        {{ busy ? translate('settings.calculating_884dbb') : translate('settings.refresh_aee887') }}
       </el-button>
     </SettingRow>
     <p class="rm-share-note">
-      统计应用数据与内置可选字体，不包含默认 Maple 和程序本体；附件与回收站已包含在笔记库内。不跟随内部符号链接，不包含数据目录外的运维备份。
+      {{ translate('settings.includes_application_data_and_optional_95f18a') }}
     </p>
     <p v-if="error" class="rm-auth-error" role="alert">
       {{ error }}
     </p>
     <div v-if="usage" class="rm-storage" :aria-busy="busy">
       <div class="rm-storage-summary">
-        <svg viewBox="0 0 120 120" role="img" aria-label="各类存储空间占比">
+        <svg viewBox="0 0 120 120" role="img" :aria-label="translate('settings.storage_usage_by_category_614032')">
           <circle cx="60" cy="60" r="46" fill="none" stroke="var(--rm-divider)" stroke-width="14" />
           <circle v-for="segment in segments" :key="segment.id" cx="60" cy="60" r="46" pathLength="100" fill="none" :stroke="segment.color" stroke-width="14" :stroke-dasharray="`${segment.percent} ${100 - segment.percent}`" :stroke-dashoffset="-segment.offset" transform="rotate(-90 60 60)" />
         </svg>
-        <div><span>总占用</span><strong :title="`${usage.totalSize} 字节`">{{ size(usage.totalSize) }}</strong><small>统计时间：{{ updated }}</small></div>
+        <div><span>{{ translate('settings.total_usage_d3d98e') }}</span><strong :title="translate('settings.bytes_8180a4', { p0: usage.totalSize })">{{ size(usage.totalSize) }}</strong><small>{{ translate('settings.calculated_239bdc') }}{{ updated }}</small></div>
       </div>
       <dl class="rm-storage-list">
         <template v-for="segment in segments" :key="segment.id">
           <div>
-            <dt><i :style="{ background: segment.color }" />{{ names[segment.id] }}</dt><dd :title="`${segment.size} 字节`">
+            <dt><i :style="{ background: segment.color }" />{{ names[segment.id] }}</dt><dd :title="translate('settings.bytes_8180a4', { p0: segment.size })">
               {{ size(segment.size) }} <small>{{ segment.percent.toFixed(1) }}%</small>
             </dd>
           </div>
           <template v-if="segment.id === 'fonts'">
             <div class="rm-storage-sub">
-              <dt>内置可选字体</dt><dd>{{ size(usage.builtinFontsSize) }}</dd>
+              <dt>{{ translate('settings.optional_built_in_fonts_05b309') }}</dt><dd>{{ size(usage.builtinFontsSize) }}</dd>
             </div>
             <div class="rm-storage-sub">
-              <dt>导入字体</dt><dd>{{ size(usage.customFontsSize) }}</dd>
+              <dt>{{ translate('common.import_font_50751a') }}</dt><dd>{{ size(usage.customFontsSize) }}</dd>
             </div>
           </template>
           <template v-if="segment.id === 'vault'">
             <div class="rm-storage-sub">
-              <dt>附件</dt><dd :title="`${usage.assetsSize} 字节`">
+              <dt>{{ translate('settings.attachments_c7225d') }}</dt><dd :title="translate('settings.bytes_8180a4', { p0: usage.assetsSize })">
                 {{ size(usage.assetsSize) }} <small>{{ (usage.totalSize ? usage.assetsSize / usage.totalSize * 100 : 0).toFixed(1) }}%</small>
               </dd>
             </div>
             <div class="rm-storage-sub">
-              <dt>回收站</dt><dd :title="`${usage.trashSize} 字节`">
+              <dt>{{ translate('common.trash_ba35dc') }}</dt><dd :title="translate('settings.bytes_8180a4', { p0: usage.trashSize })">
                 {{ size(usage.trashSize) }} <small>{{ (usage.totalSize ? usage.trashSize / usage.totalSize * 100 : 0).toFixed(1) }}%</small>
               </dd>
             </div>

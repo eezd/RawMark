@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t as translate } from '@@/i18n/runtime'
+
 import { toast } from '@@/utils/notifications'
 import { online, waitingWorker } from '@@/utils/pwa'
 import { ref } from 'vue'
@@ -14,7 +16,7 @@ async function update() {
   busy.value = true
   try {
     if (!await props.beforeReload()) {
-      toast('请先完成保存、图片上传或文件操作，再更新应用')
+      toast(translate('common.finish_saving_uploading_images_or_b9e96e'))
       return
     }
     if (!activated.value && worker) {
@@ -25,11 +27,11 @@ async function update() {
           clearTimeout(timer)
           worker.removeEventListener('statechange', finish)
           if (worker.state === 'activated') resolve()
-          else reject(new Error('新版本激活失败'))
+          else reject(new Error(translate('common.could_not_activate_the_new_c0fd5b')))
         }
         const timer = setTimeout(() => {
           worker.removeEventListener('statechange', finish)
-          reject(new Error('等待新版本超时'))
+          reject(new Error(translate('common.timed_out_waiting_for_the_57775d')))
         }, 15000)
         worker.addEventListener('statechange', finish)
         worker.postMessage('ACTIVATE')
@@ -39,9 +41,9 @@ async function update() {
     }
     // 激活期间仍可能继续输入，刷新前再次确认；保留按钮供保存后重试。
     if (await props.beforeReload()) location.reload()
-    else toast('仍有未完成的保存或操作，请完成后再次点击刷新')
+    else toast(translate('common.some_changes_or_operations_are_a5fda9'))
   } catch {
-    toast('暂时无法更新，请稍后重试')
+    toast(translate('common.cannot_update_right_now_please_c0de6a'))
   } finally {
     busy.value = false
   }
@@ -50,11 +52,11 @@ async function update() {
 
 <template>
   <div v-if="!online || waitingWorker || activated" class="rm-app-status" role="status">
-    <span v-if="!online">离线，无法加载或保存笔记</span>
+    <span v-if="!online">{{ translate('common.offline_notes_cannot_be_loaded_8ecb92') }}</span>
     <template v-else-if="waitingWorker || activated">
-      <span>有新版本</span>
+      <span>{{ translate('common.update_available_daedea') }}</span>
       <el-button class="rm-btn" :disabled="busy" @click="update">
-        {{ busy ? '正在保存…' : '保存并刷新' }}
+        {{ busy ? translate('common.saving_6bdb44') : translate('common.save_and_refresh_d080ec') }}
       </el-button>
     </template>
   </div>

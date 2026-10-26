@@ -8,17 +8,18 @@ import { createFolderApi, deleteFileApi, getRawFileApi, importNotesApi, moveFile
 import { restoreTrashApi } from '@@/apis/trash'
 import { getTreeApi, setTreeIconApi } from '@@/apis/tree'
 import { appearancePaused } from '@@/appearance/appearance'
-
+import { locale, t as translate } from '@@/i18n/runtime'
 // 工作区状态与操作：目录树、标签页、保存队列、冲突处理、实时同步。
 // 文件操作一律先更新界面再请求服务器，失败时回滚，保证"操作即时生效"。
 import { decodeLinkDestination } from '@@/markdown/links'
+
 import { pluginEditorFailure, refreshPlugins, startPlugins, stopPlugins } from '@@/plugins/host'
 import { notePath, pluginEvents, pluginRefresh, pluginsPaused, setPluginEditorHandlers } from '@@/plugins/registry'
 import { handleShortcut, registerCommand } from '@@/utils/commands'
 import { readNoteFile } from '@@/utils/note-files'
 import { toast } from '@@/utils/notifications'
-
 import { basename, dirname, encodePath, isImage, joinPath, NOTE_EXT, resolveAssetUrl } from '@@/utils/paths'
+
 import { imageResourceRoot, prepareResources } from '@@/utils/resource-tickets'
 import { typoraKeys } from '@@/utils/typora-keys'
 import { trackVisualViewport } from '@@/utils/viewport'
@@ -33,6 +34,7 @@ import { useUserStore } from '@/pinia/stores/user'
 import { drafts } from './drafts'
 import { createEditorState, insertImageFiles, languageCompartment, pasteImages, pluginCompartment, pluginEditorExtensions, pluginLanguage, preferencesCompartment, previewCompartment, previewExtensions } from './editor'
 import { refreshImages } from './editor/livepreview'
+import { editorLocale, localeCompartment } from './editor/locale'
 import { editorCommands } from './editor/shortcuts'
 import { refreshMetadata } from './metadata'
 
@@ -140,7 +142,7 @@ export function activeTab(): Tab | undefined {
 }
 
 function errorText(err: unknown): string {
-  return err instanceof ApiError ? err.message : '网络错误，请检查连接'
+  return err instanceof ApiError ? err.message : translate('common.network_error_check_your_connection_566064')
 }
 
 // ---- 编辑器状态 ----
@@ -228,22 +230,22 @@ function buildState(path: string, doc: string): EditorState {
         canPaste: () => {
           if (!isCurrentNote()) return false
           if (!slot(ref.path).paused) return true
-          toast('笔记正在移动，请完成后再粘贴或上传图片')
+          toast(translate('workspace.this_note_is_moving_finish_d105e5'))
           return false
         },
         upload: (file) => {
-          if (!isCurrentNote()) throw new CanceledError('粘贴所属笔记已关闭')
+          if (!isCurrentNote()) throw new CanceledError(translate('workspace.the_note_receiving_this_paste_a59580'))
           return uploadImageApi({ note: ref.path, file }).then(({ data }) => data.link)
         },
         importImage: (url) => {
-          if (!isCurrentNote()) throw new CanceledError('粘贴所属笔记已关闭')
+          if (!isCurrentNote()) throw new CanceledError(translate('workspace.the_note_receiving_this_paste_a59580'))
           return importImageApi({ note: ref.path, url }).then(({ data }) => data.link)
         },
         update: (change) => {
           if (!isCurrentNote()) return
           const shown = view?.state.facet(notePath) === ref
           const state = shown ? view!.state : editorStates.get(ref.path)
-          if (!state) throw new Error('粘贴所属笔记的编辑状态不存在')
+          if (!state) throw new Error(translate('workspace.the_editor_state_for_the_028961'))
           const spec = change(state)
           if (!spec) return
           if (shown) {
@@ -255,11 +257,11 @@ function buildState(path: string, doc: string): EditorState {
           }
         },
         onError: (err) => {
-          if (isCurrentNote() && !isCancel(err)) toast(`粘贴或图片导入失败：${err instanceof Error ? err.message : errorText(err)}`)
+          if (isCurrentNote() && !isCancel(err)) toast(translate('workspace.paste_or_image_import_failed_09d4e6', { p0: err instanceof Error ? err.message : errorText(err) }))
         },
         onPending: (d) => {
           if (!isCurrentNote()) return
-          if (d === 1 && slot(ref.path).uploads === 0) toast('正在处理粘贴或图片导入…')
+          if (d === 1 && slot(ref.path).uploads === 0) toast(translate('workspace.processing_paste_or_image_import_023dad'))
           slot(ref.path).uploads += d
         },
       }),
@@ -283,8 +285,8 @@ function reconfigurePluginStates() {
 const pluginWrite: PluginAPI['vault']['write'] = async (path, content, options) => {
   const tab = tabOf(path)
   const saved = slots.get(path)
-  if ((tab && (tab.dirty || tab.status !== 'ready')) || saved?.inflight || saved?.uploads || saved?.paused || opsInFlight) throw new ApiError(409, '笔记有未保存修改或正在操作，请稍后重试')
-  if (!options || (!('create' in options && options.create === true) && !('ifMatch' in options && typeof options.ifMatch === 'string' && options.ifMatch.length > 0))) throw new ApiError(400, '写入必须指定非空版本号或明确新建')
+  if ((tab && (tab.dirty || tab.status !== 'ready')) || saved?.inflight || saved?.uploads || saved?.paused || opsInFlight) throw new ApiError(409, translate('workspace.this_note_has_unsaved_changes_f14427'))
+  if (!options || (!('create' in options && options.create === true) && !('ifMatch' in options && typeof options.ifMatch === 'string' && options.ifMatch.length > 0))) throw new ApiError(400, translate('workspace.a_write_requires_a_non_b12fd4'))
   const initialRevision = tab?.rev
   const initialSequence = saved?.seq ?? 0
   const rev = (await writeFileApi({ path, content, ifMatch: 'create' in options ? '' : options.ifMatch })).data.rev
@@ -383,10 +385,10 @@ export async function flush(path: string, keepalive = false): Promise<void> {
         tab.conflictRev = serverRev
       } else if (!(err instanceof ApiError) || err.status >= 500) {
         // 网络错误与服务器错误可重试，草稿已在本地，不会丢
-        tab.saveError = s.retries < MAX_RETRIES ? '保存失败，正在重试…' : '保存失败，请检查网络后重试'
+        tab.saveError = s.retries < MAX_RETRIES ? translate('workspace.save_failed_retrying_d62793') : translate('workspace.save_failed_check_your_connection_c0913f')
         if (s.retries++ < MAX_RETRIES) s.timer = setTimeout(() => void flush(path), RETRY_DELAY)
       } else {
-        tab.saveError = `保存失败：${err.message}`
+        tab.saveError = translate('workspace.save_failed_6ba723', { p0: err.message })
       }
     }
   })()
@@ -426,7 +428,7 @@ export async function useServerVersion(path: string) {
     await drafts.delete(path)
   } catch (err) {
     if (isCancel(err)) return
-    toast(`载入失败：${errorText(err)}`)
+    toast(translate('workspace.load_failed_396d55', { p0: errorText(err) }))
   }
 }
 
@@ -438,7 +440,7 @@ export async function keepLocalVersion(path: string) {
   if (!tab || content === undefined) return
   const s = slot(path)
   if (s.inflight || s.uploads || s.paused) {
-    toast('笔记正在保存、上传或移动，请完成后再处理冲突')
+    toast(translate('workspace.this_note_is_saving_uploading_c23675'))
     return
   }
   const seq = s.seq
@@ -450,16 +452,16 @@ export async function keepLocalVersion(path: string) {
       if (s.seq === seq) await drafts.delete(path)
       if (!ws.entries.some(e => e.path === path)) {
         void refreshTree().catch((err) => {
-          if (!isCancel(err)) toast(`刷新目录失败：${errorText(err)}`)
+          if (!isCancel(err)) toast(translate('workspace.could_not_refresh_the_file_b5f68b', { p0: errorText(err) }))
         })
       }
     } catch (err) {
       if (isCancel(err)) return
       if (err instanceof ApiError && err.status === 412) {
         tab.conflictRev = typeof err.data.rev === 'string' ? err.data.rev : ''
-        toast('服务器上的版本又变化了，请再次选择')
+        toast(translate('workspace.the_server_version_changed_again_594f7d'))
       } else {
-        toast(`保存失败：${errorText(err)}`)
+        toast(translate('workspace.save_failed_6ba723', { p0: errorText(err) }))
       }
     }
   })()
@@ -538,7 +540,7 @@ export async function openNote(path: string) {
     if (isCancel(err)) return
     const t = tabOf(path)
     if (t) t.status = 'error'
-    toast(`打开失败：${errorText(err)}`)
+    toast(translate('workspace.could_not_open_0ed1e1', { p0: errorText(err) }))
   }
 }
 
@@ -546,7 +548,7 @@ export async function closeTab(path: string): Promise<boolean> {
   const version = user.getSessionVersion()
   const busy = () => Boolean(slots.get(path)?.uploads || slots.get(path)?.paused)
   if (busy()) {
-    toast('笔记正在上传或移动，完成后再关闭')
+    toast(translate('workspace.this_note_is_uploading_or_349b3d'))
     return false
   }
   await flush(path)
@@ -555,23 +557,23 @@ export async function closeTab(path: string): Promise<boolean> {
   if (i < 0) return true
   const tab = ws.tabs[i]
   if (busy()) {
-    toast('笔记正在上传或移动，完成后再关闭')
+    toast(translate('workspace.this_note_is_uploading_or_349b3d'))
     return false
   }
   if (tab.dirty) {
     const seq = slot(path).seq
     const content = docOf(path)
-    if (content === undefined) throw new Error('未保存笔记的编辑状态不存在')
+    if (content === undefined) throw new Error(translate('workspace.the_editor_state_for_this_248447'))
     try {
       await drafts.put({ path, content, baseRev: tab.rev, updatedAt: Date.now() })
       user.assertSession(version)
     } catch (err) {
       if (isCancel(err)) return false
-      toast(`本地草稿保存失败，已保留标签页：${errorText(err)}`)
+      toast(translate('workspace.could_not_save_the_local_cc0e42', { p0: errorText(err) }))
       return false
     }
     if (tabOf(path) !== tab || slot(path).seq !== seq || busy()) return false
-    toast('未保存的修改已保留为本地草稿')
+    toast(translate('workspace.unsaved_changes_retained_as_a_8cb2ab'))
   }
   const index = ws.tabs.indexOf(tab)
   if (index < 0) return true
@@ -718,12 +720,12 @@ export async function saveTreeIcon(path: string, icon: TreeIcon | null) {
     await refreshTree()
   } catch (err) {
     if (isCancel(err)) return
-    toast(`图标已保存，目录刷新失败：${errorText(err)}`)
+    toast(translate('workspace.icon_saved_but_the_file_72a5c2', { p0: errorText(err) }))
   }
 }
 
 export async function createNote(dir: string) {
-  const path = uniqueName(dir, '未命名', NOTE_EXT)
+  const path = uniqueName(dir, translate('workspace.untitled_67bee6'), NOTE_EXT)
   ws.renaming = path
   await createNoteAt(path)
 }
@@ -760,7 +762,7 @@ async function createNoteFile(path: string, content: string): Promise<boolean> {
       if (isCancel(err)) return false
       ws.entries = ws.entries.filter(e => !added.includes(e.path))
       if (ws.renaming === path) ws.renaming = null
-      toast(`新建笔记失败：${errorText(err)}`)
+      toast(translate('workspace.could_not_create_note_2760ce', { p0: errorText(err) }))
       return false
     }
   })
@@ -774,13 +776,13 @@ export async function importNotes(dir: string, folder: string, files: File[]) {
     await refreshTree()
   } catch (err) {
     if (isCancel(err)) throw err
-    toast(`导入已完成，目录刷新失败：${errorText(err)}`)
+    toast(translate('workspace.import_complete_but_the_file_52460f', { p0: errorText(err) }))
   }
   return result
 }
 
 export async function createFolder(dir: string) {
-  const path = uniqueName(dir, '新建文件夹', '')
+  const path = uniqueName(dir, translate('workspace.new_folder_84244a'), '')
   ws.entries.push({ path, dir: true, size: 0, mtime: Date.now() })
   ws.renaming = path
   await withOp(async () => {
@@ -790,7 +792,7 @@ export async function createFolder(dir: string) {
       if (isCancel(err)) return
       ws.entries = ws.entries.filter(e => e.path !== path)
       if (ws.renaming === path) ws.renaming = null
-      toast(`新建文件夹失败：${errorText(err)}`)
+      toast(translate('workspace.could_not_create_folder_bc6447', { p0: errorText(err) }))
     }
   })
 }
@@ -812,29 +814,29 @@ function operationFailed(error: string, owner: 'operation' | 'caller'): FileResu
 export async function move(from: string, to: string, errorOwner: 'operation' | 'caller' = 'operation'): Promise<FileResult> {
   const version = user.getSessionVersion()
   if (from === to) return { ok: true }
-  if (creating.has(from) && !(await creating.get(from))) return operationFailed('笔记尚未创建成功', errorOwner)
+  if (creating.has(from) && !(await creating.get(from))) return operationFailed(translate('workspace.this_note_has_not_been_77a7a9'), errorOwner)
   user.assertSession(version)
   if (ws.entries.some(e => e.path === to)) {
-    return operationFailed(`“${basename(to)}”已存在`, errorOwner)
+    return operationFailed(translate('workspace.already_exists_6af434', { p0: basename(to) }), errorOwner)
   }
   const result = await withOp<FileResult>(async () => {
     // 移动会更新仓库中的相对链接，先保存全部已打开笔记，沿用版本冲突保护。
     const impacted = () => ws.tabs.map(t => t.path)
     const busy = () => impacted().some(p => slots.get(p)?.uploads || slots.get(p)?.paused)
     if (busy()) {
-      return operationFailed('笔记正在处理粘贴、上传或移动，请完成后再移动', errorOwner)
+      return operationFailed(translate('workspace.this_note_is_processing_a_8c2cce'), errorOwner)
     }
     // 先保存待保存的修改，确保移动的是最新内容；移动期间暂停保存，避免写到旧路径
     await Promise.all(impacted().map(p => flush(p)))
     user.assertSession(version)
     // 等待保存时仍可能开始粘贴，须在取得移动占用前再次检查。
     if (busy()) {
-      return operationFailed('笔记正在处理粘贴、上传或移动，请完成后再移动', errorOwner)
+      return operationFailed(translate('workspace.this_note_is_processing_a_8c2cce'), errorOwner)
     }
     if (impacted().some((p) => {
       const tab = tabOf(p); return tab && (tab.dirty || tab.status !== 'ready')
     })) {
-      return operationFailed('请先保存笔记并解决冲突，再移动文件', errorOwner)
+      return operationFailed(translate('workspace.save_your_notes_and_resolve_5500d4'), errorOwner)
     }
     const paused = impacted().map(slot)
     paused.forEach(s => s.paused++)
@@ -866,10 +868,10 @@ export async function move(from: string, to: string, errorOwner: 'operation' | '
         try {
           await drafts.move(to, from)
         } catch (cause) {
-          toast(`恢复原路径草稿失败：${cause instanceof Error ? cause.message : errorText(cause)}`)
+          toast(translate('workspace.could_not_restore_the_draft_e5f464', { p0: cause instanceof Error ? cause.message : errorText(cause) }))
         }
       }
-      return operationFailed(`移动失败：${err instanceof Error ? err.message : errorText(err)}`, errorOwner)
+      return operationFailed(translate('workspace.move_failed_04b0a9', { p0: err instanceof Error ? err.message : errorText(err) }), errorOwner)
     } finally {
       paused.forEach(s => s.paused--)
     }
@@ -886,12 +888,12 @@ export async function move(from: string, to: string, errorOwner: 'operation' | '
       }
     })).catch((err) => {
       if (isCancel(err)) throw err
-      toast(`文件已移动，但同步笔记失败：${errorText(err)}`)
+      toast(translate('workspace.file_moved_but_note_synchronization_b9ff79', { p0: errorText(err) }))
     })
     return { ok: true }
   })
   void refreshTree().catch((err) => {
-    if (!isCancel(err)) toast(`刷新目录失败：${errorText(err)}`)
+    if (!isCancel(err)) toast(translate('workspace.could_not_refresh_the_file_b5f68b', { p0: errorText(err) }))
   })
   return result
 }
@@ -899,7 +901,7 @@ export async function move(from: string, to: string, errorOwner: 'operation' | '
 export async function remove(path: string, errorOwner: 'operation' | 'caller' = 'operation'): Promise<FileResult> {
   const version = user.getSessionVersion()
   const entry = ws.entries.find(e => e.path === path)
-  if (!entry) return operationFailed('文件已不存在', errorOwner)
+  if (!entry) return operationFailed(translate('workspace.file_no_longer_exists_4eb446'), errorOwner)
   return withOp<FileResult>(async () => {
     const paths = affected(path)
     await Promise.all(paths.map(p => flush(p)))
@@ -907,28 +909,30 @@ export async function remove(path: string, errorOwner: 'operation' | 'caller' = 
     if (paths.some((p) => {
       const tab = tabOf(p); return tab && (tab.dirty || tab.status !== 'ready')
     })) {
-      return operationFailed('请先保存笔记并解决冲突，再删除文件', errorOwner)
+      return operationFailed(translate('workspace.save_your_notes_and_resolve_5981a5'), errorOwner)
     }
     const snapshot = ws.entries
     ws.entries = ws.entries.filter(e => remapPath(e.path, path, path) === null) // 去掉自身及其下所有条目
     for (const p of paths) {
       if (!(await closeTab(p))) {
-        ws.entries = snapshot; return operationFailed('关闭笔记失败，未删除文件', errorOwner)
+        ws.entries = snapshot; return operationFailed(translate('workspace.could_not_close_the_note_cd2a80'), errorOwner)
       }
     }
     user.assertSession(version)
     try {
       const item = (await deleteFileApi(path)).data
       if (ws.image && remapPath(ws.image, path, path) !== null) ws.image = null
-      toast(`已删除“${basename(path).replace(/\.md$/, '')}”`, {
-        label: '撤销',
+      toast(translate('workspace.deleted_86a46b', { p0: basename(path).replace(/\.md$/, '') }), {
+        get label() {
+          return translate('workspace.undo_926a50')
+        },
         run: () => void restore(item.id),
       })
       return { ok: true }
     } catch (err) {
       if (isCancel(err)) throw err
       ws.entries = snapshot
-      return operationFailed(`删除失败：${errorText(err)}`, errorOwner)
+      return operationFailed(translate('common.could_not_delete_9619d7', { p0: errorText(err) }), errorOwner)
     }
   })
 }
@@ -941,7 +945,7 @@ export async function restore(id: string) {
     else if (!item.dir && isImage(item.path)) ws.image = item.path
   } catch (err) {
     if (isCancel(err)) return
-    toast(`恢复失败：${errorText(err)}`)
+    toast(translate('workspace.restore_failed_283a6e', { p0: errorText(err) }))
   }
 }
 
@@ -957,7 +961,7 @@ export async function replaceImage(path: string, file: File) {
     await refreshTree()
   } catch (err) {
     if (isCancel(err)) return
-    toast(`图片已替换，但刷新目录失败：${errorText(err)}`)
+    toast(translate('workspace.image_replaced_but_the_file_bb4848', { p0: errorText(err) }))
   }
 }
 
@@ -991,7 +995,7 @@ async function handleEvents(evs: VaultEvent[]) {
       void refreshMetadata()
     } else if (ev.type === 'settings') {
       void loadSettings().catch((err) => {
-        if (!isCancel(err)) toast(`同步设置失败：${errorText(err)}`)
+        if (!isCancel(err)) toast(translate('workspace.could_not_synchronize_settings_7e5bb1', { p0: errorText(err) }))
       })
       await refreshPlugins()
     } else if (ev.type === 'plugins') {
@@ -1014,7 +1018,7 @@ async function handleEvents(evs: VaultEvent[]) {
           await drafts.move(ev.from!, ev.path!)
         } catch (cause) {
           // 外部文件已移动，草稿失败不能阻止编辑器跟随；保留原记录并明确提示。
-          toast(`迁移本地草稿失败，原路径草稿已保留：${cause instanceof Error ? cause.message : errorText(cause)}`)
+          toast(translate('workspace.could_not_migrate_the_local_4c513a', { p0: cause instanceof Error ? cause.message : errorText(cause) }))
         }
         user.assertSession(version)
         if (epoch !== workspaceEpoch) return
@@ -1098,7 +1102,7 @@ export async function startWorkspace() {
   user.assertSession(version)
   // 设置读取失败不影响使用，沿用本地缓存的值
   const settingsLoaded = loadSettings().catch((err) => {
-    if (!isCancel(err)) toast(`读取设置失败：${errorText(err)}`)
+    if (!isCancel(err)) toast(translate('workspace.could_not_load_settings_246415', { p0: errorText(err) }))
   })
   await refreshTree()
   await settingsLoaded
@@ -1110,7 +1114,7 @@ export async function startWorkspace() {
     await recoverDrafts()
   } catch (err) {
     if (isCancel(err)) throw err
-    toast(`恢复本地草稿失败：${errorText(err)}`)
+    toast(translate('workspace.could_not_restore_the_local_a275e8', { p0: errorText(err) }))
   }
   user.assertSession(version)
   for (const tab of ws.tabs) tab.pinned = saved.pinned?.includes(tab.path) ?? false
@@ -1123,7 +1127,7 @@ export async function startWorkspace() {
     eventQueue = eventQueue.then(() => {
       if (!stopped) return work()
     }).catch((err) => {
-      if (!stopped && version === user.getSessionVersion() && !isCancel(err)) toast(`同步失败：${errorText(err)}`)
+      if (!stopped && version === user.getSessionVersion() && !isCancel(err)) toast(translate('workspace.synchronization_failed_c6eeea', { p0: errorText(err) }))
     })
   }
   const stopEvents = connectEventsApi({ onEvents: events => enqueue(() => handleEvents(events)), onResync: () => enqueue(resync) })
@@ -1173,6 +1177,17 @@ export async function startWorkspace() {
       requestAnimationFrame(() => view?.requestMeasure())
     },
   )
+  watch(locale, (value) => {
+    const effects = localeCompartment.reconfigure(editorLocale.of(value))
+    for (const [path, state] of editorStates) {
+      if (path === ws.active && view) {
+        view.dispatch({ effects })
+        editorStates.set(path, view.state)
+      } else {
+        editorStates.set(path, state.update({ effects }).state)
+      }
+    }
+  })
   // 字号、正文宽度变化后行高随之改变，编辑器需要重新测量
   watch(
     () => [settings.uiFont, settings.uiFontSize, settings.fontSize, settings.contentWidth, settings.sidebarWidth, settings.textFont, settings.codeFont, settings.lineHeight],
@@ -1219,7 +1234,9 @@ registerBuiltinCommands()
 
 function registerBuiltinCommands() {
   for (const command of editorCommands) {
-    registerCommand({ ...command, when: () => ws.view === 'notes' && ws.settings === null && ws.images === null && ws.active !== null && !!view, run: () => {
+    registerCommand({ ...command, get title() {
+      return command.title
+    }, when: () => ws.view === 'notes' && ws.settings === null && ws.images === null && ws.active !== null && !!view, run: () => {
       if (view) {
         command.run(view); view.focus()
       }
@@ -1230,29 +1247,69 @@ function registerBuiltinCommands() {
     ws.switcher = ws.switcher === null ? initial : null
   }
   for (const cmd of [
-    { id: 'app.quickOpen', title: '快速打开笔记', run: () => toggleSwitcher('') },
-    { id: 'app.commandPalette', title: '命令面板', run: () => toggleSwitcher('>') },
-    { id: 'app.search', title: '全文搜索', run: openSearch },
-    { id: 'note.new', title: '新建笔记', run: () => withSidebar(() => createNote('')) },
-    { id: 'folder.new', title: '新建文件夹', run: () => withSidebar(() => createFolder('')) },
-    { id: 'note.save', title: '保存当前笔记', when: hasNote, run: () => void flush(ws.active!) },
-    { id: 'note.rename', title: '重命名当前笔记', when: hasNote, run: () => withSidebar(() => (ws.renaming = ws.active)) },
-    { id: 'note.move', title: '移动当前笔记到…', when: hasNote, run: () => (ws.moving = ws.active) },
-    { id: 'note.delete', title: '删除当前笔记', when: hasNote, run: () => void remove(ws.active!) },
-    { id: 'note.insertImage', title: '插入图片…', when: hasNote, run: insertImagesFromPicker },
-    { id: 'tab.close', title: '关闭当前标签页', when: hasNote, run: () => void closeTab(ws.active!) },
-    { id: 'app.settings', title: '设置', run: () => (ws.settings = 'index') },
-    { id: 'view.sidebar', title: '显示/隐藏侧栏', run: toggleSidebar },
-    { id: 'view.outline', title: '显示/隐藏大纲', when: hasNote, run: () => (ws.outlineOpen = !ws.outlineOpen) },
-    { id: 'view.source', title: '开启/关闭源码编辑', when: hasNote, run: toggleSourceMode },
-    { id: 'view.focus', title: '开启/关闭专注写作', when: hasNote, run: () => (ws.focusMode = !ws.focusMode) },
-    { id: 'app.trash', title: '打开回收站', run: () => (ws.settings = 'trash') },
-    { id: 'app.images', title: '管理根目录图片', run: () => {
+    { id: 'app.quickOpen', get title() {
+      return translate('workspace.quick_open_note_0d376f')
+    }, run: () => toggleSwitcher('') },
+    { id: 'app.commandPalette', get title() {
+      return translate('workspace.command_palette_4b495d')
+    }, run: () => toggleSwitcher('>') },
+    { id: 'app.search', get title() {
+      return translate('workspace.full_text_search_a6c47a')
+    }, run: openSearch },
+    { id: 'note.new', get title() {
+      return translate('workspace.new_note_d3d2d9')
+    }, run: () => withSidebar(() => createNote('')) },
+    { id: 'folder.new', get title() {
+      return translate('workspace.new_folder_84244a')
+    }, run: () => withSidebar(() => createFolder('')) },
+    { id: 'note.save', get title() {
+      return translate('workspace.save_current_note_5a7e29')
+    }, when: hasNote, run: () => void flush(ws.active!) },
+    { id: 'note.rename', get title() {
+      return translate('workspace.rename_current_note_de288b')
+    }, when: hasNote, run: () => withSidebar(() => (ws.renaming = ws.active)) },
+    { id: 'note.move', get title() {
+      return translate('workspace.move_current_note_to_f1fc16')
+    }, when: hasNote, run: () => (ws.moving = ws.active) },
+    { id: 'note.delete', get title() {
+      return translate('workspace.delete_current_note_657a00')
+    }, when: hasNote, run: () => void remove(ws.active!) },
+    { id: 'note.insertImage', get title() {
+      return translate('workspace.insert_image_52c554')
+    }, when: hasNote, run: insertImagesFromPicker },
+    { id: 'tab.close', get title() {
+      return translate('workspace.close_current_tab_cc8a4e')
+    }, when: hasNote, run: () => void closeTab(ws.active!) },
+    { id: 'app.settings', get title() {
+      return translate('common.settings_df3d58')
+    }, run: () => (ws.settings = 'index') },
+    { id: 'view.sidebar', get title() {
+      return translate('workspace.show_hide_sidebar_96b1a4')
+    }, run: toggleSidebar },
+    { id: 'view.outline', get title() {
+      return translate('workspace.show_hide_outline_1da8d2')
+    }, when: hasNote, run: () => (ws.outlineOpen = !ws.outlineOpen) },
+    { id: 'view.source', get title() {
+      return translate('workspace.toggle_source_editing_602b33')
+    }, when: hasNote, run: toggleSourceMode },
+    { id: 'view.focus', get title() {
+      return translate('workspace.toggle_focus_mode_b52fb6')
+    }, when: hasNote, run: () => (ws.focusMode = !ws.focusMode) },
+    { id: 'app.trash', get title() {
+      return translate('workspace.open_trash_8a939d')
+    }, run: () => (ws.settings = 'trash') },
+    { id: 'app.images', get title() {
+      return translate('workspace.manage_root_folder_images_fed368')
+    }, run: () => {
       ws.imagesAll = false; ws.images = ''
     } },
-    { id: 'app.tokens', title: 'API 令牌', run: () => (ws.settings = 'account') },
+    { id: 'app.tokens', get title() {
+      return translate('common.api_tokens_79db53')
+    }, run: () => (ws.settings = 'account') },
   ]) {
-    registerCommand({ ...cmd, keys: typoraKeys(cmd.id) })
+    registerCommand({ ...cmd, get title() {
+      return cmd.title
+    }, keys: typoraKeys(cmd.id) })
   }
 }
 
@@ -1290,11 +1347,11 @@ export function stopWorkspace() {
     return content === undefined ? Promise.resolve() : drafts.put({ path: tab.path, content, baseRev: tab.rev, updatedAt: Date.now() })
   })
   draftPreserved = Promise.all(dirty).then(() => {}).catch((error) => {
-    console.error('保留本地草稿失败', error); toast('本地草稿保存失败，请勿关闭页面')
+    console.error('保留本地草稿失败', error); toast(translate('workspace.could_not_save_the_local_4b21e1'))
   })
   for (const slot of slots.values()) clearTimeout(slot.timer)
   clearTimeout(treeTimer)
-  for (const waiter of treeWaiters.splice(0)) waiter.reject(new CanceledError('工作区已关闭'))
+  for (const waiter of treeWaiters.splice(0)) waiter.reject(new CanceledError(translate('workspace.workspace_closed_221ea3')))
   treeFetching = false
   treeAgain = false
   opsInFlight = 0
@@ -1325,21 +1382,21 @@ async function openMarkdownLink(note: string, href: string) {
   try {
     url = new URL(decoded, `https://rawmark.local/${encodePath(note)}`)
   } catch {
-    toast('链接格式无效'); return
+    toast(translate('workspace.invalid_link_format_651be5')); return
   }
   if (url.origin !== 'https://rawmark.local') {
     if (['http:', 'https:', 'mailto:', 'tel:'].includes(url.protocol)) window.open(url.href, '_blank', 'noopener')
-    else toast('不支持的链接协议')
+    else toast(translate('workspace.unsupported_link_protocol_cf426f'))
     return
   }
   let target: string
   try {
     target = decodeURIComponent(url.pathname.slice(1)); decodeURIComponent(url.hash.slice(1))
   } catch {
-    toast('链接编码无效'); return
+    toast(translate('workspace.invalid_link_encoding_2c6a7e')); return
   }
   if (!ws.entries.some(e => e.path === target && !e.dir)) {
-    toast(`链接目标不存在：${target}`); return
+    toast(translate('workspace.link_target_does_not_exist_2503d1', { p0: target })); return
   }
   if (!target.endsWith('.md')) {
     const response = await getRawFileApi(target)
@@ -1398,7 +1455,7 @@ export async function cleanupImages(paths: string[]) {
   const version = user.getSessionVersion()
   await flushAll()
   user.assertSession(version)
-  if (!readyToReload()) throw new Error('仍有未保存内容或正在处理粘贴、上传与文件操作，请完成后再清理')
+  if (!readyToReload()) throw new Error(translate('workspace.finish_saving_pasting_uploading_or_e67d3d'))
   const result = await withOp(() => cleanupImagesApi({ paths }).then(({ data }) => data))
   await refreshTree()
   await refreshMetadata()

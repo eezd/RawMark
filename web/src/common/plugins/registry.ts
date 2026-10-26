@@ -1,6 +1,7 @@
 import type { CodeBlockRenderer, PluginView } from '@@/plugin-api'
 import type { Extension } from '@codemirror/state'
 import type { MarkdownExtension } from '@lezer/markdown'
+import { t as translate } from '@@/i18n/runtime'
 import { Facet, StateEffect } from '@codemirror/state'
 import { shallowReactive } from 'vue'
 import { renderMermaid } from '../markdown/render'
@@ -33,7 +34,7 @@ export function pluginsChanged() {
 }
 
 export function registerEntry<K, V>(map: Map<K, V>, key: K, value: V): () => void {
-  if (map.has(key)) throw new Error('插件重复注册，不能覆盖已有功能')
+  if (map.has(key)) throw new Error(translate('common.duplicate_plugin_registration_cannot_replace_fbc39b'))
   map.set(key, value)
   try {
     pluginsChanged()
@@ -49,7 +50,7 @@ export function registerEntry<K, V>(map: Map<K, V>, key: K, value: V): () => voi
 
 export function registerCodeRenderer(language: string, value: OwnedRenderer) {
   const key = language.trim().toLowerCase()
-  if (!/^[a-z0-9][a-z0-9_+-]*$/.test(key)) throw new Error('代码块语言名无效')
+  if (!/^[a-z0-9][a-z0-9_+-]*$/.test(key)) throw new Error(translate('common.invalid_code_block_language_name_8de01a'))
   return registerEntry(codeRenderers, key, value)
 }
 
@@ -57,7 +58,7 @@ registerCodeRenderer('mermaid', {
   owner: 'rawmark-mermaid',
   async render({ source, container, signal }) {
     if (!source.trim()) {
-      container.textContent = '空图表'; return
+      container.textContent = translate('common.empty_diagram_37edb7'); return
     }
     try {
       const svg = await renderMermaid(source)
@@ -65,8 +66,10 @@ registerCodeRenderer('mermaid', {
     } catch (error) {
       if (signal.aborted) return
       container.className = 'cm-rm-render-error'
-      container.textContent = error instanceof Error ? error.message : '图表语法错误'
+      container.textContent = error instanceof Error ? error.message : translate('common.invalid_diagram_syntax_333e74')
     }
   },
-  fail: () => window.dispatchEvent(new CustomEvent('rawmark-plugin-notice', { detail: '内置图表渲染失败，请重试' })),
+  fail: () => window.dispatchEvent(new CustomEvent('rawmark-plugin-notice', { get detail() {
+    return translate('common.built_in_diagram_rendering_failed_e93cc6')
+  } })),
 })

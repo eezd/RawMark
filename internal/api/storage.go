@@ -3,10 +3,10 @@ package api
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"net/http"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"strings"
 	"time"
 )
@@ -44,7 +44,7 @@ func (s *Server) getStorage(w http.ResponseWriter, r *http.Request) {
 func scanStorage(ctx context.Context, dataDir, vaultDir string) (storageUsage, error) {
 	usage := storageUsage{Categories: []storageCategory{{ID: "vault"}, {ID: "databases"}, {ID: "fonts"}, {ID: "themes"}, {ID: "plugins"}, {ID: "other"}}}
 	if dataDir == "" {
-		return usage, fmt.Errorf("未配置应用数据目录")
+		return usage, i18n.New("application_data_directory_is_not_a1f183")
 	}
 	dataRoot, err := filepath.EvalSymlinks(dataDir)
 	if err != nil {

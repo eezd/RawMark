@@ -1,6 +1,8 @@
 import * as authApi from '@@/apis/auth'
+import { applyLocale } from '@@/i18n/runtime'
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { pinia } from '@/pinia'
@@ -12,6 +14,7 @@ import { constantRoutes } from './routes'
 const user = useUserStore(pinia)
 const identity = { permissions: ['vault:read', 'vault:write', 'instance:manage'], expiresAt: '2030-01-01T00:00:00Z' }
 beforeEach(() => {
+  applyLocale('en')
   user.setToken(''); vi.spyOn(authApi, 'getAuthStateApi').mockResolvedValue(apiSuccess({ setUp: true })); vi.spyOn(authApi, 'getCurrentUserApi').mockResolvedValue(apiSuccess(identity))
 })
 afterEach(() => {
@@ -60,4 +63,13 @@ it('身份恢复的网络失败必须拒绝，不能伪装成匿名或成功', a
 })
 it.each(['//evil.example', 'https://evil.example', '/\\evil.example', '/login', '/setup'])('拒绝外部及循环回跳 %s', (value) => {
   expect(loginRedirect(value)).toBe('/')
+})
+
+it('登录页语言切换同步标题，不依赖再次导航', async () => {
+  const router = makeRouter()
+  await router.push('/login')
+  expect(document.title).toBe('Sign in')
+  applyLocale('zh-CN')
+  await nextTick()
+  expect(document.title).toBe('登录')
 })

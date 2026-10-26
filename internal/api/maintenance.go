@@ -5,12 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"runtime"
 	"strings"
 	"syscall"
@@ -26,6 +26,7 @@ type maintenanceStatus struct {
 	Error      string `json:"error"`
 	FinishedAt int64  `json:"finishedAt"`
 	Backup     string `json:"backup,omitempty"`
+	cause      error
 }
 
 // gate 排空普通 API 操作后再执行维护；WebSocket 不持有长期读锁。
@@ -36,7 +37,7 @@ func (s *Server) guardAPI(next http.Handler) http.Handler {
 			return
 		}
 		if s.maintenanceBusy.Load() && r.URL.Path != "/api/v1/maintenance/status" {
-			writeError(w, 503, "正在维护，请稍后重试")
+			writeError(w, 503, message(w, "maintenance_is_in_progress_please_64ef9d"))
 			return
 		}
 		resourcePath, resource := strings.CutPrefix(r.URL.Path, "/api/v1/resources/")
@@ -47,7 +48,7 @@ func (s *Server) guardAPI(next http.Handler) http.Handler {
 			return
 		}
 		if !s.activity.TryRLock() {
-			writeError(w, 503, "正在维护，请稍后重试")
+			writeError(w, 503, message(w, "maintenance_is_in_progress_please_64ef9d"))
 			return
 		}
 		defer s.activity.RUnlock()
@@ -55,8 +56,8 @@ func (s *Server) guardAPI(next http.Handler) http.Handler {
 	})
 }
 
-var errMaintenanceBusy = errors.New("其他维护操作正在执行")
-var errMaintenanceInput = errors.New("维护请求无效")
+var errMaintenanceBusy = i18n.New("another_maintenance_operation_is_in_da1aa4")
+var errMaintenanceInput = i18n.New("invalid_maintenance_request_ef9c16")
 
 func (s *Server) maintain(operation string, fn func() error) error {
 	if !s.maintenanceMu.TryLock() {
@@ -75,6 +76,7 @@ func (s *Server) maintain(operation string, fn func() error) error {
 	s.maintenanceState.FinishedAt = time.Now().UnixMilli()
 	if err != nil {
 		s.maintenanceState.Error = err.Error()
+		s.maintenanceState.cause = err
 	}
 	s.maintenanceStatusMu.Unlock()
 	if !s.restarting.Load() {
@@ -85,19 +87,26 @@ func (s *Server) maintain(operation string, fn func() error) error {
 func (s *Server) maintenanceInfo(w http.ResponseWriter, r *http.Request) {
 	s.maintenanceStatusMu.Lock()
 	defer s.maintenanceStatusMu.Unlock()
-	writeJSON(w, 200, s.maintenanceState)
+	state := s.maintenanceState
+	if state.Operation != "" {
+		state.Operation = message(w, state.Operation)
+	}
+	if state.cause != nil {
+		state.Error = i18n.RenderError(state.cause, responseLocale(w))
+	}
+	writeJSON(w, 200, state)
 }
 func (s *Server) maintenanceError(w http.ResponseWriter, r *http.Request, err error) {
 	var pathError *os.PathError
 	switch {
 	case errors.Is(err, errMaintenanceBusy):
-		writeError(w, 503, err.Error())
+		writeError(w, 503, i18n.RenderError(err, responseLocale(w)))
 	case errors.Is(err, syscall.ENOSPC):
-		writeError(w, 503, "磁盘空间不足")
+		writeError(w, 503, message(w, "not_enough_disk_space_a53a70"))
 	case errors.As(err, &pathError) && !errors.Is(pathError, os.ErrNotExist) && !errors.Is(pathError, syscall.ENOTDIR) && !errors.Is(pathError, syscall.EISDIR):
 		internalError(w, r, err)
 	case errors.Is(err, errMaintenanceInput), errors.Is(err, backup.ErrInvalidArchive):
-		writeError(w, 400, "操作失败："+err.Error())
+		writeError(w, 400, message(w, "operation_failed", i18n.RenderError(err, responseLocale(w))))
 	default:
 		internalError(w, r, err)
 	}
@@ -200,7 +209,7 @@ func sendDownload(w http.ResponseWriter, r *http.Request, file, name string) err
 func (s *Server) exportBackup(w http.ResponseWriter, r *http.Request) {
 	kind := r.PathValue("kind")
 	if kind != "full" && kind != "settings" {
-		writeError(w, 400, "备份类型无效")
+		writeError(w, 400, message(w, "invalid_backup_type_f5ff70"))
 		return
 	}
 	temp, err := s.tempDir()
@@ -217,7 +226,7 @@ func (s *Server) exportBackup(w http.ResponseWriter, r *http.Request) {
 	file.Close()
 	os.Remove(name)
 	defer os.Remove(name)
-	err = s.maintain("导出备份", func() error {
+	err = s.maintain("export_backup_e9d3dd", func() error {
 		if err := s.createArchive(r.Context(), kind, name); err != nil {
 			return err
 		}
@@ -228,7 +237,7 @@ func (s *Server) exportBackup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (s *Server) exportNotes(w http.ResponseWriter, r *http.Request) {
-	err := s.maintain("导出笔记数据", func() error {
+	err := s.maintain("export_note_data_45a4e1", func() error {
 		dataRoot, err := filepath.EvalSymlinks(s.DataDir)
 		if err != nil {
 			return err
@@ -253,39 +262,42 @@ func (s *Server) exportNotes(w http.ResponseWriter, r *http.Request) {
 func validatePreferences(values map[string]json.RawMessage) error {
 	for key, raw := range values {
 		if len(raw) > maxJSONBytes {
-			return fmt.Errorf("%w：单项设置超过 1 MiB", errMaintenanceInput)
+			return i18n.New("w_a_single_setting_exceeds_c7dccb", errMaintenanceInput)
 		}
 		switch {
 		case key == settingsKey:
 			var settings map[string]json.RawMessage
 			if err := json.Unmarshal(raw, &settings); err != nil || settings == nil {
-				return fmt.Errorf("%w：偏好设置必须为对象", errMaintenanceInput)
+				return i18n.New("w_preferences_must_be_an_8d2724", errMaintenanceInput)
+			}
+			if err := validateLocale(settings); err != nil {
+				return errors.Join(errMaintenanceInput, err)
 			}
 			if _, err := trashRetentionDays(settings); err != nil {
-				return fmt.Errorf("%w：%w", errMaintenanceInput, err)
+				return i18n.New("w_w_f0fd7d", errMaintenanceInput, err)
 			}
 			if value, ok := settings["shortcuts"]; ok {
 				var shortcuts map[string][]string
 				if err := json.Unmarshal(value, &shortcuts); err != nil {
-					return fmt.Errorf("%w：快捷键格式无效", errMaintenanceInput)
+					return i18n.New("w_invalid_shortcut_format_0acab4", errMaintenanceInput)
 				}
 			}
 		case key == pluginEnabledKey:
 			var ids map[string]bool
 			if err := json.Unmarshal(raw, &ids); err != nil {
-				return fmt.Errorf("%w：%w", errMaintenanceInput, err)
+				return i18n.New("w_w_f0fd7d", errMaintenanceInput, err)
 			}
 			for id := range ids {
 				if !validPluginID(id) {
-					return fmt.Errorf("%w：插件 ID 无效", errMaintenanceInput)
+					return i18n.New("w_invalid_plugin_id_7f3512", errMaintenanceInput)
 				}
 			}
 		case strings.HasPrefix(key, "plugin.data."):
 			if !validPluginID(strings.TrimPrefix(key, "plugin.data.")) || !json.Valid(raw) {
-				return fmt.Errorf("%w：插件数据无效", errMaintenanceInput)
+				return i18n.New("w_invalid_plugin_data_1f5fe3", errMaintenanceInput)
 			}
 		default:
-			return fmt.Errorf("%w：设置包包含不允许的设置项", errMaintenanceInput)
+			return i18n.New("w_the_settings_package_contains_e70b59", errMaintenanceInput)
 		}
 	}
 	return nil
@@ -296,7 +308,7 @@ func readPreferences(stage string) (map[string]json.RawMessage, error) {
 		return nil, err
 	}
 	if info.Size() > 32<<20 {
-		return nil, fmt.Errorf("%w：设置包设置内容超过 32 MiB", errMaintenanceInput)
+		return nil, i18n.New("w_settings_package_content_exceeds_baf8eb", errMaintenanceInput)
 	}
 	raw, err := os.ReadFile(filepath.Join(stage, "settings.json"))
 	if err != nil {
@@ -304,7 +316,7 @@ func readPreferences(stage string) (map[string]json.RawMessage, error) {
 	}
 	var values map[string]json.RawMessage
 	if err = json.Unmarshal(raw, &values); err != nil || values == nil {
-		return nil, fmt.Errorf("%w：设置包格式无效", errMaintenanceInput)
+		return nil, i18n.New("w_invalid_settings_package_format_2e7bee", errMaintenanceInput)
 	}
 	if err = validatePreferences(values); err != nil {
 		return nil, err
@@ -322,16 +334,16 @@ func (s *Server) applySettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !body.Confirmed {
-		writeError(w, 400, "请先确认导入设置")
+		writeError(w, 400, message(w, "confirm_settings_import_first_e89aa3"))
 		return
 	}
-	err := s.maintain("导入设置", func() error {
+	err := s.maintain("import_settings_1a80d4", func() error {
 		meta, dir, err := s.readUpload(r, body.ID)
 		if err != nil {
 			return err
 		}
 		if !meta.Validated || meta.Kind != "settings" {
-			return fmt.Errorf("%w：请先校验设置包", errMaintenanceInput)
+			return i18n.New("w_validate_the_settings_package_0f4f56", errMaintenanceInput)
 		}
 		stage := filepath.Join(dir, "stage")
 		values, err := readPreferences(stage)
@@ -436,10 +448,10 @@ func (s *Server) resetSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !body.Confirmed {
-		writeError(w, 400, "请先确认重置")
+		writeError(w, 400, message(w, "confirm_reset_first_22ae3d"))
 		return
 	}
-	err := s.maintain("重置设置", func() error {
+	err := s.maintain("reset_settings_9a70ef", func() error {
 		if _, err := s.saveRollback(r.Context(), "settings"); err != nil {
 			return err
 		}
@@ -458,10 +470,10 @@ func (s *Server) resetSettings(w http.ResponseWriter, r *http.Request) {
 func (s *Server) maintainIndex(w http.ResponseWriter, r *http.Request) {
 	operation := r.PathValue("operation")
 	if operation != "optimize" && operation != "rebuild" {
-		writeError(w, 400, "索引操作无效")
+		writeError(w, 400, message(w, "invalid_index_operation_be898b"))
 		return
 	}
-	err := s.maintain("索引维护", func() error {
+	err := s.maintain("index_maintenance_676706", func() error {
 		if operation == "rebuild" {
 			return s.index.Rebuild(r.Context())
 		}
@@ -476,10 +488,10 @@ func (s *Server) maintainIndex(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) exportLogs(w http.ResponseWriter, r *http.Request) {
 	if s.Logs == nil {
-		writeError(w, 503, "当前服务尚未启用日志文件")
+		writeError(w, 503, message(w, "log_files_are_not_enabled_dcf4df"))
 		return
 	}
-	err := s.maintain("导出系统日志", func() error {
+	err := s.maintain("export_system_logs_d05855", func() error {
 		temp, err := s.tempDir()
 		if err != nil {
 			return err

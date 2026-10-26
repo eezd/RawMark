@@ -5,10 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"strings"
 
 	"rawmark/internal/store"
@@ -78,14 +78,14 @@ func CheckDatabase(file string) error {
 	header := make([]byte, 16)
 	_, err = io.ReadFull(f, header)
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-		err = fmt.Errorf("%w：%w", ErrInvalidArchive, err)
+		err = i18n.New("w_w_f0fd7d", ErrInvalidArchive, err)
 	}
 	err = errors.Join(err, f.Close())
 	if err != nil {
 		return err
 	}
 	if string(header) != "SQLite format 3\x00" {
-		return fmt.Errorf("%w：备份数据库格式无效", ErrInvalidArchive)
+		return i18n.New("w_invalid_backup_database_format_d45d60", ErrInvalidArchive)
 	}
 	st, err := store.OpenExisting(file)
 	if err != nil {
@@ -101,7 +101,7 @@ func CheckDatabase(file string) error {
 				return err
 			}
 		}
-		return fmt.Errorf("%w：%w", ErrInvalidArchive, err)
+		return i18n.New("w_w_f0fd7d", ErrInvalidArchive, err)
 	}
 	password, ok, err := st.Setting("auth.password")
 	if err != nil {
@@ -109,15 +109,15 @@ func CheckDatabase(file string) error {
 	}
 	parts := strings.Split(password, "$")
 	if !ok || len(parts) != 6 || parts[1] != "argon2id" || parts[2] != "v=19" || parts[3] != "m=65536,t=3,p=4" {
-		return fmt.Errorf("%w：备份密码格式不受支持", ErrInvalidArchive)
+		return i18n.New("w_unsupported_backup_password_format_184d32", ErrInvalidArchive)
 	}
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil || len(salt) != 16 {
-		return fmt.Errorf("%w：备份密码盐无效", ErrInvalidArchive)
+		return i18n.New("w_invalid_backup_password_salt_315eca", ErrInvalidArchive)
 	}
 	key, err := base64.RawStdEncoding.DecodeString(parts[5])
 	if err != nil || len(key) != 32 {
-		return fmt.Errorf("%w：备份密码校验值无效", ErrInvalidArchive)
+		return i18n.New("w_invalid_backup_password_verification_17d1c1", ErrInvalidArchive)
 	}
 	return nil
 }
@@ -183,7 +183,7 @@ func CopyTree(src, dest string) error {
 			return err
 		}
 		if !info.Mode().IsRegular() {
-			return fmt.Errorf("不允许复制特殊文件")
+			return i18n.New("special_files_cannot_be_copied_441836")
 		}
 		if err = copyFile(p, target, 0600); err != nil {
 			return err
@@ -272,17 +272,17 @@ func Recover(data, vault string) (err error) {
 		return err
 	}
 	if record.State != "prepared" && record.State != "applying" && record.State != "verifying" {
-		return fmt.Errorf("恢复记录状态无效")
+		return i18n.New("invalid_restore_record_state_eee063")
 	}
 	// 记录由本机生成；仍限制其读取范围，避免错误记录读取任意文件。
 	if !strings.HasPrefix(record.Stage, filepath.Join(data, ".maintenance", "uploads")+string(filepath.Separator)) || !strings.HasPrefix(record.Backup, filepath.Join(data, "backups")+string(filepath.Separator)) {
-		return fmt.Errorf("恢复记录路径无效")
+		return i18n.New("invalid_restore_record_path_611881")
 	}
 	if record.Kind == "settings" {
 		return recoverSettings(data, record)
 	}
 	if record.State != "prepared" {
-		err = fmt.Errorf("上次实例恢复被中断")
+		err = i18n.New("the_previous_instance_restore_was_a9d480")
 	}
 	if record.State == "prepared" {
 		record.State = "applying"
@@ -304,13 +304,13 @@ func Recover(data, vault string) (err error) {
 		restoreErr = apply(data, vault, stage)
 	}
 	if restoreErr != nil {
-		return errors.Join(err, fmt.Errorf("实例回退失败: %w", restoreErr))
+		return errors.Join(err, i18n.New("instance_rollback_failed_w_80ec77", restoreErr))
 	}
 	if removeErr := os.Remove(recordPath(data)); removeErr != nil {
 		return errors.Join(err, removeErr)
 	}
 	if err != nil {
-		return fmt.Errorf("导入恢复失败，已回退原实例: %w", err)
+		return i18n.New("restore_failed_original_instance_restored_c03846", err)
 	}
 	return nil
 }
@@ -329,7 +329,7 @@ func FinishRecovery(data string) error {
 		return err
 	}
 	if record.State != "verifying" {
-		return fmt.Errorf("恢复尚未完成初始化")
+		return i18n.New("the_restored_instance_has_not_5ca7fb")
 	}
 	if err = os.RemoveAll(filepath.Dir(record.Stage)); err != nil {
 		return err
@@ -383,5 +383,5 @@ func recoverSettings(data string, record RestoreRecord) error {
 	if err = os.Remove(recordPath(data)); err != nil {
 		return err
 	}
-	return fmt.Errorf("设置导入被中断，已回退原设置和资源")
+	return i18n.New("settings_import_was_interrupted_original_417ef5")
 }

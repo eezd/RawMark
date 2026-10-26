@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { locale, t as translate } from '@@/i18n/runtime'
+
 import { confirmAction } from '@@/utils/confirm'
 import { basename, dirname, isImage, joinPath } from '@@/utils/paths'
 import { computed, ref, watch } from 'vue'
@@ -18,7 +20,7 @@ const extension = computed(() => basename(path.value).slice(basename(path.value)
 const src = computed(() => imageUrl(path.value))
 const siblings = computed(() => ws.entries.filter(e => !e.dir && isImage(e.path) && dirname(e.path) === dirname(path.value)))
 const index = computed(() => siblings.value.findIndex(e => e.path === path.value))
-const size = computed(() => entry.value ? `${(entry.value.size / 1024).toLocaleString('zh-CN', { maximumFractionDigits: 1 })} KB` : '')
+const size = computed(() => entry.value ? `${(entry.value.size / 1024).toLocaleString(locale.value, { maximumFractionDigits: 1 })} KB` : '')
 
 watch(path, (p) => {
   name.value = basename(p).slice(0, -extension.value.length); error.value = ''
@@ -44,7 +46,7 @@ function loaded(event: Event) {
 async function rename() {
   const base = name.value.trim()
   if (!base || base.startsWith('.') || /[/\\]/.test(base)) {
-    error.value = '图片名称不能为空、以点开头或包含斜杠'; return
+    error.value = translate('workspace.image_names_cannot_be_empty_9499af'); return
   }
   const to = joinPath(dirname(path.value), base + extension.value)
   if (to === path.value || busy.value) return
@@ -54,7 +56,7 @@ async function rename() {
     const result = await move(path.value, to, 'caller')
     if (!result.ok) error.value = result.error
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '修改后同步失败，请检查目录'
+    error.value = err instanceof Error ? err.message : translate('workspace.change_applied_but_synchronization_failed_8a50cd')
   } finally {
     busy.value = false
   }
@@ -66,18 +68,18 @@ async function replace(event: Event) {
   input.value = ''
   if (!file || busy.value) return
   if (file.size > 50 * 1024 * 1024) {
-    error.value = '图片不能超过 50 MB'; return
+    error.value = translate('workspace.images_must_not_exceed_mb_61d721'); return
   }
   if (!file.name.toLowerCase().endsWith(extension.value.toLowerCase())) {
-    error.value = '请选择与原图片扩展名相同的文件'; return
+    error.value = translate('workspace.choose_a_file_with_the_97e882'); return
   }
   busy.value = true
   error.value = ''
   try {
-    if (!await confirmAction('替换会影响所有引用此路径的笔记，旧图片不会进入回收站。确定替换？')) return
+    if (!await confirmAction(translate('workspace.replacing_this_image_affects_all_107587'))) return
     await replaceImage(path.value, file)
   } catch (err) {
-    error.value = err instanceof ApiError ? err.message : '网络错误，替换结果尚未确认，请检查图片后再重试'
+    error.value = err instanceof ApiError ? err.message : translate('workspace.network_error_replacement_status_is_8b54f6')
   } finally {
     busy.value = false
   }
@@ -87,7 +89,7 @@ async function trash() {
   if (busy.value) return
   busy.value = true
   try {
-    if (!await confirmAction('将图片移入回收站？引用它的笔记会暂时无法显示此图片，恢复后可重新显示。')) return
+    if (!await confirmAction(translate('workspace.move_this_image_to_trash_c979ba'))) return
     await remove(path.value)
   } finally {
     busy.value = false
@@ -96,41 +98,41 @@ async function trash() {
 </script>
 
 <template>
-  <el-dialog :model-value="true" title="图片管理" width="860px" class="rm-image-dialog" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy" :before-close="close" @close="close">
+  <el-dialog :model-value="true" :title="translate('workspace.image_manager_07c502')" width="860px" class="rm-image-dialog" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy" :before-close="close" @close="close">
     <div class="rm-image-body">
       <p class="rm-image-path">
         {{ path }}
       </p>
       <div class="rm-image-preview">
         <p v-if="!entry">
-          图片已不存在，请刷新目录
+          {{ translate('workspace.this_image_no_longer_exists_50dc1d') }}
         </p>
         <p v-else-if="loadError" role="alert">
-          图片无法预览，文件可能损坏或浏览器不支持此格式。
+          {{ translate('workspace.cannot_preview_this_image_it_046111') }}
         </p>
         <img v-else :key="src" :src="src" :alt="basename(path)" @load="loaded" @error="loadError = true">
       </div>
       <div class="rm-image-navigation">
         <el-button class="rm-btn" :disabled="busy || index <= 0" @click="select(-1)">
-          上一张
+          {{ translate('workspace.previous_image_bcf200') }}
         </el-button>
         <span>{{ index + 1 }} / {{ siblings.length }} · {{ dimensions }} {{ size }}</span>
         <el-button class="rm-btn" :disabled="busy || index >= siblings.length - 1" @click="select(1)">
-          下一张
+          {{ translate('workspace.next_image_dcd4eb') }}
         </el-button>
       </div>
       <form class="rm-image-rename" @submit.prevent="rename">
-        <label for="rm-image-name">图片名称</label>
+        <label for="rm-image-name">{{ translate('workspace.image_name_edb98e') }}</label>
         <div>
           <el-input id="rm-image-name" v-model="name" :disabled="busy || !entry" required />
           <span>{{ extension }}</span>
           <el-button native-type="submit" class="rm-btn" :disabled="busy || !entry || name.trim() + extension === basename(path)">
-            重命名
+            {{ translate('workspace.rename_0d0cba') }}
           </el-button>
         </div>
       </form>
       <p class="rm-image-hint">
-        改名会更新笔记中的本地引用；替换保留原路径，请选择同格式图片（最大 50 MB）。
+        {{ translate('workspace.renaming_updates_local_references_in_bc3d12') }}
       </p>
       <p v-if="error" class="rm-auth-error" role="alert">
         {{ error }}
@@ -138,13 +140,13 @@ async function trash() {
       <div class="rm-image-actions">
         <input ref="picker" type="file" :accept="extension" hidden :disabled="busy" @change="replace">
         <el-button class="rm-btn" :disabled="busy || !entry" @click="ws.moving = path">
-          移动到…
+          {{ translate('workspace.move_to_0bee16') }}
         </el-button>
         <el-button class="rm-btn rm-btn-danger" :disabled="busy || !entry" @click="trash">
-          移入回收站
+          {{ translate('workspace.move_to_trash_361bdf') }}
         </el-button>
         <el-button class="rm-btn rm-btn-primary" :disabled="busy || !entry" @click="picker?.click()">
-          {{ busy ? '处理中…' : '替换图片' }}
+          {{ busy ? translate('workspace.processing_d3d211') : translate('workspace.replace_image_dbc39d') }}
         </el-button>
       </div>
     </div>

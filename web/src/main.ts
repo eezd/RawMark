@@ -6,6 +6,7 @@ import { pinia } from '@/pinia'
 import { useUserStore } from '@/pinia/stores/user'
 import { router } from '@/router'
 import App from './App.vue'
+import { i18n } from './i18n'
 import 'element-plus/dist/index.css'
 import '@@/appearance/base.css'
 import '@@/assets/styles/app.css'
@@ -14,7 +15,7 @@ import 'virtual:uno.css'
 
 watchFontLoading()
 const app = createApp(App)
-app.use(pinia).use(router)
+app.use(i18n).use(pinia).use(router)
 const user = useUserStore(pinia)
 window.addEventListener('storage', user.syncStorage)
 watch(() => user.sessionVersion, () => {

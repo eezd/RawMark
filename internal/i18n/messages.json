@@ -1,0 +1,970 @@
+{
+  "api_endpoint_not_found_c49d86": {
+    "en": "API endpoint not found",
+    "zh-CN": "接口不存在"
+  },
+  "cross_site_request_rejected_5e7a50": {
+    "en": "Cross-site request rejected",
+    "zh-CN": "跨站请求被拒绝"
+  },
+  "invalid_request_icon_is_required_16149e": {
+    "en": "Invalid request: icon is required (null resets the default)",
+    "zh-CN": "请求格式错误：需要 icon（null 恢复默认）"
+  },
+  "note_is_too_large_86d890": {
+    "en": "Note is too large",
+    "zh-CN": "笔记过大"
+  },
+  "upload_file_is_missing_a2be00": {
+    "en": "Upload file is missing",
+    "zh-CN": "缺少上传文件"
+  },
+  "a_note_and_a_folder_8b62b5": {
+    "en": "A note and a folder cannot both be specified",
+    "zh-CN": "不能同时指定笔记和文件夹"
+  },
+  "images_must_not_exceed_mb_61d721": {
+    "en": "Images must not exceed 50 MB",
+    "zh-CN": "图片不能超过 50 MB"
+  },
+  "could_not_read_uploaded_file_4f04cc": {
+    "en": "Could not read uploaded file",
+    "zh-CN": "无法读取上传文件"
+  },
+  "invalid_request_format_2529b1": {
+    "en": "Invalid request format",
+    "zh-CN": "请求格式错误"
+  },
+  "internal_server_error_036549": {
+    "en": "Internal server error",
+    "zh-CN": "服务器内部错误"
+  },
+  "select_between_and_images_to_338e4e": {
+    "en": "Select between 1 and 1,000 images to clean up",
+    "zh-CN": "请选择 1～1000 张待清理图片"
+  },
+  "please_sign_in_48144f": {
+    "en": "Please sign in",
+    "zh-CN": "请先登录"
+  },
+  "credentials_are_invalid_or_expired_e1f63b": {
+    "en": "Credentials are invalid or expired",
+    "zh-CN": "登录凭据无效或已过期"
+  },
+  "this_endpoint_requires_a_login_d34b96": {
+    "en": "This endpoint requires a login session",
+    "zh-CN": "此接口需要登录会话"
+  },
+  "read_only_tokens_cannot_modify_6cf8e2": {
+    "en": "Read-only tokens cannot modify data",
+    "zh-CN": "只读令牌不能修改数据"
+  },
+  "the_verification_code_is_incorrect_6e789b": {
+    "en": "The verification code is incorrect or already used. Refresh it and try again",
+    "zh-CN": "验证码错误或已使用，请刷新后重试"
+  },
+  "the_verification_code_has_expired_0b3384": {
+    "en": "The verification code has expired. Refresh it and try again",
+    "zh-CN": "验证码已过期，请刷新后重试"
+  },
+  "invalid_font_installation_information_77cff8": {
+    "en": "Invalid font installation information",
+    "zh-CN": "字体安装信息无效"
+  },
+  "could_not_read_font_file_b7b543": {
+    "en": "Could not read font file. The limit is 30 MB per file",
+    "zh-CN": "无法读取字体文件，单个文件上限 30 MB"
+  },
+  "choose_a_font_file_4c95b9": {
+    "en": "Choose a font file",
+    "zh-CN": "请选择字体文件"
+  },
+  "font_file_exceeds_mb_cc001c": {
+    "en": "Font file exceeds 30 MB",
+    "zh-CN": "字体文件超过 30 MB"
+  },
+  "import_a_valid_ttf_otf_b67fd3": {
+    "en": "Import a valid TTF, OTF, WOFF, or WOFF2 font",
+    "zh-CN": "请导入有效的 TTF、OTF、WOFF 或 WOFF2 字体文件"
+  },
+  "font_directory_is_not_configured_73d32a": {
+    "en": "Font directory is not configured",
+    "zh-CN": "字体目录未配置"
+  },
+  "font_filename_is_invalid_or_a3fd5e": {
+    "en": "Font filename is invalid or too long",
+    "zh-CN": "字体文件名无效或过长"
+  },
+  "font_not_found_4383e9": {
+    "en": "Font not found",
+    "zh-CN": "字体不存在"
+  },
+  "a_font_must_be_a_5b8b51": {
+    "en": "A font must be a regular file",
+    "zh-CN": "字体必须为普通文件"
+  },
+  "maple_is_the_default_font_a8a571": {
+    "en": "Maple is the default font and cannot be deleted",
+    "zh-CN": "Maple 是默认字体，不可删除"
+  },
+  "font_disabled_but_file_cleanup_d8b892": {
+    "en": "Font disabled, but file cleanup failed: %w",
+    "zh-CN": "字体已停用，但文件清理失败：%w"
+  },
+  "image_url_must_be_a_391763": {
+    "en": "Image URL must be a public HTTP or HTTPS address",
+    "zh-CN": "图片地址必须是公网 HTTP 或 HTTPS 地址"
+  },
+  "only_png_jpeg_gif_and_a413cf": {
+    "en": "Only PNG, JPEG, GIF, and WebP images can be imported",
+    "zh-CN": "仅支持导入 PNG、JPEG、GIF 和 WebP 图片"
+  },
+  "too_many_redirects_from_the_6738ba": {
+    "en": "Too many redirects from the image source",
+    "zh-CN": "图片来源重定向次数过多"
+  },
+  "invalid_note_path_be69bd": {
+    "en": "Invalid note path",
+    "zh-CN": "所属笔记路径无效"
+  },
+  "could_not_download_image_b4a293": {
+    "en": "Could not download image",
+    "zh-CN": "下载图片失败"
+  },
+  "could_not_read_downloaded_image_4b7fdf": {
+    "en": "Could not read downloaded image",
+    "zh-CN": "读取下载图片失败"
+  },
+  "the_owning_path_must_be_867b53": {
+    "en": "The owning path must be a note file",
+    "zh-CN": "所属路径必须是笔记文件"
+  },
+  "total_import_size_must_not_23ac37": {
+    "en": "Total import size must not exceed 100 MB",
+    "zh-CN": "导入文件总量不能超过 100 MB"
+  },
+  "could_not_read_import_form_69f1c3": {
+    "en": "Could not read import form",
+    "zh-CN": "无法读取导入表单"
+  },
+  "choose_markdown_files_or_a_bea10e": {
+    "en": "Choose Markdown files or a ZIP",
+    "zh-CN": "请选择 Markdown 文件或一个 ZIP"
+  },
+  "maintenance_is_in_progress_please_64ef9d": {
+    "en": "Maintenance is in progress. Please try again later",
+    "zh-CN": "正在维护，请稍后重试"
+  },
+  "another_maintenance_operation_is_in_da1aa4": {
+    "en": "Another maintenance operation is in progress",
+    "zh-CN": "其他维护操作正在执行"
+  },
+  "invalid_maintenance_request_ef9c16": {
+    "en": "Invalid maintenance request",
+    "zh-CN": "维护请求无效"
+  },
+  "not_enough_disk_space_a53a70": {
+    "en": "Not enough disk space",
+    "zh-CN": "磁盘空间不足"
+  },
+  "invalid_backup_type_f5ff70": {
+    "en": "Invalid backup type",
+    "zh-CN": "备份类型无效"
+  },
+  "export_backup_e9d3dd": {
+    "en": "Export backup",
+    "zh-CN": "导出备份"
+  },
+  "export_note_data_45a4e1": {
+    "en": "Export note data",
+    "zh-CN": "导出笔记数据"
+  },
+  "w_a_single_setting_exceeds_c7dccb": {
+    "en": "%w: a single setting exceeds 1 MiB",
+    "zh-CN": "%w：单项设置超过 1 MiB"
+  },
+  "w_preferences_must_be_an_8d2724": {
+    "en": "%w: preferences must be an object",
+    "zh-CN": "%w：偏好设置必须为对象"
+  },
+  "w_invalid_shortcut_format_0acab4": {
+    "en": "%w: invalid shortcut format",
+    "zh-CN": "%w：快捷键格式无效"
+  },
+  "w_invalid_plugin_id_7f3512": {
+    "en": "%w: invalid plugin ID",
+    "zh-CN": "%w：插件 ID 无效"
+  },
+  "w_invalid_plugin_data_1f5fe3": {
+    "en": "%w: invalid plugin data",
+    "zh-CN": "%w：插件数据无效"
+  },
+  "w_the_settings_package_contains_e70b59": {
+    "en": "%w: the settings package contains disallowed settings",
+    "zh-CN": "%w：设置包包含不允许的设置项"
+  },
+  "w_settings_package_content_exceeds_baf8eb": {
+    "en": "%w: settings package content exceeds 32 MiB",
+    "zh-CN": "%w：设置包设置内容超过 32 MiB"
+  },
+  "w_invalid_settings_package_format_2e7bee": {
+    "en": "%w: invalid settings package format",
+    "zh-CN": "%w：设置包格式无效"
+  },
+  "confirm_settings_import_first_e89aa3": {
+    "en": "Confirm settings import first",
+    "zh-CN": "请先确认导入设置"
+  },
+  "import_settings_1a80d4": {
+    "en": "Import settings",
+    "zh-CN": "导入设置"
+  },
+  "confirm_reset_first_22ae3d": {
+    "en": "Confirm reset first",
+    "zh-CN": "请先确认重置"
+  },
+  "reset_settings_9a70ef": {
+    "en": "Reset settings",
+    "zh-CN": "重置设置"
+  },
+  "invalid_index_operation_be898b": {
+    "en": "Invalid index operation",
+    "zh-CN": "索引操作无效"
+  },
+  "index_maintenance_676706": {
+    "en": "Index maintenance",
+    "zh-CN": "索引维护"
+  },
+  "log_files_are_not_enabled_dcf4df": {
+    "en": "Log files are not enabled for this service",
+    "zh-CN": "当前服务尚未启用日志文件"
+  },
+  "export_system_logs_d05855": {
+    "en": "Export system logs",
+    "zh-CN": "导出系统日志"
+  },
+  "w_invalid_upload_id_23d358": {
+    "en": "%w: invalid upload ID",
+    "zh-CN": "%w：上传 ID 无效"
+  },
+  "w_upload_does_not_exist_918d8d": {
+    "en": "%w: upload does not exist or has expired",
+    "zh-CN": "%w：上传不存在或已过期"
+  },
+  "w_upload_does_not_belong_c4d06d": {
+    "en": "%w: upload does not belong to the current session",
+    "zh-CN": "%w：上传不属于当前会话"
+  },
+  "not_enough_disk_space_w_a39b20": {
+    "en": "Not enough disk space: %w",
+    "zh-CN": "磁盘空间不足：%w"
+  },
+  "choose_a_valid_backup_with_51ba41": {
+    "en": "Choose a valid backup with a compressed size no greater than 2 GiB",
+    "zh-CN": "请选择有效备份，压缩大小上限 2 GiB"
+  },
+  "prepare_upload_ed0bd9": {
+    "en": "Prepare upload",
+    "zh-CN": "准备上传"
+  },
+  "invalid_upload_offset_3bdbf1": {
+    "en": "Invalid upload offset",
+    "zh-CN": "上传偏移无效"
+  },
+  "upload_backup_83b1a9": {
+    "en": "Upload backup",
+    "zh-CN": "上传备份"
+  },
+  "w_the_resource_directory_contains_3898a5": {
+    "en": "%w: the resource directory contains a non-directory entry",
+    "zh-CN": "%w：资源目录内包含非目录条目"
+  },
+  "validate_backup_09df97": {
+    "en": "Validate backup",
+    "zh-CN": "校验备份"
+  },
+  "cancel_upload_a24836": {
+    "en": "Cancel upload",
+    "zh-CN": "取消上传"
+  },
+  "confirm_replacing_instance_data_and_52f3ca": {
+    "en": "Confirm replacing instance data and signing in again first",
+    "zh-CN": "请先确认替换实例数据并重新登录"
+  },
+  "this_service_does_not_support_a9a8ba": {
+    "en": "This service does not support instance restore",
+    "zh-CN": "当前服务不支持实例恢复"
+  },
+  "restore_full_instance_9b4ee0": {
+    "en": "Restore full instance",
+    "zh-CN": "恢复完整实例"
+  },
+  "clean_temporary_files_af91ae": {
+    "en": "Clean temporary files",
+    "zh-CN": "清理临时文件"
+  },
+  "invalid_plugin_manifest_a_valid_121d94": {
+    "en": "Invalid plugin manifest. A valid id, name, version, and apiVersion: 1 are required",
+    "zh-CN": "插件 manifest 无效，必须包含合法的 id、name、version 和 apiVersion: 1"
+  },
+  "plugin_directory_does_not_match_0eda90": {
+    "en": "Plugin directory does not match the manifest ID",
+    "zh-CN": "插件目录与 manifest id 不一致"
+  },
+  "invalid_plugin_installation_information_3e7873": {
+    "en": "Invalid plugin installation information",
+    "zh-CN": "插件安装信息无效"
+  },
+  "invalid_plugin_enabled_configuration_26d4bb": {
+    "en": "Invalid plugin enabled configuration",
+    "zh-CN": "插件启用配置无效"
+  },
+  "plugin_not_found_or_installation_f577c6": {
+    "en": "Plugin not found or installation is incomplete",
+    "zh-CN": "插件不存在或安装不完整"
+  },
+  "could_not_read_plugin_zip_922fd9": {
+    "en": "Could not read plugin ZIP",
+    "zh-CN": "无法读取插件 ZIP"
+  },
+  "a_plugin_may_contain_at_41c105": {
+    "en": "A plugin may contain at most 128 files or directories",
+    "zh-CN": "插件最多包含 128 个文件或目录"
+  },
+  "plugin_contains_invalid_paths_duplicate_6a1e05": {
+    "en": "Plugin contains invalid paths, duplicate paths, or special files",
+    "zh-CN": "插件包含非法路径、重复路径或特殊文件"
+  },
+  "expanded_plugin_exceeds_mib_e06d7b": {
+    "en": "Expanded plugin exceeds 20 MiB",
+    "zh-CN": "插件解压后超过 20 MiB"
+  },
+  "could_not_read_plugin_file_016a17": {
+    "en": "Could not read plugin file: %w",
+    "zh-CN": "无法读取插件文件：%w"
+  },
+  "the_zip_root_must_contain_ee8588": {
+    "en": "The ZIP root must contain manifest.json and main.js",
+    "zh-CN": "ZIP 根目录必须包含 manifest.json 和 main.js"
+  },
+  "main_js_must_be_a_e84ee8": {
+    "en": "main.js must be a regular file",
+    "zh-CN": "main.js 必须为普通文件"
+  },
+  "plugin_directory_is_not_configured_5e0928": {
+    "en": "Plugin directory is not configured",
+    "zh-CN": "插件目录未配置"
+  },
+  "could_not_read_plugin_upload_5fd8bc": {
+    "en": "Could not read plugin upload. Use a ZIP no larger than 10 MiB",
+    "zh-CN": "无法读取插件上传，请使用不超过 10 MiB 的 ZIP"
+  },
+  "choose_a_plugin_zip_file_7360c5": {
+    "en": "Choose a plugin ZIP file",
+    "zh-CN": "请选择插件 ZIP 文件"
+  },
+  "plugin_zip_exceeds_mib_046e37": {
+    "en": "Plugin ZIP exceeds 10 MiB",
+    "zh-CN": "插件 ZIP 超过 10 MiB"
+  },
+  "a_plugin_with_this_id_1551cb": {
+    "en": "A plugin with this ID is already installed. Uninstall it first",
+    "zh-CN": "同名插件已安装，请先卸载"
+  },
+  "enabled_must_be_specified_12873c": {
+    "en": "enabled must be specified",
+    "zh-CN": "必须指定 enabled"
+  },
+  "plugin_resource_not_found_8e73f3": {
+    "en": "Plugin resource not found",
+    "zh-CN": "插件资源不存在"
+  },
+  "data_must_be_provided_0dc1bc": {
+    "en": "data must be provided",
+    "zh-CN": "必须提供 data"
+  },
+  "invalid_resource_ticket_scope_7abece": {
+    "en": "Invalid resource ticket scope",
+    "zh-CN": "资源票据范围无效"
+  },
+  "plugin_version_changed_refresh_the_9fab75": {
+    "en": "Plugin version changed. Refresh the page",
+    "zh-CN": "插件版本已改变，请刷新"
+  },
+  "invalid_resource_ticket_purpose_e266b8": {
+    "en": "Invalid resource ticket purpose",
+    "zh-CN": "资源票据用途无效"
+  },
+  "resource_ticket_has_expired_309b64": {
+    "en": "Resource ticket has expired",
+    "zh-CN": "资源票据已失效"
+  },
+  "login_session_has_expired_075903": {
+    "en": "Login session has expired",
+    "zh-CN": "登录已失效"
+  },
+  "this_ticket_only_permits_reading_f26030": {
+    "en": "This ticket only permits reading images",
+    "zh-CN": "票据仅允许读取图片"
+  },
+  "font_ticket_scope_does_not_95339a": {
+    "en": "Font ticket scope does not match",
+    "zh-CN": "字体票据范围不匹配"
+  },
+  "plugin_ticket_scope_does_not_349049": {
+    "en": "Plugin ticket scope does not match",
+    "zh-CN": "插件票据范围不匹配"
+  },
+  "resource_ticket_purpose_does_not_1f573e": {
+    "en": "Resource ticket purpose does not match",
+    "zh-CN": "资源票据用途不匹配"
+  },
+  "settings_are_too_large_8a580f": {
+    "en": "Settings are too large",
+    "zh-CN": "设置过大"
+  },
+  "settings_must_be_a_json_45b36b": {
+    "en": "Settings must be a JSON object",
+    "zh-CN": "设置必须是 JSON 对象"
+  },
+  "current_password_is_incorrect_e0f0aa": {
+    "en": "Current password is incorrect",
+    "zh-CN": "当前密码错误"
+  },
+  "unsupported_request_method_bc2f08": {
+    "en": "Unsupported request method",
+    "zh-CN": "不支持的请求方法"
+  },
+  "page_not_found_e75737": {
+    "en": "Page not found",
+    "zh-CN": "页面不存在"
+  },
+  "frontend_resources_are_missing_2c9b3e": {
+    "en": "Frontend resources are missing",
+    "zh-CN": "前端资源缺失"
+  },
+  "application_data_directory_is_not_a1f183": {
+    "en": "Application data directory is not configured",
+    "zh-CN": "未配置应用数据目录"
+  },
+  "theme_file_must_be_a_1fe9df": {
+    "en": "Theme file must be a regular file",
+    "zh-CN": "主题文件必须为普通文件"
+  },
+  "theme_file_is_too_large_08667a": {
+    "en": "Theme file is too large",
+    "zh-CN": "主题文件过大"
+  },
+  "could_not_parse_manifest_json_4bef07": {
+    "en": "Could not parse manifest.json for theme %s: %w",
+    "zh-CN": "主题 %s 的 manifest.json 无法解析：%w"
+  },
+  "theme_s_has_an_invalid_8ed29c": {
+    "en": "Theme %s has an invalid ID, name, or version",
+    "zh-CN": "主题 %s 的 id、name 或 version 无效"
+  },
+  "theme_not_found_or_files_3b0d5b": {
+    "en": "Theme not found or files are incomplete",
+    "zh-CN": "主题不存在或文件不完整"
+  },
+  "name_must_contain_between_and_7c157b": {
+    "en": "Name must contain between 1 and 100 characters",
+    "zh-CN": "名称不能为空且不超过 100 个字符"
+  },
+  "token_not_found_da59eb": {
+    "en": "Token not found",
+    "zh-CN": "令牌不存在"
+  },
+  "trash_retention_must_be_a_d6bd8f": {
+    "en": "Trash retention must be a non-negative safe integer. 0 disables automatic deletion",
+    "zh-CN": "回收站保留天数必须为非负安全整数，0 表示永不自动删除"
+  },
+  "some_trash_items_could_not_0a4ca6": {
+    "en": "Some trash items could not be cleaned: %v",
+    "zh-CN": "回收站清理部分失败: %v"
+  },
+  "setup_is_already_complete_222ec6": {
+    "en": "Setup is already complete",
+    "zh-CN": "已完成初始化"
+  },
+  "password_must_contain_at_least_decf04": {
+    "en": "Password must contain at least %d characters",
+    "zh-CN": "密码至少 %d 位"
+  },
+  "incorrect_password_4585c8": {
+    "en": "Incorrect password",
+    "zh-CN": "密码错误"
+  },
+  "too_many_attempts_please_try_8bbf6d": {
+    "en": "Too many attempts. Please try again later",
+    "zh-CN": "尝试次数过多，请稍后再试"
+  },
+  "scope_must_be_read_or_2cb466": {
+    "en": "Scope must be read or write",
+    "zh-CN": "权限范围只能是 read 或 write"
+  },
+  "unrecognized_password_hash_format_2f5457": {
+    "en": "Unrecognized password hash format",
+    "zh-CN": "密码哈希格式无法识别"
+  },
+  "could_not_parse_password_hash_3cd93b": {
+    "en": "Could not parse password hash parameters: %w",
+    "zh-CN": "密码哈希参数无法解析: %w"
+  },
+  "invalid_backup_contents_ecff07": {
+    "en": "Invalid backup contents",
+    "zh-CN": "备份内容无效"
+  },
+  "invalid_or_duplicate_backup_path_ce9c5b": {
+    "en": "Invalid or duplicate backup path: %s",
+    "zh-CN": "备份路径无效或重复: %s"
+  },
+  "backups_do_not_support_symlinks_872adf": {
+    "en": "Backups do not support symlinks or special files: %s",
+    "zh-CN": "备份不支持符号链接或特殊文件: %s"
+  },
+  "backup_file_count_exceeds_the_77ac37": {
+    "en": "Backup file count exceeds the limit",
+    "zh-CN": "备份文件数超过上限"
+  },
+  "expanded_backup_exceeds_gib_b38d18": {
+    "en": "Expanded backup exceeds 8 GiB",
+    "zh-CN": "备份展开大小超过 8 GiB"
+  },
+  "a_file_changed_during_backup_a85244": {
+    "en": "A file changed during backup: %s",
+    "zh-CN": "备份期间文件发生变化: %s"
+  },
+  "compressed_backup_exceeds_gib_3962d5": {
+    "en": "Compressed backup exceeds 2 GiB",
+    "zh-CN": "备份压缩大小超过 2 GiB"
+  },
+  "w_backup_file_count_exceeds_5ba1d4": {
+    "en": "%w: backup file count exceeds the limit",
+    "zh-CN": "%w：备份文件数超过上限"
+  },
+  "w_invalid_or_duplicate_archive_c11ac2": {
+    "en": "%w: invalid or duplicate archive path",
+    "zh-CN": "%w：归档路径无效或重复"
+  },
+  "w_archives_cannot_contain_symlinks_fd836b": {
+    "en": "%w: archives cannot contain symlinks or special files",
+    "zh-CN": "%w：归档不允许符号链接或特殊文件"
+  },
+  "w_a_valid_backup_manifest_8905b1": {
+    "en": "%w: a valid backup manifest is missing",
+    "zh-CN": "%w：缺少有效备份清单"
+  },
+  "w_invalid_backup_version_type_342220": {
+    "en": "%w: invalid backup version, type, or manifest",
+    "zh-CN": "%w：备份版本、类型或清单无效"
+  },
+  "w_expanded_backup_exceeds_gib_8e4c5b": {
+    "en": "%w: expanded backup exceeds 8 GiB",
+    "zh-CN": "%w：备份展开大小超过 8 GiB"
+  },
+  "w_backup_manifest_does_not_69c8ba": {
+    "en": "%w: backup manifest does not match files",
+    "zh-CN": "%w：备份清单与文件不符"
+  },
+  "w_invalid_directory_size_3ec5c4": {
+    "en": "%w: invalid directory size",
+    "zh-CN": "%w：目录大小无效"
+  },
+  "w_invalid_file_checksum_ec0b61": {
+    "en": "%w: invalid file checksum",
+    "zh-CN": "%w：文件校验值无效"
+  },
+  "w_file_verification_failed_s_46b024": {
+    "en": "%w: file verification failed: %s",
+    "zh-CN": "%w：文件校验失败: %s"
+  },
+  "w_instance_backup_is_missing_4e260c": {
+    "en": "%w: instance backup is missing the database or vault",
+    "zh-CN": "%w：实例备份缺少数据库或笔记库"
+  },
+  "w_settings_backup_is_missing_46056b": {
+    "en": "%w: settings backup is missing settings",
+    "zh-CN": "%w：设置备份缺少设置"
+  },
+  "a_single_log_entry_exceeds_b1cdf6": {
+    "en": "A single log entry exceeds the size limit",
+    "zh-CN": "单条日志超过大小上限"
+  },
+  "w_invalid_backup_database_format_d45d60": {
+    "en": "%w: invalid backup database format",
+    "zh-CN": "%w：备份数据库格式无效"
+  },
+  "w_unsupported_backup_password_format_184d32": {
+    "en": "%w: unsupported backup password format",
+    "zh-CN": "%w：备份密码格式不受支持"
+  },
+  "w_invalid_backup_password_salt_315eca": {
+    "en": "%w: invalid backup password salt",
+    "zh-CN": "%w：备份密码盐无效"
+  },
+  "w_invalid_backup_password_verification_17d1c1": {
+    "en": "%w: invalid backup password verification value",
+    "zh-CN": "%w：备份密码校验值无效"
+  },
+  "special_files_cannot_be_copied_441836": {
+    "en": "Special files cannot be copied",
+    "zh-CN": "不允许复制特殊文件"
+  },
+  "invalid_restore_record_state_eee063": {
+    "en": "Invalid restore record state",
+    "zh-CN": "恢复记录状态无效"
+  },
+  "invalid_restore_record_path_611881": {
+    "en": "Invalid restore record path",
+    "zh-CN": "恢复记录路径无效"
+  },
+  "the_previous_instance_restore_was_a9d480": {
+    "en": "The previous instance restore was interrupted",
+    "zh-CN": "上次实例恢复被中断"
+  },
+  "instance_rollback_failed_w_80ec77": {
+    "en": "Instance rollback failed: %w",
+    "zh-CN": "实例回退失败: %w"
+  },
+  "restore_failed_original_instance_restored_c03846": {
+    "en": "Restore failed. Original instance restored: %w",
+    "zh-CN": "导入恢复失败，已回退原实例: %w"
+  },
+  "the_restored_instance_has_not_5ca7fb": {
+    "en": "The restored instance has not completed setup",
+    "zh-CN": "恢复尚未完成初始化"
+  },
+  "settings_import_was_interrupted_original_417ef5": {
+    "en": "Settings import was interrupted. Original settings and resources restored",
+    "zh-CN": "设置导入被中断，已回退原设置和资源"
+  },
+  "could_not_initialize_search_index_9155c3": {
+    "en": "Could not initialize search index: %w",
+    "zh-CN": "初始化搜索索引失败: %w"
+  },
+  "invalid_format_for_setting_s_745c8c": {
+    "en": "Invalid format for setting %s",
+    "zh-CN": "设置 %s 格式无效"
+  },
+  "settings_contain_an_invalid_entry_90c647": {
+    "en": "Settings contain an invalid entry",
+    "zh-CN": "设置包含无效设置项"
+  },
+  "backup_database_integrity_check_failed_5adb6a": {
+    "en": "Backup database integrity check failed",
+    "zh-CN": "备份数据库完整性检查失败"
+  },
+  "could_not_initialize_database_w_208f9e": {
+    "en": "Could not initialize database: %w",
+    "zh-CN": "初始化数据库失败: %w"
+  },
+  "w_invalid_metadata_in_s_478c93": {
+    "en": "%w: invalid metadata in %s prevents checking vault references: %s",
+    "zh-CN": "%w：%s 的元数据异常，无法确认全库引用：%s"
+  },
+  "w_choose_content_to_export_170d5e": {
+    "en": "%w: choose content to export",
+    "zh-CN": "%w：请选择导出内容"
+  },
+  "w_invalid_attachment_address_s_8b6ace": {
+    "en": "%w: invalid attachment address %s",
+    "zh-CN": "%w：附件地址无效 %s"
+  },
+  "attachment_s_w_7bc269": {
+    "en": "Attachment %s: %w",
+    "zh-CN": "附件 %s：%w"
+  },
+  "w_choose_a_file_with_8410e9": {
+    "en": "%w: choose a file with the same extension as the original image",
+    "zh-CN": "%w：请选择与原图片扩展名相同的文件"
+  },
+  "w_image_cannot_be_empty_a9a272": {
+    "en": "%w: image cannot be empty",
+    "zh-CN": "%w：图片不能为空"
+  },
+  "invalid_import_contents_ed556a": {
+    "en": "Invalid import contents",
+    "zh-CN": "导入内容无效"
+  },
+  "w_choose_markdown_files_or_bcaa52": {
+    "en": "%w: choose Markdown files or a ZIP",
+    "zh-CN": "%w：请选择 Markdown 文件或一个 ZIP"
+  },
+  "w_invalid_import_folder_name_a10885": {
+    "en": "%w: invalid import folder name",
+    "zh-CN": "%w：导入文件夹名称无效"
+  },
+  "w_plain_markdown_files_do_08b920": {
+    "en": "%w: plain Markdown files do not use a wrapper folder",
+    "zh-CN": "%w：普通 Markdown 不使用外层文件夹"
+  },
+  "could_not_clean_the_temporary_212214": {
+    "en": "Could not clean the temporary import directory: %w",
+    "zh-CN": "清理导入临时目录失败：%w"
+  },
+  "w_zip_contains_an_invalid_7bcf46": {
+    "en": "%w: ZIP contains an invalid path",
+    "zh-CN": "%w：ZIP 含有非法路径"
+  },
+  "w_duplicate_path_408694": {
+    "en": "%w: duplicate path",
+    "zh-CN": "%w：存在重复路径"
+  },
+  "w_file_and_directory_paths_eb0b28": {
+    "en": "%w: file and directory paths conflict",
+    "zh-CN": "%w：文件与目录路径冲突"
+  },
+  "w_could_not_read_zip_d4a777": {
+    "en": "%w: could not read ZIP: %w",
+    "zh-CN": "%w：无法读取 ZIP：%w"
+  },
+  "w_zip_cannot_contain_symlinks_5f596f": {
+    "en": "%w: ZIP cannot contain symlinks or special files",
+    "zh-CN": "%w：ZIP 不允许符号链接或特殊文件"
+  },
+  "w_could_not_read_zip_8158b9": {
+    "en": "%w: could not read ZIP entry: %w",
+    "zh-CN": "%w：无法读取 ZIP 条目：%w"
+  },
+  "w_zip_content_is_damaged_6323c7": {
+    "en": "%w: ZIP content is damaged: %w",
+    "zh-CN": "%w：ZIP 内容损坏：%w"
+  },
+  "w_only_md_files_or_6f1a4f": {
+    "en": "%w: only .md files or a single ZIP are accepted",
+    "zh-CN": "%w：只接受 .md 文件或单个 ZIP"
+  },
+  "w_no_importable_markdown_notes_3ad0b8": {
+    "en": "%w: no importable Markdown notes found",
+    "zh-CN": "%w：没有可导入的 Markdown 笔记"
+  },
+  "w_notes_cannot_be_inside_744972": {
+    "en": "%w: notes cannot be inside .assets attachment directories",
+    "zh-CN": "%w：笔记不能放在 .assets 附件目录内"
+  },
+  "w_markdown_must_be_utf_ce0d80": {
+    "en": "%w: Markdown must be UTF-8 text",
+    "zh-CN": "%w：Markdown 必须是 UTF-8 文本"
+  },
+  "w_invalid_metadata_in_s_cc1d10": {
+    "en": "%w: invalid metadata in %s prevents checking image references",
+    "zh-CN": "%w：%s 的元数据异常，无法确认图片引用"
+  },
+  "w_destination_is_not_a_f9de1c": {
+    "en": "%w: destination is not a folder",
+    "zh-CN": "%w：目标不是文件夹"
+  },
+  "w_s_choose_a_different_ac4d15": {
+    "en": "%w: %s; choose a different name",
+    "zh-CN": "%w：%s，请修改名称"
+  },
+  "import_rollback_failed_w_50748f": {
+    "en": "Import rollback failed: %w",
+    "zh-CN": "回滚导入失败：%w"
+  },
+  "retention_days_cannot_be_negative_f37c9b": {
+    "en": "Retention days cannot be negative",
+    "zh-CN": "保留天数不能为负数"
+  },
+  "invalid_icon_59d610": {
+    "en": "Invalid icon",
+    "zh-CN": "非法图标"
+  },
+  "file_tree_icon_metadata_is_49b5aa": {
+    "en": "File tree icon metadata is damaged: %w",
+    "zh-CN": "文件树图标元数据损坏: %w"
+  },
+  "file_tree_icon_metadata_must_54f104": {
+    "en": "File tree icon metadata must be an object",
+    "zh-CN": "文件树图标元数据必须是对象"
+  },
+  "file_tree_icon_metadata_contains_eb66b6": {
+    "en": "File tree icon metadata contains invalid paths or icons",
+    "zh-CN": "文件树图标元数据含非法路径或图标"
+  },
+  "invalid_path_ec93bf": {
+    "en": "Invalid path",
+    "zh-CN": "非法路径"
+  },
+  "file_not_found_3703e4": {
+    "en": "File not found",
+    "zh-CN": "文件不存在"
+  },
+  "destination_already_exists_9511c3": {
+    "en": "Destination already exists",
+    "zh-CN": "目标已存在"
+  },
+  "file_is_too_large_5bfcab": {
+    "en": "File is too large",
+    "zh-CN": "文件过大"
+  },
+  "could_not_roll_back_the_d7c4fc": {
+    "en": "Could not roll back the original image: %w",
+    "zh-CN": "回滚图片原件失败: %w"
+  },
+  "could_not_remove_the_copied_e96efd": {
+    "en": "Could not remove the copied image: %w",
+    "zh-CN": "撤回图片副本失败: %w"
+  },
+  "could_not_roll_back_the_f89084": {
+    "en": "Could not roll back the old attachment folder: %w",
+    "zh-CN": "回滚旧附件目录失败: %w"
+  },
+  "could_not_roll_back_note_8554a3": {
+    "en": "Could not roll back note references: %w",
+    "zh-CN": "回滚笔记引用失败: %w"
+  },
+  "could_not_roll_back_the_36ec22": {
+    "en": "Could not roll back the note move: %w",
+    "zh-CN": "回滚笔记移动失败: %w"
+  },
+  "could_not_move_image_folder_c39928": {
+    "en": "Could not move image folder: %w",
+    "zh-CN": "移动图片目录失败: %w"
+  },
+  "could_not_roll_back_trashed_b37d4f": {
+    "en": "Could not roll back trashed images: %w",
+    "zh-CN": "回滚回收站图片失败: %w"
+  },
+  "could_not_roll_back_trashed_3758a4": {
+    "en": "Could not roll back trashed note: %w",
+    "zh-CN": "回滚回收站笔记失败: %w"
+  },
+  "could_not_move_image_folder_7c4620": {
+    "en": "Could not move image folder to trash: %w",
+    "zh-CN": "移动图片目录到回收站失败: %w"
+  },
+  "trash_item_s_has_damaged_ba382a": {
+    "en": "Trash item %s has damaged metadata: %w",
+    "zh-CN": "回收站条目 %s 元数据损坏: %w"
+  },
+  "trash_item_s_has_invalid_006492": {
+    "en": "Trash item %s has invalid metadata",
+    "zh-CN": "回收站条目 %s 元数据无效"
+  },
+  "trash_item_s_has_damaged_856237": {
+    "en": "Trash item %s has damaged icon metadata",
+    "zh-CN": "回收站条目 %s 图标元数据损坏"
+  },
+  "could_not_roll_back_restored_952073": {
+    "en": "Could not roll back restored images: %w",
+    "zh-CN": "回滚恢复图片失败: %w"
+  },
+  "could_not_roll_back_restored_16b803": {
+    "en": "Could not roll back restored note: %w",
+    "zh-CN": "回滚恢复笔记失败: %w"
+  },
+  "could_not_restore_image_folder_f6e087": {
+    "en": "Could not restore image folder: %w",
+    "zh-CN": "恢复图片目录失败: %w"
+  },
+  "w_choose_an_image_file_544069": {
+    "en": "%w: choose an image file",
+    "zh-CN": "%w：请选择图片文件"
+  },
+  "could_not_read_note_s_708ab5": {
+    "en": "Could not read note %s: %w",
+    "zh-CN": "读取笔记 %s 失败: %w"
+  },
+  "w_w_f0fd7d": {
+    "en": "%w: %w",
+    "zh-CN": "%w：%w"
+  },
+  "operation_failed": {
+    "en": "Operation failed: %s",
+    "zh-CN": "操作失败：%s"
+  },
+  "success": {
+    "en": "Success",
+    "zh-CN": "成功"
+  },
+  "invalid_locale": {
+    "en": "Language must be en or zh-CN",
+    "zh-CN": "语言必须为 en 或 zh-CN"
+  },
+  "metadata_unclosed": {
+    "en": "YAML front matter is not closed",
+    "zh-CN": "YAML 元数据未闭合"
+  },
+  "metadata_invalid": {
+    "en": "Invalid YAML front matter: %v",
+    "zh-CN": "YAML 元数据无效：%v"
+  },
+  "metadata_tags": {
+    "en": "YAML tags must be a string or a list of strings",
+    "zh-CN": "YAML tags 必须是字符串或字符串列表"
+  },
+  "metadata_tag_list": {
+    "en": "YAML tags must be a list of strings",
+    "zh-CN": "YAML tags 必须是字符串列表"
+  },
+  "import_missing_links": {
+    "en": "%s: %d local link targets are not included in the import. Original links retained",
+    "zh-CN": "%s：%d 个本地链接的目标不在导入内容中，已保留原链接"
+  },
+  "image_not_file": {
+    "en": "Not an image file",
+    "zh-CN": "不是图片文件"
+  },
+  "image_in_use": {
+    "en": "Still referenced by notes",
+    "zh-CN": "仍被笔记引用"
+  },
+  "version_conflict": {
+    "en": "Version conflict",
+    "zh-CN": "版本冲突"
+  },
+  "theme_default": {
+    "en": "Default",
+    "zh-CN": "默认"
+  },
+  "theme_white": {
+    "en": "Light",
+    "zh-CN": "白色"
+  },
+  "theme_black": {
+    "en": "Dark",
+    "zh-CN": "黑色"
+  },
+  "w_validate_the_settings_package_0f4f56": {
+    "en": "%w: validate the settings package first",
+    "zh-CN": "%w：请先校验设置包"
+  },
+  "w_a_validated_upload_cannot_ce0e63": {
+    "en": "%w: a validated upload cannot be modified",
+    "zh-CN": "%w：已校验的上传不可修改"
+  },
+  "w_upload_offset_does_not_95e21e": {
+    "en": "%w: upload offset does not match. Upload again",
+    "zh-CN": "%w：上传偏移不匹配，请重新上传"
+  },
+  "w_upload_size_exceeds_the_0bb329": {
+    "en": "%w: upload size exceeds the manifest",
+    "zh-CN": "%w：上传大小超出清单"
+  },
+  "w_upload_content_is_empty_7c0bb2": {
+    "en": "%w: upload content is empty",
+    "zh-CN": "%w：上传内容为空"
+  },
+  "w_upload_is_not_complete_8ef575": {
+    "en": "%w: upload is not complete",
+    "zh-CN": "%w：上传尚未完成"
+  },
+  "w_backup_type_does_not_8e5e8c": {
+    "en": "%w: backup type does not match the selected operation",
+    "zh-CN": "%w：备份类型与所选操作不符"
+  },
+  "w_vault_content_conflicts_with_6e3d24": {
+    "en": "%w: vault content conflicts with the application directory",
+    "zh-CN": "%w：笔记库内容与应用目录冲突"
+  },
+  "w_validate_the_full_instance_6d329d": {
+    "en": "%w: validate the full instance backup first",
+    "zh-CN": "%w：请先校验完整服务备份"
+  },
+  "image_source_http": {
+    "en": "Image source returned HTTP %d",
+    "zh-CN": "图片来源返回 HTTP %d"
+  }
+}

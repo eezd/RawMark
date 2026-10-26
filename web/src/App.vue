@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import Toasts from '@@/components/Toasts/index.vue'
+
+import { locale, t as translate } from '@@/i18n/runtime'
+import en from 'element-plus/es/locale/lang/en'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { useUserStore } from '@/pinia/stores/user'
 import { navigationError, router } from '@/router'
@@ -12,10 +15,10 @@ function retry() {
 </script>
 
 <template>
-  <el-config-provider :locale="zhCn">
+  <el-config-provider :locale="locale === 'zh-CN' ? zhCn : en">
     <div v-if="navigationError" class="rm-splash" role="alert">
       <p>{{ navigationError.message }}</p><el-button @click="retry">
-        重试
+        {{ translate('common.retry_b8784c') }}
       </el-button>
     </div>
     <router-view v-else v-slot="{ Component, route }">

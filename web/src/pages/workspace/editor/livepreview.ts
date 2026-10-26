@@ -7,6 +7,7 @@ import { syntaxTree } from '@codemirror/language'
 import { Facet, StateEffect } from '@codemirror/state'
 import { Decoration, ViewPlugin } from '@codemirror/view'
 import { codeContentRange, fencedCodeAt, fenceLanguage } from './codeblocks'
+import { editorLocale } from './locale'
 import {
   BulletWidget,
   CheckboxWidget,
@@ -363,6 +364,7 @@ const livePreviewPlugin = ViewPlugin.fromClass(
       if (
         this.stale
         || u.transactions.some(tr => tr.effects.some(effect => effect.is(refreshImages)))
+        || u.startState.facet(editorLocale) !== u.state.facet(editorLocale)
         || u.docChanged
         || u.viewportChanged
         || u.selectionSet

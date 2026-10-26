@@ -1,6 +1,6 @@
 package vault
 
-import "fmt"
+import "rawmark/internal/i18n"
 
 type CleanupResult struct {
 	Deleted []TrashItem   `json:"deleted"`
@@ -9,6 +9,7 @@ type CleanupResult struct {
 type CleanupSkip struct {
 	Path   string `json:"path"`
 	Reason string `json:"reason"`
+	Cause  error  `json:"-"`
 }
 
 // CleanupImages 在写锁内重新扫描引用；派生索引不作为删除依据。
@@ -31,7 +32,7 @@ func (v *Vault) CleanupImages(paths []string) (CleanupResult, error) {
 		}
 		metadata := Analyze(entry.Path, content)
 		if len(metadata.Warnings) > 0 {
-			return result, fmt.Errorf("%w：%s 的元数据异常，无法确认全库引用：%s", ErrInvalidPath, entry.Path, metadata.Warnings[0])
+			return result, i18n.New("w_invalid_metadata_in_s_478c93", ErrInvalidPath, entry.Path, metadata.Diagnostics[0])
 		}
 		for _, ref := range metadata.Assets {
 			references[ref.Target] = true
@@ -43,27 +44,27 @@ func (v *Vault) CleanupImages(paths []string) (CleanupResult, error) {
 			continue
 		}
 		seen[p] = true
-		reason := ""
+		var reason error
 		switch {
 		case !IsImage(p):
-			reason = "不是图片文件"
+			reason = i18n.New("image_not_file")
 		case references[p]:
-			reason = "仍被笔记引用"
+			reason = i18n.New("image_in_use")
 		default:
 			info, err := v.Stat(p)
 			if err != nil {
-				reason = err.Error()
+				reason = err
 			} else if !info.Mode().IsRegular() {
-				reason = "不是图片文件"
+				reason = i18n.New("image_not_file")
 			}
 		}
-		if reason != "" {
-			result.Skipped = append(result.Skipped, CleanupSkip{p, reason})
+		if reason != nil {
+			result.Skipped = append(result.Skipped, CleanupSkip{p, reason.Error(), reason})
 			continue
 		}
 		item, err := v.deleteLocked(p)
 		if err != nil {
-			result.Skipped = append(result.Skipped, CleanupSkip{p, err.Error()})
+			result.Skipped = append(result.Skipped, CleanupSkip{p, err.Error(), err})
 			continue
 		}
 		result.Deleted = append(result.Deleted, item)

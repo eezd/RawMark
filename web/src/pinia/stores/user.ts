@@ -1,4 +1,5 @@
 import { getCurrentUserApi, logoutApi } from '@@/apis/auth'
+import { t as translate } from '@@/i18n/runtime'
 
 import { CanceledError } from 'axios'
 import { defineStore } from 'pinia'
@@ -33,7 +34,7 @@ export const useUserStore = defineStore('user', () => {
     token.value = value
   }
   function assertSession(version: number) {
-    if (version !== sessionVersion.value) throw new CanceledError('会话已变化')
+    if (version !== sessionVersion.value) throw new CanceledError(translate('common.session_changed_073f28'))
   }
   function invalidate(version: number) {
     if (version === sessionVersion.value) replaceToken('')
@@ -47,7 +48,7 @@ export const useUserStore = defineStore('user', () => {
       if (!data || !Array.isArray(data.permissions)
         || data.permissions.some(value => typeof value !== 'string')
         || typeof data.expiresAt !== 'string' || !Number.isFinite(Date.parse(data.expiresAt))) {
-        throw new Error('身份信息格式错误')
+        throw new Error(translate('common.invalid_identity_information_e69b1a'))
       }
       permissions.value = data.permissions
       expiresAt.value = data.expiresAt

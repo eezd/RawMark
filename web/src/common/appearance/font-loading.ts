@@ -1,3 +1,4 @@
+import { t as translate } from '@@/i18n/runtime'
 // 使用浏览器实际排版触发的字体集合，覆盖首屏、切换笔记与后来出现的字形。
 export function watchFontLoading() {
   const root = document.documentElement
@@ -11,9 +12,9 @@ export function watchFontLoading() {
     panel.className = 'rm-font-error'
     panel.setAttribute('role', 'alert')
     const message = document.createElement('p')
-    message.textContent = '字体加载失败，请检查网络后刷新页面。'
+    message.textContent = translate('common.fonts_could_not_be_loaded_42a574')
     const retry = document.createElement('button')
-    retry.textContent = '刷新页面'
+    retry.textContent = translate('common.refresh_page_9366e1')
     retry.addEventListener('click', () => location.reload())
     panel.append(message, retry)
     document.body.append(panel)

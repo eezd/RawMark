@@ -307,7 +307,7 @@ func TestMaintenanceErrorsPreserveHTTPStatus(t *testing.T) {
 		if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 			t.Fatal(err)
 		}
-		if res.StatusCode != 400 || body.Code != 40000 || !strings.Contains(body.Message, "备份内容无效") {
+		if res.StatusCode != 400 || body.Code != 40000 || !strings.Contains(body.Message, "Invalid backup contents") {
 			t.Fatalf("无效备份响应错误: %d %+v", res.StatusCode, body)
 		}
 	})
@@ -348,7 +348,7 @@ func TestMaintenanceErrorsPreserveHTTPStatus(t *testing.T) {
 		if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 			t.Fatal(err)
 		}
-		if res.StatusCode != 500 || body.Code != 50000 || body.Message != "服务器内部错误" {
+		if res.StatusCode != 500 || body.Code != 50000 || body.Message != "Internal server error" {
 			t.Fatalf("磁盘故障被当作输入错误: %d %+v", res.StatusCode, body)
 		}
 	})

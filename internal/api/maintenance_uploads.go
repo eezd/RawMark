@@ -5,11 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"regexp"
 	"strconv"
 	"strings"
@@ -39,12 +39,12 @@ func uploadOwner(r *http.Request) string {
 func (s *Server) readUpload(r *http.Request, id string) (maintenanceUpload, string, error) {
 	var meta maintenanceUpload
 	if !uploadIDPattern.MatchString(id) {
-		return meta, "", fmt.Errorf("%w：上传 ID 无效", errMaintenanceInput)
+		return meta, "", i18n.New("w_invalid_upload_id_23d358", errMaintenanceInput)
 	}
 	dir := filepath.Join(s.DataDir, ".maintenance", "uploads", id)
 	data, err := os.ReadFile(filepath.Join(dir, "upload.json"))
 	if errors.Is(err, os.ErrNotExist) {
-		return meta, "", fmt.Errorf("%w：上传不存在或已过期", errMaintenanceInput)
+		return meta, "", i18n.New("w_upload_does_not_exist_918d8d", errMaintenanceInput)
 	}
 	if err != nil {
 		return meta, "", err
@@ -53,7 +53,7 @@ func (s *Server) readUpload(r *http.Request, id string) (maintenanceUpload, stri
 		return meta, "", err
 	}
 	if meta.Owner != uploadOwner(r) {
-		return meta, "", fmt.Errorf("%w：上传不属于当前会话", errMaintenanceInput)
+		return meta, "", i18n.New("w_upload_does_not_belong_c4d06d", errMaintenanceInput)
 	}
 	return meta, dir, nil
 }
@@ -70,7 +70,7 @@ func enoughSpace(dir string, size int64) error {
 		return err
 	}
 	if size < 0 || uint64(size)+(32<<20) > stat.Bavail*uint64(stat.Bsize) {
-		return fmt.Errorf("磁盘空间不足：%w", syscall.ENOSPC)
+		return i18n.New("not_enough_disk_space_w_a39b20", syscall.ENOSPC)
 	}
 	return nil
 }
@@ -83,11 +83,11 @@ func (s *Server) startMaintenanceUpload(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if (body.Kind != "full" && body.Kind != "settings") || body.Size <= 0 || body.Size > backup.MaxArchiveBytes {
-		writeError(w, 400, "请选择有效备份，压缩大小上限 2 GiB")
+		writeError(w, 400, message(w, "choose_a_valid_backup_with_51ba41"))
 		return
 	}
 	var id string
-	err := s.maintain("准备上传", func() error {
+	err := s.maintain("prepare_upload_ed0bd9", func() error {
 		root := filepath.Join(s.DataDir, ".maintenance", "uploads")
 		if err := os.MkdirAll(root, 0700); err != nil {
 			return err
@@ -121,17 +121,17 @@ func randBytes() []byte { bytes := make([]byte, 16); rand.Read(bytes); return by
 func (s *Server) appendMaintenanceUpload(w http.ResponseWriter, r *http.Request) {
 	offset, err := strconv.ParseInt(r.Header.Get("Upload-Offset"), 10, 64)
 	if err != nil || offset < 0 {
-		writeError(w, 400, "上传偏移无效")
+		writeError(w, 400, message(w, "invalid_upload_offset_3bdbf1"))
 		return
 	}
 	var next int64
-	err = s.maintain("上传备份", func() error {
+	err = s.maintain("upload_backup_83b1a9", func() error {
 		meta, dir, err := s.readUpload(r, r.PathValue("id"))
 		if err != nil {
 			return err
 		}
 		if meta.Validated {
-			return fmt.Errorf("%w：已校验的上传不可修改", errMaintenanceInput)
+			return i18n.New("w_a_validated_upload_cannot_ce0e63", errMaintenanceInput)
 		}
 		f, err := os.OpenFile(filepath.Join(dir, "archive.zip"), os.O_WRONLY, 0600)
 		if err != nil {
@@ -143,22 +143,22 @@ func (s *Server) appendMaintenanceUpload(w http.ResponseWriter, r *http.Request)
 			return err
 		}
 		if info.Size() != offset {
-			return fmt.Errorf("%w：上传偏移不匹配，请重新上传", errMaintenanceInput)
+			return i18n.New("w_upload_offset_does_not_95e21e", errMaintenanceInput)
 		}
 		limit := min(maintenanceChunkBytes, meta.Size-offset)
 		if limit <= 0 {
-			return fmt.Errorf("%w：上传大小超出清单", errMaintenanceInput)
+			return i18n.New("w_upload_size_exceeds_the_0bb329", errMaintenanceInput)
 		}
 		data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 		if err != nil {
 			var tooLarge *http.MaxBytesError
 			if errors.As(err, &tooLarge) {
-				return fmt.Errorf("%w：%w", errMaintenanceInput, err)
+				return i18n.New("w_w_f0fd7d", errMaintenanceInput, err)
 			}
 			return err
 		}
 		if len(data) == 0 {
-			return fmt.Errorf("%w：上传内容为空", errMaintenanceInput)
+			return i18n.New("w_upload_content_is_empty_7c0bb2", errMaintenanceInput)
 		}
 		if err = enoughSpace(dir, int64(len(data))); err != nil {
 			return err
@@ -185,7 +185,7 @@ func backupResourceError(err error) error {
 	if errors.As(err, &pathError) && !errors.Is(pathError, os.ErrNotExist) && !errors.Is(pathError, syscall.ENOTDIR) && !errors.Is(pathError, syscall.EISDIR) {
 		return err
 	}
-	return fmt.Errorf("%w：%w", backup.ErrInvalidArchive, err)
+	return i18n.New("w_w_f0fd7d", backup.ErrInvalidArchive, err)
 }
 
 func (s *Server) validateResources(stage string) error {
@@ -200,7 +200,7 @@ func (s *Server) validateResources(stage string) error {
 		}
 		for _, entry := range entries {
 			if !entry.IsDir() {
-				return fmt.Errorf("%w：资源目录内包含非目录条目", errMaintenanceInput)
+				return i18n.New("w_the_resource_directory_contains_3898a5", errMaintenanceInput)
 			}
 			switch kind {
 			case "fonts":
@@ -227,7 +227,7 @@ func (s *Server) validateResources(stage string) error {
 func (s *Server) validateMaintenanceUpload(w http.ResponseWriter, r *http.Request) {
 	var manifest backup.Manifest
 	var bytes int64
-	err := s.maintain("校验备份", func() error {
+	err := s.maintain("validate_backup_09df97", func() error {
 		meta, dir, err := s.readUpload(r, r.PathValue("id"))
 		if err != nil {
 			return err
@@ -237,7 +237,7 @@ func (s *Server) validateMaintenanceUpload(w http.ResponseWriter, r *http.Reques
 			return err
 		}
 		if info.Size() != meta.Size {
-			return fmt.Errorf("%w：上传尚未完成", errMaintenanceInput)
+			return i18n.New("w_upload_is_not_complete_8ef575", errMaintenanceInput)
 		}
 		meta.Validated = false
 		if err = saveUpload(dir, meta); err != nil {
@@ -255,12 +255,12 @@ func (s *Server) validateMaintenanceUpload(w http.ResponseWriter, r *http.Reques
 			return err
 		}
 		if manifest.Kind != meta.Kind {
-			return fmt.Errorf("%w：备份类型与所选操作不符", errMaintenanceInput)
+			return i18n.New("w_backup_type_does_not_8e5e8c", errMaintenanceInput)
 		}
 		for _, entry := range manifest.Entries {
 			bytes += entry.Size
 			if strings.HasPrefix(entry.Path, "vault/") && backup.VaultExcluded(s.DataDir, s.vault.Root(), strings.TrimPrefix(entry.Path, "vault/")) {
-				return fmt.Errorf("%w：笔记库内容与应用目录冲突", errMaintenanceInput)
+				return i18n.New("w_vault_content_conflicts_with_6e3d24", errMaintenanceInput)
 			}
 		}
 		if err = enoughSpace(dir, bytes*2); err != nil {
@@ -284,7 +284,7 @@ func (s *Server) validateMaintenanceUpload(w http.ResponseWriter, r *http.Reques
 					} else {
 						var databaseError *sqlite.Error
 						if !errors.As(err, &databaseError) {
-							err = fmt.Errorf("%w：%w", backup.ErrInvalidArchive, err)
+							err = i18n.New("w_w_f0fd7d", backup.ErrInvalidArchive, err)
 						}
 					}
 					err = errors.Join(err, st.Close())
@@ -304,7 +304,7 @@ func (s *Server) validateMaintenanceUpload(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, 200, map[string]any{"kind": manifest.Kind, "createdAt": manifest.CreatedAt, "entries": len(manifest.Entries), "size": bytes})
 }
 func (s *Server) deleteMaintenanceUpload(w http.ResponseWriter, r *http.Request) {
-	err := s.maintain("取消上传", func() error {
+	err := s.maintain("cancel_upload_a24836", func() error {
 		_, dir, err := s.readUpload(r, r.PathValue("id"))
 		if err != nil {
 			return err
@@ -326,20 +326,20 @@ func (s *Server) restoreInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !body.Confirmed {
-		writeError(w, 400, "请先确认替换实例数据并重新登录")
+		writeError(w, 400, message(w, "confirm_replacing_instance_data_and_52f3ca"))
 		return
 	}
 	if s.Restart == nil {
-		writeError(w, 503, "当前服务不支持实例恢复")
+		writeError(w, 503, message(w, "this_service_does_not_support_a9a8ba"))
 		return
 	}
-	err := s.maintain("恢复完整实例", func() error {
+	err := s.maintain("restore_full_instance_9b4ee0", func() error {
 		meta, dir, err := s.readUpload(r, body.ID)
 		if err != nil {
 			return err
 		}
 		if !meta.Validated || meta.Kind != "full" {
-			return fmt.Errorf("%w：请先校验完整服务备份", errMaintenanceInput)
+			return i18n.New("w_validate_the_full_instance_6d329d", errMaintenanceInput)
 		}
 		file, err := s.saveRollback(r.Context(), "full")
 		if err != nil {
@@ -367,7 +367,7 @@ type cleanupResult struct {
 
 func (s *Server) clearTemp(w http.ResponseWriter, r *http.Request) {
 	result := cleanupResult{Failed: []string{}}
-	err := s.maintain("清理临时文件", func() error {
+	err := s.maintain("clean_temporary_files_af91ae", func() error {
 		// temp 为进程专属目录，普通 API 与维护已排空；恢复包和回退备份在其他目录。
 		temp, err := s.tempDir()
 		if err != nil {
@@ -435,7 +435,7 @@ func (s *Server) clearTemp(w http.ResponseWriter, r *http.Request) {
 				e = os.RemoveAll(target)
 			}
 			if e != nil {
-				result.Failed = append(result.Failed, e.Error())
+				result.Failed = append(result.Failed, i18n.RenderError(e, responseLocale(w)))
 			} else {
 				result.Files += count
 				result.Bytes += size
@@ -454,5 +454,5 @@ func (s *Server) clearTemp(w http.ResponseWriter, r *http.Request) {
 func (s *Server) SetRestoreFailure(err error) {
 	s.maintenanceStatusMu.Lock()
 	defer s.maintenanceStatusMu.Unlock()
-	s.maintenanceState = maintenanceStatus{Operation: "恢复完整实例", Error: err.Error(), FinishedAt: time.Now().UnixMilli()}
+	s.maintenanceState = maintenanceStatus{Operation: "restore_full_instance_9b4ee0", Error: err.Error(), cause: err, FinishedAt: time.Now().UnixMilli()}
 }

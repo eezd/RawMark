@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { StateEffect, Text } from '@codemirror/state'
+
 import type { EditorView } from '@codemirror/view'
+import { t as translate } from '@@/i18n/runtime'
 import { EditorState } from '@codemirror/state'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { createEditorView } from '../editor'
@@ -70,10 +72,10 @@ watch(() => [ws.active, tab.value?.status, ws.view, ws.images], () => {
   <div class="rm-editor-pane">
     <div v-show="tab && tab.status !== 'loading' && tab.status !== 'error'" ref="host" class="rm-editor-host" />
     <div v-if="!tab" class="rm-empty">
-      <p>选择或新建一篇笔记</p>
+      <p>{{ translate('workspace.select_or_create_a_note_669f82') }}</p>
     </div>
     <div v-else-if="tab.status === 'error'" class="rm-empty">
-      <p>笔记打开失败</p>
+      <p>{{ translate('workspace.could_not_open_this_note_634236') }}</p>
     </div>
   </div>
 </template>

@@ -3,20 +3,20 @@ package vault
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"html"
 	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"strings"
 )
 
 // ReplaceImage 原位替换已有图片，保留所有引用路径；不允许借此创建文件或改变格式。
 func (v *Vault) ReplaceImage(rel, filename string, r io.Reader, limit int64) error {
 	if !IsImage(rel) || !strings.EqualFold(path.Ext(rel), path.Ext(filename)) {
-		return fmt.Errorf("%w：请选择与原图片扩展名相同的文件", ErrInvalidPath)
+		return i18n.New("w_choose_a_file_with_8410e9", ErrInvalidPath)
 	}
 	p, err := v.abs(rel)
 	if err != nil {
@@ -30,7 +30,7 @@ func (v *Vault) ReplaceImage(rel, filename string, r io.Reader, limit int64) err
 		return ErrTooLarge
 	}
 	if len(data) == 0 {
-		return fmt.Errorf("%w：图片不能为空", ErrInvalidPath)
+		return i18n.New("w_image_cannot_be_empty_a9a272", ErrInvalidPath)
 	}
 	v.mu.Lock()
 	defer v.mu.Unlock()

@@ -6,15 +6,18 @@ import * as storageApi from '@@/apis/storage'
 import * as themesApi from '@@/apis/themes'
 import * as tokensApi from '@@/apis/tokens'
 import * as trashApi from '@@/apis/trash'
+import { applyLocale, chooseAnonymousLocale, locale } from '@@/i18n/runtime'
 import { confirmAction } from '@@/utils/confirm'
-
 import { toasts } from '@@/utils/notifications'
 import { flushPromises } from '@vue/test-utils'
+
 import { CanceledError, isCancel } from 'axios'
+import { setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // @vitest-environment happy-dom
 import { createApp, defineComponent, h, nextTick } from 'vue'
 import { ApiError } from '@/http/axios'
+import { useSettingsChange } from '@/pages/settings/composables/use-settings-change'
 import { pinia } from '@/pinia'
 
 import { apiSuccess } from '../../../tests/api-response'
@@ -34,6 +37,8 @@ let app: App | undefined
 let host: HTMLElement | undefined
 const cleanup: (() => void)[] = []
 beforeEach(() => {
+  applyLocale('en')
+  setActivePinia(pinia)
   vi.mocked(confirmAction).mockResolvedValue(true)
   applyFontCatalog([])
   Object.assign(settings, DEFAULTS, { colorMode: 'system', theme: 'default', cssSnippets: [], shortcuts: {} })
@@ -42,7 +47,7 @@ beforeEach(() => {
   vi.spyOn(settingsApi, 'getSettingsApi').mockResolvedValue(apiSuccess({}))
   vi.spyOn(fontsApi, 'getFontsApi').mockResolvedValue(apiSuccess({ fonts: [] }))
   vi.spyOn(maintenanceApi, 'getMaintenanceStatusApi').mockResolvedValue(apiSuccess({ busy: false, operation: '', error: '', finishedAt: 0 }))
-  vi.spyOn(themesApi, 'getThemesApi').mockResolvedValue(apiSuccess({ themes: [{ id: 'default', name: '默认', version: '1' }] }))
+  vi.spyOn(themesApi, 'getThemesApi').mockResolvedValue(apiSuccess({ themes: [{ id: 'default', name: 'Default', version: '1' }] }))
 })
 afterEach(async () => {
   app?.unmount()
@@ -77,9 +82,9 @@ describe('设置查找与重置', () => {
     ws.settings = 'account'
     vi.spyOn(tokensApi, 'getTokensApi').mockResolvedValue(apiSuccess({ tokens: [] }))
     await mount(SettingsDialog)
-    expect([...document.body.querySelectorAll('.rm-settings-tab')].map(el => el.textContent)).toEqual(['外观', '编辑器', '快捷键', '插件', '存储空间', '回收站', '账户与安全', '关于'])
+    expect([...document.body.querySelectorAll('.rm-settings-tab')].map(el => el.textContent)).toEqual(['Appearance', 'Editor', 'Shortcuts', 'Plugins', 'Storage', 'Trash', 'Account and security', 'About'])
     await vi.waitFor(() => expect(document.body.querySelector('#rm-setting-tokens')).not.toBeNull())
-    expect(searchSettings('API 令牌')).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'tokens', section: 'account' })]))
+    expect(searchSettings('API tokens')).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'tokens', section: 'account' })]))
   })
 
   it('编辑器字号在输入时立即生效，无需回车或失焦', async () => {
@@ -101,7 +106,7 @@ describe('设置查找与重置', () => {
 
   it('移除日记和模板设置、搜索与命令入口', async () => {
     expect(searchSettings('日记')).toEqual([])
-    expect(searchSettings('日历')).toEqual([])
+    expect(searchSettings('Calendar')).toEqual([])
     expect(DEFAULTS).not.toHaveProperty('dailyFolder')
     expect(searchSettings('模板')).toEqual([])
     expect(DEFAULTS).not.toHaveProperty('templatesFolder')
@@ -118,23 +123,23 @@ describe('设置查找与重置', () => {
     await mount(SettingsDialog)
     document.body.querySelector<HTMLButtonElement>('#rm-ui-font')!.click()
     await nextTick()
-    expect(document.body.querySelector('button[aria-label^="删除字体 Maple"]')).toBeNull()
-    document.body.querySelector<HTMLButtonElement>('button[aria-label="删除字体 Noto Serif SC · 思源宋体"]')!.click()
+    expect(document.body.querySelector('button[aria-label^="Delete font Maple"]')).toBeNull()
+    document.body.querySelector<HTMLButtonElement>('button[aria-label="Delete font Noto Serif SC · Serif"]')!.click()
     await vi.waitFor(() => expect(settings.hiddenFonts).toContain('serif'))
     expect(settings.uiFont).toBe('maple')
     expect(settings.textFont).toBe('maple')
     expect(settings.codeFont).toBe('maple')
-    const editor = [...document.body.querySelectorAll<HTMLButtonElement>('.rm-settings-tab')].find(button => button.textContent?.trim() === '编辑器')!
+    const editor = [...document.body.querySelectorAll<HTMLButtonElement>('.rm-settings-tab')].find(button => button.textContent?.trim() === 'Editor')!
     editor.click()
     await nextTick()
     document.body.querySelector<HTMLButtonElement>('#rm-text-font')!.click()
     await nextTick()
     expect(document.body.querySelector('.rm-font-options')!.textContent).not.toContain('Noto Serif SC')
-    expect(document.body.querySelector('.rm-font-options')!.textContent).toContain('导入字体')
+    expect(document.body.querySelector('.rm-font-options')!.textContent).toContain('Import font')
   })
 
   it('先装载字体资源再恢复服务器上的自定义字体，字体删除后恢复Maple', async () => {
-    const font = { id: `custom-${'a'.repeat(64)}`, name: '导入字体', format: 'woff2' as const }
+    const font = { id: `custom-${'a'.repeat(64)}`, name: 'Import font', format: 'woff2' as const }
     vi.mocked(fontsApi.getFontsApi).mockResolvedValue(apiSuccess({ fonts: [font] }))
     vi.mocked(settingsApi.getSettingsApi).mockResolvedValue(apiSuccess({ uiFont: font.id, textFont: font.id, codeFont: font.id }))
     await loadSettings()
@@ -154,7 +159,7 @@ describe('设置查找与重置', () => {
     await mount(SettingsDialog)
     document.body.querySelector<HTMLButtonElement>('#rm-ui-font')!.click()
     await nextTick()
-    const serif = [...document.body.querySelectorAll<HTMLButtonElement>('.el-select-dropdown__item')].find(button => button.textContent?.trim() === 'Noto Serif SC · 思源宋体')!
+    const serif = [...document.body.querySelectorAll<HTMLButtonElement>('.el-select-dropdown__item')].find(button => button.textContent?.trim() === 'Noto Serif SC · Serif')!
     serif.click()
     await vi.waitFor(() => expect(document.body.querySelector('[role="alert"]')!.textContent).toContain('字体设置写入失败'))
     expect(settings.uiFont).toBe('maple')
@@ -170,7 +175,7 @@ describe('设置查找与重置', () => {
     await mount(SettingsDialog)
     document.body.querySelector<HTMLButtonElement>('#rm-ui-font')!.click()
     await nextTick()
-    document.body.querySelector<HTMLButtonElement>('button[aria-label="删除字体 不可删除测试"]')!.click()
+    document.body.querySelector<HTMLButtonElement>('button[aria-label="Delete font 不可删除测试"]')!.click()
     await vi.waitFor(() => expect(document.body.querySelector('[role="alert"]')!.textContent).toContain('字体删除失败'))
     expect(settings.uiFont).toBe(font.id)
     expect(document.body.querySelector<HTMLButtonElement>('#rm-ui-font')!.disabled).toBe(false)
@@ -194,8 +199,8 @@ describe('设置查找与重置', () => {
 
   it('按名称、关键词及多词匹配，只索引静态说明', () => {
     expect(searchSettings('   ')).toEqual([])
-    expect(searchSettings('CSS 高级')).toEqual([expect.objectContaining({ id: 'css-snippets', section: 'appearance' })])
-    expect(searchSettings('api')).toEqual(expect.arrayContaining([expect.objectContaining({ section: 'account', title: 'API 令牌' }), expect.objectContaining({ id: 'openapi' })]))
+    expect(searchSettings('CSS advanced')).toEqual([expect.objectContaining({ id: 'css-snippets', section: 'appearance' })])
+    expect(searchSettings('api')).toEqual(expect.arrayContaining([expect.objectContaining({ section: 'account', title: 'API tokens' }), expect.objectContaining({ id: 'openapi' })]))
     settings.cssSnippets = [{ id: 'private', name: 'private-snippet-name', enabled: true, css: ':root { --private: 1 }' }]
     expect(searchSettings('private')).toEqual([])
   })
@@ -203,12 +208,12 @@ describe('设置查找与重置', () => {
   it('从搜索结果跳转设置行，并展开所在折叠区', async () => {
     ws.settings = 'editor'
     await mount(SettingsDialog)
-    await search('input[aria-label="搜索设置"]', 'CSS 高级')
+    await search('input[aria-label="Search settings"]', 'CSS advanced')
     document.body.querySelector<HTMLButtonElement>('.rm-settings-result')!.click()
     await vi.waitFor(() => expect(document.activeElement?.id).toBe('rm-setting-css-snippets'))
     expect(ws.settings).toBe('appearance')
     expect(document.body.querySelector<HTMLDetailsElement>('.rm-appearance-advanced')!.open).toBe(true)
-    expect(document.body.querySelector<HTMLInputElement>('input[aria-label="搜索设置"]')!.value).toBe('')
+    expect(document.body.querySelector<HTMLInputElement>('input[aria-label="Search settings"]')!.value).toBe('')
   })
 
   it('单项重置只提交对应键，不影响另一类字号，并可重新读取', async () => {
@@ -217,13 +222,13 @@ describe('设置查找与重置', () => {
     settings.lineHeight = 2
     ws.settings = 'appearance'
     await mount(SettingsDialog)
-    document.body.querySelector<HTMLButtonElement>('button[aria-label="重置界面字号"]')!.click()
+    document.body.querySelector<HTMLButtonElement>('button[aria-label="Reset Interface font size"]')!.click()
     await vi.waitFor(() => expect(settingsApi.patchSettingsApi).toHaveBeenCalledWith({ uiFontSize: DEFAULTS.uiFontSize }))
     expect(settings.fontSize).toBe(24)
-    const editor = [...document.body.querySelectorAll<HTMLButtonElement>('.rm-settings-tab')].find(e => e.textContent?.trim() === '编辑器')!
+    const editor = [...document.body.querySelectorAll<HTMLButtonElement>('.rm-settings-tab')].find(e => e.textContent?.trim() === 'Editor')!
     editor.click()
     await nextTick()
-    document.body.querySelector<HTMLButtonElement>('button[aria-label="重置正文行高"]')!.click()
+    document.body.querySelector<HTMLButtonElement>('button[aria-label="Reset Body line height"]')!.click()
     await vi.waitFor(() => expect(settingsApi.patchSettingsApi).toHaveBeenLastCalledWith({ lineHeight: DEFAULTS.lineHeight }))
     expect(settings.fontSize).toBe(24)
     vi.mocked(settingsApi.getSettingsApi).mockResolvedValue(apiSuccess({ uiFontSize: DEFAULTS.uiFontSize, fontSize: 24, lineHeight: DEFAULTS.lineHeight }))
@@ -400,19 +405,19 @@ describe('保存反馈', () => {
     const failure = await updateSettings({ theme: 'unavailable' }).catch(error => error)
     expect(failure).toBeInstanceOf(SettingsAppearanceError)
     expect(failure.cause).toBe(cause)
-    expect(failure.message).toContain('设置已保存，但主题应用失败')
+    expect(failure.message).toContain('Settings saved, but the theme could not be applied')
     expect(settingsSave).toMatchObject({ pending: 0, result: 'saved' })
   })
 
   it('取消的主题读取保留取消语义，不伪装成主题应用失败', async () => {
-    vi.spyOn(themesApi, 'getThemeApi').mockRejectedValueOnce(new CanceledError('会话已变化'))
+    vi.spyOn(themesApi, 'getThemeApi').mockRejectedValueOnce(new CanceledError('Session changed'))
     const failure = await updateSettings({ theme: 'cancelled-theme' }).catch(error => error)
     expect(isCancel(failure)).toBe(true)
     expect(failure).not.toBeInstanceOf(SettingsAppearanceError)
   })
 
   it('失效会话的设置保存取消后不弹错误或启动新会话的回退读取', async () => {
-    vi.mocked(settingsApi.patchSettingsApi).mockRejectedValueOnce(new CanceledError('会话已变化'))
+    vi.mocked(settingsApi.patchSettingsApi).mockRejectedValueOnce(new CanceledError('Session changed'))
     ws.settings = 'editor'
     await mount(SettingsDialog)
     toasts.splice(0)
@@ -430,10 +435,10 @@ describe('保存反馈', () => {
     ws.settings = 'appearance'
     await mount(SettingsDialog)
     document.body.querySelector<HTMLDetailsElement>('.rm-appearance-advanced')!.open = true
-    const add = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(e => e.textContent?.trim() === '新建片段')!
+    const add = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(e => e.textContent?.trim() === 'New snippet')!
     add.click()
     await nextTick()
-    await search('input[aria-label="片段名称"]', '主题失败时的片段')
+    await search('input[aria-label="Snippet name"]', '主题失败时的片段')
     const css = document.body.querySelector<HTMLTextAreaElement>('textarea')!
     css.value = ':root { --test-marker: 1; }'
     css.dispatchEvent(new Event('input', { bubbles: true }))
@@ -450,23 +455,23 @@ describe('快捷键查找', () => {
     const occupied = { id: 'plugin:settings-test:hidden', title: '隐藏占用命令', keys: ['Mod+Alt+Shift+9'], run() {} }
     cleanup.push(registerCommand({ id: 'settings-test.target', title: '审查定位命令', run() {} }), registerCommand(occupied))
     await mount(ShortcutSettings)
-    await search('input[aria-label="搜索快捷键"]', '审查定位命令')
+    await search('input[aria-label="Search shortcuts"]', '审查定位命令')
     expect(document.body.querySelectorAll('.rm-shortcut-row')).toHaveLength(1)
-    const add = [...document.body.querySelectorAll<HTMLButtonElement>('.rm-shortcut-row button')].find(e => e.textContent?.trim() === '添加')!
+    const add = [...document.body.querySelectorAll<HTMLButtonElement>('.rm-shortcut-row button')].find(e => e.textContent?.trim() === 'Add')!
     add.click()
     await nextTick()
     document.body.querySelector('[data-shortcut-recorder]')!.dispatchEvent(new KeyboardEvent('keydown', { key: '9', code: 'Digit9', ctrlKey: true, altKey: true, shiftKey: true, bubbles: true, cancelable: true }))
     await nextTick()
     expect(document.body.querySelector('[role="alert"]')!.textContent).toContain('隐藏占用命令')
     expect(settingsApi.patchSettingsApi).not.toHaveBeenCalled()
-    await search('input[aria-label="搜索快捷键"]', 'plugin:settings-test:hidden')
+    await search('input[aria-label="Search shortcuts"]', 'plugin:settings-test:hidden')
     expect(document.body.querySelectorAll('.rm-shortcut-row')).toHaveLength(1)
     expect(document.body.querySelector('[data-shortcut-recorder]')).toBeNull()
-    await search('input[aria-label="搜索快捷键"]', formatKeys(commandKeys(occupied)[0]))
+    await search('input[aria-label="Search shortcuts"]', formatKeys(commandKeys(occupied)[0]))
     expect(document.body.textContent).toContain('隐藏占用命令')
-    await search('input[aria-label="搜索快捷键"]', '不存在的命令')
+    await search('input[aria-label="Search shortcuts"]', '不存在的命令')
     expect(document.body.querySelectorAll('.rm-shortcut-row')).toHaveLength(0)
-    expect(document.body.textContent).toContain('没有匹配的快捷键')
+    expect(document.body.textContent).toContain('no matching shortcuts')
   })
 })
 
@@ -488,7 +493,7 @@ describe('应用存储与回收站', () => {
     expect(storage).toHaveBeenCalledTimes(1)
     resolve(usage)
     await vi.waitFor(() => expect(document.body.textContent).toContain('1 KiB'))
-    expect(document.body.textContent).toContain('附件')
+    expect(document.body.textContent).toContain('Attachments')
     storage.mockRejectedValueOnce(new Error('磁盘读取错误'))
     button.click()
     await vi.waitFor(() => expect(document.body.querySelector('[role="alert"]')?.textContent).toContain('磁盘读取错误'))
@@ -582,4 +587,49 @@ it('换会话后旧设置队列不得使用新Token提交，也不得覆盖新�
   expect(patch).toHaveBeenCalledTimes(1)
   expect(settingsSave.result).toBe('idle')
   user.setToken('')
+})
+
+describe('账户语言', () => {
+  it('登录页的临时语言不写服务器，登录后以账户语言覆盖', async () => {
+    chooseAnonymousLocale('zh-CN')
+    expect(locale.value).toBe('zh-CN')
+    expect(settingsApi.patchSettingsApi).not.toHaveBeenCalled()
+    vi.mocked(settingsApi.getSettingsApi).mockResolvedValueOnce(apiSuccess({ locale: 'en' }))
+    await loadSettings()
+    expect(locale.value).toBe('en')
+    expect(settings.locale).toBe('en')
+    expect(JSON.parse(localStorage.getItem('rawmark.settings')!).locale).toBe('en')
+  })
+  it('语言立即生效、串行保存并从服务器同步恢复，缺省恢复英文', async () => {
+    const pending = updateSettings({ locale: 'zh-CN' })
+    expect(locale.value).toBe('zh-CN')
+    expect(document.documentElement.lang).toBe('zh-CN')
+    await pending
+    expect(settingsApi.patchSettingsApi).toHaveBeenCalledWith({ locale: 'zh-CN' })
+    vi.mocked(settingsApi.getSettingsApi).mockResolvedValueOnce(apiSuccess({ locale: 'zh-CN' }))
+    await loadSettings()
+    expect(locale.value).toBe('zh-CN')
+    await loadSettings()
+    expect(locale.value).toBe('en')
+  })
+  it('语言保存失败会报告错误并重新应用服务器语言', async () => {
+    vi.mocked(settingsApi.patchSettingsApi).mockRejectedValueOnce(new ApiError(503, 'Cannot save language'))
+    expect(await useSettingsChange()({ locale: 'zh-CN' })).toBe(false)
+    expect(locale.value).toBe('en')
+    expect(settings.locale).toBe('en')
+    expect(toasts.some(item => item.text.includes('Cannot save language'))).toBe(true)
+  })
+  it('切换语言会更新已打开的设置分类与搜索，不翻译插件自带标题', async () => {
+    ws.settings = 'appearance'
+    await mount(SettingsDialog)
+    expect(document.body.querySelector('.rm-settings-tab')!.textContent).toContain('Appearance')
+    await updateSettings({ locale: 'zh-CN' })
+    await nextTick()
+    expect(document.body.querySelector('.rm-settings-tab')!.textContent).toContain('外观')
+    expect(searchSettings('CSS 高级')).toEqual([expect.objectContaining({ id: 'css-snippets' })])
+    cleanup.push(registerCommand({ id: 'plugin:i18n:sample', title: '插件原始标题', run() {} }))
+    await updateSettings({ locale: 'en' })
+    expect(allCommands().find(command => command.id === 'plugin:i18n:sample')?.title).toBe('插件原始标题')
+    expect(allCommands().find(command => command.id === 'note.new')?.title).toBe('New note')
+  })
 })

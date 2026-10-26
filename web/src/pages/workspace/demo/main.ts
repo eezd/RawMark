@@ -2,6 +2,7 @@ import { watchFontLoading } from '@@/appearance/font-loading'
 // 编辑器演示页（无需登录），用于性能与交互的自动化测试
 import { createEditorState, createEditorView } from '../editor'
 import sample from './sample.md?raw'
+import '@/i18n'
 import '@@/appearance/base.css'
 
 // ?repeat=N 将示例重复 N 次，用于大文档性能测试

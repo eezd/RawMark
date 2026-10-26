@@ -21,7 +21,7 @@ type response struct {
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
-	writeResponse(w, status, response{Code: 0, Data: v, Message: "成功"})
+	writeResponse(w, status, response{Code: 0, Data: v, Message: message(w, "success")})
 }
 func writeFailure(w http.ResponseWriter, status, code int, message string, data any) {
 	writeResponse(w, status, response{Code: code, Data: data, Message: message})

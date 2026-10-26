@@ -1,3 +1,4 @@
+import { applyLocale } from '@@/i18n/runtime'
 import { readNoteFile } from '@@/utils/note-files'
 import { toasts } from '@@/utils/notifications'
 import { isCancel } from 'axios'
@@ -13,6 +14,7 @@ const user = useUserStore(pinia)
 const permission = usePermissionStore(pinia)
 const payload = (data: unknown, status = 200, code = 0, message = '成功') => new Response(JSON.stringify({ code, data, message }), { status, headers: { 'Content-Type': 'application/json' } })
 beforeEach(() => {
+  applyLocale('en')
   user.setToken('rms_test'); toasts.splice(0)
 })
 afterEach(() => {
@@ -24,6 +26,7 @@ it('使用 Bearer 和统一 JSON，省略 Cookie 且禁止缓存', async () => {
   expect(await request({ method: 'post', url: '/test', data: { a: 1 } })).toEqual({ code: 0, data: { path: 'a.md' }, message: '成功' })
   const req = fetch.mock.calls[0]![0] as Request
   expect(req.headers.get('Authorization')).toBe('Bearer rms_test')
+  expect(req.headers.get('Accept-Language')).toBe('en')
   expect(req.credentials).toBe('omit')
   expect(fetch.mock.calls[0]![1]).toEqual(expect.objectContaining({ cache: 'no-store' }))
   expect(await req.text()).toBe('{"a":1}')
@@ -109,4 +112,13 @@ it('读取笔记的原始响应解码期间切换会话，旧正文仍须拒绝'
   expect(isCancel(await pending)).toBe(true)
   expect(user.token).toBe('rms_new')
   expect(toasts).toHaveLength(0)
+})
+
+it('语言切换仅影响后续请求，不取消业务请求或改变会话', async () => {
+  const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(payload({ ok: true }))
+  const version = user.getSessionVersion()
+  applyLocale('zh-CN')
+  await request({ method: 'get', url: '/localized' })
+  expect((fetch.mock.calls[0]![0] as Request).headers.get('Accept-Language')).toBe('zh-CN')
+  expect(user.getSessionVersion()).toBe(version)
 })

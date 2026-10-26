@@ -2,10 +2,11 @@ import type { Appearance } from '@@/appearance/appearance'
 import { getFontsApi } from '@@/apis/fonts'
 import { getSettingsApi, patchSettingsApi } from '@@/apis/settings'
 import { getThemeApi } from '@@/apis/themes'
-
 import { appearancePaused, applyAppearance, sanitizeAppearance } from '@@/appearance/appearance'
+
 import { applyFontCatalog, customFonts, parseFontCatalog } from '@@/appearance/fonts'
 import { applyDisplaySettings, DISPLAY_DEFAULTS, FONT_PRESETS, sanitizeDisplaySettings } from '@@/appearance/typography'
+import { applyLocale, DEFAULT_LOCALE, isLocale, t as translate } from '@@/i18n/runtime'
 import { normalizeKeys } from '@@/utils/keys'
 import { isCancel } from 'axios'
 import { defineStore } from 'pinia'
@@ -18,15 +19,23 @@ import { useUserStore } from './user'
 export const TAB_SIZES = [2, 4, 8]
 // 0 为全宽
 export const CONTENT_WIDTHS = [
-  { label: '窄', value: 680 },
-  { label: '标准', value: 760 },
-  { label: '宽', value: 960 },
-  { label: '全宽', value: 0 },
+  { get label() {
+    return translate('common.narrow_a614db')
+  }, value: 680 },
+  { get label() {
+    return translate('common.standard_6bea77')
+  }, value: 760 },
+  { get label() {
+    return translate('common.wide_8dd966')
+  }, value: 960 },
+  { get label() {
+    return translate('common.full_width_8ecc7d')
+  }, value: 0 },
 ]
 
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
-export const DEFAULTS = { trashRetentionDays: 30, hiddenFonts: [] as string[], selectionToolbar: true, ...DISPLAY_DEFAULTS, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
+export const DEFAULTS = { locale: DEFAULT_LOCALE, trashRetentionDays: 30, hiddenFonts: [] as string[], selectionToolbar: true, ...DISPLAY_DEFAULTS, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
 export type Settings = typeof DEFAULTS & Appearance & { shortcuts: Record<string, string[]> }
 
 const CACHE_KEY = 'rawmark.settings'
@@ -35,7 +44,7 @@ export type SettingsSection = 'appearance' | 'editor' | 'account' | 'shortcuts' 
 
 export class SettingsAppearanceError extends Error {
   constructor(cause: unknown) {
-    super(`设置已保存，但主题应用失败：${cause instanceof Error ? cause.message : String(cause)}`, { cause })
+    super(translate('common.settings_saved_but_the_theme_9f87f8', { p0: cause instanceof Error ? cause.message : String(cause) }), { cause })
   }
 }
 
@@ -44,6 +53,7 @@ function sanitize(raw: Record<string, unknown>): Settings {
   const pick = <T>(v: unknown, allowed: T[], def: T) => (allowed.includes(v as T) ? (v as T) : def)
   const hiddenFonts = Array.isArray(raw.hiddenFonts) ? raw.hiddenFonts.filter((id): id is string => typeof id === 'string' && id !== 'maple' && Object.hasOwn(FONT_PRESETS, id)) : []
   return {
+    locale: isLocale(raw.locale) ? raw.locale : DEFAULT_LOCALE,
     hiddenFonts,
     trashRetentionDays: Number.isSafeInteger(raw.trashRetentionDays) && (raw.trashRetentionDays as number) >= 0 ? raw.trashRetentionDays as number : DEFAULTS.trashRetentionDays,
     ...sanitizeDisplaySettings(raw, customFonts.value.map(font => font.id), hiddenFonts),
@@ -61,10 +71,10 @@ function sanitize(raw: Record<string, unknown>): Settings {
 
 function sanitizeShortcuts(raw: unknown): Record<string, string[]> {
   if (raw === undefined) return {}
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('快捷键设置格式无效')
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(translate('common.invalid_shortcut_settings_2f07e6'))
   const out: Record<string, string[]> = {}
   for (const [id, keys] of Object.entries(raw)) {
-    if (!Array.isArray(keys) || keys.some(key => typeof key !== 'string')) throw new Error('快捷键设置格式无效')
+    if (!Array.isArray(keys) || keys.some(key => typeof key !== 'string')) throw new Error(translate('common.invalid_shortcut_settings_2f07e6'))
     out[id] = keys.map(normalizeKeys)
   }
   return out
@@ -95,6 +105,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function applied(next: Settings) {
     Object.assign(settings, next)
+    applyLocale(settings.locale)
     localStorage.setItem(CACHE_KEY, JSON.stringify(settings))
     const root = document.documentElement.style
     applyDisplaySettings(settings)
@@ -172,7 +183,7 @@ export const useSettingsStore = defineStore('settings', () => {
   /** 维护前等待现有设置保存；失败时不得继续替换配置。 */
   async function flushSettings() {
     await saveQueue
-    if (settingsSave.result === 'error') throw new Error(`设置保存失败：${settingsSave.error}`)
+    if (settingsSave.result === 'error') throw new Error(translate('common.could_not_save_settings_1cdd7f', { p0: settingsSave.error }))
   }
 
   return { settings, settingsSave, loadSettings, updateSettings, flushSettings, reloadTheme }

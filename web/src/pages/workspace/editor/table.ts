@@ -1,6 +1,7 @@
 import type { EditorState, Range } from '@codemirror/state'
 import type { DecorationSet } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
+import { locale, t as translate } from '@@/i18n/runtime'
 import { renderInlineMarkdown } from '@@/markdown/html'
 import { hydrate } from '@@/markdown/render'
 import { isolateHistory, redo, undo } from '@codemirror/commands'
@@ -8,6 +9,7 @@ import { syntaxTree } from '@codemirror/language'
 import { StateField } from '@codemirror/state'
 import { Decoration, EditorView, WidgetType } from '@codemirror/view'
 import { editorFocused, setEditorFocus } from './focus'
+import { editorLocale } from './locale'
 
 type Align = '' | 'left' | 'center' | 'right'
 
@@ -116,6 +118,7 @@ interface WidgetState {
 const widgetStates = new WeakMap<HTMLElement, WidgetState>()
 
 class TableWidget extends WidgetType {
+  readonly locale = locale.value
   readonly key: string
 
   constructor(readonly model: TableModel) {
@@ -124,7 +127,7 @@ class TableWidget extends WidgetType {
   }
 
   eq(other: TableWidget) {
-    return other.key === this.key
+    return other.locale === this.locale && other.key === this.key
   }
 
   get estimatedHeight() {
@@ -134,6 +137,7 @@ class TableWidget extends WidgetType {
   toDOM(view: EditorView) {
     const wrap = document.createElement('div')
     wrap.className = 'cm-rm-table-widget'
+    wrap.lang = this.locale
     widgetStates.set(wrap, { model: this.model, current: { r: 0, c: 0 }, pendingFocus: null })
     // 横向滚动放在内层，避免绝对定位的工具栏被裁剪
     const scroller = document.createElement('div')
@@ -146,6 +150,10 @@ class TableWidget extends WidgetType {
   updateDOM(dom: HTMLElement, view: EditorView) {
     const st = widgetStates.get(dom)
     if (!st) return false
+    if (dom.lang !== this.locale) {
+      dom.querySelector('.cm-rm-table-toolbar')!.replaceWith(this.toolbar(view, dom))
+      dom.lang = this.locale
+    }
     const old = st.model
     st.model = this.model
     const sameShape
@@ -230,13 +238,13 @@ class TableWidget extends WidgetType {
       sep.className = 'cm-rm-sep'
       tools.append(sep)
     }
-    button(ICONS.addRow, '行', '在下方插入行', () => insertRow(view, wrap))
-    button(ICONS.addColumn, '列', '在右侧插入列', () => insertColumn(view, wrap))
+    button(ICONS.addRow, translate('workspace.line_4cc7b0'), translate('workspace.insert_row_below_7c131f'), () => insertRow(view, wrap))
+    button(ICONS.addColumn, translate('workspace.column_c06d21'), translate('workspace.insert_column_to_the_right_8ae98f'), () => insertColumn(view, wrap))
     separator()
-    button(ICONS.deleteRow, '行', '删除当前行', () => deleteRow(view, wrap), true)
-    button(ICONS.deleteColumn, '列', '删除当前列', () => deleteColumn(view, wrap), true)
+    button(ICONS.deleteRow, translate('workspace.line_4cc7b0'), translate('workspace.delete_current_row_3bc4de'), () => deleteRow(view, wrap), true)
+    button(ICONS.deleteColumn, translate('workspace.column_c06d21'), translate('workspace.delete_current_column_435bde'), () => deleteColumn(view, wrap), true)
     separator()
-    button(ICONS.source, '源码', '以 Markdown 源码编辑', () => {
+    button(ICONS.source, translate('workspace.source_41b50a'), translate('workspace.edit_as_markdown_source_9375e8'), () => {
       const model = currentModel(view, wrap)
       if (!model) return
       view.dispatch({ selection: { anchor: model.from } })
@@ -439,7 +447,8 @@ export const tableField = StateField.define<DecorationSet>({
   create: buildTables,
   update(value, tr) {
     if (
-      tr.docChanged
+      tr.startState.facet(editorLocale) !== tr.state.facet(editorLocale)
+      || tr.docChanged
       || tr.selection
       || tr.effects.some(e => e.is(setEditorFocus))
       || syntaxTree(tr.startState) !== syntaxTree(tr.state)

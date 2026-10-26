@@ -356,7 +356,7 @@ describe('导入', () => {
     vi.mocked(filesApi.importNotesApi).mockResolvedValueOnce(apiSuccess(result))
     vi.mocked(treeApi.getTreeApi).mockRejectedValueOnce(new ApiError(500, '目录读取失败'))
     expect(await importNotes('', '导入', [])).toEqual(result)
-    expect(toasts.some(t => t.text.includes('导入已完成，目录刷新失败'))).toBe(true)
+    expect(toasts.some(t => t.text.includes('Import complete, but the file tree could not be refreshed'))).toBe(true)
   })
 
   it('失败保留错误并释放操作占用', async () => {
@@ -384,7 +384,7 @@ describe('图片管理', () => {
     vi.mocked(assetsApi.replaceImageApi).mockResolvedValueOnce(apiSuccess(new Response()))
     vi.mocked(treeApi.getTreeApi).mockRejectedValueOnce(new ApiError(500, '读取失败'))
     await replaceImage('assets/a.png', new File(['image'], 'a.png'))
-    expect(toasts.some(t => t.text.includes('图片已替换，但刷新目录失败'))).toBe(true)
+    expect(toasts.some(t => t.text.includes('Image replaced, but the file tree could not be refreshed'))).toBe(true)
   })
 
   it('恢复图片只打开预览，不创建 Markdown 标签', async () => {
@@ -572,8 +572,8 @@ it('弹窗接管移动错误时只返回失败，由调用方展示；目录操�
   toasts.splice(0)
   ws.entries = [{ path: 'already.md', dir: false, size: 0, mtime: 0 }]
   const result = await move('source.md', 'already.md', 'caller')
-  expect(result).toEqual({ ok: false, error: '“already.md”已存在' })
+  expect(result).toEqual({ ok: false, error: '“already.md” already exists' })
   expect(toasts).toHaveLength(0)
   await move('source.md', 'already.md')
-  expect(toasts.map(item => item.text)).toEqual(['“already.md”已存在'])
+  expect(toasts.map(item => item.text)).toEqual(['“already.md” already exists'])
 })

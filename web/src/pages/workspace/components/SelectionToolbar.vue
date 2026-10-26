@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { InlineStyles } from '@@/markdown/inline-styles'
+
 import type { EditorSelection } from '@codemirror/state'
 import type { FormatCommand } from '../editor/format'
 import Icon from '@@/components/Icon/index.vue'
 import InlineAppearance from '@@/components/InlineAppearance/index.vue'
+import { t as translate } from '@@/i18n/runtime'
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { pinia } from '@/pinia'
 import { useSettingsStore } from '@/pinia/stores/settings'
@@ -22,11 +24,21 @@ let unsubscribe: (() => void) | undefined
 let frame = 0
 let dismissed: EditorSelection | undefined
 const buttons = [
-  { title: '加粗', label: 'B', cls: 'bold', key: 'bold', run: toggleSelectionMark('StrongEmphasis') },
-  { title: '斜体', label: 'I', cls: 'italic', key: 'italic', run: toggleSelectionMark('Emphasis') },
-  { title: '下划线', label: 'U', cls: 'underline', key: 'underline', run: toggleUnderline },
-  { title: '删除线', label: 'S', cls: 'strike', key: 'strike', run: toggleSelectionMark('Strikethrough') },
-  { title: '高亮', label: 'M', cls: 'highlight', key: 'highlight', run: toggleSelectionMark('Highlight') },
+  { get title() {
+    return translate('workspace.bold_5ceac6')
+  }, label: 'B', cls: 'bold', key: 'bold', run: toggleSelectionMark('StrongEmphasis') },
+  { get title() {
+    return translate('workspace.italic_217901')
+  }, label: 'I', cls: 'italic', key: 'italic', run: toggleSelectionMark('Emphasis') },
+  { get title() {
+    return translate('workspace.underline_d3b4a2')
+  }, label: 'U', cls: 'underline', key: 'underline', run: toggleUnderline },
+  { get title() {
+    return translate('workspace.strikethrough_5b0508')
+  }, label: 'S', cls: 'strike', key: 'strike', run: toggleSelectionMark('Strikethrough') },
+  { get title() {
+    return translate('workspace.highlight_05f954')
+  }, label: 'M', cls: 'highlight', key: 'highlight', run: toggleSelectionMark('Highlight') },
 ] as const
 
 function close(restoreFocus = false) {
@@ -134,14 +146,14 @@ watch(() => ws.active, () => {
 <template>
   <Teleport to="body">
     <div v-if="floating" ref="root" class="rm-selection-popover" :style="{ left: `${floating.left}px`, top: `${floating.top}px`, maxHeight: `${floating.maxHeight}px`, maxWidth: `${floating.maxWidth}px` }">
-      <div class="rm-selection-toolbar" role="toolbar" aria-label="选中文本格式">
-        <button type="button" title="外观" aria-label="外观" :aria-expanded="appearanceOpen" aria-controls="rm-inline-appearance" @mousedown.prevent @click="appearanceOpen = !appearanceOpen">
+      <div class="rm-selection-toolbar" role="toolbar" :aria-label="translate('workspace.format_selected_text_bd0a7d')">
+        <button type="button" :title="translate('common.appearance_86a63f')" :aria-label="translate('common.appearance_86a63f')" :aria-expanded="appearanceOpen" aria-controls="rm-inline-appearance" @mousedown.prevent @click="appearanceOpen = !appearanceOpen">
           <Icon name="palette" />
         </button>
         <button v-for="button in buttons" :key="button.key" type="button" :title="button.title" :aria-label="button.title" :aria-pressed="appearance[button.key]" :class="button.cls" @mousedown.prevent @click="run(button.run)">
           {{ button.label }}
         </button>
-        <button type="button" title="链接" aria-label="链接" :aria-pressed="appearance.link" @mousedown.prevent @click="run(insertLink)">
+        <button type="button" :title="translate('workspace.link_305378')" :aria-label="translate('workspace.link_305378')" :aria-pressed="appearance.link" @mousedown.prevent @click="run(insertLink)">
           <Icon name="link" />
         </button>
       </div>

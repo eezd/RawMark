@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"sync"
 )
 
@@ -35,7 +36,7 @@ func (l *LogWriter) Write(p []byte) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if len(p) > 10<<20 {
-		return 0, errors.New("单条日志超过大小上限")
+		return 0, i18n.New("a_single_log_entry_exceeds_b1cdf6")
 	}
 	if l.size+int64(len(p)) > 10<<20 {
 		if err := l.file.Close(); err != nil {

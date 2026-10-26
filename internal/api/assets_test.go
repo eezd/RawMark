@@ -34,7 +34,7 @@ func TestImageCleanupRejectsDirectories(t *testing.T) {
 		t.Fatalf("清理应逐项汇报：%d", res.StatusCode)
 	}
 	result := decode[vault.CleanupResult](t, res)
-	if len(result.Deleted) != 1 || result.Deleted[0].Path != "assets/orphan.png" || len(result.Skipped) != 1 || result.Skipped[0].Path != "assets/folder.png" || result.Skipped[0].Reason != "不是图片文件" {
+	if len(result.Deleted) != 1 || result.Deleted[0].Path != "assets/orphan.png" || len(result.Skipped) != 1 || result.Skipped[0].Path != "assets/folder.png" || result.Skipped[0].Reason != "Not an image file" {
 		t.Fatalf("目录应跳过，普通孤立图片仍可清理：%+v", result)
 	}
 	kept := f.do(f.admin, "GET", "/api/v1/files/assets/folder.png/keep.md", "", nil)

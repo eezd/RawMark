@@ -1,51 +1,287 @@
 import type { IconName } from '@@/components/Icon/index.vue'
 import type { SettingsSection } from '@/pinia/stores/settings'
+import { t as translate } from '@@/i18n/runtime'
 
 export const SETTINGS_SECTIONS: { id: SettingsSection, title: string, icon: IconName, description: string }[] = [
-  { id: 'appearance', title: '外观', icon: 'palette', description: '界面字号、主题、明暗模式与 CSS 片段' },
-  { id: 'editor', title: '编辑器', icon: 'edit', description: '正文排版、代码字体与编辑行为' },
-  { id: 'shortcuts', title: '快捷键', icon: 'command', description: '查找命令，添加、移除或重置快捷键' },
-  { id: 'plugins', title: '插件', icon: 'grid', description: '安装、启停和管理插件及其设置页' },
-  { id: 'storage', title: '存储空间', icon: 'grid', description: '空间占用、备份迁移及维护工具' },
-  { id: 'trash', title: '回收站', icon: 'trash', description: '恢复或永久删除已移入回收站的文件' },
-  { id: 'account', title: '账户与安全', icon: 'user', description: '登录密码、API 令牌与退出登录' },
-  { id: 'about', title: '关于', icon: 'info', description: '应用版本、安装应用与 API 文档' },
+  { id: 'appearance', get title() {
+    return translate('common.appearance_86a63f')
+  }, icon: 'palette', get description() {
+    return translate('settings.interface_text_size_themes_color_5acf4b')
+  } },
+  { id: 'editor', get title() {
+    return translate('settings.editor_3b7f59')
+  }, icon: 'edit', get description() {
+    return translate('settings.body_typography_code_font_and_f38913')
+  } },
+  { id: 'shortcuts', get title() {
+    return translate('settings.shortcuts_ee2638')
+  }, icon: 'command', get description() {
+    return translate('settings.find_commands_and_add_remove_05d2bd')
+  } },
+  { id: 'plugins', get title() {
+    return translate('settings.plugins_e806fb')
+  }, icon: 'grid', get description() {
+    return translate('settings.install_enable_disable_and_manage_50b0ae')
+  } },
+  { id: 'storage', get title() {
+    return translate('settings.storage_26de3d')
+  }, icon: 'grid', get description() {
+    return translate('settings.storage_usage_backups_migration_and_a2f3e7')
+  } },
+  { id: 'trash', get title() {
+    return translate('common.trash_ba35dc')
+  }, icon: 'trash', get description() {
+    return translate('settings.restore_or_permanently_delete_files_3db466')
+  } },
+  { id: 'account', get title() {
+    return translate('settings.account_and_security_ed3b4b')
+  }, icon: 'user', get description() {
+    return translate('settings.password_api_tokens_and_signing_9c84b0')
+  } },
+  { id: 'about', get title() {
+    return translate('settings.about_52d25a')
+  }, icon: 'info', get description() {
+    return translate('settings.app_version_installation_and_api_1217bd')
+  } },
 ]
 
 export const SETTING_ITEMS = {
-  'storage': { section: 'storage', title: '空间占用', description: '自动统计笔记库、数据库、字体、主题、插件及其他文件；字体不包含默认 Maple。', keywords: '容量 占用 大小 附件 图片 回收站' },
-  'backup-full': { section: 'storage', title: '完整服务备份', description: '包含笔记、回收站、登录信息、设置和资源，用于恢复实例；恢复前备份当前数据，完成后重新登录。请妥善保管导出包。', keywords: 'Data 导入 导出 备份 恢复 迁移' },
-  'backup-notes': { section: 'storage', title: '笔记数据', description: '导出普通 Markdown 与附件 ZIP，保留目录和相对链接，缺失附件另附清单；导入到新文件夹，不覆盖现有笔记。', keywords: 'Data MD Markdown 导入 导出 迁移' },
-  'backup-settings': { section: 'storage', title: '设置与资源', description: '备份偏好、快捷键、插件数据及字体、主题、插件；不包含笔记或登录信息。导入前备份，同 ID 资源替换。', keywords: '设置 导入 导出 字体 主题 插件' },
-  'index-optimize': { section: 'storage', title: '优化索引', description: '整理全文索引并回收索引数据库空闲空间，不修改笔记。', keywords: '搜索 数据库 整理 VACUUM' },
-  'index-rebuild': { section: 'storage', title: '重建索引', description: '从当前 Markdown 笔记重新生成全文搜索和元数据索引。', keywords: '搜索 数据库 重建 修复' },
-  'temp-clear': { section: 'storage', title: '清理临时文件', description: '清理本程序不再使用的临时文件；保留活动上传、恢复备份与用户文件。', keywords: '临时 缓存 空间 清理' },
-  'settings-reset': { section: 'storage', title: '重置设置', description: '恢复全部 RawMark 偏好并停用插件，保留笔记、账户、已安装资源、插件存储和本机标签页／布局。', keywords: '重置 默认 恢复' },
-  'logs-export': { section: 'storage', title: '导出系统日志', description: '导出有限轮转的应用日志和运行环境摘要，不包含笔记正文及认证信息。历史未保存的日志无法补回。', keywords: '日志 系统 错误 排查' },
-  'trash-retention': { section: 'trash', title: '自动删除期限', description: '按原删除时间计算，默认 30 天；0 表示永不自动删除。修改期限会影响已有条目，服务启动及每小时清理一次。', keywords: '回收站 天数 自动 清理 保留' },
-  'trash-clear': { section: 'trash', title: '清空全部', description: '永久删除回收站中的全部条目，无法撤销。', keywords: '回收站 清理 全部 删除' },
-  'ui-font': { section: 'appearance', title: '界面字体', description: '用于菜单、侧栏与按钮；可导入或删除字体，Maple 为不可删除的默认字体。', keywords: 'UI 字体 导入 删除 TTF OTF WOFF' },
-  'ui-font-size': { section: 'appearance', title: '界面字号', description: '调整菜单、侧栏与按钮文字，不影响正文和代码字号。', keywords: 'UI 大小' },
-  'theme-select': { section: 'appearance', title: '主题', description: '使用内置主题，或从服务器数据目录的 themes 文件夹添加主题。', keywords: '白色 黑色 自定义' },
-  'color-mode': { section: 'appearance', title: '明暗模式', description: '选择浅色、深色，或跟随系统切换。', keywords: '黑暗 夜间 light dark system' },
-  'glass-opacity': { section: 'appearance', title: '磨砂玻璃通透度', description: '调整玻璃面板的透明程度，保留当前主题配色。', keywords: '透明度 背景' },
-  'css-snippets': { section: 'appearance', title: 'CSS 片段', description: '管理自定义主题和 CSS 片段。', keywords: '样式 自定义 高级' },
-  'reset-appearance': { section: 'appearance', title: '恢复默认外观与排版', description: '重置主题、界面与正文排版；停用并保留 CSS 片段。', keywords: '重置 默认 恢复' },
-  'text-font': { section: 'editor', title: '正文主要字体', description: '用于笔记正文，不改变界面字体。', keywords: '无衬线 宋体 系统' },
-  'code-font': { section: 'editor', title: '代码字体', description: '用于代码块和行内代码。', keywords: '等宽 JetBrains Mono' },
-  'font-size': { section: 'editor', title: '编辑器字号', description: '调整正文与代码的基础字号，不影响界面字号。', keywords: '正文 大小' },
-  'content-width': { section: 'editor', title: '正文宽度', description: '限制正文最大宽度，或使用可用空间的全宽。', keywords: '窄 标准 宽 全宽' },
-  'line-height': { section: 'editor', title: '正文行高', description: '调整正文各行之间的距离。', keywords: '行距 排版' },
-  'selection-toolbar': { section: 'editor', title: '选中文本浮动工具栏', description: '选中文字后显示常用格式操作。', keywords: '格式 编辑' },
-  'spellcheck': { section: 'editor', title: '拼写检查', description: '使用浏览器的拼写检查，检查语言取决于浏览器设置。', keywords: '语言 拼写' },
-  'tab-size': { section: 'editor', title: '制表符宽度', description: '仅调整 Tab 字符的显示宽度，不改写正文；Tab 键仍按两个空格缩进。', keywords: 'Tab 缩进 空格' },
-  'typography-preview': { section: 'editor', title: '排版预览', description: '查看当前正文与代码字体的显示效果。', keywords: '字号 行高 段距 预览' },
-  'tokens': { section: 'account', title: 'API 令牌', description: '创建或撤销 REST API 访问令牌。', keywords: 'API REST 接口 自动化 安全' },
-  'password': { section: 'account', title: '修改登录密码', description: '修改后其他设备需要重新登录。', keywords: '账户 安全 鉴权' },
-  'logout': { section: 'account', title: '退出登录', description: '退出当前设备的登录会话。', keywords: '账户 会话' },
-  'install': { section: 'about', title: '安装应用', description: '浏览器支持安装时，可将 RawMark 添加到桌面或主屏幕。', keywords: 'PWA 安装' },
-  'version': { section: 'about', title: '构建版本', description: '当前页面加载的应用版本。', keywords: 'RawMark 关于' },
-  'openapi': { section: 'about', title: 'API 文档', description: '在「账户与安全 → API 令牌」创建令牌后，通过 REST API 读取或写入笔记。', keywords: 'OpenAPI 接口 自动化' },
+  'locale': { section: 'appearance', get title() {
+    return translate('settings.language')
+  }, get description() {
+    return translate('settings.language_description')
+  }, keywords: 'language English Chinese 语言 英文 中文' },
+  'storage': { section: 'storage', get title() {
+    return translate('settings.storage_usage_37ac17')
+  }, get description() {
+    return translate('settings.automatically_counts_vault_databases_fonts_0fcb92')
+  }, get keywords() {
+    return translate('settings.capacity_usage_size_attachments_images_43526f')
+  } },
+  'backup-full': { section: 'storage', get title() {
+    return translate('settings.full_instance_backup_093926')
+  }, get description() {
+    return translate('settings.includes_notes_trash_authentication_settings_c1fad0')
+  }, get keywords() {
+    return translate('settings.data_import_export_backup_restore_edece0')
+  } },
+  'backup-notes': { section: 'storage', get title() {
+    return translate('settings.note_data_7d34ee')
+  }, get description() {
+    return translate('settings.export_markdown_and_attachments_as_362805')
+  }, get keywords() {
+    return translate('settings.data_md_markdown_import_export_0fe592')
+  } },
+  'backup-settings': { section: 'storage', get title() {
+    return translate('settings.settings_and_resources_7408ce')
+  }, get description() {
+    return translate('settings.back_up_preferences_shortcuts_plugin_88d8f8')
+  }, get keywords() {
+    return translate('settings.settings_import_export_fonts_themes_6ca5d2')
+  } },
+  'index-optimize': { section: 'storage', get title() {
+    return translate('settings.optimize_index_57f600')
+  }, get description() {
+    return translate('settings.optimize_full_text_search_and_c95d3a')
+  }, get keywords() {
+    return translate('settings.search_database_optimize_vacuum_378345')
+  } },
+  'index-rebuild': { section: 'storage', get title() {
+    return translate('settings.rebuild_index_9b178a')
+  }, get description() {
+    return translate('settings.rebuild_full_text_search_and_af7c7e')
+  }, get keywords() {
+    return translate('settings.search_database_rebuild_repair_fa9c2a')
+  } },
+  'temp-clear': { section: 'storage', get title() {
+    return translate('settings.clean_temporary_files_af91ae')
+  }, get description() {
+    return translate('settings.remove_temporary_files_no_longer_d96efe')
+  }, get keywords() {
+    return translate('settings.temporary_cache_space_cleanup_c6ff13')
+  } },
+  'settings-reset': { section: 'storage', get title() {
+    return translate('settings.reset_settings_9a70ef')
+  }, get description() {
+    return translate('settings.reset_all_rawmark_preferences_and_9b1af9')
+  }, get keywords() {
+    return translate('settings.reset_default_restore_3d517b')
+  } },
+  'logs-export': { section: 'storage', get title() {
+    return translate('settings.export_system_logs_d05855')
+  }, get description() {
+    return translate('settings.export_rotated_application_logs_and_b1f880')
+  }, get keywords() {
+    return translate('settings.logs_system_errors_diagnostics_f13574')
+  } },
+  'trash-retention': { section: 'trash', get title() {
+    return translate('settings.automatic_deletion_2fb018')
+  }, get description() {
+    return translate('settings.measured_from_the_original_deletion_0b80f9')
+  }, get keywords() {
+    return translate('settings.trash_days_automatic_cleanup_retention_f6669a')
+  } },
+  'trash-clear': { section: 'trash', get title() {
+    return translate('settings.empty_trash_1b5909')
+  }, get description() {
+    return translate('settings.permanently_delete_all_items_in_cf673d')
+  }, get keywords() {
+    return translate('settings.trash_cleanup_all_delete_bf12ce')
+  } },
+  'ui-font': { section: 'appearance', get title() {
+    return translate('settings.interface_font_52a039')
+  }, get description() {
+    return translate('settings.used_for_menus_sidebars_and_4ac475')
+  }, get keywords() {
+    return translate('settings.ui_fonts_import_delete_ttf_767e88')
+  } },
+  'ui-font-size': { section: 'appearance', get title() {
+    return translate('settings.interface_font_size_608972')
+  }, get description() {
+    return translate('settings.adjust_text_in_menus_sidebars_2eb51a')
+  }, get keywords() {
+    return translate('settings.ui_size_8d1a96')
+  } },
+  'theme-select': { section: 'appearance', get title() {
+    return translate('settings.themes_788db1')
+  }, get description() {
+    return translate('settings.use_a_built_in_theme_c2d94c')
+  }, get keywords() {
+    return translate('settings.light_dark_custom_2035c5')
+  } },
+  'color-mode': { section: 'appearance', get title() {
+    return translate('settings.color_mode_65260b')
+  }, get description() {
+    return translate('settings.choose_light_dark_or_follow_614653')
+  }, get keywords() {
+    return translate('settings.night_light_dark_system_49c06d')
+  } },
+  'glass-opacity': { section: 'appearance', get title() {
+    return translate('settings.glass_opacity_c60f04')
+  }, get description() {
+    return translate('settings.adjust_glass_panel_transparency_while_69b576')
+  }, get keywords() {
+    return translate('settings.opacity_background_33f07e')
+  } },
+  'css-snippets': { section: 'appearance', get title() {
+    return translate('settings.css_snippets_d0a2c3')
+  }, get description() {
+    return translate('settings.manage_custom_themes_and_css_5e5a1a')
+  }, get keywords() {
+    return translate('settings.styles_custom_advanced_88fcf7')
+  } },
+  'reset-appearance': { section: 'appearance', get title() {
+    return translate('settings.reset_appearance_and_typography_c73c09')
+  }, get description() {
+    return translate('settings.reset_themes_interface_and_body_b13efd')
+  }, get keywords() {
+    return translate('settings.reset_default_restore_3d517b')
+  } },
+  'text-font': { section: 'editor', get title() {
+    return translate('settings.body_font_dd63f6')
+  }, get description() {
+    return translate('settings.used_for_note_content_without_30ab7a')
+  }, get keywords() {
+    return translate('settings.sans_serif_system_13027c')
+  } },
+  'code-font': { section: 'editor', get title() {
+    return translate('settings.code_font_e42107')
+  }, get description() {
+    return translate('settings.used_for_code_blocks_and_a5b950')
+  }, get keywords() {
+    return translate('settings.monospace_jetbrains_mono_324be7')
+  } },
+  'font-size': { section: 'editor', get title() {
+    return translate('settings.editor_font_size_7c825e')
+  }, get description() {
+    return translate('settings.adjust_the_base_font_size_12669f')
+  }, get keywords() {
+    return translate('settings.body_size_daa3aa')
+  } },
+  'content-width': { section: 'editor', get title() {
+    return translate('settings.content_width_e92272')
+  }, get description() {
+    return translate('settings.limit_the_maximum_content_width_5de587')
+  }, get keywords() {
+    return translate('settings.narrow_standard_wide_full_width_d586a8')
+  } },
+  'line-height': { section: 'editor', get title() {
+    return translate('settings.body_line_height_088ef4')
+  }, get description() {
+    return translate('settings.adjust_the_distance_between_lines_d6a35c')
+  }, get keywords() {
+    return translate('settings.line_spacing_typography_703508')
+  } },
+  'selection-toolbar': { section: 'editor', get title() {
+    return translate('settings.selection_toolbar_1fe31f')
+  }, get description() {
+    return translate('settings.show_common_formatting_actions_when_b8ed19')
+  }, get keywords() {
+    return translate('settings.format_editing_8105d6')
+  } },
+  'spellcheck': { section: 'editor', get title() {
+    return translate('settings.spell_check_c664a4')
+  }, get description() {
+    return translate('settings.use_the_browser_s_spell_be99c8')
+  }, get keywords() {
+    return translate('settings.language_spelling_d5cb13')
+  } },
+  'tab-size': { section: 'editor', get title() {
+    return translate('settings.tab_width_c8881a')
+  }, get description() {
+    return translate('settings.change_only_the_display_width_3af0c9')
+  }, get keywords() {
+    return translate('settings.tab_indentation_spaces_8a3c02')
+  } },
+  'typography-preview': { section: 'editor', get title() {
+    return translate('settings.typography_preview_31ac73')
+  }, get description() {
+    return translate('settings.preview_the_current_body_and_aadacb')
+  }, get keywords() {
+    return translate('settings.font_size_line_height_spacing_862f84')
+  } },
+  'tokens': { section: 'account', get title() {
+    return translate('common.api_tokens_79db53')
+  }, get description() {
+    return translate('settings.create_or_revoke_rest_api_64d1ec')
+  }, get keywords() {
+    return translate('settings.api_rest_automation_security_ca1d07')
+  } },
+  'password': { section: 'account', get title() {
+    return translate('settings.change_password_81ecab')
+  }, get description() {
+    return translate('settings.other_devices_must_sign_in_2c516e')
+  }, get keywords() {
+    return translate('settings.account_security_authentication_e06655')
+  } },
+  'logout': { section: 'account', get title() {
+    return translate('common.sign_out_3ab8cc')
+  }, get description() {
+    return translate('settings.end_this_device_s_login_c5bf28')
+  }, get keywords() {
+    return translate('settings.account_session_4b227c')
+  } },
+  'install': { section: 'about', get title() {
+    return translate('settings.install_app_a298ba')
+  }, get description() {
+    return translate('settings.add_rawmark_to_your_desktop_fb06d4')
+  }, get keywords() {
+    return translate('settings.pwa_install_57a0e5')
+  } },
+  'version': { section: 'about', get title() {
+    return translate('settings.build_version_736f65')
+  }, get description() {
+    return translate('settings.the_application_version_loaded_by_3242d8')
+  }, get keywords() {
+    return translate('settings.rawmark_about_64ca9b')
+  } },
+  'openapi': { section: 'about', get title() {
+    return translate('settings.api_documentation_c7042f')
+  }, get description() {
+    return translate('settings.create_a_token_under_account_8d40ff')
+  }, get keywords() {
+    return translate('settings.openapi_automation_9f53ae')
+  } },
 } satisfies Record<string, { section: SettingsSection, title: string, description: string, keywords: string }>
 
 export type SettingId = keyof typeof SETTING_ITEMS

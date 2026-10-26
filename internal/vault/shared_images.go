@@ -1,10 +1,10 @@
 package vault
 
 import (
-	"fmt"
 	"os"
 	"path"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"strings"
 )
 
@@ -25,7 +25,7 @@ func (v *Vault) copyNoteImages(from, to string) (transfers []imageTransfer, targ
 	}
 	metadata := Analyze(from, content)
 	if len(metadata.Warnings) != 0 {
-		return nil, nil, fmt.Errorf("%w：%s 的元数据异常，无法确认图片引用", ErrInvalidPath, from)
+		return nil, nil, i18n.New("w_invalid_metadata_in_s_cc1d10", ErrInvalidPath, from)
 	}
 	var images []Reference
 	for _, ref := range metadata.Assets {
@@ -51,7 +51,7 @@ func (v *Vault) copyNoteImages(from, to string) (transfers []imageTransfer, targ
 		}
 		m := Analyze(entry.Path, body)
 		if len(m.Warnings) != 0 {
-			return nil, nil, fmt.Errorf("%w：%s 的元数据异常，无法确认图片引用", ErrInvalidPath, entry.Path)
+			return nil, nil, i18n.New("w_invalid_metadata_in_s_cc1d10", ErrInvalidPath, entry.Path)
 		}
 		for _, ref := range m.Assets {
 			used[ref.Target] = true

@@ -1,4 +1,5 @@
 import type { OwnedRenderer } from '@@/plugins/registry'
+import { locale, t as translate } from '@@/i18n/runtime'
 import { emojiFor, renderMath } from '@@/markdown/render'
 import { mountContent } from '@@/plugins/mount'
 import { copyText } from '@@/utils/clipboard'
@@ -66,6 +67,7 @@ const CHECK_ICON
 
 // 代码块右上角：语言标签（未激活时）+ 复制按钮
 export class CodeHeaderWidget extends WidgetType {
+  readonly locale = locale.value
   constructor(
     readonly lang: string,
     readonly showLang: boolean,
@@ -76,7 +78,7 @@ export class CodeHeaderWidget extends WidgetType {
   }
 
   eq(other: CodeHeaderWidget) {
-    return other.lang === this.lang && other.showLang === this.showLang
+    return other.locale === this.locale && other.lang === this.lang && other.showLang === this.showLang
   }
 
   toDOM(view: EditorView) {
@@ -91,7 +93,7 @@ export class CodeHeaderWidget extends WidgetType {
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'cm-rm-code-copy'
-    btn.title = '复制代码'
+    btn.title = translate('workspace.copy_code_420c20')
     btn.innerHTML = COPY_ICON
     btn.addEventListener('mousedown', e => e.preventDefault())
     btn.addEventListener('click', async () => {
@@ -175,6 +177,7 @@ function showRenderError(el: HTMLElement, err: unknown) {
  * 否则是替换源码的渲染结果，点击后光标移到源码 editOffset 处
  */
 export class MathWidget extends WidgetType {
+  readonly locale = locale.value
   constructor(
     readonly tex: string,
     readonly display: boolean,
@@ -184,7 +187,7 @@ export class MathWidget extends WidgetType {
   }
 
   eq(other: MathWidget) {
-    return other.tex === this.tex && other.display === this.display && other.editOffset === this.editOffset
+    return other.locale === this.locale && other.tex === this.tex && other.display === this.display && other.editOffset === this.editOffset
   }
 
   toDOM(view: EditorView) {
@@ -205,7 +208,7 @@ export class MathWidget extends WidgetType {
 
   private render(el: HTMLElement, view: EditorView) {
     if (!this.tex.trim()) {
-      el.textContent = '空公式'
+      el.textContent = translate('workspace.empty_formula_fd803b')
       el.classList.add('cm-rm-placeholder')
       return
     }
@@ -224,6 +227,7 @@ const rendererMounts = new WeakMap<HTMLElement, () => void>()
 
 /** 通用代码块预览；editOffset 与公式组件使用相同的点击编辑约定。 */
 export class CodeRendererWidget extends WidgetType {
+  readonly locale = locale.value
   constructor(
     readonly code: string,
     readonly editOffset: number | null,
@@ -235,7 +239,7 @@ export class CodeRendererWidget extends WidgetType {
   }
 
   eq(other: CodeRendererWidget) {
-    return other.code === this.code && other.editOffset === this.editOffset && other.language === this.language && other.path === this.path && other.renderer === this.renderer
+    return other.locale === this.locale && other.code === this.code && other.editOffset === this.editOffset && other.language === this.language && other.path === this.path && other.renderer === this.renderer
   }
 
   toDOM(view: EditorView) {
@@ -313,6 +317,7 @@ export class EmojiWidget extends WidgetType {
 }
 
 export class FootnoteRefWidget extends WidgetType {
+  readonly locale = locale.value
   constructor(
     readonly label: string,
     readonly definition: string | undefined,
@@ -321,14 +326,14 @@ export class FootnoteRefWidget extends WidgetType {
   }
 
   eq(other: FootnoteRefWidget) {
-    return other.label === this.label && other.definition === this.definition
+    return other.locale === this.locale && other.label === this.label && other.definition === this.definition
   }
 
   toDOM(view: EditorView) {
     const el = document.createElement('sup')
     el.className = 'cm-rm-footnote-ref'
     el.textContent = this.label
-    el.title = this.definition ?? '未找到脚注定义'
+    el.title = this.definition ?? translate('workspace.footnote_definition_not_found_1c0993')
     editOnMousedown(el, view, 2)
     return el
   }
@@ -341,19 +346,20 @@ export interface TocEntry {
 }
 
 export class TocWidget extends WidgetType {
+  readonly locale = locale.value
   constructor(readonly entries: TocEntry[]) {
     super()
   }
 
   eq(other: TocWidget) {
-    return JSON.stringify(other.entries) === JSON.stringify(this.entries)
+    return other.locale === this.locale && JSON.stringify(other.entries) === JSON.stringify(this.entries)
   }
 
   toDOM(view: EditorView) {
     const el = document.createElement('div')
     el.className = 'cm-rm-toc'
     if (!this.entries.length) {
-      el.textContent = '目录（还没有标题）'
+      el.textContent = translate('workspace.table_of_contents_no_headings_c24b5d')
       el.classList.add('cm-rm-placeholder')
     }
     const minLevel = Math.min(...this.entries.map(e => e.level))

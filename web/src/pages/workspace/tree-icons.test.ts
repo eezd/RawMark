@@ -1,5 +1,6 @@
 import type { App } from 'vue'
 import * as treeApi from '@@/apis/tree'
+import { applyLocale } from '@@/i18n/runtime'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // @vitest-environment happy-dom
 import { createApp, nextTick } from 'vue'
@@ -11,6 +12,7 @@ import * as workspace from './workspace'
 let app: App
 let host: HTMLElement
 beforeEach(async () => {
+  applyLocale('en')
   vi.spyOn(workspace, 'saveTreeIcon').mockResolvedValue()
   vi.spyOn(workspace, 'openNote').mockResolvedValue()
   vi.spyOn(workspace, 'move').mockResolvedValue({ ok: true })
@@ -32,6 +34,7 @@ beforeEach(async () => {
 })
 afterEach(() => {
   app.unmount(); host.remove(); vi.restoreAllMocks()
+  applyLocale('en')
 })
 const row = (name: string) => [...host.querySelectorAll<HTMLElement>('.rm-tree-row')].find(e => e.querySelector('.rm-tree-name')?.textContent?.trim() === name)!
 async function click(element: Element, init: MouseEventInit = {}) {
@@ -40,12 +43,12 @@ async function click(element: Element, init: MouseEventInit = {}) {
 const button = (name: string) => document.querySelector<HTMLElement>(`[aria-label="${name}"]`)!
 async function picker() {
   await click(row('folder').querySelector('.rm-tree-icon')!)
-  await vi.waitFor(() => expect(button('搜索图标')).not.toBeNull())
+  await vi.waitFor(() => expect(button('Search icons')).not.toBeNull())
 }
 
 describe('文件树图标操作', () => {
   it('保留右侧目录菜单，点击默认图标不折叠目录或改变多选', async () => {
-    expect(host.querySelector('.rm-vault-heading .rm-tree-label')?.textContent?.trim()).toBe('文件目录')
+    expect(host.querySelector('.rm-vault-heading .rm-tree-label')?.textContent?.trim()).toBe('Files')
     expect(row('folder').querySelector('.rm-tree-icon')?.textContent?.trim()).toBe('📂')
     await click(row('folder'))
     expect(row('a').querySelector('.rm-tree-icon')?.textContent?.trim()).toBe('📄')
@@ -63,24 +66,41 @@ describe('文件树图标操作', () => {
 
   it('中文搜索表情并保存到当前节点，最近使用只记成功操作', async () => {
     await picker()
-    const input = button('搜索图标') as HTMLInputElement
+    const input = button('Search icons') as HTMLInputElement
     input.value = '文件夹'
     input.dispatchEvent(new Event('input', { bubbles: true }))
-    await vi.waitFor(() => expect(button('文件夹 目录 打开')).not.toBeNull())
-    await click(button('文件夹 目录 打开'))
+    await vi.waitFor(() => expect(button('folder directory open')).not.toBeNull())
+    await click(button('folder directory open'))
     await vi.waitFor(() => expect(treeIconTarget.value).toBeNull())
     expect(workspace.saveTreeIcon).toHaveBeenCalledExactlyOnceWith('folder', { kind: 'emoji', value: '📂' })
     expect(JSON.parse(localStorage.getItem('rawmark.recent-tree-icons')!)).toEqual([{ kind: 'emoji', value: '📂' }])
   })
 
+  it('图标提示与搜索随语言双向切换，保留弹窗和查询', async () => {
+    await picker()
+    const input = button('Search icons') as HTMLInputElement
+    input.value = '文件夹'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await vi.waitFor(() => expect(button('folder directory open')).not.toBeNull())
+    for (const [language, label] of [['zh-CN', '文件夹 目录 打开'], ['en', 'folder directory open']] as const) {
+      applyLocale(language)
+      await nextTick()
+      const folder = button(label)
+      expect(folder).not.toBeNull()
+      expect(folder.title).toBe(label)
+      expect(document.querySelector('.rm-tree-icon-picker input')).toBe(input)
+      expect(input.value).toBe('文件夹')
+    }
+  })
+
   it('保存失败保留弹窗与明确错误，恢复默认成功后关闭', async () => {
     vi.mocked(workspace.saveTreeIcon).mockRejectedValueOnce(new Error('磁盘只读'))
     await picker()
-    await click([...document.querySelectorAll('button')].find(e => e.textContent?.trim() === '恢复默认图标')!)
+    await click([...document.querySelectorAll('button')].find(e => e.textContent?.trim() === 'Reset icon')!)
     await vi.waitFor(() => expect(document.querySelector('[role="alert"]')?.textContent).toContain('磁盘只读'))
     expect(treeIconTarget.value?.path).toBe('folder')
     expect(localStorage.getItem('rawmark.recent-tree-icons')).toBeNull()
-    await click([...document.querySelectorAll('button')].find(e => e.textContent?.trim() === '恢复默认图标')!)
+    await click([...document.querySelectorAll('button')].find(e => e.textContent?.trim() === 'Reset icon')!)
     await vi.waitFor(() => expect(treeIconTarget.value).toBeNull())
     expect(workspace.saveTreeIcon).toHaveBeenLastCalledWith('folder', null)
   })
@@ -88,12 +108,12 @@ describe('文件树图标操作', () => {
   it('线性图标可搜索，右键入口选择同一节点', async () => {
     row('folder').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
     await nextTick()
-    await click([...document.querySelectorAll('.rm-tree-menu button')].find(e => e.textContent?.trim() === '修改图标')!)
-    await click([...document.querySelectorAll('[role="tab"]')].find(e => e.textContent?.trim() === '线性图标')!)
-    const input = button('搜索图标') as HTMLInputElement
-    input.value = '任务'; input.dispatchEvent(new Event('input', { bubbles: true })); await nextTick()
+    await click([...document.querySelectorAll('.rm-tree-menu button')].find(e => e.textContent?.trim() === 'Change icon')!)
+    await click([...document.querySelectorAll('[role="tab"]')].find(e => e.textContent?.trim() === 'Line icons')!)
+    const input = button('Search icons') as HTMLInputElement
+    input.value = 'Task'; input.dispatchEvent(new Event('input', { bubbles: true })); await nextTick()
     expect(document.querySelectorAll('.rm-tree-icon-grid button')).toHaveLength(1)
-    await click(button('任务'))
+    await click(button('Task'))
     expect(workspace.saveTreeIcon).toHaveBeenCalledWith('folder', { kind: 'builtin', value: 'task' })
   })
 

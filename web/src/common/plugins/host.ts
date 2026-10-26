@@ -2,6 +2,7 @@ import type { InstalledPlugin } from '@@/apis/plugins/type'
 import type { AsyncCleanup, JSONValue, PluginAPI, PluginView, PluginWorkspace, VaultEvents } from '@@/plugin-api'
 import { getPluginDataApi, getPluginsApi, savePluginDataApi } from '@@/apis/plugins'
 import { getTreeApi } from '@@/apis/tree'
+import { t as translate } from '@@/i18n/runtime'
 import { readNoteFile } from '@@/utils/note-files'
 import { pluginResourceURL } from '@@/utils/resource-tickets'
 
@@ -35,12 +36,12 @@ function status(id: string, phase: string, error = '', cause?: unknown) {
   pluginState.status[id] = { phase, error, cause, cleanupErrors: pluginState.status[id]?.cleanupErrors }
 }
 function assertActive(instance: Instance) {
-  if (instance.stopped || !running) throw new Error('插件已停止，不能继续调用 SDK')
+  if (instance.stopped || !running) throw new Error(translate('common.this_plugin_has_stopped_and_796b24'))
 }
 
 function cleanupFailure(instance: Instance, cause: unknown) {
   instance.cleanupErrors.push(cause)
-  adapter.notice(`插件“${instance.info.name}”清理失败`)
+  adapter.notice(translate('common.plugin_cleanup_failed_6388d7', { p0: instance.info.name }))
 }
 
 function track(instance: Instance, cleanup: AsyncCleanup): () => void {
@@ -75,27 +76,27 @@ async function stop(instance: Instance) {
     }),
   ])
   clearTimeout(timer!)
-  if (!finished) adapter.notice(`插件“${instance.info.name}”清理超过 5 秒`)
+  if (!finished) adapter.notice(translate('common.plugin_cleanup_exceeded_seconds_32945c', { p0: instance.info.name }))
 }
 
 function fail(instance: Instance, phase: string, cause: unknown) {
   if (instance.stopped) return
-  const message = `${phase}失败，已在当前页面停用；可在插件设置中重试`
+  const message = translate('common.failed_and_has_been_disabled_aa6412', { p0: phase })
   faults.set(instance.info.id, instance.info.revision)
   status(instance.info.id, 'error', message, cause)
-  adapter.notice(`插件“${instance.info.name}”：${message}`)
+  adapter.notice(translate('common.plugin_44a1b7', { p0: instance.info.name, p1: message }))
   void stop(instance)
 }
 
 function localID(instance: Instance, id: string) {
-  if (!/^[a-z0-9][\w.-]{0,63}$/i.test(id)) throw new Error('插件注册 id 无效')
+  if (!/^[a-z0-9][\w.-]{0,63}$/i.test(id)) throw new Error(translate('common.invalid_plugin_registration_id_9702fe'))
   return `plugin:${instance.info.id}:${id}`
 }
 
 function addView(instance: Instance, map: typeof sidebarViews, view: PluginView) {
   assertActive(instance)
-  if (!view.title.trim() || typeof view.mount !== 'function') throw new Error('插件视图必须提供标题与挂载函数')
-  return track(instance, registerEntry(map, localID(instance, view.id), { ...view, owner: instance.info.id, fail: cause => fail(instance, '视图', cause) }))
+  if (!view.title.trim() || typeof view.mount !== 'function') throw new Error(translate('common.plugin_views_require_a_title_79ae1b'))
+  return track(instance, registerEntry(map, localID(instance, view.id), { ...view, owner: instance.info.id, fail: cause => fail(instance, translate('common.view_1c5c06'), cause) }))
 }
 
 async function createAPI(instance: Instance): Promise<PluginAPI> {
@@ -109,20 +110,20 @@ async function createAPI(instance: Instance): Promise<PluginAPI> {
     addCommand(command) {
       check()
       const commandID = localID(instance, command.id)
-      if (!command.title.trim() || typeof command.run !== 'function' || allCommands().some(c => c.id === commandID)) throw new Error('命令无效或重复注册')
+      if (!command.title.trim() || typeof command.run !== 'function' || allCommands().some(c => c.id === commandID)) throw new Error(translate('common.invalid_or_duplicate_command_f6503b'))
       return track(instance, registerCommand({ ...command, id: commandID, keys: [], when: () => {
         if (instance.stopped) return false
         try {
           return command.when?.() ?? true
         } catch (cause) {
-          fail(instance, '命令条件', cause); return false
+          fail(instance, translate('common.command_condition_df314d'), cause); return false
         }
       }, run: () => {
         if (instance.stopped) return
         try {
-          void Promise.resolve(command.run()).catch(cause => fail(instance, '命令', cause))
+          void Promise.resolve(command.run()).catch(cause => fail(instance, translate('common.command_928f87'), cause))
         } catch (cause) {
-          fail(instance, '命令', cause)
+          fail(instance, translate('common.command_928f87'), cause)
         }
       } }))
     },
@@ -136,13 +137,13 @@ async function createAPI(instance: Instance): Promise<PluginAPI> {
     },
     registerCodeBlockRenderer(language, render) {
       check()
-      if (typeof render !== 'function') throw new Error('代码块渲染器必须为函数')
-      return track(instance, registerCodeRenderer(language, { owner: id, render, fail: cause => fail(instance, '代码块渲染', cause) }))
+      if (typeof render !== 'function') throw new Error(translate('common.a_code_block_renderer_must_952f83'))
+      return track(instance, registerCodeRenderer(language, { owner: id, render, fail: cause => fail(instance, translate('common.code_block_rendering_1d4ae4'), cause) }))
     },
     addSidebarView: view => addView(instance, sidebarViews, view),
     addSettingTab: view => addView(instance, settingTabs, view),
     registerCleanup: (cleanup) => {
-      if (typeof cleanup !== 'function') throw new Error('清理回调必须为函数')
+      if (typeof cleanup !== 'function') throw new Error(translate('common.a_cleanup_callback_must_be_6ce04e'))
       return track(instance, cleanup)
     },
     vault: {
@@ -157,13 +158,13 @@ async function createAPI(instance: Instance): Promise<PluginAPI> {
       },
       on<K extends keyof VaultEvents>(event: K, callback: (value: VaultEvents[K]) => void | Promise<void>) {
         check()
-        if (!['changed', 'moved', 'deleted', 'resync'].includes(event)) throw new Error('仓库事件类型无效')
+        if (!['changed', 'moved', 'deleted', 'resync'].includes(event)) throw new Error(translate('common.invalid_vault_event_type_8621e4'))
         const listener = (e: Event) => {
           if (instance.stopped) return
           try {
-            void Promise.resolve(callback(event === 'resync' ? undefined : (e as CustomEvent).detail)).catch(cause => fail(instance, '仓库事件', cause))
+            void Promise.resolve(callback(event === 'resync' ? undefined : (e as CustomEvent).detail)).catch(cause => fail(instance, translate('common.vault_event_03582e'), cause))
           } catch (cause) {
-            fail(instance, '仓库事件', cause)
+            fail(instance, translate('common.vault_event_03582e'), cause)
           }
         }
         pluginEvents.addEventListener(event, listener)
@@ -197,9 +198,9 @@ async function activate(instance: Instance) {
   const signal = instance.controller.signal
   let onAbort: () => void = () => {}
   const interrupted = new Promise<never>((_, reject) => {
-    onAbort = () => reject(new Error('插件已停止'))
+    onAbort = () => reject(new Error(translate('common.plugin_stopped_9ac692')))
     signal.addEventListener('abort', onAbort, { once: true })
-    timer = setTimeout(() => reject(new Error('插件激活超过 10 秒')), 10_000)
+    timer = setTimeout(() => reject(new Error(translate('common.plugin_activation_exceeded_seconds_cffeae'))), 10_000)
   })
   const pending = (async () => {
     const sdk = await createAPI(instance)
@@ -209,9 +210,9 @@ async function activate(instance: Instance) {
     assertActive(instance)
     const module = await import(/* @vite-ignore */ url)
     assertActive(instance)
-    if (typeof module.default !== 'function') throw new Error('插件必须默认导出激活函数')
+    if (typeof module.default !== 'function') throw new Error(translate('common.a_plugin_must_export_an_1fbc50'))
     const cleanup: unknown = await module.default(sdk)
-    if (cleanup !== undefined && typeof cleanup !== 'function') throw new Error('激活返回值必须为清理函数')
+    if (cleanup !== undefined && typeof cleanup !== 'function') throw new Error(translate('common.activation_must_return_a_cleanup_ea3a8c'))
     if (cleanup) {
       if (instance.stopped) {
         try {
@@ -228,7 +229,7 @@ async function activate(instance: Instance) {
     await Promise.race([pending, interrupted])
     if (!instance.stopped) status(instance.info.id, 'active')
   } catch (cause) {
-    fail(instance, '激活', cause)
+    fail(instance, translate('common.activation_dd1286'), cause)
   } finally {
     clearTimeout(timer!)
     signal.removeEventListener('abort', onAbort)
@@ -256,12 +257,12 @@ async function pump() {
 }
 
 export async function refreshPlugins() {
-  if (!running) throw new CanceledError('插件宿主已停止')
+  if (!running) throw new CanceledError(translate('common.plugin_host_stopped_901067'))
   const currentSession = session
   const sequence = ++request
   try {
     const installed = (await getPluginsApi()).data.plugins
-    if (!running || currentSession !== session || sequence !== request) throw new CanceledError('插件刷新已过期')
+    if (!running || currentSession !== session || sequence !== request) throw new CanceledError(translate('common.plugin_refresh_superseded_2fa245'))
     pluginState.installed = installed
     pluginState.error = ''
     pluginState.errorCause = undefined
@@ -277,9 +278,9 @@ export async function refreshPlugins() {
     }
     void pump()
   } catch (cause) {
-    if (!running || currentSession !== session || sequence !== request) throw new CanceledError('插件刷新已过期')
+    if (!running || currentSession !== session || sequence !== request) throw new CanceledError(translate('common.plugin_refresh_superseded_2fa245'))
     if (isCancel(cause)) throw cause
-    pluginState.error = `读取插件列表失败：${cause instanceof Error ? cause.message : String(cause)}`
+    pluginState.error = translate('common.could_not_load_plugins_a1c343', { p0: cause instanceof Error ? cause.message : String(cause) })
     pluginState.errorCause = cause
     for (const instance of instances.values()) {
       status(instance.info.id, 'paused')
@@ -319,7 +320,7 @@ export function pluginEditorFailure(error: unknown) {
   queueMicrotask(() => {
     for (const owner of owners) {
       const instance = instances.get(owner)
-      if (instance) fail(instance, '编辑器扩展', error)
+      if (instance) fail(instance, translate('common.editor_extension_28bb35'), error)
     }
   })
 }

@@ -1,15 +1,24 @@
+import { t as translate } from '@@/i18n/runtime'
 // 编辑器排版设置；账户、快捷键等设置不进入此模块。
 const maple = { label: 'Maple Mono Normal NL NF CN', css: '\'Maple Mono Normal NL NF CN\', monospace' }
 export const TEXT_FONTS = {
   maple,
-  sans: { label: 'Manrope · 清晰无衬线', css: '\'Manrope\', \'PingFang SC\', \'Microsoft YaHei\', sans-serif' },
-  serif: { label: 'Noto Serif SC · 思源宋体', css: '\'Noto Serif SC\', \'Source Han Serif SC\', serif' },
-  system: { label: '系统字体', css: 'system-ui, sans-serif' },
+  sans: { get label() {
+    return translate('common.manrope_sans_serif_a8923c')
+  }, css: '\'Manrope\', \'PingFang SC\', \'Microsoft YaHei\', sans-serif' },
+  serif: { get label() {
+    return translate('common.noto_serif_sc_serif_18133d')
+  }, css: '\'Noto Serif SC\', \'Source Han Serif SC\', serif' },
+  system: { get label() {
+    return translate('common.system_font_96a2a0')
+  }, css: 'system-ui, sans-serif' },
 }
 export const CODE_FONTS = {
   maple,
   jetbrains: { label: 'JetBrains Mono', css: '\'JetBrains Mono\', ui-monospace, monospace' },
-  system: { label: '系统等宽字体', css: 'ui-monospace, monospace' },
+  system: { get label() {
+    return translate('common.system_monospace_e32ca0')
+  }, css: 'ui-monospace, monospace' },
 }
 export const UI_FONT_SIZE = { min: 14, max: 20, default: 14 }
 export const FONT_PRESETS: Record<string, { label: string, css: string }> = { ...TEXT_FONTS, jetbrains: CODE_FONTS.jetbrains }

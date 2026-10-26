@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Entry } from '@@/apis/tree/type'
+
 import Icon from '@@/components/Icon/index.vue'
+import { locale, t as translate } from '@@/i18n/runtime'
 import { toast } from '@@/utils/notifications'
 import { basename, hiddenAssetPath, imageInFolder, isImage } from '@@/utils/paths'
 import { computed, onMounted, ref } from 'vue'
@@ -40,7 +42,7 @@ const certain = computed(() => metadata.ready && !metadata.error && !metadata.no
 const images = computed(() => scopeImages.value.filter((entry) => {
   const count = references.value.get(entry.path)?.length ?? 0
   return entry.path.toLocaleLowerCase().includes(query.value.toLocaleLowerCase()) && (!format.value || entry.path.toLowerCase().endsWith(`.${format.value}`)) && (usage.value === 'all' || (certain.value && (usage.value === 'used' ? count > 0 : count === 0)))
-}).sort((a, b) => sort.value === 'name' ? a.path.localeCompare(b.path, 'zh-CN', { numeric: true }) : sort.value === 'size' ? b.size - a.size : b.mtime - a.mtime))
+}).sort((a, b) => sort.value === 'name' ? a.path.localeCompare(b.path, locale.value, { numeric: true }) : sort.value === 'size' ? b.size - a.size : b.mtime - a.mtime))
 const types = computed(() => [...new Set(scopeImages.value.map(entry => entry.path.slice(entry.path.lastIndexOf('.') + 1).toLowerCase()))].sort())
 const totalSize = computed(() => scopeImages.value.reduce((sum, entry) => sum + entry.size, 0))
 const current = computed(() => scopeImages.value.find(entry => entry.path === selected.value))
@@ -65,13 +67,13 @@ async function upload(event: Event) {
   busy.value = true; report.value = []
   const valid = files.filter((file) => {
     if (!isImage(file.name) || file.size === 0 || file.size > 50 * 1024 * 1024) {
-      report.value.push(`${file.name}：请选择非空图片，单张最大 50 MB`); return false
+      report.value.push(translate('workspace.choose_a_non_empty_image_c3cdc3', { p0: file.name })); return false
     }; return true
   })
   try {
-    const result = await uploadFolderImages(uploadDir.value, valid); report.value.push(`已处理 ${result.uploaded} 张图片，相同内容自动去重`, ...result.failures)
+    const result = await uploadFolderImages(uploadDir.value, valid); report.value.push(translate('workspace.processed_images_identical_content_is_9c3f9a', { p0: result.uploaded }), ...result.failures)
   } catch (error) {
-    report.value.push(`上传后刷新失败，请重新检查目录：${error instanceof Error ? error.message : '网络错误'}`)
+    report.value.push(translate('workspace.upload_complete_but_refresh_failed_a8fdfb', { p0: error instanceof Error ? error.message : translate('common.network_error') }))
   } finally {
     busy.value = false
   }
@@ -79,7 +81,7 @@ async function upload(event: Event) {
 async function proposeCleanup() {
   await refreshMetadata()
   if (!certain.value) {
-    toast('引用状态尚未确认，不能列出清理候选'); return
+    toast(translate('workspace.references_are_not_confirmed_cleanup_76caea')); return
   }
   cleanupCandidates.value = [...orphans.value]
   cleanupSelected.value = orphans.value.map(entry => entry.path)
@@ -88,10 +90,10 @@ async function clean() {
   busy.value = true; report.value = []
   try {
     const result = await cleanupImages(cleanupSelected.value)
-    report.value.push(`已将 ${result.deleted.length} 张图片移入回收站`, ...result.skipped.map(item => `${item.path}：${item.reason}`))
+    report.value.push(translate('workspace.moved_images_to_trash_c5b457', { count: result.deleted.length }), ...result.skipped.map(item => `${item.path}：${item.reason}`))
     cleanupCandidates.value = null
   } catch (error) {
-    report.value.push(`清理失败：${error instanceof Error ? error.message : '网络错误'}`)
+    report.value.push(translate('workspace.cleanup_failed_86823d', { p0: error instanceof Error ? error.message : translate('common.network_error') }))
   } finally {
     busy.value = false
   }
@@ -99,55 +101,55 @@ async function clean() {
 </script>
 
 <template>
-  <section class="rm-media-library" aria-label="图片库" @keydown.esc.stop="!busy && (ws.images = null)">
+  <section class="rm-media-library" :aria-label="translate('workspace.image_library_92329a')" @keydown.esc.stop="!busy && (ws.images = null)">
     <header class="rm-media-header">
-      <div><small>ASSET LIBRARY</small><h1>图片与灵感资源</h1><p>{{ ws.imagesAll ? '整个知识库' : `${dir || '根目录'} · 当前目录及直属附件` }} · {{ scopeImages.length }} 张图片 · {{ size(totalSize) }}</p></div><el-button class="rm-btn" :disabled="busy" @click="ws.images = null; ws.view = 'notes'">
-        返回笔记
+      <div><small>ASSET LIBRARY</small><h1>{{ translate('workspace.images_and_visual_resources_794f97') }}</h1><p>{{ ws.imagesAll ? translate('workspace.entire_vault_a8e1f0') : translate('workspace.current_folder_and_direct_attachments_c2a863', { p0: dir || translate('workspace.root_folder_42ee28') }) }} · {{ scopeImages.length }} {{ translate('workspace.images_b62646') }} {{ size(totalSize) }}</p></div><el-button class="rm-btn" :disabled="busy" @click="ws.images = null; ws.view = 'notes'">
+        {{ translate('workspace.back_to_notes_38461a') }}
       </el-button>
     </header>
     <div class="rm-media-mobile-filters">
-      <el-select v-model="ws.imagesAll" aria-label="资源范围">
-        <el-option :value="false" label="当前目录" /><el-option :value="true" label="整个知识库" />
-      </el-select><el-select v-model="usage" aria-label="引用状态">
-        <el-option value="all" label="全部图片" /><el-option value="used" :disabled="!certain" label="已被引用" /><el-option value="unused" :disabled="!certain" label="未被引用" />
+      <el-select v-model="ws.imagesAll" :aria-label="translate('workspace.resource_scope_9c55b5')">
+        <el-option :value="false" :label="translate('workspace.current_folder_257f44')" /><el-option :value="true" :label="translate('workspace.entire_vault_a8e1f0')" />
+      </el-select><el-select v-model="usage" :aria-label="translate('workspace.references_92fb1e')">
+        <el-option value="all" :label="translate('workspace.all_images_048d65')" /><el-option value="used" :disabled="!certain" :label="translate('workspace.referenced_981f27')" /><el-option value="unused" :disabled="!certain" :label="translate('workspace.unreferenced_01e3bd')" />
       </el-select><el-button class="rm-btn" :disabled="busy || !certain" @click="proposeCleanup">
-        清理孤立图片
+        {{ translate('workspace.clean_unused_images_f4eb11') }}
       </el-button>
     </div>
     <div class="rm-media-workspace">
       <aside class="rm-media-filters">
-        <span class="rm-media-section-label">资源范围</span><button :class="{ on: !ws.imagesAll }" @click="ws.imagesAll = false">
-          <Icon name="folder" />{{ dir || '根目录' }}
+        <span class="rm-media-section-label">{{ translate('workspace.resource_scope_9c55b5') }}</span><button :class="{ on: !ws.imagesAll }" @click="ws.imagesAll = false">
+          <Icon name="folder" />{{ dir || translate('workspace.root_folder_42ee28') }}
         </button><button :class="{ on: ws.imagesAll }" @click="ws.imagesAll = true">
-          <Icon name="image" />整个知识库
-        </button><span class="rm-media-section-label">引用状态</span><button v-for="item in [{ id: 'all', label: '全部图片' }, { id: 'used', label: '已被引用' }, { id: 'unused', label: '未被引用' }]" :key="item.id" :class="{ on: usage === item.id }" :disabled="item.id !== 'all' && !certain" @click="usage = item.id">
+          <Icon name="image" />{{ translate('workspace.entire_vault_a8e1f0') }}
+        </button><span class="rm-media-section-label">{{ translate('workspace.references_92fb1e') }}</span><button v-for="item in [{ id: 'all', get label() { return translate('workspace.all_images_048d65') } }, { id: 'used', get label() { return translate('workspace.referenced_981f27') } }, { id: 'unused', get label() { return translate('workspace.unreferenced_01e3bd') } }]" :key="item.id" :class="{ on: usage === item.id }" :disabled="item.id !== 'all' && !certain" @click="usage = item.id">
           {{ item.label }}
-        </button><span class="rm-media-section-label">整理资源</span><button :disabled="busy || !certain" @click="proposeCleanup">
-          <Icon name="trash" />清理孤立图片 <small>{{ orphans.length }}</small>
-        </button><p>清理前核对全库引用，图片移入回收站，可恢复。</p>
+        </button><span class="rm-media-section-label">{{ translate('workspace.organize_resources_ecf902') }}</span><button :disabled="busy || !certain" @click="proposeCleanup">
+          <Icon name="trash" />{{ translate('workspace.clean_unused_images_f4eb11') }} <small>{{ orphans.length }}</small>
+        </button><p>{{ translate('workspace.checks_references_across_the_vault_371581') }}</p>
       </aside>
       <div class="rm-media-content">
         <div class="rm-media-toolbar">
-          <el-input v-model="query" class="rm-media-search" type="search" clearable placeholder="搜索图片名称或路径…" aria-label="搜索图片">
+          <el-input v-model="query" class="rm-media-search" type="search" clearable :placeholder="translate('workspace.search_image_names_or_paths_944196')" :aria-label="translate('workspace.search_images_8f938f')">
             <template #prefix>
               <Icon name="search" />
             </template>
-          </el-input><el-select v-model="format" aria-label="图片格式">
-            <el-option value="" label="所有格式" /><el-option v-for="type in types" :key="type" :value="type" :label="type.toUpperCase()" />
-          </el-select><el-select v-model="sort" aria-label="图片排序">
-            <el-option value="modified" label="最近修改" /><el-option value="name" label="名称" /><el-option value="size" label="文件大小" />
-          </el-select><button class="rm-icon-btn" :title="list ? '切换网格' : '切换列表'" @click="list = !list">
+          </el-input><el-select v-model="format" :aria-label="translate('workspace.image_format_f2ed45')">
+            <el-option value="" :label="translate('workspace.all_formats_c8b740')" /><el-option v-for="type in types" :key="type" :value="type" :label="type.toUpperCase()" />
+          </el-select><el-select v-model="sort" :aria-label="translate('workspace.image_sort_order_34877a')">
+            <el-option value="modified" :label="translate('workspace.last_modified_ad3bf1')" /><el-option value="name" :label="translate('common.name_d44e9b')" /><el-option value="size" :label="translate('workspace.file_size_b9bf69')" />
+          </el-select><button class="rm-icon-btn" :title="list ? translate('workspace.grid_view_709ce2') : translate('workspace.list_view_383611')" @click="list = !list">
             <Icon :name="list ? 'grid' : 'outline'" />
           </button>
         </div>
         <div class="rm-media-upload">
-          <label>上传至 <el-select v-model="uploadDir" aria-label="上传目录"><el-option value="" label="根目录 / assets" /><el-option v-for="folder in directories" :key="folder.path" :value="folder.path" :label="`${folder.path} / assets`" /></el-select></label><input ref="picker" type="file" accept="image/*" multiple hidden @change="upload"><el-button class="rm-btn rm-btn-primary" :disabled="busy" @click="picker?.click()">
-            <Icon name="plus" />{{ busy ? '处理中…' : '上传图片' }}
+          <label>{{ translate('workspace.upload_to_46873e') }} <el-select v-model="uploadDir" :aria-label="translate('workspace.upload_folder_462e85')"><el-option value="" :label="translate('workspace.root_assets_c9d759')" /><el-option v-for="folder in directories" :key="folder.path" :value="folder.path" :label="`${folder.path} / assets`" /></el-select></label><input ref="picker" type="file" accept="image/*" multiple hidden @change="upload"><el-button class="rm-btn rm-btn-primary" :disabled="busy" @click="picker?.click()">
+            <Icon name="plus" />{{ busy ? translate('workspace.processing_d3d211') : translate('workspace.upload_images_9fbb47') }}
           </el-button>
         </div>
         <p v-if="metadata.error || !certain" class="rm-media-warning" role="status">
-          {{ metadata.error || (metadata.ready ? '部分笔记元数据异常，引用状态不完整；已禁用清理。' : '正在读取引用索引…') }} <el-button class="rm-btn" @click="refreshMetadata()">
-            刷新状态
+          {{ metadata.error || (metadata.ready ? translate('workspace.some_note_metadata_is_invalid_26b8ec') : translate('workspace.reading_reference_index_8392a7')) }} <el-button class="rm-btn" @click="refreshMetadata()">
+            {{ translate('workspace.refresh_status_802a40') }}
           </el-button>
         </p>
         <div v-if="report.length" class="rm-media-report" role="status">
@@ -157,34 +159,34 @@ async function clean() {
         </div>
         <div class="rm-media-grid" :class="{ list }">
           <button v-for="image in images" :key="image.path" class="rm-media-card" :class="{ selected: selected === image.path }" :title="image.path" @click="select(image.path)" @dblclick="ws.image = image.path" @contextmenu.prevent="ws.image = image.path">
-            <span class="rm-media-thumbnail"><img :src="imageUrl(image.path)" :alt="basename(image.path)" loading="lazy"></span><strong>{{ basename(image.path) }}</strong><small>{{ size(image.size) }} · {{ certain ? `${references.get(image.path)?.length ?? 0} 篇引用` : '引用未确认' }}</small>
+            <span class="rm-media-thumbnail"><img :src="imageUrl(image.path)" :alt="basename(image.path)" loading="lazy"></span><strong>{{ basename(image.path) }}</strong><small>{{ size(image.size) }} · {{ certain ? translate('workspace.references_9aa726', { count: references.get(image.path)?.length ?? 0 }) : translate('workspace.references_not_confirmed_5abb9b') }}</small>
           </button>
         </div>
         <p v-if="!images.length" class="rm-tree-empty">
-          没有符合条件的图片
+          {{ translate('workspace.no_matching_images_129380') }}
         </p>
       </div>
       <aside v-if="current" class="rm-media-inspector">
-        <button class="rm-icon-btn rm-media-deselect" title="关闭详情" @click="selected = ''">
+        <button class="rm-icon-btn rm-media-deselect" :title="translate('workspace.close_details_9071cf')" @click="selected = ''">
           <Icon name="close" />
         </button><div class="rm-media-detail-image">
           <img v-if="!broken" :src="imageUrl(current.path)" :alt="basename(current.path)" @load="loaded" @error="broken = true"><p v-else>
-            无法预览此图片
+            {{ translate('workspace.cannot_preview_this_image_99dab9') }}
           </p>
         </div><h2>{{ basename(current.path) }}</h2><p class="rm-media-path">
           {{ current.path }}
-        </p><dl><dt>尺寸</dt><dd>{{ dimensions || (broken ? '无法读取' : '加载中…') }}</dd><dt>大小</dt><dd>{{ size(current.size) }}</dd><dt>修改时间</dt><dd>{{ new Date(current.mtime).toLocaleDateString('zh-CN') }}</dd><dt>引用</dt><dd>{{ certain ? `${currentRefs.length} 篇笔记` : '尚未确认' }}</dd></dl><el-button class="rm-btn rm-btn-primary" @click="ws.image = current.path">
-          <Icon name="edit" />预览与编辑
-        </el-button><h3>引用此图片的笔记</h3><button v-for="reference in currentRefs" :key="reference.path" class="rm-media-reference" @click="ws.images = null; openReference(reference.path, reference.line)">
+        </p><dl><dt>{{ translate('workspace.dimensions_246df7') }}</dt><dd>{{ dimensions || (broken ? translate('workspace.cannot_read_c27041') : translate('workspace.loading_4927a5')) }}</dd><dt>{{ translate('workspace.size_50db74') }}</dt><dd>{{ size(current.size) }}</dd><dt>{{ translate('workspace.modified_257bbc') }}</dt><dd>{{ new Date(current.mtime).toLocaleDateString(locale) }}</dd><dt>{{ translate('workspace.references_e0ec65') }}</dt><dd>{{ certain ? translate('workspace.notes_fd9460', { count: currentRefs.length }) : translate('workspace.not_confirmed_10e9fc') }}</dd></dl><el-button class="rm-btn rm-btn-primary" @click="ws.image = current.path">
+          <Icon name="edit" />{{ translate('workspace.preview_and_edit_d797af') }}
+        </el-button><h3>{{ translate('workspace.notes_referencing_this_image_b2a9ac') }}</h3><button v-for="reference in currentRefs" :key="reference.path" class="rm-media-reference" @click="ws.images = null; openReference(reference.path, reference.line)">
           <Icon name="note" /><span>{{ reference.title }}<small>{{ reference.path }}</small></span>
         </button><p v-if="certain && !currentRefs.length">
-          没有笔记引用
+          {{ translate('workspace.no_notes_reference_this_image_aab134') }}
         </p>
       </aside>
     </div>
-    <el-dialog :model-value="cleanupCandidates !== null" :title="`清理候选 · ${cleanupCandidates?.length ?? 0} 张`" width="640px" class="rm-cleanup-dialog" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy" :before-close="() => { if (!busy) cleanupCandidates = null }" @close="cleanupCandidates = null">
+    <el-dialog :model-value="cleanupCandidates !== null" :title="translate('workspace.cleanup_candidates_images_9cd82b', { count: cleanupCandidates?.length ?? 0 })" width="640px" class="rm-cleanup-dialog" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy" :before-close="() => { if (!busy) cleanupCandidates = null }" @close="cleanupCandidates = null">
       <p class="rm-share-note">
-        服务端会再次读取最新笔记；仍有引用的图片将跳过。确认后移入回收站。
+        {{ translate('workspace.the_server_will_check_the_cce22a') }}
       </p><ul>
         <li v-for="image in cleanupCandidates ?? []" :key="image.path">
           <el-checkbox-group v-model="cleanupSelected">
@@ -194,12 +196,12 @@ async function clean() {
           </el-checkbox-group>
         </li>
       </ul><p v-if="!cleanupCandidates?.length" class="rm-share-note">
-        当前范围没有可清理的孤立图片。
+        {{ translate('workspace.no_unused_images_to_clean_ad136a') }}
       </p><div class="rm-cleanup-actions">
         <el-button class="rm-btn" :disabled="busy" @click="cleanupCandidates = null">
-          取消
+          {{ translate('common.cancel_2cd0f3') }}
         </el-button><el-button class="rm-btn rm-btn-primary" :disabled="busy || !cleanupSelected.length" @click="clean">
-          移入回收站（{{ cleanupSelected.length }}）
+          {{ translate('workspace.move_to_trash_911c22') }}{{ cleanupSelected.length }}）
         </el-button>
       </div>
     </el-dialog>

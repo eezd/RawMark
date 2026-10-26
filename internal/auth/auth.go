@@ -7,8 +7,8 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
 	"fmt"
+	"rawmark/internal/i18n"
 	"strings"
 	"sync"
 	"time"
@@ -38,11 +38,11 @@ const (
 )
 
 var (
-	ErrAlreadySetUp   = errors.New("已完成初始化")
-	ErrWeakPassword   = fmt.Errorf("密码至少 %d 位", MinPasswordLen)
-	ErrBadCredentials = errors.New("密码错误")
-	ErrRateLimited    = errors.New("尝试次数过多，请稍后再试")
-	ErrBadScope       = errors.New("权限范围只能是 read 或 write")
+	ErrAlreadySetUp   = i18n.New("setup_is_already_complete_222ec6")
+	ErrWeakPassword   = i18n.New("password_must_contain_at_least_decf04", MinPasswordLen)
+	ErrBadCredentials = i18n.New("incorrect_password_4585c8")
+	ErrRateLimited    = i18n.New("too_many_attempts_please_try_8bbf6d")
+	ErrBadScope       = i18n.New("scope_must_be_read_or_2cb466")
 )
 
 type Manager struct {
@@ -240,13 +240,13 @@ func hashPassword(password string) string {
 func verifyPassword(encoded, password string) (bool, error) {
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 6 || parts[1] != "argon2id" {
-		return false, errors.New("密码哈希格式无法识别")
+		return false, i18n.New("unrecognized_password_hash_format_2f5457")
 	}
 	var mem uint32
 	var t uint32
 	var p uint8
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &mem, &t, &p); err != nil {
-		return false, fmt.Errorf("密码哈希参数无法解析: %w", err)
+		return false, i18n.New("could_not_parse_password_hash_3cd93b", err)
 	}
 	b64 := base64.RawStdEncoding
 	salt, err := b64.DecodeString(parts[4])

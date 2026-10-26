@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { BackupKind, MaintenanceStatus } from '@@/apis/maintenance/type'
+
 import type { AxiosHeaders, AxiosResponse } from 'axios'
 import { getAuthStateApi } from '@@/apis/auth'
-
 import { cancelBackupUploadApi, clearTempApi, exportBackupApi, exportLogsApi, exportNotesApi, getMaintenanceStatusApi, importSettingsApi, maintainIndexApi, resetSettingsApi, restoreBackupApi, startBackupUploadApi, uploadBackupChunkApi, validateBackupApi } from '@@/apis/maintenance'
+
+import { locale, t as translate } from '@@/i18n/runtime'
 import { refreshPlugins } from '@@/plugins/host'
 
 import { confirmAction } from '@@/utils/confirm'
@@ -38,7 +40,7 @@ onMounted(async () => {
   try {
     const status = (await getMaintenanceStatusApi()).data; if (mounted) last.value = status
   } catch (cause) {
-    if (mounted) error.value = `读取维护状态失败：${String(cause)}`
+    if (mounted) error.value = translate('settings.could_not_load_maintenance_status_51d391', { p0: String(cause) })
   }
 })
 async function prepare() {
@@ -75,16 +77,16 @@ async function download(response: AxiosResponse<Blob, unknown, AxiosHeaders>, fa
   const url = URL.createObjectURL(blob)
   const link = Object.assign(document.createElement('a'), { href: url, download: name })
   link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
-  message.value = '导出文件已生成'
+  message.value = translate('settings.export_file_generated_9d8f6c')
 }
 async function exportPackage(kind: BackupKind) {
-  await perform('正在导出…', async () => download(await exportBackupApi(kind), `rawmark-${kind}.zip`))
+  await perform(translate('settings.exporting_62731d'), async () => download(await exportBackupApi(kind), `rawmark-${kind}.zip`))
 }
 async function exportMarkdown() {
-  await perform('正在导出笔记…', async () => download(await exportNotesApi(), 'rawmark-notes.zip'))
+  await perform(translate('settings.exporting_notes_015ed1'), async () => download(await exportNotesApi(), 'rawmark-notes.zip'))
 }
 async function exportSystemLogs() {
-  await perform('正在导出日志…', async () => download(await exportLogsApi(), 'rawmark-system-logs.zip'))
+  await perform(translate('settings.exporting_logs_2a89f7'), async () => download(await exportLogsApi(), 'rawmark-system-logs.zip'))
 }
 async function syncPreferences(completed: string, version: number) {
   try {
@@ -98,7 +100,7 @@ async function syncPreferences(completed: string, version: number) {
   } catch (cause) {
     user.assertSession(version)
     if (isCancel(cause)) throw cause
-    throw new Error(`${completed}，但同步失败：${cause instanceof Error ? cause.message : String(cause)}`, { cause })
+    throw new Error(translate('settings.but_synchronization_failed_54aebd', { p0: completed, p1: cause instanceof Error ? cause.message : String(cause) }), { cause })
   }
   message.value = completed
 }
@@ -107,46 +109,46 @@ async function reset() {
   busy.value = true
   let confirmed = false
   try {
-    confirmed = await confirmAction('恢复全部 RawMark 偏好？快捷键恢复默认，回收站期限恢复为 30 天，插件停用。保留笔记、账号、已安装资源、插件存储和本机标签页／布局。操作前会备份设置。')
+    confirmed = await confirmAction(translate('settings.reset_all_rawmark_preferences_shortcuts_9ab27e'))
   } finally {
     busy.value = false
   }
   if (!confirmed) return
-  await perform('正在重置设置…', async (version) => {
-    await resetSettingsApi(); await syncPreferences('设置已重置，原设置已备份', version)
+  await perform(translate('settings.resetting_settings_39808b'), async (version) => {
+    await resetSettingsApi(); await syncPreferences(translate('settings.settings_reset_previous_settings_backed_f4a4fa'), version)
   })
 }
 async function restore(kind: BackupKind, event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]; input.value = ''
   if (!file) return
-  await perform('正在上传…', async () => {
-    if (file.size <= 0 || file.size > 2 * 1024 ** 3) throw new Error('备份压缩大小须在 0–2 GiB 之间')
+  await perform(translate('settings.uploading_6148b3'), async () => {
+    if (file.size <= 0 || file.size > 2 * 1024 ** 3) throw new Error(translate('settings.the_compressed_backup_must_be_cdce88'))
     const version = user.getSessionVersion()
     const { id } = (await startBackupUploadApi({ kind, size: file.size })).data
     let submitted = false
     try {
       let offset = 0
       while (offset < file.size) {
-        if (!mounted) throw new Error('已取消上传')
+        if (!mounted) throw new Error(translate('settings.upload_canceled_fb2c92'))
         const chunk = file.slice(offset, offset + 8 * 1024 ** 2)
         const result = (await uploadBackupChunkApi({ id, offset, body: chunk })).data
-        if (result.offset !== offset + chunk.size) throw new Error('服务端返回的上传进度不一致')
-        offset = result.offset; progress.value = `正在上传… ${Math.round(offset / file.size * 100)}%`
+        if (result.offset !== offset + chunk.size) throw new Error(translate('settings.the_server_returned_inconsistent_upload_dd61f8'))
+        offset = result.offset; progress.value = translate('settings.uploading_38466c', { p0: Math.round(offset / file.size * 100) })
       }
-      progress.value = '正在校验备份…'
+      progress.value = translate('settings.validating_backup_7a1f32')
       const summary = (await validateBackupApi(id)).data
-      if (!mounted) throw new Error('已取消导入')
+      if (!mounted) throw new Error(translate('settings.import_canceled_08d7a9'))
       const description = kind === 'full'
-        ? '将替换全部实例数据，恢复备份中的密码与 API 令牌，短暂维护后需要重新登录。'
-        : '将替换全部偏好和插件配置，合并字体、主题和插件，同 ID 资源以导入包为准。'
-      if (!await confirmAction(`备份时间：${new Date(summary.createdAt).toLocaleString()}\n条目：${summary.entries}，展开大小：${(summary.size / 1024 ** 2).toFixed(2)} MiB\n${description}\n操作前会备份当前内容。确认继续？`)) return
+        ? translate('settings.all_instance_data_will_be_4b1eb6')
+        : translate('settings.all_preferences_and_plugin_configuration_11b0e4')
+      if (!await confirmAction(translate('settings.backup_date_entries_expanded_size_b6755e', { p0: new Date(summary.createdAt).toLocaleString(locale.value), p1: summary.entries, p2: (summary.size / 1024 ** 2).toFixed(2), p3: description }))) return
       await prepare()
       user.assertSession(version)
-      progress.value = kind === 'full' ? '正在恢复实例，请勿关闭页面…' : '正在导入设置…'
+      progress.value = kind === 'full' ? translate('settings.restoring_instance_keep_this_page_405c69') : translate('settings.importing_settings_078500')
       if (kind === 'settings') {
         await importSettingsApi(id); submitted = true
-        await syncPreferences('设置与资源已导入，原设置已备份', version)
+        await syncPreferences(translate('settings.settings_and_resources_imported_previous_f96d82'), version)
       } else {
         await restoreBackupApi(id); submitted = true
         user.invalidate(version)
@@ -160,29 +162,29 @@ async function restore(kind: BackupKind, event: Event) {
             }
           } catch { /* 服务关闭和重新监听期间继续等待，最终超时会明确提示。 */ }
         }
-        throw new Error('恢复请求已提交，服务仍在维护，请稍后重新打开页面核对结果')
+        throw new Error(translate('settings.restore_request_submitted_the_service_b1d2c2'))
       }
     } finally {
       if (!submitted && version === user.getSessionVersion()) {
         try {
           await cancelBackupUploadApi(id)
         } catch (cause) {
-          if (mounted) error.value = `清理上传暂存失败：${String(cause)}`
+          if (mounted) error.value = translate('settings.could_not_clean_up_the_ca0ac3', { p0: String(cause) })
         }
       }
     }
   })
 }
 async function index(operation: 'optimize' | 'rebuild') {
-  await perform(operation === 'optimize' ? '正在优化索引…' : '正在重建索引…', async () => {
-    await maintainIndexApi(operation); message.value = operation === 'optimize' ? '索引已优化' : '索引已重建'
+  await perform(operation === 'optimize' ? translate('settings.optimizing_index_0aabbf') : translate('settings.rebuilding_index_ae8fea'), async () => {
+    await maintainIndexApi(operation); message.value = operation === 'optimize' ? translate('settings.index_optimized_dfe862') : translate('settings.index_rebuilt_d1763b')
   })
 }
 async function clearTemp() {
-  await perform('正在清理临时文件…', async () => {
+  await perform(translate('settings.cleaning_temporary_files_a62be6'), async () => {
     const result = (await clearTempApi()).data
-    message.value = `已清理 ${result.files} 个文件，释放 ${(result.bytes / 1024 ** 2).toFixed(2)} MiB`
-    if (result.failed.length) error.value = `部分清理失败：\n${result.failed.join('\n')}`
+    message.value = translate('settings.removed_files_freed_mib_027d71', { p0: result.files, p1: (result.bytes / 1024 ** 2).toFixed(2) })
+    if (result.failed.length) error.value = translate('settings.some_files_could_not_be_628a24', { p0: result.failed.join('\n') })
   })
 }
 function importNotes() {
@@ -193,55 +195,55 @@ function importNotes() {
 <template>
   <div class="rm-maintenance" :aria-busy="busy">
     <h3 class="rm-settings-group-title">
-      备份与迁移
+      {{ translate('settings.backup_and_migration_97dce0') }}
     </h3>
     <SettingRow id="backup-full">
       <el-button class="rm-btn" :disabled="busy" @click="exportPackage('full')">
-        导出
+        {{ translate('settings.export_764204') }}
       </el-button><el-button class="rm-btn" :disabled="busy" @click="fullInput!.click()">
-        恢复
+        {{ translate('common.restore_e0534b') }}
       </el-button><input ref="fullInput" type="file" accept=".zip" hidden @change="restore('full', $event)">
     </SettingRow>
     <SettingRow id="backup-notes">
       <el-button class="rm-btn" :disabled="busy" @click="exportMarkdown">
-        导出
+        {{ translate('settings.export_764204') }}
       </el-button><el-button class="rm-btn" :disabled="busy" @click="importNotes">
-        导入
+        {{ translate('common.import_576d81') }}
       </el-button>
     </SettingRow>
     <SettingRow id="backup-settings">
       <el-button class="rm-btn" :disabled="busy" @click="exportPackage('settings')">
-        导出
+        {{ translate('settings.export_764204') }}
       </el-button><el-button class="rm-btn" :disabled="busy" @click="settingsInput!.click()">
-        导入
+        {{ translate('common.import_576d81') }}
       </el-button><input ref="settingsInput" type="file" accept=".zip" hidden @change="restore('settings', $event)">
     </SettingRow>
     <h3 class="rm-settings-group-title">
-      维护工具
+      {{ translate('settings.maintenance_tools_051093') }}
     </h3>
     <SettingRow id="index-optimize">
       <el-button class="rm-btn" :disabled="busy" @click="index('optimize')">
-        优化
+        {{ translate('settings.optimize_e1d83f') }}
       </el-button>
     </SettingRow>
     <SettingRow id="index-rebuild">
       <el-button class="rm-btn" :disabled="busy" @click="index('rebuild')">
-        重建
+        {{ translate('settings.rebuild_4b8d9d') }}
       </el-button>
     </SettingRow>
     <SettingRow id="temp-clear">
       <el-button class="rm-btn" :disabled="busy" @click="clearTemp">
-        清理
+        {{ translate('settings.clean_up_9d2998') }}
       </el-button>
     </SettingRow>
     <SettingRow id="settings-reset">
       <el-button class="rm-btn" :disabled="busy" @click="reset">
-        重置
+        {{ translate('settings.reset_cb5d68') }}
       </el-button>
     </SettingRow>
     <SettingRow id="logs-export">
       <el-button class="rm-btn" :disabled="busy" @click="exportSystemLogs">
-        导出
+        {{ translate('settings.export_764204') }}
       </el-button>
     </SettingRow>
     <p v-if="busy" role="status" aria-live="polite">
@@ -254,10 +256,10 @@ function importNotes() {
       {{ error }}
     </p>
     <p v-if="last?.error" class="rm-auth-error" role="alert">
-      上次维护失败：{{ last.error }}
+      {{ translate('settings.last_maintenance_failed_283226') }}{{ last.error }}
     </p>
     <p v-if="last?.backup" class="rm-share-note">
-      操作前备份：backups/{{ last.backup }}
+      {{ translate('settings.pre_operation_backup_backups_b966a1') }}{{ last.backup }}
     </p>
   </div>
 </template>

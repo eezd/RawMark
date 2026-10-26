@@ -1,4 +1,5 @@
 import type { AsyncCleanup, Awaitable, MountContext } from '@@/plugin-api'
+import { t as translate } from '@@/i18n/runtime'
 
 // 每次挂载使用独立容器；超时或停用后的异步渲染只能修改已脱离页面的容器。
 export function mountContent(
@@ -30,14 +31,14 @@ export function mountContent(
   const timer = setTimeout(() => {
     if (!pending || stopped) return
     stop()
-    fail(new Error('插件视图渲染超过 10 秒'))
+    fail(new Error(translate('common.plugin_view_rendering_exceeded_seconds_0d20d2')))
   }, 10_000)
   void Promise.resolve().then(() => {
     if (!stopped) return mount({ container, signal: controller.signal })
   }).then((result) => {
     pending = false
     clearTimeout(timer)
-    if (result !== undefined && typeof result !== 'function') throw new Error('插件挂载返回值必须为清理函数')
+    if (result !== undefined && typeof result !== 'function') throw new Error(translate('common.plugin_mount_must_return_a_c66e82'))
     if (stopped) {
       if (result) runCleanup(result)
     } else {

@@ -2,7 +2,9 @@
 import type { SearchResult } from '@@/apis/search/type'
 
 import { searchApi } from '@@/apis/search'
+
 import Icon from '@@/components/Icon/index.vue'
+import { t as translate } from '@@/i18n/runtime'
 import { reportError } from '@@/utils/notifications'
 
 import { dirname, noteTitle } from '@@/utils/paths'
@@ -95,11 +97,11 @@ onMounted(() => input.value?.focus())
         v-model="query"
         class="rm-search-input"
         type="search"
-        placeholder="搜索笔记"
+        :placeholder="translate('workspace.search_notes_d8912a')"
         enterkeyhint="search"
         @keydown="onKeydown"
       >
-      <button class="rm-icon-btn" title="关闭搜索" @click="ws.searchOpen = false">
+      <button class="rm-icon-btn" :title="translate('workspace.close_search_ab008e')" @click="ws.searchOpen = false">
         <Icon name="close" />
       </button>
     </div>
@@ -122,10 +124,10 @@ onMounted(() => input.value?.focus())
       </li>
     </ul>
     <p v-else-if="results" class="rm-tree-empty">
-      没有找到匹配的笔记
+      {{ translate('workspace.no_matching_notes_found_d87b01') }}
     </p>
     <p v-else class="rm-tree-empty">
-      输入关键词，多个词用空格分隔
+      {{ translate('workspace.enter_keywords_separated_by_spaces_a25285') }}
     </p>
   </div>
 </template>

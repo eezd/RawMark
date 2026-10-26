@@ -3,9 +3,9 @@ package vault
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"time"
 )
 
@@ -39,6 +39,7 @@ func (v *Vault) purgeTrashItemLocked(metadata trashMetadata) error {
 type TrashFailure struct {
 	ID    string `json:"id"`
 	Error string `json:"error"`
+	Cause error  `json:"-"`
 }
 
 type TrashPurgeResult struct {
@@ -53,7 +54,7 @@ func (v *Vault) PurgeTrash(days int64, now time.Time) (TrashPurgeResult, error) 
 	defer v.mu.Unlock()
 	result := TrashPurgeResult{Deleted: []string{}, Failed: []TrashFailure{}}
 	if days < 0 {
-		return result, fmt.Errorf("保留天数不能为负数")
+		return result, i18n.New("retention_days_cannot_be_negative_f37c9b")
 	}
 	dirs, err := os.ReadDir(v.trash)
 	if err != nil {
@@ -72,7 +73,7 @@ func (v *Vault) PurgeTrash(days int64, now time.Time) (TrashPurgeResult, error) 
 			err = v.purgeTrashItemLocked(metadata)
 		}
 		if err != nil {
-			result.Failed = append(result.Failed, TrashFailure{ID: id, Error: err.Error()})
+			result.Failed = append(result.Failed, TrashFailure{ID: id, Error: err.Error(), Cause: err})
 		} else {
 			result.Deleted = append(result.Deleted, id)
 		}

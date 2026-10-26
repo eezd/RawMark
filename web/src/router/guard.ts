@@ -1,7 +1,9 @@
 import type { Router } from 'vue-router'
 import { getAuthStateApi } from '@@/apis/auth'
-
+import { locale, t as translate } from '@@/i18n/runtime'
 import { isCancel } from 'axios'
+
+import { watch } from 'vue'
 import { pinia } from '@/pinia'
 import { usePermissionStore } from '@/pinia/stores/permission'
 import { useUserStore } from '@/pinia/stores/user'
@@ -48,7 +50,10 @@ export function registerNavigationGuard(router: Router) {
     if (to.meta.anonymous) return loginRedirect(to.query.redirect)
     return true
   })
-  router.afterEach((to) => {
-    document.title = typeof to.meta.title === 'string' ? to.meta.title : 'RawMark'
-  })
+  function updateTitle() {
+    const meta = router.currentRoute.value.meta
+    document.title = typeof meta.titleKey === 'string' ? translate(meta.titleKey) : typeof meta.title === 'string' ? meta.title : 'RawMark'
+  }
+  watch(locale, updateTitle)
+  router.afterEach(updateTitle)
 }

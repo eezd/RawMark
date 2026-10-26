@@ -5,11 +5,11 @@ package watch
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"rawmark/internal/i18n"
 	"sort"
 	"strings"
 	"time"
@@ -148,7 +148,7 @@ func (w *Watcher) scan() (map[string]fileState, error) {
 					continue // 扫描期间被删除，下一轮会处理
 				}
 				if err != nil {
-					return nil, fmt.Errorf("读取笔记 %s 失败: %w", e.Path, err)
+					return nil, i18n.New("could_not_read_note_s_708ab5", e.Path, err)
 				}
 				st.rev = vault.Rev(data)
 			}

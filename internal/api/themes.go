@@ -4,11 +4,11 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
 	"os"
+	"rawmark/internal/i18n"
 	"regexp"
 )
 
@@ -54,14 +54,14 @@ func readThemeFile(root *os.Root, name string, limit int64) ([]byte, error) {
 		return nil, err
 	}
 	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("主题文件必须为普通文件")
+		return nil, i18n.New("theme_file_must_be_a_1fe9df")
 	}
 	data, err := io.ReadAll(io.LimitReader(f, limit+1))
 	if err != nil {
 		return nil, err
 	}
 	if int64(len(data)) > limit {
-		return nil, fmt.Errorf("主题文件过大")
+		return nil, i18n.New("theme_file_is_too_large_08667a")
 	}
 	return data, nil
 }
@@ -89,19 +89,21 @@ func (s *Server) readTheme(id string) (themeManifest, string, error) {
 		return manifest, "", err
 	}
 	if err := json.Unmarshal(data, &manifest); err != nil {
-		return manifest, "", fmt.Errorf("主题 %s 的 manifest.json 无法解析：%w", id, err)
+		return manifest, "", i18n.New("could_not_parse_manifest_json_4bef07", id, err)
 	}
 	if manifest.ID != id || manifest.Name == "" || manifest.Version == "" {
-		return manifest, "", fmt.Errorf("主题 %s 的 id、name 或 version 无效", id)
+		return manifest, "", i18n.New("theme_s_has_an_invalid_8ed29c", id)
 	}
 	css, err := readThemeFile(dir, "theme.css", 256<<10)
 	return manifest, string(css), err
 }
 
 func (s *Server) listThemes(w http.ResponseWriter, r *http.Request) {
-	themes := []themeManifest{{ID: "default", Name: "默认", Version: "1"}}
+	themes := []themeManifest{{ID: "default", Name: message(w, "theme_default"), Version: "1"}}
 	for _, theme := range builtinThemes {
-		themes = append(themes, theme.themeManifest)
+		manifest := theme.themeManifest
+		manifest.Name = message(w, "theme_"+theme.ID)
+		themes = append(themes, manifest)
 	}
 	if s.ThemesDir != "" {
 		entries, err := os.ReadDir(s.ThemesDir)
@@ -130,12 +132,15 @@ func (s *Server) listThemes(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getTheme(w http.ResponseWriter, r *http.Request) {
 	manifest, css, err := s.readTheme(r.PathValue("id"))
 	if errors.Is(err, fs.ErrNotExist) {
-		writeError(w, 404, "主题不存在或文件不完整")
+		writeError(w, 404, message(w, "theme_not_found_or_files_3b0d5b"))
 		return
 	}
 	if err != nil {
 		internalError(w, r, err)
 		return
+	}
+	if _, _, ok := builtinTheme(manifest.ID); ok {
+		manifest.Name = message(w, "theme_"+manifest.ID)
 	}
 	writeJSON(w, 200, struct {
 		themeManifest

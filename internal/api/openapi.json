@@ -3,7 +3,7 @@
   "info": {
     "title": "RawMark API",
     "version": "1",
-    "description": "RawMark单用户API。普通JSON统一{code,data,message}，code=0成功；保留HTTP语义。登录会话固定30天；API令牌保留read/write权限。受保护API只接受Bearer，不接受Cookie。文件、下载、事件、204与OpenAPI文档不包装。"
+    "description": "RawMark单用户API。普通JSON统一{code,data,message}，code=0成功；保留HTTP语义。登录会话固定30天；API令牌保留read/write权限。受保护API只接受Bearer，不接受Cookie。文件、下载、事件、204与OpenAPI文档不包装。 响应提示支持Accept-Language: en或zh-CN（按q权重选择，缺省英文），Content-Language返回实际语言；状态码与业务码不变。/settings的locale为账户语言，支持en、zh-CN，null删除覆盖。"
   },
   "servers": [
     {
