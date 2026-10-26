@@ -17,7 +17,7 @@ type MissingAsset struct {
 	Path string `json:"path"`
 }
 
-// exclude 由应用层提供，笔记库不持有数据库和资源目录的配置。
+// exclude comes from the application layer; the vault does not own database or resource-directory configuration.
 func (v *Vault) ExportNotes(ctx context.Context, exclude func(string) bool) (result *os.File, err error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -100,7 +100,7 @@ func (v *Vault) ExportNotes(ctx context.Context, exclude func(string) bool) (res
 				return e
 			}
 			for _, target := range Analyze(rel, content).Assets {
-				// Analyze 的目标已解析为仓库相对路径，仅检查本地资源。
+				// Analyze resolves targets to vault-relative paths; inspect only local resources.
 				if strings.HasPrefix(target.Target, "/") || strings.Contains(target.Target, "://") {
 					continue
 				}
@@ -117,7 +117,7 @@ func (v *Vault) ExportNotes(ctx context.Context, exclude func(string) bool) (res
 		return nil, err
 	}
 	if len(missing) > 0 {
-		// 报告放在内部目录，不与用户的普通 Markdown 文件重名；不修改原链接。
+		// Keep the report in an internal directory to avoid collisions with user Markdown files; preserve original links.
 		out, e := z.Create(path.Join(".rawmark-export", "missing-assets.json"))
 		if e != nil {
 			return nil, e

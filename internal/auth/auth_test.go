@@ -25,7 +25,7 @@ func newManager(t *testing.T) (*Manager, *time.Time) {
 	return m, &clock
 }
 
-// 登录密码累计 30 次失败后封禁 15 分钟，期间正确密码也被拒绝
+// Thirty failed password attempts block the source for fifteen minutes, even with the correct password.
 func TestRateLimit(t *testing.T) {
 	m, clock := newManager(t)
 	for i := 0; i < maxFailures-1; i++ {
@@ -52,7 +52,7 @@ func TestRateLimit(t *testing.T) {
 	}
 }
 
-// 窗口外的失败不计入；登录成功清零
+// Failures outside the window do not count; successful login resets the counter.
 func TestRateLimitWindow(t *testing.T) {
 	m, clock := newManager(t)
 	for i := 0; i < maxFailures-1; i++ {

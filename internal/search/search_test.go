@@ -49,7 +49,7 @@ func (f *fixture) write(p, content string) {
 	}
 }
 
-// sync 模拟监听器提交快照
+// sync simulates watcher snapshot submissions.
 func (f *fixture) sync() {
 	f.t.Helper()
 	entries, err := f.v.Tree()
@@ -92,11 +92,11 @@ func TestSearchTerms(t *testing.T) {
 	f.sync()
 
 	cases := map[string]string{
-		"装饰器":        "a.md,目录/c.md", // 3 个字符以上走 FTS
-		"检索":         "b.md,目录/c.md", // 不足 3 个字符走 LIKE
-		"codemirror": "a.md",         // 不区分大小写
-		"装饰器 检索":     "目录/c.md",      // 多个词同时满足
-		"目录":         "目录/c.md",      // 命中路径
+		"装饰器":        "a.md,目录/c.md", // Use FTS for at least three characters.
+		"检索":         "b.md,目录/c.md", // Use LIKE for fewer than three characters.
+		"codemirror": "a.md",         // Case-insensitive.
+		"装饰器 检索":     "目录/c.md",      // Match every term.
+		"目录":         "目录/c.md",      // Path match.
 		"不存在的词":      "",
 		"100%":       "",
 		`"引号"`:       "",
@@ -169,7 +169,7 @@ func TestSyncTracksChanges(t *testing.T) {
 		}
 	}
 
-	// 重启后沿用已有索引，只处理变化
+	// Reuse the existing index after restart and process only changes.
 	f.reopen()
 	if len(f.idx.known) != 2 {
 		t.Fatalf("重启后应载入已索引笔记: %v", f.idx.known)
@@ -210,7 +210,7 @@ func TestRebuildsLinkedImageMetadataFromOldIndex(t *testing.T) {
 	f := newFixture(t)
 	f.write("a.md", "[![预览](assets/used.png)](https://example.com)")
 	f.sync()
-	// 模拟旧版索引漏记图片引用；笔记正文和 rev 均不改变。
+	// Simulate an old index missing image references without changing note contents or revisions.
 	if _, err := f.idx.db.Exec(`UPDATE docs SET metadata = ?`, `{"title":"a","tags":[],"links":[],"assets":[],"warnings":[]}`); err != nil {
 		t.Fatal(err)
 	}

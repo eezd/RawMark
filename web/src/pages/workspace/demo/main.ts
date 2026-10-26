@@ -1,11 +1,11 @@
 import { watchFontLoading } from '@@/appearance/font-loading'
-// 编辑器演示页（无需登录），用于性能与交互的自动化测试
+// Unauthenticated editor demo for automated performance and interaction tests.
 import { createEditorState, createEditorView } from '../editor'
 import sample from './sample.md?raw'
 import '@/i18n'
 import '@@/appearance/base.css'
 
-// ?repeat=N 将示例重复 N 次，用于大文档性能测试
+// ?repeat=N repeats the sample N times for large-document performance testing.
 const repeat = Number(new URLSearchParams(location.search).get('repeat') ?? 1)
 const doc = Array.from({ length: Math.max(1, repeat) }).fill(sample).join('\n')
 

@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-// ReplaceImage 原位替换已有图片，保留所有引用路径；不允许借此创建文件或改变格式。
+// ReplaceImage replaces an existing image in place, preserving reference paths; it cannot create files or change formats.
 func (v *Vault) ReplaceImage(rel, filename string, r io.Reader, limit int64) error {
 	if !IsImage(rel) || !strings.EqualFold(path.Ext(rel), path.Ext(filename)) {
 		return i18n.New("w_choose_a_file_with_8410e9", ErrInvalidPath)
@@ -52,7 +52,7 @@ type linkChange struct {
 	before, after []byte
 }
 
-// 调用方持有写锁；先计算全部改写，移动成功后再写入，出错时保留回滚依据。
+// The caller holds the write lock. Compute all rewrites before moving, write them after success, and retain rollback information on error.
 func (v *Vault) moveLinkChanges(from, to string, directory bool, ownAssets bool, images map[string]string) ([]linkChange, error) {
 	entries, err := v.Tree()
 	if err != nil {
@@ -103,7 +103,7 @@ func movedPath(p, from, to string, directory bool) string {
 	return p
 }
 
-// 只替换链接地址，不重新序列化正文；移动和图片归位共用相同的代码/公式边界。
+// Replace only link destinations without reserializing text; moves and image relocation share code/math boundaries.
 func rewriteLocalLinks(content []byte, oldNote, newNote string, mapTarget func(string) string) ([]byte, error) {
 	var out []byte
 	last := 0

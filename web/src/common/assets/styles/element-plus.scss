@@ -39,7 +39,7 @@
   gap: inherit;
 }
 
-/* 复用 RawMark 主题，弹出层与页面使用相同的字体、色彩和密度。 */
+/* Reuse the RawMark theme so popovers and pages share fonts, colors, and density. */
 :root {
   --el-font-size-small: var(--rm-ui-font-small);
   --el-font-size-extra-small: var(--rm-ui-font-small);

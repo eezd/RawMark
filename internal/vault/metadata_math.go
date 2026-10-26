@@ -12,8 +12,8 @@ import (
 	"github.com/yuin/goldmark/v2/util"
 )
 
-// 仅供关系提取：公式与代码同属非正文，不能把其中的 #1 或示例链接当成知识关系。
-// 分隔规则与前端 Typora 扩展一致；此解析器不参与 Markdown 渲染。
+// Relationship extraction only: math and code are not body text, so #1 and example links must not become knowledge relationships.
+// Delimiter rules match frontend Typora extensions; this parser does not render Markdown.
 type metadataMath struct{}
 
 func (metadataMath) Trigger() []byte { return []byte{'$'} }
@@ -79,7 +79,7 @@ func parseMetadata(source []byte) ast.Node {
 	return parser.New(parser.WithExtensions(extension.GFMParser, extension.FootnoteParser), parser.WithBlockParsers(util.Prioritized[parser.BlockParser](math, 650)), parser.WithInlineParsers(util.Prioritized[parser.InlineParser](math, 150))).Parse(source)
 }
 
-// 返回非正文的字节范围，供无损链接改写器跳过公式中的示例语法。
+// Return non-body byte ranges so lossless link rewriting can skip example syntax inside math.
 func nonProseRanges(root ast.Node) [][2]int {
 	var ranges [][2]int
 	_ = ast.Walk(root, func(node ast.Node, entering bool) (ast.WalkStatus, error) {

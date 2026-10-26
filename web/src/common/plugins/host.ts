@@ -241,7 +241,7 @@ async function pump() {
   loading = true
   const currentSession = session
   try {
-    // eslint-disable-next-line no-unmodified-loop-condition -- await 期间可由停用或刷新变更会话。
+    // eslint-disable-next-line no-unmodified-loop-condition -- Disabling or refreshing may change the session during await.
     while (running && currentSession === session && !pluginState.error) {
       const next = pluginState.installed.find(p => p.enabled && !instances.has(p.id) && faults.get(p.id) !== p.revision)
       if (!next) break
@@ -316,7 +316,7 @@ export function retryPlugin(id: string) {
 export function pluginEditorFailure(error: unknown) {
   const owners = new Set([...editorExtensions.values(), ...markdownSyntax.values()].map(entry => entry.owner))
   if (!owners.size) throw error
-  // CodeMirror 的事务/解析错误无法可靠定位任意第三方扩展；先保留文档并撤回外部扩展。
+  // CodeMirror transaction/parser errors cannot reliably identify arbitrary third-party extensions; preserve the document and remove external extensions first.
   queueMicrotask(() => {
     for (const owner of owners) {
       const instance = instances.get(owner)

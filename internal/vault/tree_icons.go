@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 )
 
-// TreeIcon 是文件树的显示属性，不参与 Markdown 内容或版本计算。
+// TreeIcon is a file-tree display attribute and does not affect Markdown contents or revisions.
 type TreeIcon struct {
 	Kind  string `json:"kind"`
 	Value string `json:"value"`
@@ -105,7 +105,7 @@ func (v *Vault) SetTreeIcon(rel string, icon *TreeIcon) error {
 	return v.writeTreeIcons(icons)
 }
 
-// 从所属子树移出属性，供移动和回收站操作在原有写锁内提交。
+// Extract attributes from the owning subtree for move/recycle-bin operations to commit under the existing write lock.
 func takeTreeIcons(icons map[string]TreeIcon, root string, directory bool) map[string]TreeIcon {
 	taken := map[string]TreeIcon{}
 	for p, icon := range icons {
@@ -117,7 +117,7 @@ func takeTreeIcons(icons map[string]TreeIcon, root string, directory bool) map[s
 	return taken
 }
 
-// 回收站保留属性，但普通回收站 API 不暴露内部元数据。
+// The recycle bin retains attributes, but ordinary recycle-bin APIs do not expose internal metadata.
 type trashMetadata struct {
 	TrashItem
 	Icons map[string]TreeIcon `json:"icons,omitempty"`

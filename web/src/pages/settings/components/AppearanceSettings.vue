@@ -77,7 +77,7 @@ async function saveSnippet() {
   if (existing) {
     Object.assign(existing, draft.value, { name: draft.value.name.trim() })
   } else {
-    // getRandomValues 在局域网 HTTP 开发页面也可用，randomUUID 需要安全上下文。
+    // getRandomValues works on LAN HTTP development pages; randomUUID requires a secure context.
     const id = [...crypto.getRandomValues(new Uint32Array(4))].map(n => n.toString(16).padStart(8, '0')).join('')
     snippets.push({ ...draft.value, name: draft.value.name.trim(), id, enabled: true })
   }

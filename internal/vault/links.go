@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// RewriteAssetLinks 在笔记改名后，把正文中指向旧图片目录（oldBase.assets/）的链接改为新目录。
-// 覆盖行内链接/图片 `](…)`、引用定义 `[x]: …` 与 HTML `src="…"`，跳过代码与公式。
+// RewriteAssetLinks updates links from the old image directory (oldBase.assets/) after renaming a note.
+// Handle inline links/images `](...)`, reference definitions `[x]: ...`, and HTML `src="..."`, skipping code and math.
 func RewriteAssetLinks(content []byte, oldBase, newBase string) []byte {
 	oldRaw := regexp.QuoteMeta(oldBase + AssetsExt + "/")
 	oldEsc := regexp.QuoteMeta(EscapeLinkPath(oldBase+AssetsExt) + "/")
@@ -43,17 +43,17 @@ func RewriteAssetLinks(content []byte, oldBase, newBase string) []byte {
 	})
 }
 
-// transformMarkdownLines 复用链接改写的容器与代码块识别，避免导入时修改代码示例。
+// transformMarkdownLines reuses container/code-block detection from link rewriting to preserve code examples during import.
 func transformMarkdownLines(content []byte, refDef *regexp.Regexp, transform func(line, body []byte, offset int) []byte) []byte {
 	lines := bytes.SplitAfter(content, []byte("\n"))
-	var fence []byte // 当前所在围栏代码块的围栏字符串，nil 表示不在代码块中
+	var fence []byte // Current code fence string; nil when outside a fenced block.
 	var containers []linkContainer
 	paragraph := false
 	lineOffset := 0
 	for i, line := range lines {
 		offset := lineOffset
 		lineOffset += len(line)
-		// 分类时展开制表符，替换仍作用于原始字节，不重新序列化 Markdown。
+		// Expand tabs for classification, but apply replacements to original bytes without reserializing Markdown.
 		body := bytes.TrimRight(expandLinkTabs(line), "\r\n")
 		width := len(body)
 		matched := 0
@@ -68,7 +68,7 @@ func transformMarkdownLines(content []byte, refDef *regexp.Regexp, transform fun
 					body = body[1:]
 				}
 			} else if indent == len(body) {
-				body = nil // 空行不结束列表容器。
+				body = nil // Blank lines do not close list containers.
 			} else if indent >= container.indent {
 				body = body[container.indent:]
 			} else {
@@ -80,14 +80,14 @@ func transformMarkdownLines(content []byte, refDef *regexp.Regexp, transform fun
 			rest := bytes.TrimLeft(body, " ")
 			if marker := listMarker.Find(rest); len(body)-len(rest) <= 3 && marker != nil {
 				mark := bytes.TrimRight(marker, " ")
-				// 同级列表的新条目结束上一项段落，不受“只能以 1 打断段落”的限制。
+				// A new sibling list item ends the previous item's paragraph without the "only 1 interrupts a paragraph" restriction.
 				if mark[len(mark)-1] == containers[matched].marker {
 					paragraph = false
 				}
 			}
 			containers = containers[:matched]
-			fence = nil // 容器结束时，其内部未闭合的代码块也结束。
-			// 段落允许省略引用或列表前缀的续行，不能把其缩进误认成代码。
+			fence = nil // Closing a container also closes its unclosed code block.
+			// Paragraphs allow lazy continuation without quote/list prefixes; do not mistake their indentation for code.
 		}
 		if fence != nil {
 			trimmed := bytes.TrimLeft(body, " ")
@@ -96,7 +96,7 @@ func transformMarkdownLines(content []byte, refDef *regexp.Regexp, transform fun
 			}
 			continue
 		}
-		// 新的引用或列表可以嵌套；列表的后续行按其内容起始列剥离缩进。
+		// New quotes or lists may nest; strip continuation indentation using the list's content-start column.
 		for {
 			indent := len(body) - len(bytes.TrimLeft(body, " "))
 			if indent > 3 || indent == len(body) {
@@ -110,10 +110,10 @@ func transformMarkdownLines(content []byte, refDef *regexp.Regexp, transform fun
 					body = body[1:]
 				}
 			} else if paragraphBoundary.Match(rest) {
-				break // 分隔线优先于列表标记。
+				break // Thematic breaks take precedence over list markers.
 			} else if marker := listMarker.Find(rest); marker != nil {
 				mark := bytes.TrimRight(marker, " ")
-				// 有序列表只有从 1 开始且非空时才能打断段落。
+				// Only nonempty ordered lists starting at 1 may interrupt a paragraph.
 				if paragraph && (len(marker) == len(rest) || (mark[0] >= '0' && mark[0] <= '9' && !bytes.Equal(mark[:len(mark)-1], []byte("1")))) {
 					break
 				}
@@ -134,7 +134,7 @@ func transformMarkdownLines(content []byte, refDef *regexp.Regexp, transform fun
 			paragraph = false
 			continue
 		}
-		// 缩进代码不能打断已有段落，列表容器自身的缩进不计入这四列。
+		// Indented code cannot interrupt an existing paragraph; the list container's indentation does not count toward the four columns.
 		if len(body)-len(trimmed) >= 4 && !paragraph {
 			continue
 		}
@@ -144,7 +144,7 @@ func transformMarkdownLines(content []byte, refDef *regexp.Regexp, transform fun
 			continue
 		}
 		paragraph = !paragraphBoundary.Match(trimmed) && !refDef.Match(trimmed)
-		// 将剥离容器时的展开列数映射回原始字节，保留制表符和正文位置。
+		// Map expanded container columns back to original bytes, preserving tabs and text positions.
 		start, column := 0, 0
 		for column < width-len(body) {
 			if line[start] == '\t' {
@@ -183,7 +183,7 @@ func expandLinkTabs(line []byte) []byte {
 	return out
 }
 
-// fenceOpen 识别围栏代码块起始行（至多 3 个空格缩进，3 个以上 ` 或 ~），返回围栏字符串
+// fenceOpen recognizes a fenced-code opening (up to three leading spaces, at least three backticks or tildes) and returns its fence string.
 func fenceOpen(line []byte) []byte {
 	indent := len(line) - len(bytes.TrimLeft(line, " "))
 	if indent > 3 {
@@ -203,7 +203,7 @@ func fenceOpen(line []byte) []byte {
 	return rest[:n]
 }
 
-// transformOutsideCode 只在行内代码 `…` 之外的片段上做转换。
+// transformOutsideCode transforms only fragments outside inline code `...`.
 func transformOutsideCode(line []byte, transform func(text []byte, offset int) []byte) []byte {
 	var out []byte
 	offset := 0

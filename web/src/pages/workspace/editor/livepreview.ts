@@ -21,14 +21,14 @@ import {
   TocWidget,
 } from './widgets'
 
-// 把笔记中书写的图片地址解析为浏览器可加载的 URL（相对路径需结合笔记所在目录）
+// Resolve note image paths to browser-loadable URLs, using the note's folder for relative paths.
 export const resolveImageUrl = Facet.define<(src: string) => string, (src: string) => string>({
   combine: values => values[0] ?? (src => src),
 })
 
 export const openLink = Facet.define<(href: string) => void, ((href: string) => void) | undefined>({ combine: values => values[0] })
 
-// 图片文件原位替换时重建预览，不改变正文、选区或撤销历史。
+// Rebuild previews after in-place image replacement without changing text, selection, or undo history.
 export const refreshImages = StateEffect.define<null>()
 
 const hidden = Decoration.replace({})
@@ -46,8 +46,8 @@ function lineDeco(cls: string): Decoration {
   return deco
 }
 
-// 块级标记（标题、引用、列表、围栏）按行展开源码，行内语法只展开光标所在的元素，
-// 与 Typora/Obsidian 一致，避免长段落中光标一落整行跳动；编辑器失焦时整篇按渲染效果显示
+// Expand block markers (headings, quotes, lists, fences) by line; expand inline syntax only around the cursor,
+// matching Typora/Obsidian and avoiding whole-line jumps in long paragraphs. Render the entire document when the editor loses focus.
 function activeLines(view: EditorView): Set<number> {
   const lines = new Set<number>()
   if (!view.hasFocus) return lines
@@ -74,7 +74,7 @@ function buildDecorations(view: EditorView): DecorationSet {
   }
   const ranges = view.hasFocus ? state.selection.ranges : []
   const touches = (node: SyntaxNode) => ranges.some(r => r.from <= node.to && r.to >= node.from)
-  // 视图插件提供的替换装饰不能跨越换行
+  // Replacement decorations from view plugins cannot cross newlines.
   const hide = (from: number, to: number) => {
     if (from < to && lineOf(from) === lineOf(to)) out.push(hidden.range(from, to))
   }
@@ -93,7 +93,7 @@ function buildDecorations(view: EditorView): DecorationSet {
     return end
   }
 
-  // 脚注定义（标签 → 内容）与目录条目，只在可见区域出现相应语法时才计算
+  // Compute footnote definitions (label -> content) and table-of-contents entries only when the relevant syntax is visible.
   let footnoteMap: Map<string, string> | undefined
   function footnotes() {
     if (!footnoteMap) {
@@ -195,7 +195,7 @@ function buildDecorations(view: EditorView): DecorationSet {
               n === first ? 'cm-rm-frontmatter cm-rm-frontmatter-begin' : n === last ? 'cm-rm-frontmatter cm-rm-frontmatter-end' : 'cm-rm-frontmatter')
             return false
           case 'BlockMath':
-            // 未编辑时由 blocks.ts 整块替换为渲染结果，这里只负责编辑时的源码样式
+            // blocks.ts replaces inactive blocks with rendered output; this code handles source styling only while editing.
             classLines(node.from, node.to, () => 'cm-rm-math-source')
             return false
           case 'InlineCode':
@@ -244,7 +244,7 @@ function buildDecorations(view: EditorView): DecorationSet {
             classLines(node.from, node.to, () => 'cm-rm-code')
             return false
           case 'Table':
-            // 光标在表格内时由此以等宽源码显示（其余情况由 table.ts 渲染为可编辑表格），内部语法不做隐藏以免列对不齐
+            // Show monospaced source while the cursor is in a table (otherwise table.ts renders an editable table); preserve internal syntax to keep columns aligned.
             classLines(node.from, node.to, () => 'cm-rm-table')
             return false
           case 'HTMLBlock':
@@ -290,7 +290,7 @@ function buildDecorations(view: EditorView): DecorationSet {
     const openLine = doc.lineAt(node.from)
     const lang = info ? fenceLanguage(state, info.from, info.to) : ''
     if (isActive(node.from, node.to)) {
-      // 编辑中显示围栏源码，复制按钮浮在行尾
+      // Show fence source while editing, with the copy button floating at line end.
       out.push(Decoration.widget({ widget: new CodeHeaderWidget(lang, false, codeAt), side: 1 }).range(openLine.to))
       return
     }
@@ -319,7 +319,7 @@ function trailingSpaceStart(state: EditorState, pos: number): number {
   return start
 }
 
-// Ctrl/Cmd + 点击打开链接
+// Ctrl/Cmd-click opens links.
 function linkAt(state: EditorState, pos: number): string | null {
   for (let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1); node; node = node.parent) {
     if (node.name === 'URL') return state.sliceDoc(node.from, node.to).replace(/^<|>$/g, '')
@@ -348,7 +348,7 @@ function linkAt(state: EditorState, pos: number): string | null {
 const livePreviewPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet
-    // 输入法组字期间只映射位置不重建，组字结束后再补一次重建
+    // During IME composition, map positions without rebuilding; rebuild once composition ends.
     stale = false
 
     constructor(view: EditorView) {

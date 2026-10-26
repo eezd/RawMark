@@ -1,5 +1,5 @@
 import { t as translate } from '@@/i18n/runtime'
-// 编辑器排版设置；账户、快捷键等设置不进入此模块。
+// Editor typography settings only; account, shortcuts, and other settings do not belong here.
 const maple = { label: 'Maple Mono Normal NL NF CN', css: '\'Maple Mono Normal NL NF CN\', monospace' }
 export const TEXT_FONTS = {
   maple,

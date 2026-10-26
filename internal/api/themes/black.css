@@ -19,7 +19,7 @@
   --rm-highlight-bg: rgba(232, 196, 119, 0.25);
 }
 
-/* 绿色按钮使用深色文字，保持按钮的文字对比度。 */
+/* Use dark text on green buttons to preserve text contrast. */
 .rm-btn-primary,
 .rm-btn-primary:hover,
 .rm-segmented button.on {

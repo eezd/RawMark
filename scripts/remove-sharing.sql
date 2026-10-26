@@ -1,5 +1,5 @@
--- 一次性部署清理：先停止旧服务，并保留数据库与镜像配套的回滚备份。
--- 不由应用启动流程执行；原始笔记和图片不在此脚本的清理范围内。
+-- One-time deployment cleanup: stop the old service and retain matching database/image rollback backups first.
+-- Never run at application startup; original notes and images are outside this script's cleanup scope.
 BEGIN IMMEDIATE;
 DROP TABLE IF EXISTS share_items;
 DROP TABLE IF EXISTS shares;

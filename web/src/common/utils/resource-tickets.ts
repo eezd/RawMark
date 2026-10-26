@@ -23,7 +23,7 @@ export async function prepareResources() {
     pending = request
     void request.finally(() => {
       if (pending === request) pending = undefined
-    }).catch(() => { /* 由等待初始化的调用方处理失败。 */ })
+    }).catch(() => { /* The caller awaiting initialization handles failures. */ })
   }
   await pending
   user.assertSession(current)

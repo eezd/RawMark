@@ -8,7 +8,7 @@ import { noteTitle } from '@@/utils/paths'
 import { nextTick, ref } from 'vue'
 import { closeTab, createNote, ws } from '../workspace'
 
-// 拖动排序：拖到某个标签的左半边插到它前面，右半边插到它后面
+// Drag sorting: dropping on a tab's left half inserts before it; its right half inserts after it.
 const TAB_TYPE = 'application/x-rawmark-tab'
 const dragging = ref<string | null>(null)
 const dropAt = ref<{ path: string, after: boolean } | null>(null)
@@ -44,7 +44,7 @@ function onDragEnd() {
   dragging.value = dropAt.value = null
 }
 
-// ---- 右键菜单 ----
+// ---- Context menu ----
 const menu = ref<{ tab: Tab, x: number, y: number } | null>(null)
 
 const menuElement = ref<HTMLElement>()

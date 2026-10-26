@@ -1,4 +1,4 @@
-// Package auth 实现单用户登录（Argon2id 密码哈希、会话令牌、登录限速），以及 API 令牌的校验。
+// Package auth implements single-user login (Argon2id hashes, session tokens, rate limiting) and API-token validation.
 package auth
 
 import (
@@ -25,13 +25,13 @@ const (
 	SessionTTL     = 30 * 24 * time.Hour
 	MinPasswordLen = 8
 
-	// RFC 9106 推荐的第二组参数（内存受限环境）
+	// The second recommended parameter set in RFC 9106 (memory-constrained environments).
 	argonTime    = 3
 	argonMemory  = 64 * 1024
 	argonThreads = 4
 	argonKeyLen  = 32
 
-	// 同一来源在窗口内累计失败 maxFailures 次即封禁 lockout
+	// Block a source for lockout after maxFailures failures within the window.
 	maxFailures   = 30
 	failureWindow = 15 * time.Minute
 	lockout       = 15 * time.Minute
@@ -49,7 +49,7 @@ type Manager struct {
 	store    *store.Store
 	mu       sync.Mutex
 	failures map[string][]time.Time
-	blocked  map[string]time.Time // 来源 -> 解封时间
+	blocked  map[string]time.Time // Source -> unblock time.
 	now      func() time.Time
 }
 
@@ -63,7 +63,7 @@ func (m *Manager) IsSetUp() (bool, error) {
 }
 
 func (m *Manager) Setup(password string) error {
-	// 已初始化时提前拒绝，避免公开接口重复计算密码哈希；并发首次写入仍由数据库保证原子性。
+	// Reject initialized instances early to avoid repeated public password hashing; the database still makes concurrent first writes atomic.
 	setUp, err := m.IsSetUp()
 	if err != nil {
 		return err
@@ -85,12 +85,12 @@ func (m *Manager) Setup(password string) error {
 	return nil
 }
 
-// Login 校验密码并创建会话，返回明文令牌（仅存哈希）
+// Login validates the password and creates a session, returning the plaintext token (only its hash is stored).
 func (m *Manager) Login(ip, password string) (string, error) {
 	return m.AttemptLogin(ip, password, nil)
 }
 
-// AttemptLogin 在同一限流边界校验登录挑战与密码；初始化无需挑战。
+// AttemptLogin validates the login challenge and password within one rate-limit boundary; setup needs no challenge.
 func (m *Manager) AttemptLogin(ip, password string, challenge func() error) (string, error) {
 	if !m.allow(ip) {
 		return "", ErrRateLimited
@@ -138,7 +138,7 @@ func (m *Manager) SessionExpiry(token string) (time.Time, bool, error) {
 
 func (m *Manager) Logout(token string) error { return m.store.DeleteSession(hashToken(token)) }
 
-// ChangePassword 校验当前密码后设置新密码，并注销 keepToken 以外的所有会话
+// ChangePassword verifies the current password, sets the new one, and revokes all sessions except keepToken.
 func (m *Manager) ChangePassword(ip, keepToken, current, next string) error {
 	if !m.allow(ip) {
 		return ErrRateLimited
@@ -164,9 +164,9 @@ func (m *Manager) ChangePassword(ip, keepToken, current, next string) error {
 	return m.store.DeleteOtherSessions(hashToken(keepToken))
 }
 
-// ---- API 令牌 ----
+// ---- API tokens ----
 
-// CreateAPIToken 创建令牌，返回只显示这一次的明文
+// CreateAPIToken creates a token and returns its plaintext value for one-time display.
 func (m *Manager) CreateAPIToken(name, scope string) (string, store.APIToken, error) {
 	if scope != "read" && scope != "write" {
 		return "", store.APIToken{}, ErrBadScope
@@ -179,7 +179,7 @@ func (m *Manager) CreateAPIToken(name, scope string) (string, store.APIToken, er
 	return plain, t, nil
 }
 
-// ValidateAPIToken 返回令牌的权限范围；无效时 ok 为 false
+// ValidateAPIToken returns a token's scope; ok is false for an invalid token.
 func (m *Manager) ValidateAPIToken(plain string) (scope string, ok bool, err error) {
 	if !strings.HasPrefix(plain, apiTokenPrefix) {
 		return "", false, nil
@@ -187,7 +187,7 @@ func (m *Manager) ValidateAPIToken(plain string) (scope string, ok bool, err err
 	return m.store.UseAPIToken(hashToken(plain), time.Now().UnixMilli())
 }
 
-// ---- 限速：同一来源在时间窗口内失败过多则封禁一段时间 ----
+// ---- Rate limiting: temporarily block sources with too many failures within the window ----
 
 func (m *Manager) allow(ip string) bool {
 	m.mu.Lock()
@@ -226,7 +226,7 @@ func (m *Manager) clearFailures(ip string) {
 	m.mu.Unlock()
 }
 
-// ---- 密码与令牌 ----
+// ---- Passwords and tokens ----
 
 func hashPassword(password string) string {
 	salt := make([]byte, 16)
@@ -272,7 +272,7 @@ func hashToken(token string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// randomCode 生成形如 ABCD-EFGH 的 API 令牌标识，去掉易混淆字符
+// randomCode generates an API-token identifier such as ABCD-EFGH, excluding ambiguous characters.
 func randomCode() string {
 	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	b := make([]byte, 8)

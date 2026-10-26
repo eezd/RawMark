@@ -1,4 +1,4 @@
-// 主线程与高亮 Worker 之间的消息格式
+// Message format between the main thread and highlight Worker.
 
 export interface HighlightRequest {
   id: number
@@ -6,8 +6,8 @@ export interface HighlightRequest {
   code: string
 }
 
-// 保留 highlight.js 的嵌套 token 与原文，编辑器使用官方 token 类样式。
+// Preserve highlight.js nested tokens and source text; the editor uses official token-class styles.
 export type TokenRun = (string | { classes: string, content: TokenRun })[]
 
-// 语言不受支持时 tokens 为 null；实际失败必须与纯文本结果区分。
+// tokens is null for unsupported languages; actual failures must remain distinct from plain-text results.
 export type HighlightResponse = { id: number, tokens: TokenRun | null } | { id: number, error: Error }

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// JSON/JavaScript 共同精确表示的非负整数范围；不乘天数，避免期限溢出。
+// Nonnegative integers exactly representable in both JSON and JavaScript; avoid multiplying by days, which could overflow.
 const maxRetentionDays = 1<<53 - 1
 
 func trashRetentionDays(settings map[string]json.RawMessage) (int64, error) {
@@ -40,7 +40,7 @@ func (s *Server) trashClear(w http.ResponseWriter, r *http.Request) {
 func (s *Server) cleanupTrash(now time.Time) error {
 	s.activity.RLock()
 	defer s.activity.RUnlock()
-	// 与设置写入串行，避免在“永不删除”已保存后使用旧期限开始清理。
+	// Serialize with settings writes so cleanup cannot start with stale retention after "never delete" is saved.
 	s.settingsMu.Lock()
 	defer s.settingsMu.Unlock()
 	settings, err := s.readSettings()
@@ -64,7 +64,7 @@ func (s *Server) cleanupTrash(now time.Time) error {
 	return nil
 }
 
-// RunTrashCleanup 启动时执行一次，其后每小时执行；不依赖浏览器在线。
+// RunTrashCleanup runs at startup and hourly thereafter, independently of browser connections.
 func (s *Server) RunTrashCleanup(ctx context.Context) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()

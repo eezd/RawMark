@@ -5,15 +5,15 @@ import { Facet, StateEffect, StateField } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 
 export interface PasteImagesOptions {
-  // 文件移动期间不能开始异步粘贴或上传，避免响应中的资源链接属于旧路径。
+  // Do not start asynchronous paste or uploads during file moves; returned resource links could target the old path.
   canPaste: () => boolean
-  // 上传文件，返回写入 Markdown 的链接
+  // Upload a file and return its Markdown link.
   upload: (file: File) => Promise<string>
   importImage: (url: string) => Promise<string>
-  // 按笔记身份更新，异步粘贴或上传结束时该笔记可能已切到后台。
+  // Update by note identity; the note may be in the background when asynchronous paste or upload completes.
   update: (change: (state: EditorState) => TransactionSpec | undefined) => void
   onError: (err: unknown) => void
-  // 上传开始/结束，供保存队列在上传期间暂缓保存（避免把临时的 blob: 地址写入文件）
+  // Notify upload start/end so the save queue can pause and avoid writing temporary blob: URLs to files.
   onPending: (delta: 1 | -1) => void
 }
 
@@ -37,8 +37,8 @@ const pendingPastes = StateField.define<Map<object, { from: number, to: number }
       transaction.changes.iterChangedRanges((from, to) => {
         if ((from < range.to && to > range.from) || (from === to && from > range.from && from < range.to)) edited = true
       })
-      // 用户在等待期间编辑或撤销了粘贴内容，迟到的转换结果不能覆盖输入。
-      // 同一位置连续粘贴时按发起顺序定位，与图片下载完成的先后无关。
+      // Edits or undo while waiting must not be overwritten by a late conversion result.
+      // Locate successive pastes at the same position in initiation order, independent of image-download completion order.
       const association = range.from === range.to ? (afterCompleted ? 1 : -1) : 1
       if (!edited) next.set(id, { from: transaction.changes.mapPos(range.from, association), to: transaction.changes.mapPos(range.to, range.from === range.to ? association : -1) })
     }
@@ -85,8 +85,8 @@ function insertHTML(view: EditorView, html: string, text: string, opts: PasteIma
 }
 
 /**
- * 插入图片文件（粘贴、拖入、从相册选择共用）：先用 blob: 地址插入占位，立即显示；上传完成后替换为正式链接。
- * 返回是否已处理图片插入（包括因操作冲突被拒绝）；未配置上传时不处理
+ * Insert image files from paste, drop, or photo selection: immediately show blob: placeholders, then replace them with
+ * uploaded links. Return whether insertion was handled, including operation-conflict rejection; do nothing if upload is unconfigured.
  */
 export function insertImageFiles(view: EditorView, files: File[], pos?: number): boolean {
   const opts = view.state.facet(uploadOptions)
@@ -120,7 +120,7 @@ export function insertImageFiles(view: EditorView, files: File[], pos?: number):
   return true
 }
 
-// 粘贴或拖入图片
+// Paste or drop images.
 export function pasteImages(opts: PasteImagesOptions): Extension {
   let plain = false
   return [
@@ -144,7 +144,7 @@ export function pasteImages(opts: PasteImagesOptions): Extension {
           e.preventDefault()
           return true
         }
-        // 个别浏览器/来源只在 items 中提供图片
+        // Some browsers/sources expose images only through items.
         let files = [...(e.clipboardData?.files ?? [])]
         if (!files.length) {
           files = [...(e.clipboardData?.items ?? [])].filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(f => f !== null)

@@ -1,4 +1,4 @@
 package api
 
-// CloseEvents 在数据库关闭前断开并等待全部 WebSocket 处理结束。
+// CloseEvents disconnects and waits for all WebSocket handlers before databases close.
 func (s *Server) CloseEvents() { s.hub.Close(); s.eventWG.Wait() }

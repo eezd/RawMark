@@ -2,7 +2,7 @@ import type { EventHandlers } from './type'
 
 import { createResourceTicketApi } from '@@/apis/auth'
 
-// 订阅仓库事件；每次连接领取一次性票据，重连后补全量同步。
+// Subscribe to vault events; obtain a one-use ticket for each connection and fully sync after reconnecting.
 import { isCancel } from 'axios'
 import { pinia } from '@/pinia'
 import { useUserStore } from '@/pinia/stores/user'

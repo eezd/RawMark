@@ -1,4 +1,4 @@
-// Package backup 处理 RawMark 自有的实例与设置归档；普通 Markdown 导出由 vault 负责。
+// Package backup handles RawMark instance and settings archives; vault handles ordinary Markdown exports.
 package backup
 
 import (
@@ -23,7 +23,7 @@ const MaxArchiveBytes int64 = 2 << 30
 const MaxExpandedBytes int64 = 8 << 30
 const MaxEntries = 100000
 
-// ErrInvalidArchive 表示归档内容不满足备份契约，不包含磁盘或文件系统故障。
+// ErrInvalidArchive denotes a backup-contract violation, excluding disk or filesystem failures.
 var ErrInvalidArchive = i18n.New("invalid_backup_contents_ecff07")
 
 type Entry struct {
@@ -59,7 +59,7 @@ func validEntry(kind, name string) bool {
 	return kind == "settings" && name == "settings.json"
 }
 
-// Create 不追踪符号链接，任何无法读取的文件都使备份明确失败。
+// Create does not follow symlinks and explicitly fails if any file cannot be read.
 func Create(ctx context.Context, dest, kind string, sources []Source, skip func(string) bool) (err error) {
 	if kind != "full" && kind != "settings" {
 		return i18n.New("invalid_backup_type_f5ff70")
@@ -182,7 +182,7 @@ func Create(ctx context.Context, dest, kind string, sources []Source, skip func(
 	return f.Sync()
 }
 
-// Extract 在私有暂存目录校验完整清单和全部文件哈希，绝不写入活动数据目录。
+// Extract verifies the full manifest and all file hashes in private staging, never writing to active data directories.
 func Extract(ctx context.Context, archive, dest string) (Manifest, error) {
 	var manifest Manifest
 	z, err := zip.OpenReader(archive)

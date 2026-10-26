@@ -24,16 +24,16 @@ const MARK_NODES: Record<InlineMark, string> = { StrongEmphasis: 'EmphasisMark',
 
 function formattingTree(state: EditorState) {
   const to = state.selection.ranges.at(-1)!.to
-  // 后台标签页或长文末尾的选区可能尚未完成增量解析；操作不能悄悄漏掉文字。
+  // Selections in background tabs or near long-document ends may not be fully parsed; operations must not silently skip text.
   return ensureSyntaxTree(state, to, 50) ?? state.facet(language)!.parser.parse(state.doc.toString())
 }
 
-/** 从当前语法树取文字片段，保留 Markdown 的标记、链接地址和块级结构。 */
+/** Extract text fragments from the current syntax tree, preserving Markdown markers, link destinations, and block structure. */
 function segments(state: EditorState): Segment[] {
   const result: Segment[] = []
   function walk(node: SyntaxNode, styles: InlineStyles = {}, underline = false, formats: string[] = [], wrappers: Wrapper[] = []) {
     if (['InlineCode', 'InlineMath', 'Image', 'FootnoteReference', 'Emoji', 'Autolink', 'Escape', 'Entity'].includes(node.name)) {
-      // 不拆开原子语法；调整同一外层标签的其他文字时，仍须保留这些未选内容的原样式。
+      // Do not split atomic syntax; when changing sibling text under the same outer tag, preserve styles on these unselected fragments.
       result.push({ from: node.from, to: node.to, atomic: true, styles, underline, formats, wrappers })
       return
     }
@@ -54,7 +54,7 @@ function segments(state: EditorState): Segment[] {
       for (const match of state.sliceDoc(from, to).matchAll(/[^\n]+/g)) {
         const start = from + match.index; const end = start + match[0].length
         const line = state.doc.lineAt(start)
-        // 连续段落里的下一行仍可能带列表缩进或引用前缀，标签必须写在前缀之后。
+        // Continuation lines can still have list indentation or quote prefixes; insert tags after the prefix.
         const prefixEnd = line.from + /^(?:[\t ]*>[\t ]?)*[\t ]*/.exec(line.text)![0].length
         const contentFrom = Math.max(start, prefixEnd)
         if (contentFrom < end) result.push({ from: contentFrom, to: end, atomic: false, styles, underline, formats, wrappers })
@@ -116,7 +116,7 @@ function wrap(text: string, styles: InlineStyles, underline: boolean, formats: s
   return { prefix, leading: leading.length, trailing: trailing.length, marks: open.length, text: prefix + (content ? leading + open + content + close + trailing : text) + (underline ? '</u>' : '') + (css ? '</span>' : '') }
 }
 
-/** 只重写选中文字及包围它的外观标签；被拆开的其余文字保留原样式。 */
+/** Rewrite only selected text and surrounding appearance tags; retain styles on remaining split fragments. */
 function editAppearance(update: (styles: InlineStyles, underline: boolean, formats: string[]) => { styles: InlineStyles, underline: boolean, formats: string[] }): FormatCommand {
   return ({ state, dispatch }) => {
     if (!canFormatSelection(state)) return false
@@ -130,14 +130,14 @@ function editAppearance(update: (styles: InlineStyles, underline: boolean, forma
     }
     for (const run of runs) {
       if (!selected(state, run) && !run.wrappers.some(wrapper => wrappers.has(wrapper))) continue
-      // 同一外层标签内的兄弟标签也要展开，重新写回合并后的有效样式。
+      // Expand sibling tags within the same outer tag too, then write back merged effective styles.
       for (const wrapper of run.wrappers) {
         if (!wrappers.has(wrapper)) {
           wrappers.add(wrapper)
           for (const mark of wrapper.marks) changes.push({ from: mark.from, to: mark.to, insert: '' })
         }
       }
-      // 部分选中转义字符等语法单元时，格式应用于整个单元，不能把标签插进语法内部。
+      // Partial selections of atomic syntax, such as escapes, format the whole unit; never insert tags inside the syntax.
       const cuts = run.atomic ? [run.from, run.to] : [...new Set([run.from, run.to, ...state.selection.ranges.flatMap(range => [Math.max(run.from, Math.min(run.to, range.from)), Math.max(run.from, Math.min(run.to, range.to))])])].sort((a, b) => a - b)
       let insert = ''
       for (let i = 0; i < cuts.length - 1; i++) {
@@ -184,7 +184,7 @@ export const toggleUnderline: FormatCommand = (target) => {
   return editAppearance((styles, _underline, formats) => ({ styles, underline: !remove, formats }))(target)
 }
 
-/** 跨段落格式化按语法片段处理，不把列表标记或链接地址包进 Markdown 定界符。 */
+/** Format across paragraphs by syntax fragment, without wrapping list markers or link destinations in Markdown delimiters. */
 export function toggleSelectionMark(mark: InlineMark): FormatCommand {
   return (target) => {
     const runs = segments(target.state).filter(run => selected(target.state, run))

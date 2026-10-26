@@ -9,8 +9,8 @@ import { restoreTrashApi } from '@@/apis/trash'
 import { getTreeApi, setTreeIconApi } from '@@/apis/tree'
 import { appearancePaused } from '@@/appearance/appearance'
 import { locale, t as translate } from '@@/i18n/runtime'
-// 工作区状态与操作：目录树、标签页、保存队列、冲突处理、实时同步。
-// 文件操作一律先更新界面再请求服务器，失败时回滚，保证"操作即时生效"。
+// Workspace state and operations: tree, tabs, save queue, conflict handling, and live synchronization.
+// File operations update the interface optimistically before requesting the server, rolling back on failure for immediate feedback.
 import { decodeLinkDestination } from '@@/markdown/links'
 
 import { pluginEditorFailure, refreshPlugins, startPlugins, stopPlugins } from '@@/plugins/host'
@@ -45,18 +45,18 @@ export type TabStatus = 'loading' | 'ready' | 'conflict' | 'deleted' | 'error'
 export interface Tab {
   path: string
   pinned?: boolean
-  // 最近一次与服务器一致的版本
+  // Last revision synchronized with the server.
   rev: string
   status: TabStatus
-  // 有尚未保存成功的修改
+  // Changes not yet saved successfully.
   dirty: boolean
   saveError?: string
-  // 冲突时服务器上的版本；为空字符串表示服务器上已不存在
+  // Server revision during conflict; an empty string means the file no longer exists there.
   conflictRev?: string
 }
 
 const RECENT_KEY = 'rawmark.recent'
-// 本机的界面状态（不属于设置）：侧栏折叠、大纲面板
+// Local interface state outside settings: sidebar collapse and outline panel.
 const LAYOUT_KEY = 'rawmark.layout'
 const layout = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? '{}') as { sidebarCollapsed?: boolean, outlineOpen?: boolean }
 const RECENT_MAX = 30
@@ -65,32 +65,32 @@ export const ws = reactive({
   entries: [] as Entry[],
   tabs: [] as Tab[],
   active: null as string | null,
-  // 目录树中正在行内重命名的路径
+  // Path currently being renamed inline in the tree.
   renaming: null as string | null,
-  // 移动端侧栏抽屉
+  // Mobile sidebar drawer.
   sidebarOpen: false,
-  // 侧栏显示搜索而非目录树
+  // Show search instead of the tree in the sidebar.
   searchOpen: false,
-  // 快速切换/命令面板的初始输入，null 为关闭；以 > 开头时列出命令
+  // Initial quick-switcher/command-palette query; null closes it, and leading > lists commands.
   switcher: null as string | null,
-  // 打开的设置分组，null 为关闭；index 为从通用入口打开（手机上先显示分组列表，电脑上显示第一组）
+  // Open settings category; null closes it. index is the general entry, showing categories on phones and the first category on desktop.
   settings: (pluginsPaused ? 'plugins' : appearancePaused ? 'appearance' : null) as SettingsSection | 'index' | null,
-  // 「移动到…」对话框（笔记或文件夹路径）
+  // "Move to..." dialog paths for notes or folders.
   moving: null as string | string[] | null,
-  // 导入目标目录，空字符串为根目录
+  // Import destination folder; an empty string denotes the root.
   importing: null as string | null,
-  // 图片预览与管理，独立于笔记标签和草稿
+  // Image preview and management, independent of note tabs and drafts.
   image: null as string | null,
   images: null as string | null,
   imagesAll: false,
-  // 电脑上侧栏折叠
+  // Desktop sidebar collapse state.
   sidebarCollapsed: layout.sidebarCollapsed ?? false,
-  // 大纲面板（电脑上在右侧常驻，手机上为浮层）
+  // Outline panel: persistent on the right on desktop, an overlay on phones.
   outlineOpen: layout.outlineOpen ?? false,
   sourceMode: false,
   focusMode: false,
   view: 'notes' as 'notes' | 'graph' | 'tags',
-  // 最近打开的笔记，最新的在前
+  // Recently opened notes, newest first.
   recent: JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[],
 })
 
@@ -98,15 +98,15 @@ const SAVE_DELAY = 500
 const RETRY_DELAY = 5000
 const MAX_RETRIES = 12
 
-// 以下状态不放进 reactive：EditorState 体积大且不可变，交给 Vue 代理没有意义
+// Keep the following state outside reactive: large immutable EditorState objects gain nothing from Vue proxies.
 const editorStates = new Map<string, EditorState>()
-// 每个打开的笔记一个可变引用，编辑器扩展通过它取得笔记的当前路径（重命名后随之更新）
+// Each open note has a mutable reference through which editor extensions read its current path, updated on rename.
 const noteRefs = new Map<string, { path: string }>()
 
 interface SaveSlot {
   timer?: ReturnType<typeof setTimeout>
   inflight?: Promise<void>
-  // 修改序号与已保存序号，二者相等即没有待保存的修改
+  // Change and saved sequence numbers; equality means no pending changes.
   seq: number
   savedSeq: number
   uploads: number
@@ -121,12 +121,12 @@ let workspaceEpoch = 0
 let draftPreserved: Promise<void> = Promise.resolve()
 
 let view: EditorView | null = null
-// 进行中的本地文件操作数；期间收到的目录事件不用于判断标签页是否被删除
+// In-flight local file operations; tree events during these operations must not determine whether tabs were deleted.
 let opsInFlight = 0
 
 const externalChange = Annotation.define<boolean>()
 
-// 编辑器内容或光标变化的订阅者（大纲面板）；不经过 Vue 响应式，避免每次按键都触发组件更新
+// Editor content/cursor subscribers, such as the outline, bypass Vue reactivity to avoid component updates on every keystroke.
 const editorListeners = new Set<() => void>()
 export function onEditorUpdate(fn: () => void): () => void {
   editorListeners.add(fn)
@@ -145,13 +145,13 @@ function errorText(err: unknown): string {
   return err instanceof ApiError ? err.message : translate('common.network_error_check_your_connection_566064')
 }
 
-// ---- 编辑器状态 ----
+// ---- Editor state ----
 
 export function attachView(v: EditorView | null) {
   view = v
 }
 
-/** 当前显示的编辑器视图（手机工具条等需要直接操作编辑器） */
+/** Current editor view, accessed directly by controls such as the mobile toolbar. */
 export function editorView(): EditorView | null {
   return view
 }
@@ -169,7 +169,7 @@ export function toggleSourceMode() {
   }
 }
 
-/** 从相册/文件中选择图片插入到光标处 */
+/** Choose an image from photos/files and insert it at the cursor. */
 export function insertImagesFromPicker() {
   const v = view
   const tab = activeTab()
@@ -188,12 +188,12 @@ export function editorStateOf(path: string): EditorState | undefined {
   return editorStates.get(path)
 }
 
-// 笔记的身份对象：重命名/移动后保持不变，用于判断编辑器中显示的是否仍是同一篇笔记
+// Note identity survives rename/move and determines whether the editor still displays the same note.
 export function noteRefOf(path: string): { path: string } | undefined {
   return noteRefs.get(path)
 }
 
-// 切换标签页前由编辑器面板调用，保存当前视图状态（含光标、滚动无关的选区与撤销历史）
+// Called by the editor pane before tab switches to save view state, including cursor, non-scroll selection state, and undo history.
 export function storeViewState(path: string, state: EditorState) {
   if (editorStates.has(path)) editorStates.set(path, state)
 }
@@ -271,7 +271,7 @@ function buildState(path: string, doc: string): EditorState {
 
 function reconfigurePluginStates() {
   const effects = [languageCompartment.reconfigure(pluginLanguage()), pluginCompartment.reconfigure(pluginEditorExtensions()), pluginRefresh.of(null)]
-  // 先计算全部新状态，失败时让注册方撤回；不让后台标签保留已停用扩展。
+  // Compute every new state first so the registering party can roll back on failure; background tabs must not retain disabled extensions.
   const updates = [...editorStates].map(([path, state]) => {
     const current = path === ws.active && view ? view.state : state
     return { path, transaction: current.update({ effects }) }
@@ -290,7 +290,7 @@ const pluginWrite: PluginAPI['vault']['write'] = async (path, content, options) 
   const initialRevision = tab?.rev
   const initialSequence = saved?.seq ?? 0
   const rev = (await writeFileApi({ path, content, ifMatch: 'create' in options ? '' : options.ifMatch })).data.rev
-  // 用户可能已完成下一次保存，或已收到更新版本；迟到响应不能退回正文与 rev。
+  // A later save or newer revision may already exist; late responses must not revert contents or rev.
   if (tab && tabOf(path) === tab && tab.rev === initialRevision && (slots.get(path)?.seq ?? 0) === initialSequence && !tab.dirty && tab.status === 'ready' && !slots.get(path)?.inflight) {
     replaceDoc(path, content); tab.rev = rev
   }
@@ -298,7 +298,7 @@ const pluginWrite: PluginAPI['vault']['write'] = async (path, content, options) 
   return { rev }
 }
 
-// 用服务器内容替换文档：只替换首尾相同部分之间的差异，尽量保留光标位置；不进入撤销历史
+// Replace document contents with server text by changing only the difference between shared prefix/suffix, preserving the cursor where possible and bypassing undo history.
 function replaceDoc(path: string, content: string) {
   const state = path === ws.active && view ? view.state : editorStates.get(path)
   if (!state) return
@@ -325,7 +325,7 @@ function docOf(path: string): string | undefined {
   return editorStates.get(path)?.doc.toString()
 }
 
-// ---- 保存队列 ----
+// ---- Save queue ----
 
 function slot(path: string): SaveSlot {
   let s = slots.get(path)
@@ -342,7 +342,7 @@ function scheduleSave(path: string, delay = SAVE_DELAY) {
   s.timer = setTimeout(() => void flush(path), delay)
 }
 
-// 立即保存一篇笔记的待保存修改；keepalive 用于页面隐藏/关闭时尽力发出请求
+// Immediately save pending changes for one note; keepalive attempts delivery when the page hides or closes.
 export async function flush(path: string, keepalive = false): Promise<void> {
   const version = user.getSessionVersion()
   const s = slots.get(path)
@@ -353,7 +353,7 @@ export async function flush(path: string, keepalive = false): Promise<void> {
   const tab = tabOf(path)
   if (!tab || tab.status !== 'ready' || s.seq === s.savedSeq) return
   if (s.paused || s.uploads) {
-    // 图片上传中或文件正在移动，稍后再存，避免写入临时 blob: 地址或写到旧路径
+    // Defer saves during image uploads or file moves to avoid temporary blob: URLs or writes to old paths.
     s.timer = setTimeout(() => void flush(path), SAVE_DELAY)
     return
   }
@@ -362,8 +362,8 @@ export async function flush(path: string, keepalive = false): Promise<void> {
   const seq = s.seq
   const baseRev = tab.rev
   s.inflight = (async () => {
-    // 草稿与请求并行：页面关闭时等待 IndexedDB 写完再发请求，请求往往来不及发出
-    // 草稿只是兜底，写入失败不影响保存本身
+    // Run draft persistence and the request in parallel; waiting for IndexedDB first often prevents the request from starting during page close.
+    // Drafts are a recovery fallback; draft-write failures do not block saving itself.
     const draftSaved = drafts.put({ path, content, baseRev, updatedAt: Date.now() }).catch(err => console.warn('写入本地草稿失败', err))
     try {
       const rev = (await writeFileApi({ path, content, ifMatch: baseRev, keepalive })).data.rev
@@ -384,7 +384,7 @@ export async function flush(path: string, keepalive = false): Promise<void> {
         tab.status = serverRev ? 'conflict' : 'deleted'
         tab.conflictRev = serverRev
       } else if (!(err instanceof ApiError) || err.status >= 500) {
-        // 网络错误与服务器错误可重试，草稿已在本地，不会丢
+        // Network/server failures can be retried; the local draft preserves contents.
         tab.saveError = s.retries < MAX_RETRIES ? translate('workspace.save_failed_retrying_d62793') : translate('workspace.save_failed_check_your_connection_c0913f')
         if (s.retries++ < MAX_RETRIES) s.timer = setTimeout(() => void flush(path), RETRY_DELAY)
       } else {
@@ -407,15 +407,15 @@ export async function flushAll(keepalive = false) {
   await Promise.all([...slots.keys()].map(p => flush(p, keepalive)))
 }
 
-// 保存失败会留在标签页状态中，flushAll 完成并不意味着可以安全刷新。
+// Save failures remain in tab state; completion of flushAll does not guarantee a safe refresh.
 export function readyToReload(): boolean {
   return opsInFlight === 0 && !ws.tabs.some(t => t.dirty || t.status === 'loading')
     && [...slots.values()].every(s => !s.uploads && !s.paused && !s.inflight)
 }
 
-// ---- 冲突处理 ----
+// ---- Conflict handling ----
 
-// 放弃本地修改，载入服务器版本
+// Discard local changes and load the server version.
 export async function useServerVersion(path: string) {
   const tab = tabOf(path)
   if (!tab) return
@@ -432,7 +432,7 @@ export async function useServerVersion(path: string) {
   }
 }
 
-// 保留本地修改，覆盖服务器版本（服务器上已删除时重新创建）
+// Keep local changes and overwrite the server version, recreating the file if deleted there.
 export async function keepLocalVersion(path: string) {
   const version = user.getSessionVersion()
   const tab = tabOf(path)
@@ -471,17 +471,17 @@ export async function keepLocalVersion(path: string) {
   if (tab.dirty && tab.status === 'ready') void flush(path)
 }
 
-// ---- 打开并聚焦（快速切换、搜索结果跳转） ----
+// ---- Open and focus (quick switcher and search results) ----
 
 interface RevealTarget {
   path: string
   line: number
   terms: string[]
 }
-// 笔记可能尚未载入或编辑器尚未显示，由编辑器面板在显示该笔记后执行
+// The note may not be loaded or its editor visible yet; the editor pane performs this after displaying the note.
 let pendingReveal: RevealTarget | null = null
 
-/** 打开笔记并聚焦编辑器；line > 0 时定位到该行（从 1 开始）并选中该行第一个搜索词 */
+/** Open a note and focus the editor; line > 0 targets that 1-based line and selects its first search-term match. */
 export async function openAt(path: string, line = 0, terms: string[] = []) {
   pendingReveal = { path, line, terms }
   if (path === ws.active && view && editorStates.has(path)) {
@@ -492,12 +492,12 @@ export async function openAt(path: string, line = 0, terms: string[] = []) {
   }
 }
 
-/** 编辑器面板显示笔记后调用；返回 true 表示已定位到指定行（不应再恢复原来的滚动位置） */
+/** Called after the editor pane displays the note; true means the requested line was reached, so do not restore the old scroll position. */
 export function revealPending(v: EditorView, path: string): boolean {
   const r = pendingReveal
   if (!r || r.path !== path) return false
   pendingReveal = null
-  // 触屏设备上聚焦会弹出软键盘遮住内容，只在有鼠标的设备上聚焦
+  // Focus opens software keyboards on touch devices and covers content; focus only devices with a mouse.
   if (!matchMedia('(pointer: coarse)').matches) v.focus()
   if (r.line === 0) return false
   const line = v.state.doc.line(Math.min(r.line, v.state.doc.lines))
@@ -513,14 +513,14 @@ export function revealPending(v: EditorView, path: string): boolean {
   return true
 }
 
-// ---- 标签页 ----
+// ---- Tabs ----
 
 export async function openNote(path: string) {
   const version = user.getSessionVersion()
   ws.view = 'notes'
   ws.images = null
   ws.sidebarOpen = false
-  // 目录中的新笔记先乐观显示，读取前须等它真正创建成功。
+  // New tree notes appear optimistically; wait for actual creation before reading them.
   const pending = creating.get(path)
   if (pending && !(await pending)) return
   user.assertSession(version)
@@ -591,7 +591,7 @@ function forget(path: string) {
   slots.delete(path)
 }
 
-// 路径前缀替换（移动文件夹时其下所有路径一起变化）
+// Replace path prefixes; moving a folder changes every descendant path together.
 function remapPath(p: string, from: string, to: string): string | null {
   if (p === from) return to
   if (p.startsWith(`${from}/`)) return to + p.slice(from.length)
@@ -625,11 +625,11 @@ function affected(path: string): string[] {
   return ws.tabs.map(t => t.path).filter(p => p === path || p.startsWith(`${path}/`))
 }
 
-// ---- 目录树 ----
+// ---- Directory tree ----
 
-// 目录刷新：同一时间只有一个请求；请求期间又有刷新请求或本地操作时，结果可能已过时，丢弃后重新获取。
-// 本地操作会先乐观修改目录，过时的结果会抹掉刚加入的条目（例如新建笔记的重命名框随之消失）。
-// 等待中的调用者在下一次被采用的结果（或请求失败）后统一完成
+// Tree refresh permits one request at a time; discard and refetch if another refresh or local operation makes its result stale.
+// Local operations update the tree optimistically; stale results would erase new entries, such as a new note's rename input.
+// Waiting callers settle together after the next accepted result or request failure.
 let treeTimer: ReturnType<typeof setTimeout> | undefined
 let treeFetching = false
 let treeAgain = false
@@ -669,7 +669,7 @@ async function fetchTree() {
   }
   treeFetching = false
   if (treeAgain || edits !== localTreeEdits || opsInFlight > 0) {
-    // 有操作进行中时由 withOp 在全部结束后重新调度
+    // During active operations, withOp reschedules once all operations finish.
     if (opsInFlight === 0) scheduleTreeRefresh()
     return
   }
@@ -730,10 +730,10 @@ export async function createNote(dir: string) {
   await createNoteAt(path)
 }
 
-// 进行中的新建：新建后立即出现重命名输入框，重命名须等文件真正创建后再执行
+// In-flight creation: immediately show the rename input, but wait for actual file creation before renaming.
 const creating = new Map<string, Promise<boolean>>()
 
-/** 在指定路径新建空笔记并打开，返回是否成功；不存在的上级目录由服务器创建 */
+/** Create and open an empty note at the requested path and report success; the server creates missing parent folders. */
 export async function createNoteAt(path: string, content = ''): Promise<boolean> {
   ws.view = 'notes'
   ws.images = null
@@ -769,7 +769,7 @@ async function createNoteFile(path: string, content: string): Promise<boolean> {
 }
 
 export async function importNotes(dir: string, folder: string, files: File[]) {
-  // refreshTree 必须等 withOp 结束，否则会等待自身释放操作计数。
+  // refreshTree must wait until withOp ends, or it would wait for its own operation count to be released.
   const result = await withOp(() => importNotesApi({ dir, folder, files }).then(({ data }) => data))
   ws.searchOpen = false
   try {
@@ -820,16 +820,16 @@ export async function move(from: string, to: string, errorOwner: 'operation' | '
     return operationFailed(translate('workspace.already_exists_6af434', { p0: basename(to) }), errorOwner)
   }
   const result = await withOp<FileResult>(async () => {
-    // 移动会更新仓库中的相对链接，先保存全部已打开笔记，沿用版本冲突保护。
+    // Moves update relative vault links; save all open notes first, retaining revision-conflict protection.
     const impacted = () => ws.tabs.map(t => t.path)
     const busy = () => impacted().some(p => slots.get(p)?.uploads || slots.get(p)?.paused)
     if (busy()) {
       return operationFailed(translate('workspace.this_note_is_processing_a_8c2cce'), errorOwner)
     }
-    // 先保存待保存的修改，确保移动的是最新内容；移动期间暂停保存，避免写到旧路径
+    // Save pending edits first so the latest contents move; pause saving during the move to avoid writing to old paths.
     await Promise.all(impacted().map(p => flush(p)))
     user.assertSession(version)
-    // 等待保存时仍可能开始粘贴，须在取得移动占用前再次检查。
+    // Pasting may start while awaiting saves; check again before acquiring the move lock.
     if (busy()) {
       return operationFailed(translate('workspace.this_note_is_processing_a_8c2cce'), errorOwner)
     }
@@ -844,7 +844,7 @@ export async function move(from: string, to: string, errorOwner: 'operation' | '
     let draftsMoved = false
     let remapped = false
     try {
-      // 先确认持久草稿能够迁移；失败时服务器与界面均保留原路径。
+      // Verify persistent drafts can migrate first; on failure, keep original paths on both the server and interface.
       await drafts.move(from, to)
       user.assertSession(version)
       draftsMoved = true
@@ -875,12 +875,12 @@ export async function move(from: string, to: string, errorOwner: 'operation' | '
     } finally {
       paused.forEach(s => s.paused--)
     }
-    // 笔记改名时服务器会改写正文中的图片链接，版本随之变化，需要重新同步
+    // The server rewrites image links when renaming notes, changing their revisions and requiring resynchronization.
     await Promise.all(ws.tabs.map(t => t.path).map(async (p) => {
       const tab = tabOf(p)
       if (!tab) return
       if (tab.dirty) {
-        // 移动期间又有输入：本地内容仍含旧链接，交给用户选择
+        // Input during the move still contains old links; let the user resolve it.
         const { rev } = await readNoteFile(p)
         if (rev !== tab.rev) Object.assign(tab, { status: 'conflict', conflictRev: rev })
       } else {
@@ -912,7 +912,7 @@ export async function remove(path: string, errorOwner: 'operation' | 'caller' = 
       return operationFailed(translate('workspace.save_your_notes_and_resolve_5981a5'), errorOwner)
     }
     const snapshot = ws.entries
-    ws.entries = ws.entries.filter(e => remapPath(e.path, path, path) === null) // 去掉自身及其下所有条目
+    ws.entries = ws.entries.filter(e => remapPath(e.path, path, path) === null) // Remove the item and all descendants.
     for (const p of paths) {
       if (!(await closeTab(p))) {
         ws.entries = snapshot; return operationFailed(translate('workspace.could_not_close_the_note_cd2a80'), errorOwner)
@@ -949,7 +949,7 @@ export async function restore(id: string) {
   }
 }
 
-// 版本只用于刷新浏览器图片，不改变 Markdown 中保存的相对路径。
+// The version refreshes browser images only; relative Markdown paths remain unchanged.
 export function imageUrl(path: string): string {
   const entry = ws.entries.find(e => e.path === path)
   return imageResourceRoot() + encodePath(path) + (entry ? `?v=${entry.mtime}-${entry.size}` : '')
@@ -965,7 +965,7 @@ export async function replaceImage(path: string, file: File) {
   }
 }
 
-// ---- 实时同步 ----
+// ---- Live synchronization ----
 
 async function syncOpenTab(tab: Tab) {
   const s = slots.get(tab.path)
@@ -1002,7 +1002,7 @@ async function handleEvents(evs: VaultEvent[]) {
       await refreshPlugins()
     } else if (ev.type === 'changed') {
       const tab = tabOf(ev.path!)
-      // 自己保存产生的事件 rev 与本地一致；有本地修改时不覆盖，交由下次保存的冲突检测处理
+      // Own-save events match the local rev; do not overwrite local edits, and let the next save detect conflicts.
       if (tab && tab.rev !== ev.rev) await syncOpenTab(tab)
     } else if (ev.type === 'moved') {
       if (ws.image) ws.image = remapPath(ws.image, ev.from!, ev.path!) ?? ws.image
@@ -1010,14 +1010,14 @@ async function handleEvents(evs: VaultEvent[]) {
       const paused = affected(ev.from!).map(slot)
       paused.forEach(s => s.paused++)
       try {
-        // 已发出的保存仍可能写入旧键，先等其草稿事务结束。
+        // In-flight saves may still write the old key; wait for their draft transactions first.
         await Promise.all(paused.map(s => s.inflight))
         user.assertSession(version)
         if (epoch !== workspaceEpoch) return
         try {
           await drafts.move(ev.from!, ev.path!)
         } catch (cause) {
-          // 外部文件已移动，草稿失败不能阻止编辑器跟随；保留原记录并明确提示。
+          // The external file already moved, so draft failures must not prevent editor tracking; retain the original record and report failure explicitly.
           toast(translate('workspace.could_not_migrate_the_local_4c513a', { p0: cause instanceof Error ? cause.message : errorText(cause) }))
         }
         user.assertSession(version)
@@ -1056,11 +1056,11 @@ async function resync() {
   await refreshPlugins()
 }
 
-// ---- 启动 ----
+// ---- Startup ----
 
 const TABS_KEY = 'rawmark.tabs'
 
-// 恢复未保存成功的草稿：服务器版本未变则继续保存，已变则进入冲突状态由用户选择
+// Restore unsaved drafts: continue saving if the server revision is unchanged; otherwise enter conflict state for user resolution.
 async function recoverDrafts() {
   const version = user.getSessionVersion()
   for (const d of await drafts.all()) {
@@ -1100,7 +1100,7 @@ export async function startWorkspace() {
   workspaceRunning = false
   await prepareResources()
   user.assertSession(version)
-  // 设置读取失败不影响使用，沿用本地缓存的值
+  // Settings-read failures do not prevent use; retain locally cached values.
   const settingsLoaded = loadSettings().catch((err) => {
     if (!isCancel(err)) toast(translate('workspace.could_not_load_settings_246415', { p0: errorText(err) }))
   })
@@ -1123,7 +1123,7 @@ export async function startWorkspace() {
   let eventQueue = Promise.resolve()
   let stopped = false
   const enqueue = (work: () => Promise<void>) => {
-    // 同步读取是异步的，后续批次不能越过前一批次的移动和正文更新。
+    // Synchronization reads are asynchronous; later batches must not overtake earlier moves or content updates.
     eventQueue = eventQueue.then(() => {
       if (!stopped) return work()
     }).catch((err) => {
@@ -1147,7 +1147,7 @@ export async function startWorkspace() {
       return { path: tab.path, content: state.doc.toString(), rev: tab.rev, dirty: tab.dirty }
     },
   })
-  // 重新登录后工作区会再次启动，以下全局监听只注册一次
+  // The workspace starts again after signing in; register the following global listeners only once.
   if (listenersInstalled) return
   listenersInstalled = true
   watch(
@@ -1155,7 +1155,7 @@ export async function startWorkspace() {
     (tabs) => {
       if (workspaceRunning) localStorage.setItem(TABS_KEY, JSON.stringify(tabs))
     },
-    // 启动期间（如等待目录刷新时）打开的标签页也要立即记录
+    // Record tabs opened during startup immediately, including while waiting for tree refresh.
     { immediate: true },
   )
   watch(
@@ -1173,7 +1173,7 @@ export async function startWorkspace() {
     () => ({ sidebarCollapsed: ws.sidebarCollapsed, outlineOpen: ws.outlineOpen, focusMode: ws.focusMode }),
     (l) => {
       localStorage.setItem(LAYOUT_KEY, JSON.stringify(l))
-      // 编辑区宽度变化，需要重新测量
+      // Editor width changed; request remeasurement.
       requestAnimationFrame(() => view?.requestMeasure())
     },
   )
@@ -1188,7 +1188,7 @@ export async function startWorkspace() {
       }
     }
   })
-  // 字号、正文宽度变化后行高随之改变，编辑器需要重新测量
+  // Font-size and text-width changes affect line heights; request editor remeasurement.
   watch(
     () => [settings.uiFont, settings.uiFontSize, settings.fontSize, settings.contentWidth, settings.sidebarWidth, settings.textFont, settings.codeFont, settings.lineHeight],
     () => view?.requestMeasure(),
@@ -1212,7 +1212,7 @@ export async function startWorkspace() {
   )
   window.addEventListener('rawmark-appearance', () => requestAnimationFrame(() => view?.requestMeasure()))
   window.addEventListener('rawmark-plugin-notice', event => toast((event as CustomEvent<string>).detail))
-  // 页面隐藏/关闭前尽力发出待保存的修改（部分浏览器关闭标签页时只触发 pagehide）
+  // Attempt to send pending saves before page hide/close; some browsers fire only pagehide on tab close.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void flushAll(true)
   })
@@ -1223,13 +1223,13 @@ export async function startWorkspace() {
   window.addEventListener('keydown', (event) => {
     if (workspaceRunning) handleShortcut(event)
   }, true)
-  // 软键盘弹出、编辑区变矮后，让光标保持可见
+  // Keep the cursor visible when the software keyboard reduces editor height.
   trackVisualViewport(() => {
     if (view?.hasFocus) view.dispatch({ effects: EditorView.scrollIntoView(view.state.selection.main.head, { y: 'nearest', yMargin: 24 }) })
   })
 }
 
-// 内置命令不依赖工作区状态，模块载入时注册，排在组件注册的命令（如退出登录）之前
+// Built-in commands do not depend on workspace state; register at module load before component commands such as sign-out.
 registerBuiltinCommands()
 
 function registerBuiltinCommands() {
@@ -1313,13 +1313,13 @@ function registerBuiltinCommands() {
   }
 }
 
-// 手机上侧栏是抽屉，电脑上折叠/展开
+// The sidebar is a drawer on phones and collapsible on desktop.
 function toggleSidebar() {
   if (matchMedia('(max-width: 768px)').matches) ws.sidebarOpen = !ws.sidebarOpen
   else ws.sidebarCollapsed = !ws.sidebarCollapsed
 }
 
-// 需要在目录树中操作的命令：切回目录树，移动端打开侧栏
+// For tree operations, switch back to the tree and open the sidebar on mobile.
 function withSidebar(fn: () => unknown) {
   ws.searchOpen = false
   ws.sidebarOpen = true
@@ -1331,7 +1331,7 @@ export function openSearch() {
   ws.searchOpen = true
   ws.sidebarOpen = true
   ws.sidebarCollapsed = false
-  // 已打开时重新聚焦并全选，便于直接输入新的搜索词
+  // If already open, refocus and select all so users can immediately enter a new query.
   void nextTick(() => {
     const input = document.querySelector<HTMLInputElement>('.rm-search-input')
     input?.focus()

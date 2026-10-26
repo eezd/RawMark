@@ -1,8 +1,8 @@
-// RawMark 服务入口。配置全部来自环境变量：
+// RawMark service entry point. All configuration comes from environment variables:
 //
-//	RAWMARK_DATA   数据目录，默认 /data（存放 rawmark.db、可重建的搜索索引 index.db 与默认仓库）
-//	RAWMARK_VAULT  笔记仓库目录，默认 $RAWMARK_DATA/vault；可指向已有的 Typora 笔记目录
-//	RAWMARK_ADDR   监听地址，默认 :8080
+//	RAWMARK_DATA   Data directory; defaults to /data (rawmark.db, rebuildable index.db, and the default vault).
+//	RAWMARK_VAULT  Note vault; defaults to $RAWMARK_DATA/vault and may point to an existing Typora directory.
+//	RAWMARK_ADDR   Listen address; defaults to :8080.
 package main
 
 import (
@@ -65,7 +65,7 @@ func run(addr string) error {
 	if err != nil {
 		return err
 	}
-	// 所有标准库上传、导出临时文件归本进程专属目录，不能清理宿主机 /tmp。
+	// Keep all standard-library upload/export temporary files in this process's own directory; never clean the host /tmp.
 	tempDir := filepath.Join(dataDir, "temp")
 	if err = os.MkdirAll(tempDir, 0700); err != nil {
 		return err
@@ -208,7 +208,7 @@ func serve(parent context.Context, addr, dataDir, vaultDir, version string, font
 	return requested, nil
 }
 
-// permissionHint 为权限错误补充排查提示：Docker 绑定挂载的宿主机目录常常对容器内的非 root 用户不可写
+// permissionHint adds guidance for permission errors: Docker bind mounts are often not writable by non-root container users.
 func permissionHint(err error) error {
 	if errors.Is(err, fs.ErrPermission) {
 		return fmt.Errorf("%w（当前 UID %d 对数据目录没有写权限：请用 --user 指定宿主机目录所有者的 UID:GID，或执行 chown 修改目录所有者）", err, os.Getuid())
@@ -231,7 +231,7 @@ func cleanupSessions(ctx context.Context, st *store.Store) {
 	}
 }
 
-// healthcheck 供 Docker HEALTHCHECK 使用（distroless 镜像中没有 curl）
+// healthcheck supports Docker HEALTHCHECK without curl in the distroless image.
 func healthcheck(addr string) int {
 	_, port, err := net.SplitHostPort(addr)
 	if err != nil {

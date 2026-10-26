@@ -42,7 +42,7 @@ func publicImageIP(ip netip.Addr) bool {
 	if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
 		return false
 	}
-	// 不接受 IPv6 地址转换前缀，避免其中嵌入的 IPv4 地址访问内网。
+	// Reject IPv6 translation prefixes so embedded IPv4 addresses cannot reach private networks.
 	if ip.Is6() && !netip.MustParsePrefix("2000::/3").Contains(ip) {
 		return false
 	}
@@ -64,7 +64,7 @@ func checkImageURL(u *url.URL) error {
 var remoteImageClient = &http.Client{
 	Timeout: 10 * time.Second,
 	Transport: &http.Transport{
-		// 不使用环境代理，确保每个实际连接都经过目标地址校验。
+		// Ignore environment proxies so every actual connection passes destination-address validation.
 		DialContext: (&net.Dialer{
 			Timeout: 5 * time.Second,
 			ControlContext: func(_ context.Context, _, address string, _ syscall.RawConn) error {
@@ -105,7 +105,7 @@ var remoteImageClient = &http.Client{
 	},
 }
 
-// readImageDownload 按实际文件签名确定类型，不信任来源的扩展名或 Content-Type。
+// readImageDownload determines type from file signatures, not the source extension or Content-Type.
 func readImageDownload(body io.Reader) ([]byte, string, error) {
 	data, err := io.ReadAll(io.LimitReader(body, maxAssetBytes+1))
 	if err != nil {
@@ -174,7 +174,7 @@ func (s *Server) importAsset(w http.ResponseWriter, r *http.Request) {
 				writeError(w, 400, i18n.RenderError(errImageAddress, responseLocale(w)))
 				return
 			}
-			// url.Error 含完整来源 URL，其中可能有临时签名，日志只保留底层原因。
+			// url.Error includes the full source URL, potentially with temporary signatures; log only its underlying cause.
 			var urlError *url.Error
 			if errors.As(err, &urlError) {
 				err = urlError.Err
@@ -208,7 +208,7 @@ func (s *Server) importAsset(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-		// 下载期间笔记可能被外部程序移动或删除；不能在旧路径下创建孤立资源。
+		// External programs may move or delete the note during download; do not create orphaned resources at the old path.
 		info, err := s.vault.Stat(note)
 		if err != nil {
 			vaultError(w, r, err)

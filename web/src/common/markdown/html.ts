@@ -4,7 +4,7 @@ import { parser as commonmarkParser, Emoji, GFM, Subscript, Superscript } from '
 import { typoraExtensions } from './extensions'
 import { inlineStyleText, stylesFromTag } from './inline-styles'
 
-// 与编辑器一致的语法集（lang-markdown 的 markdownLanguage 加 Typora 扩展）
+// Match the editor's syntax set: lang-markdown's markdownLanguage plus Typora extensions.
 export const markdownParser = commonmarkParser.configure([GFM, Subscript, Superscript, Emoji, ...typoraExtensions])
 
 export { commonmarkParser }
@@ -27,7 +27,7 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;'))
 }
 
-// 属性值中保留实体引用（交给浏览器解码），只转义其余的特殊字符
+// Preserve entity references in attributes for browser decoding; escape only other special characters.
 function escapeAttr(s: string): string {
   return s.replace(/&(?!(?:#\d{1,7}|#x[\da-f]{1,6}|[A-Z][A-Z\d]{1,31});)|[<>"]/gi, c =>
     c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;')
@@ -37,7 +37,7 @@ function unescapeBackslashes(s: string): string {
   return s.replace(/\\([\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E])/g, '$1')
 }
 
-// 对非法 URL 字符做百分号编码，已有的 %XX 保留
+// Percent-encode invalid URL characters while preserving existing %XX escapes.
 function normalizeUrl(s: string): string {
   return s.replace(/%(?![\da-f]{2})|[^\w\-.~:/?#[\]@!$&'()*+,;=%]/gi, c => encodeURIComponent(c))
 }
@@ -52,7 +52,7 @@ function tabWidth(col: number): number {
 
 export interface RenderOptions {
   parser?: MarkdownParser
-  // 为 true 时原样输出原始 HTML、不过滤危险链接协议；仅用于可信内容（如规范测试）
+  // When true, preserve raw HTML and unsafe link schemes; use only with trusted content such as specification tests.
   unsafe?: boolean
 }
 
@@ -60,12 +60,12 @@ const UNSAFE_PROTOCOL = /^\s*(javascript|vbscript|file|data):/i
 const SAFE_DATA_IMAGE = /^\s*data:image\/(png|gif|jpeg|webp);/i
 
 function safeHref(href: string): string {
-  // 协议由 ASCII 组成；属性实体会被浏览器解码，URL 解析还会忽略制表符和换行。
+  // Schemes are ASCII; browsers decode attribute entities, and URL parsing also ignores tabs and newlines.
   const protocol = href.replace(/&#(?:(\d{1,7})|[xX]([\da-fA-F]{1,6}));|&(colon|Tab|NewLine);/g, (entity, decimal, hex, named) => {
     if (named) return named === 'colon' ? ':' : named === 'Tab' ? '\t' : '\n'
     const code = decimal ? Number(decimal) : Number.parseInt(hex, 16)
     return code <= 127 ? String.fromCharCode(code) : entity
-  // eslint-disable-next-line no-control-regex -- URL 安全检查必须移除 ASCII 控制字符。
+  // eslint-disable-next-line no-control-regex -- URL safety checks must remove ASCII control characters.
   }).replace(/[\t\r\n]/g, '').replace(/^[\x00-\x20]+/, '')
   return UNSAFE_PROTOCOL.test(protocol) && !SAFE_DATA_IMAGE.test(protocol) ? '#' : href
 }
@@ -100,7 +100,7 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
     return node ? unescapeBackslashes(text(node.from + 1, node.to - 1)) : null
   }
 
-  // ---- 容器前缀剥离：代码块、HTML 块需要按 CommonMark 的列规则去掉引用符与列表缩进 ----
+  // ---- Strip container prefixes: code and HTML blocks must remove quote markers and list indentation using CommonMark column rules ----
 
   function containers(node: SyntaxNode): SyntaxNode[] {
     const out: SyntaxNode[] = []
@@ -125,7 +125,7 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
     return col
   }
 
-  // 列表项内容的起始列（绝对列号）
+  // Absolute starting column of list-item content.
   function itemContentColumn(item: SyntaxNode): number {
     const mark = item.getChild('ListMark')!
     const markEnd = columnAt(mark.to)
@@ -137,7 +137,7 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
     return col
   }
 
-  // 去掉一行开头属于容器的部分，返回剩余文本（被拆开的制表符以空格补齐）
+  // Remove the container prefix from a line and return the remaining text, padding split tabs with spaces.
   function stripContainers(lineFrom: number, cs: SyntaxNode[]): { rest: string, col: number } {
     const end = lineEnd(lineFrom)
     let i = lineFrom
@@ -177,7 +177,7 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
       } else {
         const target = itemContentColumn(c)
         if (lineStart(c.from) === lineFrom) {
-          // 列表项首行：跳过列表标记本身
+          // First list-item line: skip the list marker itself.
           const mark = c.getChild('ListMark')!
           col = columnAt(mark.to)
           i = mark.to
@@ -191,11 +191,11 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
         eatColumns(target)
       }
     }
-    // pad 个空格（被拆开的制表符剩余部分）从第 col 列开始
+    // pad spaces (the remainder of a split tab) start at column col.
     return { rest: ' '.repeat(pad) + src.slice(i, end), col }
   }
 
-  // 去掉至多 n 列的前导空白；startCol 为该行文本起始的绝对列，用于计算制表符宽度
+  // Remove up to n columns of leading whitespace; startCol is the line's absolute starting column for tab-width calculation.
   function stripIndent({ rest: line, col: startCol }: Line, n: number): string {
     let col = 0
     let i = 0
@@ -212,7 +212,7 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
     const cs = containers(node)
     const lines: Line[] = []
     let pos = lineStart(node.from)
-    // 未闭合的块会延伸到文末换行之后，那一行不属于内容
+    // Unclosed blocks extend past the final newline; that trailing line is not content.
     const last = lineStart(node.to > node.from && src[node.to - 1] === '\n' ? node.to - 1 : node.to)
     for (let first = true; pos <= last; first = false) {
       const isLast = pos === last
@@ -223,12 +223,12 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
     return lines
   }
 
-  // ---- 行内 ----
+  // ---- Inline ----
 
   function inline(parent: SyntaxNode, from: number, to: number): string {
     let out = ''
     let pos = from
-    // 引用符和硬换行之后的行首空白不属于内容
+    // Leading whitespace after quote markers or hard breaks is not content.
     let afterQuote = false
     for (let ch = parent.firstChild; ch; ch = ch.nextSibling) {
       if (ch.to <= from || ch.from >= to) continue
@@ -289,7 +289,7 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
         const styles = stylesFromTag(text(open.from, open.to))!
         return `<span style="${escapeAttr(inlineStyleText(styles))}">${innerOf(node, 'InlineStyleMark')}</span>`
       }
-      // 公式与 emoji 输出占位元素，由 render.ts 的 hydrate 按需加载依赖后填充
+      // Math and emoji emit placeholders; render.ts hydrate loads dependencies and fills them as needed.
       case 'InlineMath': {
         const tex = text(node.from + 1, node.to - 1)
         return `<span data-math="${escapeHtml(tex)}">${escapeHtml(tex)}</span>`
@@ -320,7 +320,7 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
         return `<a href="${escapeAttr(linkHref(normalizeUrl(href)))}">${escapeHtml(raw)}</a>`
       }
       case 'URL': {
-        // GFM 裸链接
+        // GFM autolinks.
         const raw = text(node.from, node.to)
         const href = raw.startsWith('www.') ? `http://${raw}` : raw.includes('@') && !raw.includes(':') ? `mailto:${raw}` : raw
         return `<a href="${escapeAttr(linkHref(normalizeUrl(href)))}">${escapeHtml(raw)}</a>`
@@ -349,7 +349,7 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
       const key = label && text(label.from, label.to) !== '[]' ? text(label.from, label.to) : text(labelFrom - 1, closeBracket.to)
       def = defs.get(normalizeLabel(key))
       if (!def) {
-        // 引用未定义：按字面文本输出
+        // Undefined reference: output literal text.
         const tail = label ? escapeHtml(unescapeBackslashes(text(label.from, label.to))) : ''
         return `${isImage ? '!' : ''}[${content}]${tail}`
       }
@@ -359,7 +359,7 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
     return `<a href="${escapeAttr(linkHref(def.href))}"${title}>${content}</a>`
   }
 
-  // ---- 块级 ----
+  // ---- Blocks ----
 
   function isBlank(line: string): boolean {
     return /^[ \t>]*$/.test(line)
@@ -477,10 +477,10 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
         const name = text(label.from + 2, label.to - 2)
         return `<div class="footnote" id="${escapeAttr(footnoteId(name))}"><sup>${escapeHtml(name)}</sup> ${inline(node, label.to, node.to).trim()}</div>\n`
       }
-      // 目录占位，由调用方根据标题填充
+      // Table-of-contents placeholder; the caller fills it from headings.
       case 'TableOfContents':
         return '<nav class="toc"></nav>\n'
-      // front matter 是元数据，不输出
+      // Front matter is metadata and is not rendered.
       default:
         return ''
     }
@@ -531,7 +531,7 @@ export function renderMarkdown(src: string, { parser = markdownParser, unsafe = 
   return blocks(tree.topNode)
 }
 
-// 渲染单行行内 Markdown（表格单元格等），不产生块级结构
+// Render single-line inline Markdown, such as table cells, without creating block structures.
 export function renderInlineMarkdown(src: string, options?: RenderOptions): string {
   const html = renderMarkdown(src, options)
   const m = /^<p>([\s\S]*)<\/p>\n$/.exec(html)

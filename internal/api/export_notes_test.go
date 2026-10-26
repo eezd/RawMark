@@ -76,7 +76,7 @@ func TestPortableNotesExcludeApplicationData(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			// 与真实进程一致，导出暂存文件位于应用数据目录内。
+			// As in the real process, export temporary files live inside the application data directory.
 			t.Setenv("TMPDIR", filepath.Join(data, "temp"))
 			res = f.do(f.admin, "POST", "/api/v1/maintenance/notes/export", "", nil)
 			defer res.Body.Close()

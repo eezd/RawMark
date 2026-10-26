@@ -20,14 +20,14 @@ export default defineConfig({
       apply: 'build',
       enforce: 'post',
       generateBundle(_options, bundle) {
-        // 只统计应用内可选字体；Maple 与 KaTeX 不在 fonts.css 内。
+        // Count only optional application fonts; fonts.css excludes Maple and KaTeX.
         const fontCSS = readFileSync(new URL('./src/common/appearance/fonts.css', import.meta.url), 'utf8')
         const fontPaths = new Set([...fontCSS.matchAll(/url\(['"]?(\.?\/?fonts\/[^)'"]+)/g)].map(match => match[1]!))
         const size = [...fontPaths].reduce((total, path) => total + readFileSync(new URL(`./src/common/appearance/${path}`, import.meta.url)).byteLength, 0)
         const manifest = JSON.stringify({ optionalFontsSize: size })
         this.emitFile({ type: 'asset', fileName: 'font-storage.json', source: manifest })
 
-        // 缓存列表由产物生成，覆盖懒加载资源，旧页面更新后仍能加载其依赖。
+        // Generate the cache list from build output, including lazy resources, so old pages retain access to their dependencies after updates.
         const files = Object.keys(bundle).filter(name => name === 'index.html' || name.startsWith('assets/')).sort()
         const version = createHash('sha256')
         for (const name of files) {
@@ -43,7 +43,7 @@ export default defineConfig({
         const buildVersion = version.digest('hex').slice(0, 16)
         const entry = bundle['index.html']
         if (!entry || entry.type !== 'asset' || typeof entry.source !== 'string') throw new Error('缺少应用入口 HTML，无法写入构建版本')
-        // 入口与离线外壳使用同一构建标识，旧页面仍显示其自身的版本。
+        // The entry and offline shell share a build identifier; old pages continue displaying their own version.
         entry.source = entry.source.replace('</head>', `<meta name="rawmark-version" content="${buildVersion}" />\n  </head>`)
         const source = readFileSync(new URL('./src/service-worker.js', import.meta.url), 'utf8')
           .replace('__VERSION__', buildVersion)
@@ -54,13 +54,13 @@ export default defineConfig({
   ],
   build: {
     rolldownOptions: {
-      // demo.html 为免登录的编辑器演示页，供自动化性能/交互测试使用
+      // demo.html is an unauthenticated editor demo for automated performance/interaction tests.
       input: { index: 'index.html', demo: 'demo.html' },
     },
   },
   worker: { format: 'es' },
   server: {
-    // 开发时把 API 与 WebSocket 转发给本地 Go 服务（端口与 scripts/dev.sh 的 API_PORT 一致）
+    // During development, proxy APIs and WebSockets to the local Go service using scripts/dev.sh's API_PORT.
     proxy: { '/api': { target: `http://127.0.0.1:${process.env.API_PORT ?? 8080}`, ws: true } },
   },
   test: { environment: 'node', setupFiles: ['./src/i18n.ts'] },

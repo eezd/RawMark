@@ -43,10 +43,10 @@ async function prepareMaintenance() {
 }
 const title = computed(() => (ws.active ? noteTitle(ws.active) : 'RawMark'))
 const resizingSidebar = ref(false)
-// 自定义字体需登录后读取；初始化期间保留排版，但不先显示默认字体。
+// Custom fonts require authentication; preserve layout during initialization without briefly showing the default font.
 const initializing = ref(true)
 
-// 拖动侧栏右缘调整宽度：拖动中只改 CSS 变量，松手后保存到设置
+// Drag the sidebar's right edge to resize: update only CSS variables while dragging, then save settings on release.
 function startResize(e: PointerEvent) {
   const version = user.getSessionVersion()
   const handle = e.currentTarget as HTMLElement
@@ -88,16 +88,16 @@ async function logout() {
     await user.logout()
   } catch (error) {
     if (isCancel(error)) return
-    // 注销错误已由请求层提示。
+    // The request layer already displays logout errors.
     return
   }
   stopWorkspace()
   await router.replace('/login')
 }
 
-// 移动端：从屏幕左边缘右滑打开侧栏
+// Mobile: swipe right from the screen's left edge to open the sidebar.
 let touchX: number | null = null
-// 侧栏打开时向左滑关闭（以水平方向为主，避免与列表上下滚动冲突）
+// Swipe left to close the open sidebar; require primarily horizontal movement to avoid conflicts with list scrolling.
 let touchStart: { x: number, y: number } | null = null
 function onTouchStart(e: TouchEvent) {
   const t = e.touches[0]

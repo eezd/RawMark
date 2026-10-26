@@ -1,6 +1,6 @@
 import { isMac } from './keys'
 
-// https://support.typora.io/Shortcut-Keys/；仅为已有功能提供默认值。
+// https://support.typora.io/Shortcut-Keys/; provide defaults only for existing actions.
 export function typoraKeys(id: string, mac = isMac): string[] {
   if (/^editor\.heading[1-6]$/.test(id)) return [`Mod+${id.at(-1)}`]
   const common: Record<string, string[]> = {

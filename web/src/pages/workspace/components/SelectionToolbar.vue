@@ -60,7 +60,7 @@ function change(patch: InlineStyles) {
   run(applyInlineStyles(patch), true)
 }
 
-// 保留 CM 选区，允许面板输入框获得焦点；不用 pointerdown.prevent，以免 WebKit 丢 click。
+// Preserve the CM selection while allowing panel inputs to focus; avoid pointerdown.prevent, which loses clicks in WebKit.
 function sync() {
   cancelAnimationFrame(frame)
   frame = requestAnimationFrame(async () => {

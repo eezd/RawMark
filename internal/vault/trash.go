@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// 调用方持有写锁并已读取验证元数据。先删除内容，失败时保留条目的管理依据。
+// The caller holds the write lock and has validated metadata. Delete contents first, retaining management metadata on failure.
 func (v *Vault) purgeTrashItemLocked(metadata trashMetadata) error {
 	dir := filepath.Join(v.trash, metadata.ID)
 	entries, err := os.ReadDir(dir)
@@ -29,7 +29,7 @@ func (v *Vault) purgeTrashItemLocked(metadata trashMetadata) error {
 		return err
 	}
 	if err := os.Remove(dir); err != nil {
-		// 父目录不可写等原因仍可能阻止最后的 rmdir，恢复元数据以便继续清理。
+		// A non-writable parent or similar error can still block the final rmdir; restore metadata to allow later cleanup.
 		data, _ := json.Marshal(metadata)
 		return errors.Join(err, atomicWrite(metaPath, data))
 	}
@@ -47,8 +47,8 @@ type TrashPurgeResult struct {
 	Failed  []TrashFailure `json:"failed"`
 }
 
-// PurgeTrash 在与恢复相同的写锁内读取元数据并清理。days=0 清空所有；
-// 自动清理的“永不删除”由调用方处理，不调用本方法。
+// PurgeTrash reads metadata and cleans entries under the same write lock as restore. days=0 empties everything;
+// the caller handles automatic cleanup's "never delete" setting by not invoking this method.
 func (v *Vault) PurgeTrash(days int64, now time.Time) (TrashPurgeResult, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -63,7 +63,7 @@ func (v *Vault) PurgeTrash(days int64, now time.Time) (TrashPurgeResult, error) 
 	for _, dir := range dirs {
 		id := dir.Name()
 		if !trashIDPattern.MatchString(id) {
-			continue // 不删除非本程序管理的文件。
+			continue // Do not delete files not managed by this application.
 		}
 		metadata, err := v.readTrashMetadata(id)
 		if err == nil && days > 0 && (metadata.DeletedAt > now.UnixMilli() || (now.UnixMilli()-metadata.DeletedAt)/int64(24*time.Hour/time.Millisecond) < days) {

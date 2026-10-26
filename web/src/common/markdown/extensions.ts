@@ -1,6 +1,6 @@
 import type { BlockContext, LeafBlockParser, Line, MarkdownConfig } from '@lezer/markdown'
-// Typora 扩展语法：==高亮==、$行内公式$、$$公式块$$、脚注、[TOC]、YAML front matter。
-// 上标 ^x^、下标 ~x~、:emoji: 由 @lezer/markdown 自带的扩展解析
+// Typora extensions: ==highlight==, $inline math$, $$math blocks$$, footnotes, [TOC], and YAML front matter.
+// Superscript ^x^, subscript ~x~, and :emoji: use built-in @lezer/markdown extensions.
 import { tags } from '@lezer/highlight'
 import { inlineStyleSyntax } from './inline-styles'
 
@@ -8,7 +8,7 @@ const PUNCTUATION = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~\xA1\u2010-\u2027]/
 
 const highlightDelim = { resolve: 'Highlight', mark: 'HighlightMark' }
 
-/** ==高亮==，定界规则与 GFM 删除线相同 */
+/** ==highlight== uses the same delimiter rules as GFM strikethrough. */
 const Highlight: MarkdownConfig = {
   defineNodes: [
     { name: 'Highlight', style: { 'Highlight/...': tags.special(tags.content) } },
@@ -39,8 +39,8 @@ const Highlight: MarkdownConfig = {
 }
 
 /**
- * $行内公式$（Pandoc 规则）：开头 $ 后不能是空白，结尾 $ 前不能是空白、后面不能紧跟数字，
- * 因此"$5 和 $10"这类金额不会被当成公式；\$ 为转义
+ * $inline math$ follows Pandoc rules: no whitespace after the opening $ or before the closing $, and
+ * no digit immediately after the closing $. Thus "$5 and $10" is not math; \$ is escaped.
  */
 const InlineMath: MarkdownConfig = {
   defineNodes: [
@@ -70,8 +70,8 @@ const InlineMath: MarkdownConfig = {
 const isMathFence = (line: Line) => /^\$\$\s*$/.test(line.text.slice(line.pos))
 
 /**
- * 独占一行的 $$ 之间为公式块，未闭合时延续到文档末尾。只在顶层识别：解析器的公开接口无法判断
- * 下一行是否仍属于引用、列表等容器，与表格一样，容器内的公式块以源码显示
+ * Standalone $$ lines delimit math blocks; unclosed blocks extend to the document end. Recognize only top-level blocks: the public parser
+ * API cannot tell whether the next line remains in a quote/list container, so nested blocks show source, like tables.
  */
 const BlockMath: MarkdownConfig = {
   defineNodes: [
@@ -103,7 +103,7 @@ const BlockMath: MarkdownConfig = {
 
 const FOOTNOTE_LABEL = /^\[\^([^\]\s]+)\]/
 
-/** 脚注引用 [^label] 与脚注定义 [^label]: 内容（定义可跨行，直到空行） */
+/** Footnote references [^label] and definitions [^label]: content; definitions may span lines until a blank line. */
 const Footnote: MarkdownConfig = {
   defineNodes: [
     { name: 'FootnoteReference', style: tags.labelName },
@@ -128,8 +128,8 @@ const Footnote: MarkdownConfig = {
         const m = /^\[\^[^\]\s]+\]:/.exec(leaf.content)
         if (!m) return null
         const self: LeafBlockParser = {
-          // "[^1]: 文字"同时也是合法的链接引用定义；本解析器排在前面，续行时去掉其他候选，整块归为脚注定义。
-          // 须原地修改：调用方正在遍历这个数组
+          // "[^1]: text" is also a valid link reference definition; run this parser first and remove other continuation candidates to keep the entire block a footnote.
+          // Mutate in place because the caller is iterating this array.
           nextLine(_cx, _line, leaf) {
             leaf.parsers.splice(0, leaf.parsers.length, self)
             return false
@@ -148,7 +148,7 @@ const Footnote: MarkdownConfig = {
   ],
 }
 
-/** 独占一行的 [TOC]（不区分大小写）显示为目录 */
+/** A standalone [TOC], case-insensitively, displays a table of contents. */
 const TableOfContents: MarkdownConfig = {
   defineNodes: [{ name: 'TableOfContents', block: true, style: tags.meta }],
   parseBlock: [
@@ -168,8 +168,8 @@ const TableOfContents: MarkdownConfig = {
 const isFrontMatterEnd = (line: Line) => /^(---|\.\.\.)\s*$/.test(line.text)
 
 /**
- * 文档首行为 --- 时，到下一个 --- 或 ... 为 YAML front matter。解析器无法向后预读整个文档，
- * 未闭合时延续到文末——与 Typora（首行输入 --- 即创建 front matter）及 GitHub、Hugo 的识别方式一致
+ * When the first line is ---, YAML front matter runs through the next --- or ... . The parser cannot look ahead
+ * through the whole document, so unclosed front matter extends to the end, matching Typora's immediate creation after --- and GitHub/Hugo recognition.
  */
 const FrontMatter: MarkdownConfig = {
   defineNodes: [

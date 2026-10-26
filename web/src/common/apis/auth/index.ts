@@ -1,7 +1,7 @@
 import type * as Auth from './type'
 import { request } from '@/http/axios'
 
-/** 查询初始化状态。 */
+/** Query initialization status. */
 export function getAuthStateApi() {
   return request<Auth.StateResponseData>({
     url: 'auth/state',
@@ -11,7 +11,7 @@ export function getAuthStateApi() {
   })
 }
 
-/** 签发或刷新登录验证码。 */
+/** Issue or refresh a sign-in captcha. */
 export function getCaptchaApi(data: Auth.CaptchaRequestData) {
   return request<Auth.CaptchaResponseData>({
     url: 'auth/captcha',
@@ -22,7 +22,7 @@ export function getCaptchaApi(data: Auth.CaptchaRequestData) {
   })
 }
 
-/** 初始化登录密码。 */
+/** Initialize the login password. */
 export function setupApi(data: Auth.SetupRequestData) {
   return request<Auth.LoginResponseData>({
     url: 'auth/setup',
@@ -33,7 +33,7 @@ export function setupApi(data: Auth.SetupRequestData) {
   })
 }
 
-/** 使用密码和验证码登录。 */
+/** Sign in with a password and captcha. */
 export function loginApi(data: Auth.LoginRequestData) {
   return request<Auth.LoginResponseData>({
     url: 'auth/login',
@@ -44,7 +44,7 @@ export function loginApi(data: Auth.LoginRequestData) {
   })
 }
 
-/** 恢复当前身份与权限。 */
+/** Restore the current identity and permissions. */
 export function getCurrentUserApi() {
   return request<Auth.IdentityResponseData>({
     url: 'auth/me',
@@ -53,7 +53,7 @@ export function getCurrentUserApi() {
   })
 }
 
-/** 撤销当前服务端会话。 */
+/** Revoke the current server session. */
 export function logoutApi() {
   return request<void>({
     url: 'auth/logout',
@@ -61,7 +61,7 @@ export function logoutApi() {
   })
 }
 
-/** 签发受限资源票据。 */
+/** Issue restricted resource tickets. */
 export function createResourceTicketApi(data: Auth.TicketRequestData) {
   return request<Auth.TicketResponseData>({
     url: 'auth/tickets',
@@ -71,7 +71,7 @@ export function createResourceTicketApi(data: Auth.TicketRequestData) {
   })
 }
 
-/** 修改登录密码。 */
+/** Change the login password. */
 export function changePasswordApi(data: Auth.PasswordRequestData) {
   return request<Auth.PasswordResponseData>({
     url: 'auth/password',

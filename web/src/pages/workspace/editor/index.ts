@@ -20,8 +20,8 @@ import { markdownTheme } from './theme'
 
 export { insertImageFiles, pasteImages } from './paste'
 
-// 在 lang-markdown 的语法集（CommonMark + GFM + 上下标 + emoji）上加 Typora 扩展。
-// 沿用其语言数据，markdownKeymap 中的命令据此识别 Markdown（isActiveAt 按语言数据判断）
+// Add Typora extensions to lang-markdown's syntax set (CommonMark, GFM, superscript/subscript, and emoji).
+// Reuse its language data so markdownKeymap commands recognize Markdown through isActiveAt.
 export const pluginCompartment = new Compartment()
 export const languageCompartment = new Compartment()
 export const preferencesCompartment = new Compartment()
@@ -49,20 +49,20 @@ export interface EditorStateOptions {
   shortcuts?: KeyBinding[]
   resolveImage?: (src: string) => string
   openLink?: (href: string) => void
-  // 文档变化回调，仅对挂载在视图上的状态触发；未激活标签页的状态由调用方直接更新
+  // Notify document changes only for the state mounted in the view; callers update inactive-tab states directly.
   onChange?: (update: ViewUpdate) => void
   extensions?: Extension[]
 }
 
-// 每个打开的笔记各自持有一个 EditorState（含撤销历史），切换标签页时整体替换
+// Each open note owns an EditorState with undo history; replace the entire state on tab switches.
 export function createEditorState(opts: EditorStateOptions): EditorState {
   const extensions: Extension[] = [
     history(),
     localeCompartment.of(editorLocale.of(locale.value)),
     drawSelection(),
     EditorView.lineWrapping,
-    // 不用 lang-markdown 的 markdown()：它会静态引入 lang-html/css/javascript 用于嵌套 HTML 高亮，
-    // 首屏包 gzip 从约 108 KB 增至约 180 KB，而 Live Preview 不需要 HTML 高亮
+    // Avoid lang-markdown's markdown(): its static lang-html/css/javascript imports enable nested HTML highlighting,
+    // increasing the initial gzip bundle from roughly 108 KB to 180 KB, while Live Preview does not need HTML highlighting.
     languageCompartment.of(pluginLanguage()),
     pluginCompartment.of(pluginEditorExtensions()),
     EditorView.exceptionSink.of(reportEditorFailure),
@@ -72,7 +72,7 @@ export function createEditorState(opts: EditorStateOptions): EditorState {
     codeBlockHighlight,
     editorFocus,
     previewCompartment.of(previewExtensions(opts.sourceMode ?? false)),
-    // 可配置操作不再通过 CM 的默认绑定重复注册。
+    // Do not register configurable actions again through CodeMirror's default bindings.
     keymap.of(defaultKeymap.filter(binding => binding.run !== selectAll && binding.run !== indentLess && binding.run !== indentMore && binding.run !== selectParentSyntax && binding.run !== toggleComment)),
     preferencesCompartment.of([
       EditorState.tabSize.of(opts.tabSize ?? 4),

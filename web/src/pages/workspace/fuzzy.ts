@@ -1,9 +1,9 @@
-// 快速切换的模糊匹配。目标形如"目录/标题"，空白分隔的每个词都要命中；
-// 连续命中标题 > 连续命中目录 > 按顺序零散命中（如用首字母找笔记）
+// Quick-switcher fuzzy matching targets "folder/title" and requires every whitespace-separated term to match.
+// Rank contiguous title matches above contiguous folder matches, then ordered scattered matches such as initials.
 
 export interface FuzzyMatch {
   score: number
-  // 命中字符在目标中的下标，用于高亮
+  // Matched character indices in the target, for highlighting.
   positions: number[]
 }
 
@@ -14,7 +14,7 @@ function isBoundary(target: string, i: number): boolean {
 }
 
 function matchTerm(term: string, target: string, lower: string, titleStart: number): FuzzyMatch | null {
-  // 取最后一处连续命中：标题在末尾，优先落在标题上
+  // Use the last contiguous match: the title is at the end and takes priority.
   const at = lower.lastIndexOf(term)
   if (at >= 0) {
     let score = at >= titleStart ? 100 : 50
@@ -30,13 +30,13 @@ function matchTerm(term: string, target: string, lower: string, titleStart: numb
     positions.push(i)
     from = i + 1
   }
-  // 越分散得分越低，命中词首的字符加分
+  // Scattered matches score lower; word-initial matches receive a bonus.
   const spread = positions[positions.length - 1] - positions[0] + 1 - positions.length
   const boundaries = positions.filter(i => isBoundary(target, i)).length
   return { score: Math.max(1, 20 - spread + boundaries * 3), positions }
 }
 
-/** titleStart 为标题在 target 中的起始下标；不匹配时返回 null */
+/** titleStart is the title's starting index in target; return null when unmatched. */
 export function fuzzyMatch(query: string, target: string, titleStart: number): FuzzyMatch | null {
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean)
   if (!terms.length) return null
@@ -49,12 +49,12 @@ export function fuzzyMatch(query: string, target: string, titleStart: number): F
     score += m.score
     m.positions.forEach(p => positions.add(p))
   }
-  // 标题与输入完全一致时排在最前
+  // Exact title/query matches rank first.
   if (lower.slice(titleStart) === query.trim().toLowerCase()) score += 1000
   return { score, positions: [...positions].sort((a, b) => a - b) }
 }
 
-/** 按命中与否把文本切成连续片段，用于高亮 */
+/** Split text into contiguous matched/unmatched fragments for highlighting. */
 export function segments(text: string, hits: Set<number>) {
   const out: { text: string, hit: boolean }[] = []
   for (let i = 0; i < text.length; i++) {

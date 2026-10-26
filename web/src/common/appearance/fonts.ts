@@ -13,7 +13,7 @@ export function applyFontCatalog(fonts: CustomFont[]) {
   if (!style) {
     style = document.createElement('style'); style.id = 'rm-custom-fonts'; document.head.append(style)
   }
-  // 名称仅用于界面；CSS 标识和资源路径只由服务端内容哈希构成。
+  // Names are display-only; CSS identifiers and resource paths use only server-generated content hashes.
   const css = fonts.map(font => `@font-face { font-family: '${font.id}'; src: url('${fontResourceRoot()}${font.id}/file'); font-display: block; }`).join('\n')
   if (style.textContent !== css) style.textContent = css
 }

@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-// LogWriter 保留三份各不超过 10 MiB 的应用日志，权限 0600。
+// LogWriter retains three application log files of at most 10 MiB each, with mode 0600.
 type LogWriter struct {
 	mu   sync.Mutex
 	dir  string
@@ -66,7 +66,7 @@ func (l *LogWriter) Write(p []byte) (int, error) {
 }
 func (l *LogWriter) Close() error { l.mu.Lock(); defer l.mu.Unlock(); return l.file.Close() }
 
-// Snapshot 读取当前日志的稳定副本，避免导出与日志轮转竞争。
+// Snapshot reads stable copies of current logs to avoid races with rotation during export.
 func (l *LogWriter) Snapshot(dest string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()

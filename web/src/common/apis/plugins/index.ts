@@ -1,7 +1,7 @@
 import type * as Plugins from './type'
 import { request } from '@/http/axios'
 
-/** 读取已安装插件。 */
+/** List installed plugins. */
 export function getPluginsApi() {
   return request<Plugins.PluginsResponseData>({
     url: 'plugins',
@@ -10,7 +10,7 @@ export function getPluginsApi() {
   })
 }
 
-/** 安装插件 ZIP。 */
+/** Install a plugin ZIP. */
 export function installPluginApi(file: File) {
   const data = new FormData()
   data.append('file', file)
@@ -22,7 +22,7 @@ export function installPluginApi(file: File) {
   })
 }
 
-/** 启用或停用插件。 */
+/** Enable or disable a plugin. */
 export function togglePluginApi(data: Plugins.TogglePluginRequestData) {
   return request<Plugins.PluginResponseData>({
     url: `plugins/${encodeURIComponent(data.id)}`,
@@ -32,7 +32,7 @@ export function togglePluginApi(data: Plugins.TogglePluginRequestData) {
   })
 }
 
-/** 卸载插件并保留插件数据。 */
+/** Uninstall a plugin while retaining its data. */
 export function uninstallPluginApi(id: string) {
   return request<Plugins.PluginOperationResponseData>({
     url: `plugins/${encodeURIComponent(id)}`,
@@ -41,7 +41,7 @@ export function uninstallPluginApi(id: string) {
   })
 }
 
-/** 读取插件存储。 */
+/** Read plugin storage. */
 export function getPluginDataApi(id: string) {
   return request<Plugins.PluginDataResponseData>({
     url: `plugins/${encodeURIComponent(id)}/data`,
@@ -50,7 +50,7 @@ export function getPluginDataApi(id: string) {
   })
 }
 
-/** 保存插件存储。 */
+/** Save plugin storage. */
 export function savePluginDataApi(data: Plugins.PluginDataRequestData) {
   return request<Plugins.PluginDataResponseData>({
     url: `plugins/${encodeURIComponent(data.id)}/data`,

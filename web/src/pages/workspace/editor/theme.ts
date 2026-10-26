@@ -1,7 +1,7 @@
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
 
-// 编辑器排版样式在 themes/base.css 中以 CSS 变量定义，这里只做语法元素到类名的映射
+// Editor typography uses CSS variables in common/appearance/base.css; this module maps syntax elements to class names only.
 const markdownHighlight = HighlightStyle.define([
   { tag: t.emphasis, fontStyle: 'italic' },
   { tag: t.strong, fontWeight: '600' },

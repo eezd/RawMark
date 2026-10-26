@@ -11,7 +11,7 @@ import { fuzzyMatch, segments } from '../fuzzy'
 import { minimalPaths } from '../selection'
 import { move, ws } from '../workspace'
 
-// 「移动到…」：选择目标文件夹（手机上没有拖放，电脑上也比拖放快）
+// "Move to..." selects a destination folder, supporting phones without drag-and-drop and faster desktop moves.
 const props = defineProps<{ path: string | string[] }>()
 const emit = defineEmits<{ close: [] }>()
 

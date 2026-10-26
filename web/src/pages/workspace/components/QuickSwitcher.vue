@@ -17,9 +17,9 @@ interface Item {
   key: string
   icon: 'note' | 'noteAdd' | 'command'
   title: string
-  // 笔记为所在目录，命令为快捷键
+  // Parent folder for notes; shortcut for commands.
   detail: string
-  // 命中字符在标题、目录中的下标
+  // Indices of matched characters in the title and folder.
   titleHits: Set<number>
   detailHits: Set<number>
   run: () => void
@@ -29,10 +29,10 @@ const input = ref<InputInstance>()
 const list = ref<HTMLElement>()
 const query = ref(ws.switcher ?? '')
 const selected = ref(0)
-// 以 > 开头时列出命令（与 VS Code 一致），删掉 > 回到找笔记
+// A leading > lists commands, matching VS Code; remove it to search notes again.
 const commandMode = computed(() => query.value.startsWith('>'))
 
-// 取消时把焦点还给打开前的元素（通常是编辑器）
+// On cancellation, return focus to the element that opened the switcher, usually the editor.
 const previousFocus = document.activeElement as HTMLElement | null
 function close() {
   ws.switcher = null
@@ -59,7 +59,7 @@ function noteItems(q: string): Item[] {
     }
   }
   if (!q) {
-    // 最近打开的在前（当前笔记除外，回车即回到上一篇），其余按修改时间
+    // Recently opened notes first, excluding the current note so Enter returns to the previous one; sort others by modification time.
     const rank = (p: string) => recentRank.get(p) ?? Infinity
     const mtime = new Map(notes.map(e => [e.path, e.mtime]))
     return notes
@@ -79,7 +79,7 @@ function noteItems(q: string): Item[] {
     (a, b) => b.score - a.score || (recentRank.get(a.path) ?? Infinity) - (recentRank.get(b.path) ?? Infinity) || a.path.length - b.path.length,
   )
   const items = scored.slice(0, MAX_ITEMS).map(s => toItem(s.path, s.positions))
-  // 没有同名笔记时提供"新建"；输入中的 / 表示目录
+  // Offer "Create" when no note has the same name; / in the input denotes folders.
   const name = q.replace(/\.md$/i, '')
   const path = name + NOTE_EXT
   if (
@@ -115,7 +115,7 @@ function commandItems(q: string): Item[] {
     .filter(c => c.id !== 'app.commandPalette')
     .map((c, order) => ({ c, order, m: q ? fuzzyMatch(q, c.title, 0) : { score: 0, positions: [] } }))
     .filter(x => x.m)
-  // 无输入时最近用过的在前，其余保持注册顺序
+  // With no query, show recently used commands first and preserve registration order for the rest.
   scored.sort((a, b) => b.m!.score - a.m!.score || rank(a.c.id) - rank(b.c.id) || a.order - b.order)
   return scored.map(({ c, m }) => ({
     key: c.id,

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 describe('快捷键', () => {
   it('windows 上 Ctrl+Y 为重做', async () => {
-    // CodeMirror 在模块加载时读取平台，需先设置再导入
+    // CodeMirror reads the platform at module load; configure it before importing.
     Object.defineProperty(navigator, 'platform', { value: 'Win32', configurable: true })
     const { undo } = await import('@codemirror/commands')
     const { EditorView, runScopeHandlers } = await import('@codemirror/view')

@@ -95,7 +95,7 @@ func TestImportImageDownloadAndRedirects(t *testing.T) {
 	transport := original.Transport.(*http.Transport).Clone()
 	dial := transport.DialContext
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
-		// 只把固定的测试来源映射到本地真实 HTTP 服务，其他目标仍走生产地址校验。
+		// Map only the fixed test origin to a real local HTTP server; other destinations retain production address validation.
 		if address == "images.example:80" {
 			return (&net.Dialer{}).DialContext(ctx, network, source.Listener.Addr().String())
 		}

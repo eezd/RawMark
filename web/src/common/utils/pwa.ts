@@ -25,7 +25,7 @@ export async function installApp() {
 }
 
 export async function registerPwa() {
-  // 开发服务器不注册，避免外壳缓存干扰热更新。
+  // Do not register on the development server, where shell caching would interfere with hot updates.
   if (!import.meta.env.PROD || !('serviceWorker' in navigator) || !window.isSecureContext) return
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
@@ -40,7 +40,7 @@ export async function registerPwa() {
     trackInstalling()
     registration.addEventListener('updatefound', trackInstalling)
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      // 其他标签页激活新版时，本页也保留手动更新入口。
+      // Keep the manual update entry point when another tab activates the new version.
       waitingWorker.value = navigator.serviceWorker.controller
     })
     const checkUpdate = () => {
@@ -50,7 +50,7 @@ export async function registerPwa() {
     }
     document.addEventListener('visibilitychange', checkUpdate)
     window.addEventListener('online', checkUpdate)
-    // 新旧页面报告入口哈希，确认所有页面均已更新后才回收旧资源。
+    // Old and new pages report entry hashes; reclaim old resources only after every page updates.
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data === 'SHELL_ENTRY') {
         const script = document.querySelector<HTMLScriptElement>('script[type="module"][src]')!

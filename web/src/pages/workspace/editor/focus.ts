@@ -2,9 +2,9 @@ import type { EditorView, ViewUpdate } from '@codemirror/view'
 import { StateEffect, StateField } from '@codemirror/state'
 import { ViewPlugin } from '@codemirror/view'
 
-// 编辑器焦点状态。块级渲染组件（表格、公式块、Mermaid）由 StateField 提供，拿不到视图的焦点，
-// 由视图插件把焦点变化同步进状态：获得焦点且光标在块内时显示源码，否则渲染
-// （打开笔记时光标默认在文首，不应因此展开开头的块）
+// Editor focus state. StateField-based block widgets (tables, math, Mermaid) cannot access view focus directly,
+// so a view plugin syncs focus into state: show source only when focused with the cursor inside the block; otherwise render.
+// Opening a note places the cursor at the start and must not expand its first block by itself.
 export const setEditorFocus = StateEffect.define<boolean>()
 
 export const editorFocused = StateField.define<boolean>({
@@ -27,7 +27,7 @@ const focusTracker = ViewPlugin.fromClass(
       if (u.focusChanged) this.sync()
     }
 
-    // 不能在 update 中同步 dispatch，推迟到微任务
+    // Do not dispatch synchronously inside update; defer to a microtask.
     sync() {
       queueMicrotask(() => {
         const focused = this.view.hasFocus

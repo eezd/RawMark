@@ -11,9 +11,9 @@ import { activeTab, attachView, editorStateOf, noteRefOf, revealPending, storeVi
 const host = ref<HTMLElement>()
 const tab = computed(activeTab)
 let view: EditorView
-// 当前显示的笔记（以身份对象标识，重命名后不变）及各笔记的滚动位置。
-// 优先用滚动快照（锚定文档位置）：重设状态后视口外的行高会重新估算，单靠 scrollTop 会偏移几行；
-// 快照只对同一文档有效，笔记在后台被外部修改时退回 scrollTop
+// The displayed note (identified by an identity object that survives renaming) and each note's scroll position.
+// Prefer document-anchored scroll snapshots: resetting state reestimates offscreen line heights, so scrollTop alone may drift by several lines.
+// Snapshots apply only to the same document; fall back to scrollTop when external changes update a background note.
 interface ScrollPosition {
   doc: Text
   snapshot: StateEffect<unknown>
@@ -34,11 +34,11 @@ function show() {
     shown = undefined
     return
   }
-  // 切换笔记，或该笔记的状态在别处被整体替换（如恢复草稿）时才重设
+  // Reset only on note switches or when another operation replaces the entire state, such as draft restoration.
   if (shown !== ref || state.doc !== view.state.doc) {
     view.setState(state)
     const pos = scrollPositions.get(ref)
-    // 等一帧：v-show 在此回调之后才取消 display:none，隐藏状态下无法滚动和聚焦
+    // Wait one frame: v-show removes display:none after this callback, and hidden elements cannot scroll or focus.
     requestAnimationFrame(() => {
       if (shown !== ref || revealPending(view, ref.path)) return
       if (pos?.doc === view.state.doc) view.dispatch({ effects: pos.snapshot })

@@ -1,26 +1,26 @@
 import antfu from '@antfu/eslint-config'
 
-// 更多自定义配置可查阅仓库：https://github.com/antfu/eslint-config
+// For more custom configuration, see https://github.com/antfu/eslint-config.
 export default antfu(
   {
-    // 使用外部格式化程序格式化 css、html、markdown 等文件
+    // Use external formatters for CSS, HTML, Markdown, and similar files.
     formatters: true,
-    // 启用样式规则
+    // Enable stylistic rules.
     stylistic: {
-      // 缩进级别
+      // Indentation width.
       indent: 2,
-      // 引号风格 'single' | 'double'
+      // Quote style: 'single' | 'double'.
       quotes: 'single',
-      // 是否启用分号
+      // Whether to require semicolons.
       semi: false,
     },
-    // 忽略文件
+    // Ignored files.
     ignores: ['dist/**', 'types/auto/**', 'public/**', 'src/common/appearance/fonts/**', 'src/common/appearance/maple-font.css', 'LICENSE'],
   },
   {
-    // 对所有文件都生效的规则
+    // Rules applied to all files.
     rules: {
-      // 保留项目现有紧凑分支及浏览器原生危险操作确认。
+      // Preserve existing compact branches and native browser confirmation for destructive actions.
       'style/max-statements-per-line': 'off',
       'no-alert': 'off',
       // vue

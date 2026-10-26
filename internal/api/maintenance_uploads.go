@@ -181,7 +181,7 @@ func (s *Server) appendMaintenanceUpload(w http.ResponseWriter, r *http.Request)
 }
 func backupResourceError(err error) error {
 	var pathError *os.PathError
-	// 缺失文件或文件／目录类型错误来自归档内容；其他磁盘故障仍由服务端处理。
+	// Missing files or file/directory type mismatches are archive errors; other disk failures remain server errors.
 	if errors.As(err, &pathError) && !errors.Is(pathError, os.ErrNotExist) && !errors.Is(pathError, syscall.ENOTDIR) && !errors.Is(pathError, syscall.EISDIR) {
 		return err
 	}
@@ -368,7 +368,7 @@ type cleanupResult struct {
 func (s *Server) clearTemp(w http.ResponseWriter, r *http.Request) {
 	result := cleanupResult{Failed: []string{}}
 	err := s.maintain("clean_temporary_files_af91ae", func() error {
-		// temp 为进程专属目录，普通 API 与维护已排空；恢复包和回退备份在其他目录。
+		// temp belongs to this process; ordinary APIs and maintenance have drained. Restore archives and rollback backups live elsewhere.
 		temp, err := s.tempDir()
 		if err != nil {
 			return err
@@ -381,7 +381,7 @@ func (s *Server) clearTemp(w http.ResponseWriter, r *http.Request) {
 		for _, entry := range entries {
 			targets = append(targets, filepath.Join(temp, entry.Name()))
 		}
-		// 只清理过期未使用上传；当前会话新上传和待恢复内容不会被清除。
+		// Clean only expired unused uploads; retain new uploads from the current session and pending restore contents.
 		uploads := filepath.Join(s.DataDir, ".maintenance", "uploads")
 		entries, err = os.ReadDir(uploads)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -450,7 +450,7 @@ func (s *Server) clearTemp(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, result)
 }
 
-// 仅用于服务启动前读取恢复结果，不以空响应伪装已恢复。
+// Read restore results only before service startup; never disguise an empty response as a completed restore.
 func (s *Server) SetRestoreFailure(err error) {
 	s.maintenanceStatusMu.Lock()
 	defer s.maintenanceStatusMu.Unlock()

@@ -143,7 +143,7 @@ func TestTrashRetentionAndInvalidMetadata(t *testing.T) {
 			t.Fatalf("不应删除未过期/无效条目: %v", err)
 		}
 	}
-	// 极大天数不应溢出成过期期限。
+	// Very large day counts must not overflow into an expired retention period.
 	result, err = v.PurgeTrash(1<<53-1, now)
 	if err != nil || len(result.Deleted) != 0 || len(result.Failed) != 1 {
 		t.Fatalf("极大期限: %+v, %v", result, err)

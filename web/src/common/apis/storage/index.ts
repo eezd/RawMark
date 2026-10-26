@@ -1,7 +1,7 @@
 import type * as Storage from './type'
 import { request } from '@/http/axios'
 
-/** 统计实际存储占用。 */
+/** Measure actual storage usage. */
 export function getStorageApi() {
   return request<Storage.StorageResponseData>({
     url: 'storage',

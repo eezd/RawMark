@@ -26,7 +26,7 @@ export interface HostModules {
 export interface PluginCommand {
   id: string
   title: string
-  /** 保留声明兼容；默认不绑定，请用户在设置中添加快捷键。 */
+  /** Retain declaration compatibility; do not bind by default. Users can add shortcuts in settings. */
   keys?: string[]
   when?: () => boolean
   run: () => Awaitable<void>

@@ -292,7 +292,7 @@ export interface SettingSearchResult {
   description: string
 }
 
-/** 只搜索设置说明，不读取设置值、笔记或管理列表。 */
+/** Search setting descriptions only, without reading values, notes, or management lists. */
 export function searchSettings(query: string): SettingSearchResult[] {
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
   if (!terms.length) return []

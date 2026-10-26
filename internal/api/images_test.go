@@ -79,7 +79,7 @@ func TestReplaceImageAPI(t *testing.T) {
 	if err != nil || string(data) != "![](assets/a.png)" {
 		t.Fatalf("替换不应改变引用：%q %v", data, err)
 	}
-	// 复用现有移动与回收站接口，图片不会被当作 Markdown 正文读取。
+	// Reuse move and recycle-bin endpoints without reading images as Markdown text.
 	if code := f.status(f.admin, "POST", "/api/v1/move", `{"from":"assets/a.png","to":"assets/b.png"}`, nil); code != 200 {
 		t.Fatal(code)
 	}

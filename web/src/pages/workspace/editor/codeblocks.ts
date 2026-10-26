@@ -8,7 +8,7 @@ import { StateEffect, StateField } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin } from '@codemirror/view'
 
 interface CodeBlock {
-  // 代码内容（不含围栏行）在文档中的范围
+  // Document range of code contents, excluding fence lines.
   from: number
   to: number
   lang: string
@@ -17,7 +17,7 @@ interface CodeBlock {
 
 const setBlockTokens = StateEffect.define<{ from: number, to: number, decorations: Range<Decoration>[] }>()
 
-// 高亮结果作为 StateField 保存并随编辑映射位置：Worker 返回新结果前沿用旧颜色，避免闪烁
+// Keep highlighting in a StateField and map positions through edits; retain old colors until the Worker responds to avoid flashing.
 const codeTokenField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update(value, tr) {
@@ -72,7 +72,7 @@ export function fenceLanguage(state: EditorState, infoFrom: number, infoTo: numb
   return state.sliceDoc(infoFrom, infoTo).trim().split(/\s/)[0].toLowerCase()
 }
 
-// 围栏代码块的内容范围（不含围栏行）；有闭合围栏时到闭合行之前为止，否则到块尾
+// Fenced-code content range, excluding fence lines; stop before the closing line if present, otherwise at the block end.
 export function codeContentRange(state: EditorState, node: SyntaxNode): { from: number, to: number } {
   const open = state.doc.lineAt(node.from)
   const marks = node.getChildren('CodeMark')
@@ -87,7 +87,7 @@ export function fencedCodeAt(state: EditorState, pos: number): SyntaxNode | null
   return null
 }
 
-// Ctrl/Cmd+A：光标在代码块内时先选中整块代码，已选中整块时交给默认的全选
+// Ctrl/Cmd+A first selects the current code block's contents; when already selected, defer to normal select-all.
 export function selectCodeBlock(view: EditorView): boolean {
   const { state } = view
   const main = state.selection.main
@@ -124,7 +124,7 @@ function visibleCodeBlocks(view: EditorView): CodeBlock[] {
 
 const codeHighlighter = ViewPlugin.fromClass(
   class {
-    // 已应用到各代码块的结果键，按块起点记录
+    // Result keys applied to code blocks, indexed by block start.
     applied = new Map<number, string>()
     destroyed = false
 
@@ -141,7 +141,7 @@ const codeHighlighter = ViewPlugin.fromClass(
       if (u.docChanged || u.viewportChanged || syntaxTree(u.startState) !== syntaxTree(u.state)) this.schedule()
     }
 
-    // 不能在 update 中同步 dispatch，推迟到微任务
+    // Do not dispatch synchronously inside update; defer to a microtask.
     schedule() {
       queueMicrotask(() => this.sync())
     }
@@ -161,9 +161,9 @@ const codeHighlighter = ViewPlugin.fromClass(
           this.applied.set(block.from, key)
           effects.push(setBlockTokens.of({ from: block.from, to: block.to, decorations: tokensToDecorations(block, cached) }))
         } else {
-          // 结果到达后再走一次 sync，届时命中缓存；期间文档若已变化，键不同则自然重算
+          // Run sync again when results arrive to hit the cache; changed document keys naturally trigger recalculation.
           requestTokens(block.lang, block.code).then(() => this.schedule()).catch((error) => {
-            // 本次内容失败后不随每次光标移动重试，修改代码或语言后重新请求。
+            // Do not retry failed content on every cursor movement; request again after code or language changes.
             if (!this.destroyed) this.applied.set(block.from, key)
             console.error('代码高亮失败', error)
           })

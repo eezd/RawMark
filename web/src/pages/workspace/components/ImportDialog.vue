@@ -46,13 +46,13 @@ async function submit() {
   busy.value = true
   error.value = ''
   try {
-    // 支持修改普通 Markdown 的目标文件名，以便处理同名冲突。
+    // Allow changing plain Markdown destination filenames to resolve name conflicts.
     const uploads = zipped.value ? files.value : files.value.map((file, i) => new File([file], names.value[i], { type: file.type }))
     result.value = await importNotes(props.dir, zipped.value ? folder.value.trim() : '', uploads)
     for (const p of result.value.paths) {
       for (let d = zipped.value ? p : dirname(p); d; d = dirname(d)) expanded.add(d)
     }
-    // 导入文件成功后释放浏览器持有的文件，结果仍保留在弹窗中。
+    // Release browser-held files after a successful import while retaining results in the dialog.
     files.value = []
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : translate('workspace.network_error_import_status_is_fb8726')

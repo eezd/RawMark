@@ -1,21 +1,21 @@
 import { defineConfig, presetAttributify, presetWind3 } from 'unocss'
 
 export default defineConfig({
-  // 预设
+  // Presets.
   presets: [
-    // 属性化模式 & 无值的属性模式
+    // Attributify mode and valueless attributes.
     presetAttributify({
       prefix: 'un-',
       prefixedOnly: false,
     }),
-    // 默认预设
+    // Default preset.
     presetWind3({
       important: '#app',
     }),
   ],
-  // 自定义规则
+  // Custom rules.
   rules: [],
-  // 自定义快捷方式
+  // Custom shortcuts.
   shortcuts: {
     'wh-full': 'w-full h-full',
     'flex-center': 'flex justify-center items-center',

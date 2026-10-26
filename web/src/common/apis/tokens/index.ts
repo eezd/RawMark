@@ -1,7 +1,7 @@
 import type * as Tokens from './type'
 import { request } from '@/http/axios'
 
-/** 读取 API 令牌列表。 */
+/** List API tokens. */
 export function getTokensApi() {
   return request<Tokens.TokensResponseData>({
     url: 'tokens',
@@ -10,7 +10,7 @@ export function getTokensApi() {
   })
 }
 
-/** 创建 API 令牌。 */
+/** Create an API token. */
 export function createTokenApi(data: Tokens.CreateTokenRequestData) {
   return request<Tokens.CreateTokenResponseData>({
     url: 'tokens',
@@ -20,7 +20,7 @@ export function createTokenApi(data: Tokens.CreateTokenRequestData) {
   })
 }
 
-/** 撤销 API 令牌。 */
+/** Revoke an API token. */
 export function deleteTokenApi(id: string) {
   return request<Tokens.DeleteTokenResponseData>({
     url: `tokens/${encodeURIComponent(id)}`,

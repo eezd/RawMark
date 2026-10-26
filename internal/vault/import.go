@@ -28,7 +28,7 @@ const (
 
 var ErrInvalidImport = i18n.New("invalid_import_contents_ed556a")
 
-// ImportFile 的读取范围是单个上传文件，ZIP 与普通 Markdown 共用这一输入边界。
+// ImportFile bounds reads to one uploaded file; ZIP and plain Markdown share this input boundary.
 type ImportFile struct {
 	Name   string
 	Reader io.ReaderAt
@@ -43,7 +43,7 @@ type ImportResult struct {
 	WarningMessages []*i18n.Error `json:"-"`
 }
 
-// Import 在隐藏目录内整理完整内容，提交前统一检查冲突，绝不覆盖已有文件。
+// Import prepares complete contents in a hidden directory and checks all conflicts before commit, never overwriting existing files.
 func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFile) (result ImportResult, err error) {
 	result = ImportResult{Paths: []string{}, Warnings: []string{}}
 	if len(files) == 0 || len(files) > maxImportEntries {
@@ -82,7 +82,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 	entries := map[string]struct{}{}
 	var total int64
 	var notes []string
-	// 每个来源文件只写一次；目录与文件重名也会在暂存阶段报错。
+	// Write each source file once; file/directory name collisions also fail during staging.
 	write := func(name string, isDir bool, reader io.Reader) error {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -140,7 +140,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 		for _, f := range z.File {
 			if f.Name == ".rawmark-export/missing-assets.json" {
 				continue
-			} // 本程序笔记导出的缺失附件报告，不作为笔记导入。
+			} // Do not import RawMark's missing-attachment export report as a note.
 			if !f.Mode().IsRegular() && !f.Mode().IsDir() {
 				return result, i18n.New("w_zip_cannot_contain_symlinks_5f596f", ErrInvalidImport)
 			}
@@ -207,7 +207,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 			return result, err
 		}
 	}
-	// 所有笔记改链完成后再清理已迁移的原图，避免后处理的笔记读取不到共享来源。
+	// Clean migrated source images only after rewriting all notes, so later notes can still read shared sources.
 	if len(migrated) > 0 {
 		used := map[string]bool{}
 		for _, note := range notes {
@@ -232,7 +232,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 		}
 	}
 	result.Notes = len(notes)
-	// 附件数量为最终保留的文件，包含目录共享图片与其他原始附件。
+	// The attachment count covers final retained files, including folder-shared images and other original attachments.
 	count := 0
 	err = filepath.WalkDir(stage, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -296,7 +296,7 @@ func (v *Vault) Import(ctx context.Context, dir, folder string, files []ImportFi
 		return result, err
 	}
 	if zipped {
-		// 暂存目录与仓库位于同一文件系统，整个 ZIP 一次 rename 发布。
+		// Staging and the vault share a filesystem; publish the entire ZIP import with one rename.
 		err = os.Rename(stage, filepath.Join(parent, folder))
 	} else {
 		var published []string

@@ -13,7 +13,7 @@ export class ApiError extends Error {
 interface RequestConfig extends Omit<AxiosRequestConfig<unknown>, 'auth'> {
   anonymous?: boolean
   errorOwner?: 'request' | 'caller'
-  /** 原文和下载需要 ETag、Content-Disposition 等响应头。 */
+  /** Raw files and downloads need response headers such as ETag and Content-Disposition. */
   returnResponse?: boolean
 }
 const instance = axios.create({ baseURL: '/api/v1', adapter: 'fetch', withCredentials: false })

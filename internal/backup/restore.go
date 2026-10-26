@@ -17,8 +17,8 @@ import (
 	sqlite3 "modernc.org/sqlite/lib"
 )
 
-// RestoreRecord 必须在关闭 HTTP、文件监听、索引和数据库之后执行。
-// prepared 尚未改动活动数据，applying 表示上次中断，必须先回退。
+// RestoreRecord must run after HTTP, file watching, indexing, and databases have shut down.
+// prepared means active data is unchanged; applying indicates an interrupted restore that must first roll back.
 type RestoreRecord struct {
 	State  string `json:"state"`
 	Kind   string `json:"kind,omitempty"`
@@ -70,7 +70,7 @@ func Pending(data string) (bool, error) {
 }
 
 func CheckDatabase(file string) error {
-	// 先检查文件签名，Open 的 schema 初始化不能将错误文件伪装为新实例。
+	// Check file signatures first so Open's schema initialization cannot disguise an invalid file as a new instance.
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -122,7 +122,7 @@ func CheckDatabase(file string) error {
 	return nil
 }
 
-// VaultExcluded 支持外置与嵌套仓库，避免将应用文件重复备份为笔记。
+// VaultExcluded supports external and nested vaults, avoiding duplicate application files in note backups.
 func VaultExcluded(data, vault, rel string) bool {
 	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
 		if strings.HasPrefix(part, ".rawmark-tmp-") {
@@ -164,7 +164,7 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	return errors.Join(err, out.Close())
 }
 
-// CopyTree 不覆盖任何已有目标，也不允许跟随链接。
+// CopyTree never overwrites an existing destination or follows symlinks.
 func CopyTree(src, dest string) error {
 	return filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -205,7 +205,7 @@ func clearVault(data, root, dir string) error {
 		if VaultExcluded(data, root, rel) {
 			continue
 		}
-		// data 在某个祖先目录内时保留祖先，只清理其余子项。
+		// When data lies inside an ancestor directory, keep that ancestor and clean only the other children.
 		if entry.IsDir() && strings.HasPrefix(data, full+string(filepath.Separator)) {
 			if err = clearVault(data, root, full); err != nil {
 				return err
@@ -258,7 +258,7 @@ func apply(data, vault, stage string) error {
 	return errors.Join(err, st.Close())
 }
 
-// Recover 在启动时完成预先确认的恢复；若中断或失败，使用操作前备份回退。
+// Recover performs a previously confirmed restore at startup, reverting to the pre-operation backup on interruption or failure.
 func Recover(data, vault string) (err error) {
 	raw, err := os.ReadFile(recordPath(data))
 	if errors.Is(err, os.ErrNotExist) {
@@ -274,7 +274,7 @@ func Recover(data, vault string) (err error) {
 	if record.State != "prepared" && record.State != "applying" && record.State != "verifying" {
 		return i18n.New("invalid_restore_record_state_eee063")
 	}
-	// 记录由本机生成；仍限制其读取范围，避免错误记录读取任意文件。
+	// The record is locally generated, but restrict its read scope to prevent malformed records from reading arbitrary files.
 	if !strings.HasPrefix(record.Stage, filepath.Join(data, ".maintenance", "uploads")+string(filepath.Separator)) || !strings.HasPrefix(record.Backup, filepath.Join(data, "backups")+string(filepath.Separator)) {
 		return i18n.New("invalid_restore_record_path_611881")
 	}
@@ -315,7 +315,7 @@ func Recover(data, vault string) (err error) {
 	return nil
 }
 
-// FinishRecovery 在新实例的索引、监听与端口初始化成功后提交恢复。
+// FinishRecovery commits the restore after the new instance's index, watcher, and listener initialize successfully.
 func FinishRecovery(data string) error {
 	raw, err := os.ReadFile(recordPath(data))
 	if errors.Is(err, os.ErrNotExist) {

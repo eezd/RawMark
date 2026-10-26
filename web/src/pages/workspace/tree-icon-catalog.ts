@@ -149,7 +149,7 @@ export const emojiCategories = [
   }, icon: '🏳️' },
 ]
 
-// 常见图标的显示标签在使用时翻译，避免缓存语言切换前的文案。
+// Translate common icon labels at use time so locale changes do not retain cached text.
 const keywordKeys: Record<string, string> = {
   '📂': 'workspace.folder_directory_open_3744fe',
   '📁': 'workspace.folder_directory_796213',

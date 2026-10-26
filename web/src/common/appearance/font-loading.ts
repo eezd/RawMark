@@ -1,5 +1,5 @@
 import { t as translate } from '@@/i18n/runtime'
-// 使用浏览器实际排版触发的字体集合，覆盖首屏、切换笔记与后来出现的字形。
+// Use the font set requested by actual browser layout, covering initial render, note switches, and later glyphs.
 export function watchFontLoading() {
   const root = document.documentElement
   const fonts = document.fonts
@@ -22,7 +22,7 @@ export function watchFontLoading() {
 
   function ready() {
     if (root.dataset.rmFonts === 'error') return
-    // fonts.ready 在下载失败时也会完成，不能将失败当作字体已就绪。
+    // fonts.ready also resolves after download failure; failure must not count as fonts being ready.
     if ([...fonts].some(font => font.status === 'error')) failed()
     else if (fonts.status === 'loaded') root.dataset.rmFonts = 'ready'
   }
@@ -34,7 +34,7 @@ export function watchFontLoading() {
   })
   fonts.addEventListener('loadingerror', failed)
 
-  // 挂载完成后触发一次排版，确保等待的是当前文字用到的字体。
+  // Trigger layout after mounting so the wait covers fonts used by the current text.
   requestAnimationFrame(() => {
     document.body.getBoundingClientRect()
     void fonts.ready.then(ready)

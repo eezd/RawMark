@@ -10,10 +10,10 @@ import { editorFocused, setEditorFocus } from './focus'
 import { editorLocale } from './locale'
 import { CodeRendererWidget, MathWidget } from './widgets'
 
-// 公式块与 Mermaid 图表：未编辑时整块替换为渲染结果；光标在块内时显示源码，并在下方实时预览。
-// 跨行的块级替换只能由 StateField 提供；与表格一样只处理顶层的块
+// Math and Mermaid blocks render as replacements while inactive; show source and a live preview below when the cursor enters the block.
+// Multiline block replacements must come from StateField; handle only top-level blocks, as with tables.
 
-/** 返回块的源码内容及其相对块起点的偏移（点击渲染结果时光标落在内容开头） */
+/** Return block source and its offset from the block start so clicking rendered output places the cursor at the content start. */
 function blockContent(state: EditorState, node: SyntaxNode): { text: string, offset: number, language?: string } | null {
   if (node.name === 'BlockMath') {
     const marks = node.getChildren('BlockMathMark')

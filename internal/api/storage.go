@@ -39,8 +39,8 @@ func (s *Server) getStorage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, usage)
 }
 
-// 只统计普通文件逻辑字节，不跟随内部符号链接；外置仓库单独扫描。
-// 两个根互相嵌套时，各自由更具体的根负责，避免重复计算。
+// Count logical bytes of regular files only, without following internal symlinks; scan external vaults separately.
+// For nested roots, assign each file to the more specific root to avoid double counting.
 func scanStorage(ctx context.Context, dataDir, vaultDir string) (storageUsage, error) {
 	usage := storageUsage{Categories: []storageCategory{{ID: "vault"}, {ID: "databases"}, {ID: "fonts"}, {ID: "themes"}, {ID: "plugins"}, {ID: "other"}}}
 	if dataDir == "" {
@@ -80,7 +80,7 @@ func scanStorage(ctx context.Context, dataDir, vaultDir string) (storageUsage, e
 			}
 			if walkErr != nil {
 				if path != root && errors.Is(walkErr, fs.ErrNotExist) {
-					return nil // 文件可能在扫描期间被移动或删除。
+					return nil // Files may move or disappear during the scan.
 				}
 				return walkErr
 			}

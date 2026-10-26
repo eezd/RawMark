@@ -90,7 +90,7 @@ func TestTreeIconsPersistFollowSubtreeAndTrash(t *testing.T) {
 	if got := treeIcons(t, v); !reflect.DeepEqual(got, want) {
 		t.Fatalf("恢复默认失败: %v", got)
 	}
-	// 原有无图标的回收站条目也可恢复。
+	// Legacy recycle-bin entries without icons remain restorable.
 	item, err = v.Delete("replacement")
 	if err != nil {
 		t.Fatal(err)

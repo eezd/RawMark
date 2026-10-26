@@ -2,7 +2,7 @@
 
 ## 语言与沟通
 
-- 回复使用简体中文；注释、文档字符串、日志和错误信息遵循项目既有语言约定，无约定时优先使用简体中文。
+- 回复使用简体中文；代码注释、文档字符串及配置/脚本中的注释统一使用英文。日志和错误信息遵循项目既有语言约定，无约定时优先使用简体中文。
 - 命名使用清晰英文；Git commit 标题与正文使用英文并遵循项目约定。
 - Git commit 不得添加 Claude、Claude Code、AI 助手等作为 Contributor、Co-authored-by 或其他署名；不得添加 AI 生成声明或署名 trailer，除非用户明确要求。
 - 先给结论，按需解释，明确未验证的信息。
@@ -110,7 +110,7 @@ RawMark 是单用户 Markdown 网页笔记编辑器。文件是真源；Go 标�
 
 ```bash
 pnpm -C web install --frozen-lockfile
-scripts/dev.sh                  # 隔离开发数据默认 .dev-data，API_PORT/WEB_PORT 控制端口
+scripts/dev.sh                  # Isolated data defaults to .dev-data; API_PORT/WEB_PORT select ports.
 pnpm -C web lint:check
 pnpm -C web typecheck
 pnpm -C web test

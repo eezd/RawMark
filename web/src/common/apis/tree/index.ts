@@ -1,7 +1,7 @@
 import type * as Tree from './type'
 import { request } from '@/http/axios'
 
-/** 读取目录树。 */
+/** Read the directory tree. */
 export function getTreeApi() {
   return request<Tree.TreeResponseData>({
     url: 'tree',
@@ -10,7 +10,7 @@ export function getTreeApi() {
   })
 }
 
-/** 设置或重置目录项图标。 */
+/** Set or reset a tree entry's icon. */
 export function setTreeIconApi(data: Tree.TreeIconRequestData) {
   return request<Tree.TreeIconResponseData>({
     url: 'tree-icon',

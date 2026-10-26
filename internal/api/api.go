@@ -1,4 +1,4 @@
-// Package api 提供 REST API（/api/v1）、事件推送与前端静态资源。前端只通过这套 API 访问数据。
+// Package api serves the REST API (/api/v1), events, and frontend assets. The frontend accesses data only through this API.
 package api
 
 import (
@@ -37,9 +37,9 @@ type Server struct {
 	store    *store.Store
 	hub      *events.Hub
 	index    *search.Index
-	// 串行化设置的"读取-合并-写入"
+	// Serialize settings read/merge/write operations.
 	settingsMu sync.Mutex
-	// ThemesDir 指向数据目录中的主题目录；为空时只有内置主题。
+	// ThemesDir points to the data directory's themes folder; an empty value enables only built-in themes.
 	DataDir             string
 	ThemesDir           string
 	PluginsDir          string
@@ -62,14 +62,14 @@ func New(v *vault.Vault, a *auth.Manager, st *store.Store, hub *events.Hub, inde
 	return &Server{vault: v, auth: a, store: st, hub: hub, index: index, captchas: newCaptchas()}
 }
 
-// access 为接口的访问要求
+// access defines an endpoint's access requirement.
 type access int
 
 const (
 	public access = iota
-	// 登录会话或 API 令牌（只读令牌可用 GET 和只读导出接口）
+	// Login session or API token (read-only tokens may use GET and read-only exports).
 	authed
-	// 只允许登录会话：管理 API 令牌，避免令牌给自己扩权
+	// Login sessions only: prevent API tokens from expanding their own permissions through token management.
 	sessionOnly
 )
 
@@ -79,7 +79,7 @@ type route struct {
 	handler http.HandlerFunc
 }
 
-// routes 为全部接口；openapi.json 须与之一致（见 TestOpenAPICoversRoutes）
+// routes lists all endpoints; openapi.json must match it (see TestOpenAPICoversRoutes).
 func (s *Server) routes() []route {
 	return []route{
 		{"GET /api/v1/health", public, func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]bool{"ok": true}) }},
@@ -170,7 +170,7 @@ func (s *Server) Handler(static fs.FS) http.Handler {
 	return localized(securityHeaders(sameOrigin(s.guardAPI(mux))))
 }
 
-// ---- 中间件 ----
+// ---- Middleware ----
 
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -185,8 +185,8 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// sameOrigin 保持写请求的同源边界；Bearer 鉴权不依赖浏览器 Cookie。
-// 没有 Origin 头的请求来自非浏览器客户端，放行
+// sameOrigin preserves the same-origin boundary for writes; Bearer authentication does not rely on browser Cookies.
+// Requests without Origin come from non-browser clients and are allowed.
 func sameOrigin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -201,7 +201,7 @@ func sameOrigin(next http.Handler) http.Handler {
 	})
 }
 
-// ---- 鉴权 ----
+// ---- Authentication ----
 
 func (s *Server) authState(w http.ResponseWriter, r *http.Request) {
 	setUp, err := s.auth.IsSetUp()
@@ -276,7 +276,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"permissions": []string{"vault:read", "vault:write", "instance:manage"}, "expiresAt": identity(r).ExpiresAt})
 }
 
-// ---- 文件 ----
+// ---- Files ----
 
 func (s *Server) tree(w http.ResponseWriter, r *http.Request) {
 	entries, err := s.vault.Tree()
@@ -331,7 +331,7 @@ func (s *Server) readFile(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// writeFile 以请求体整体作为笔记内容。If-Match: "rev" 要求版本一致；If-None-Match: * 要求文件不存在；都不带则直接覆盖
+// writeFile uses the entire request body as note content. If-Match: "rev" requires a matching revision; If-None-Match: * requires a new file; omitting both overwrites unconditionally.
 func (s *Server) writeFile(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxNoteBytes))
 	if err != nil {
@@ -371,10 +371,10 @@ func (s *Server) move(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if rewritten {
-		// 原子改写替换了文件身份，监听器无法再从快照中识别这次移动。
+		// Atomic rewriting replaced the file identity, so the watcher can no longer identify this move from its snapshot.
 		s.hub.Broadcast(events.Event{Type: "moved", From: body.From, Path: body.To}, events.Event{Type: "tree"})
 	} else {
-		// 图标提交在文件移动之后；不能仅依赖文件监听器较早的通知。
+		// Icons commit after the file move; the watcher's earlier notification alone is insufficient.
 		s.hub.Broadcast(events.Event{Type: "tree"})
 	}
 	writeJSON(w, 200, map[string]bool{"ok": true})
@@ -392,7 +392,7 @@ func (s *Server) mkdir(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
-// uploadAsset 接收 multipart 表单中的 file 字段，存入指定笔记或目录下的共享 assets 目录。
+// uploadAsset accepts the multipart file field and saves it in the shared assets directory for the selected note or folder.
 func (s *Server) uploadAsset(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxAssetBytes+1<<20)
 	file, header, err := r.FormFile("file")
@@ -418,7 +418,7 @@ func (s *Server) uploadAsset(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]string{"link": link})
 }
 
-// replaceImage 仅替换已存在的图片；路径与引用保持不变。
+// replaceImage replaces only an existing image, preserving its path and references.
 func (s *Server) replaceImage(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxAssetBytes+1<<20)
 	if err := r.ParseMultipartForm(1 << 20); err != nil {
@@ -444,7 +444,7 @@ func (s *Server) replaceImage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
-// raw 输出仓库内任意非隐藏文件（主要是图片）。以沙箱 CSP 返回，防止 SVG/HTML 中的脚本在本站执行
+// raw serves any non-hidden vault file (mainly images). A sandbox CSP prevents SVG/HTML scripts from running on this origin.
 func (s *Server) raw(w http.ResponseWriter, r *http.Request) {
 	s.serveRaw(w, r, r.PathValue("path"))
 }
@@ -465,7 +465,7 @@ func (s *Server) serveRaw(w http.ResponseWriter, r *http.Request, rel string) {
 	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
 }
 
-// ---- 回收站 ----
+// ---- Recycle bin ----
 
 func (s *Server) trashList(w http.ResponseWriter, r *http.Request) {
 	items, err := s.vault.TrashList()
@@ -494,9 +494,9 @@ func (s *Server) trashPurge(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
-// ---- 响应工具 ----
+// ---- Response helpers ----
 
-// clientIP 返回限速用的来源地址（未经反向代理头部，避免伪造）
+// clientIP returns the source address for rate limiting, ignoring proxy headers to prevent spoofing.
 func clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

@@ -1,9 +1,9 @@
-/* 应用外壳样式，颜色与字体沿用 themes/base.css 中的 --rm-* 变量 */
+/* Application shell styles; colors and fonts use --rm-* variables from common/appearance/base.css. */
 html,
 body {
   height: 100%;
 }
-/* 软键盘弹出时为可视区域高度，见 viewport.ts */
+/* Use the visible viewport height when the software keyboard opens; see viewport.ts. */
 #app {
   height: var(--rm-app-height, 100%);
   display: flex;
@@ -52,7 +52,7 @@ button {
   color: inherit;
 }
 
-/* ---- 通用控件 ---- */
+/* ---- Shared controls ---- */
 .rm-btn {
   display: inline-flex;
   align-items: center;
@@ -121,7 +121,7 @@ button {
   color: var(--rm-text-muted);
 }
 
-/* ---- 登录 ---- */
+/* ---- Sign-in ---- */
 .rm-auth {
   display: flex;
   align-items: center;
@@ -159,7 +159,7 @@ button {
   font-size: var(--rm-ui-font-small);
 }
 
-/* ---- 布局 ---- */
+/* ---- Layout ---- */
 .rm-shell {
   display: flex;
   flex-direction: column;
@@ -220,7 +220,7 @@ button {
   transition: none;
 }
 
-/* ---- 大纲 ---- */
+/* ---- Outline ---- */
 .rm-outline-backdrop {
   display: flex;
   flex: none;
@@ -292,7 +292,7 @@ button {
   display: none;
 }
 
-/* ---- 侧栏 ---- */
+/* ---- Sidebar ---- */
 .rm-sidebar-inner {
   box-sizing: border-box;
   display: flex;
@@ -346,7 +346,7 @@ button {
   --rm-tree-row-overlay: var(--rm-hover);
   background: var(--rm-hover);
 }
-/* 长按由应用处理，不弹出 iOS 的系统菜单 */
+/* The application handles long presses instead of showing the iOS system menu. */
 .rm-tree-row {
   -webkit-touch-callout: none;
 }
@@ -403,7 +403,7 @@ button {
   opacity: 0;
   pointer-events: none;
 }
-/* 按钮覆盖名称末尾，不为隐藏按钮留位；不透明底色遮住下方文字。 */
+/* Buttons overlay the end of the name without reserving hidden space; an opaque background covers underlying text. */
 .rm-tree-row .rm-tree-more {
   background: linear-gradient(var(--rm-tree-row-overlay), var(--rm-tree-row-overlay)), var(--rm-sidebar-bg);
 }
@@ -432,7 +432,7 @@ button {
   font-size: var(--rm-ui-font-small);
   text-align: center;
 }
-/* ---- 搜索 ---- */
+/* ---- Search ---- */
 .rm-search {
   flex: 1;
   display: flex;
@@ -515,7 +515,7 @@ button {
   color: var(--rm-text);
   border-radius: 2px;
 }
-/* ---- 快速切换 ---- */
+/* ---- Quick switcher ---- */
 .rm-switcher-list {
   flex: 1;
   overflow: auto;
@@ -583,7 +583,7 @@ button {
   color: var(--rm-text);
 }
 
-/* ---- 菜单 ---- */
+/* ---- Menus ---- */
 .rm-menu {
   position: absolute;
   top: 100%;
@@ -626,7 +626,7 @@ button {
   cursor: default;
 }
 
-/* ---- 标签页 ---- */
+/* ---- Tabs ---- */
 .rm-tabs {
   display: flex;
   gap: 2px;
@@ -733,7 +733,7 @@ button {
   border-radius: 50%;
   background: var(--rm-accent);
 }
-/* 有未保存修改时显示圆点，悬停时换回关闭图标 */
+/* Show a dot for unsaved changes; replace it with the close icon on hover. */
 .rm-tab-close.dirty .rm-dirty-dot {
   display: block;
 }
@@ -747,7 +747,7 @@ button {
   opacity: 1 !important;
 }
 
-/* ---- 提示条 ---- */
+/* ---- Status bars ---- */
 .rm-banner {
   display: flex;
   flex-wrap: wrap;
@@ -767,7 +767,7 @@ button {
   color: var(--rm-warn-text);
 }
 
-/* ---- 编辑区 ---- */
+/* ---- Editor area ---- */
 .rm-editor-pane {
   flex: 1;
   min-height: 0;
@@ -780,7 +780,7 @@ button {
   height: 100%;
 }
 
-/* ---- 对话框 ---- */
+/* ---- Dialogs ---- */
 .rm-dialog-head {
   display: flex;
   align-items: center;
@@ -823,7 +823,7 @@ button {
   font-size: var(--rm-ui-font-small);
   user-select: all;
 }
-/* ---- 设置 ---- */
+/* ---- Settings ---- */
 .rm-setting {
   display: flex;
   align-items: center;
@@ -849,7 +849,7 @@ button {
   transform: rotate(180deg);
 }
 
-/* ---- 通知 ---- */
+/* ---- Notifications ---- */
 .rm-toasts {
   position: fixed;
   left: 50%;
@@ -883,7 +883,7 @@ button {
   padding: 0;
 }
 
-/* ---- 移动端 ---- */
+/* ---- Mobile ---- */
 @media (max-width: 767px) {
   .rm-sidebar {
     position: fixed;
@@ -966,7 +966,7 @@ button {
   .rm-sidebar-resize {
     display: none;
   }
-  /* 大纲在手机上为从右侧滑入的浮层 */
+  /* On phones, the outline is an overlay sliding in from the right. */
   .rm-outline-backdrop {
     display: block;
     position: fixed;
@@ -984,12 +984,12 @@ button {
     padding-top: env(safe-area-inset-top);
     box-shadow: var(--rm-shadow);
   }
-  /* 触控热区不小于 44px */
+  /* Touch targets must be at least 44px. */
   .rm-tree-row {
     height: var(--rm-control-size);
     font-size: inherit;
   }
-  /* 小于 16px 时 iOS Safari 聚焦输入框会自动放大页面 */
+  /* iOS Safari zooms focused inputs when their font size is below 16px. */
   .rm-search-input {
     height: var(--rm-control-size);
     font-size: var(--rm-ui-font-size);
@@ -1001,14 +1001,14 @@ button {
   .rm-search-item {
     padding: 10px 8px;
   }
-  /* 手机上从顶部弹出，给软键盘留出空间 */
+  /* Open from the top on phones to leave room for the software keyboard. */
   .rm-switcher-item {
     height: var(--rm-control-size);
     font-size: var(--rm-ui-font-size);
   }
 }
 
-/* 主题与 CSS 编辑 */
+/* Theme and CSS editing. */
 .rm-appearance-note {
   margin: var(--rm-space-2) var(--rm-space-4) var(--rm-space-4);
   font-size: var(--rm-ui-font-small);
@@ -1195,7 +1195,7 @@ button {
   background: var(--rm-active);
 }
 
-/* 轻玻璃工作台 */
+/* Glass workspace. */
 .rm-vault-heading {
   display: flex;
   align-items: center;
@@ -1348,7 +1348,7 @@ button {
   min-height: 0;
   position: relative;
 }
-/* 选区工具栏与局部外观面板 */
+/* Selection toolbar and local appearance panel. */
 .rm-selection-popover {
   position: fixed;
   display: flex;
@@ -1597,7 +1597,7 @@ button {
   }
 }
 
-/* 文件树子层按实际内容高度展开；退出期间不能继续点击或聚焦。 */
+/* Tree children expand to their actual content height; exiting items must not remain clickable or focusable. */
 .rm-tree-children {
   display: grid;
   grid-template-rows: 1fr;

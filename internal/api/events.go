@@ -9,11 +9,11 @@ import (
 	"github.com/coder/websocket"
 )
 
-// events 通过 WebSocket 推送仓库变更。websocket.Accept 默认校验 Origin 与 Host 一致
+// events pushes vault changes over WebSocket. websocket.Accept checks that Origin matches Host by default.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	s.eventWG.Add(1)
 	defer s.eventWG.Done()
-	// 先订阅再完成握手，避免连接建立后首条变更落在订阅空窗中。
+	// Subscribe before completing the handshake so the first change cannot fall into a subscription gap.
 	msgs, unsubscribe := s.hub.Subscribe()
 	defer unsubscribe()
 	conn, err := websocket.Accept(w, r, nil)
@@ -36,9 +36,9 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		}
 		return true
 	}
-	// 客户端不发消息；CloseRead 负责处理控制帧并在连接断开时取消 ctx
+	// Clients send no messages; CloseRead handles control frames and cancels ctx on disconnect.
 	ctx := conn.CloseRead(r.Context())
-	// 定期 ping，避免反向代理因空闲断开连接
+	// Ping periodically to prevent idle disconnects by reverse proxies.
 	ping := time.NewTicker(30 * time.Second)
 	defer ping.Stop()
 	for {
@@ -47,7 +47,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 			return
 		case msg, ok := <-msgs:
 			if !ok {
-				// 客户端消费过慢被移出广播列表，断开后由客户端重连并全量同步
+				// Disconnect slow subscribers removed from the hub; clients reconnect and perform a full sync.
 				conn.Close(websocket.StatusTryAgainLater, "too slow")
 				return
 			}

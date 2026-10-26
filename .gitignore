@@ -1,4 +1,4 @@
-# 本地交接文件与历史设计文档不入库；公开文档单独放行
+# Ignore local handoff and historical design documents; allow public guides explicitly.
 CONTEXT.md
 docs/*
 !docs/guide.md
@@ -11,14 +11,14 @@ docs/*
 !docs/api.zh-CN.md
 !docs/images/
 
-# 前端
+# Frontend
 node_modules/
 web/dist/
 
-# 本地开发数据
+# Local development data
 .dev-data/
 deploy/data/
 
-# 仓库维护的工具规则（其他本地技能不入库）
+# Repository-maintained tool rules (other local skills stay untracked)
 .agents/skills/*
 !.agents/skills/v3-*/

@@ -29,7 +29,7 @@ type maintenanceStatus struct {
 	cause      error
 }
 
-// gate 排空普通 API 操作后再执行维护；WebSocket 不持有长期读锁。
+// gate drains ordinary API operations before maintenance; WebSockets do not hold long-lived read locks.
 func (s *Server) guardAPI(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api/v1/health" {
@@ -324,7 +324,7 @@ func readPreferences(stage string) (map[string]json.RawMessage, error) {
 	return values, nil
 }
 
-// importSettings 在确认后合并资源；原资源与数据库值都保留到成功提交为止。
+// importSettings merges resources after confirmation, retaining original resources and database values until commit succeeds.
 func (s *Server) applySettings(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		ID        string

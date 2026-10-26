@@ -1,5 +1,5 @@
 import { t as translate } from '@@/i18n/runtime'
-// 命令注册表：命令面板列出的操作与全局快捷键都来自这里；插件也通过 registerCommand 添加命令
+// Command registry: command-palette actions and global shortcuts originate here; plugins also add commands through registerCommand.
 import { shallowReactive } from 'vue'
 import { pinia } from '@/pinia'
 import { useSettingsStore } from '@/pinia/stores/settings'
@@ -12,16 +12,16 @@ export { formatKeys, matchKeys } from './keys'
 export interface Command {
   id: string
   title: string
-  /** 快捷键，如 'Mod+Shift+F'、'F1'；Mod 在 Mac 上为 Cmd，其他平台为 Ctrl。第一个用于显示 */
+  /** Shortcuts such as 'Mod+Shift+F' or 'F1'; Mod is Cmd on Mac and Ctrl elsewhere. The first binding is displayed. */
   keys?: string[]
-  /** 返回 false 时命令不可用：不在面板中列出，快捷键也不触发 */
+  /** Returning false disables the command in both the palette and shortcut dispatch. */
   when?: () => boolean
   run: () => void
 }
 
 const commands = shallowReactive(new Map<string, Command>())
 
-/** 注册命令，返回注销函数；id 重复时后注册的覆盖先注册的 */
+/** Register a command and return its disposer; later registrations replace earlier ones with the same id. */
 export function registerCommand(cmd: Command): () => void {
   commands.set(cmd.id, cmd)
   return () => {
@@ -29,11 +29,11 @@ export function registerCommand(cmd: Command): () => void {
   }
 }
 
-/** 全部已注册的命令（含当前不可用的），用于快捷键一览 */
+/** All registered commands, including unavailable ones, for the shortcut overview. */
 export function allCommands(): Command[] {
   const all = [...commands.values()]
   const plugins = all.filter(command => command.id.startsWith('plugin:'))
-  // 动态启停不能改变快捷键优先级；同一插件内仍保留注册顺序。
+  // Dynamic enable/disable must not change shortcut priority; retain registration order within each plugin.
   plugins.sort((a, b) => {
     const left = a.id.split(':')[1]; const right = b.id.split(':')[1]
     return left < right ? -1 : left > right ? 1 : 0
@@ -65,14 +65,14 @@ export function shortcutConflict(id: string, keys: string[]): Command | undefine
   return allCommands().find(command => command.id !== id && commandKeys(command).some(existing => keys.some(key => physicalKeys(existing) === physicalKeys(key))))
 }
 
-/** 全局快捷键分发；编辑器等已处理的按键（defaultPrevented）和输入法组字中的按键不处理 */
+/** Dispatch global shortcuts, ignoring defaultPrevented keys already handled by editors and keys during IME composition. */
 export function handleShortcut(e: KeyboardEvent) {
   if (e.defaultPrevented || e.isComposing || e.getModifierState('AltGraph') || (e.target instanceof Element && e.target.closest('[data-shortcut-recorder]'))) return
   for (const cmd of availableCommands()) {
     if (cmd.id.startsWith('editor.') && !(e.target instanceof Element && e.target.closest('.cm-content'))) continue
     if (commandKeys(cmd).some(k => matchKeys(e, k))) {
       e.preventDefault()
-      // 捕获阶段已执行命令，不再让编辑器或弹窗重复处理同一次按键。
+      // The capture phase already ran the command; prevent editors or dialogs from handling the same key again.
       e.stopPropagation()
       cmd.run()
       return

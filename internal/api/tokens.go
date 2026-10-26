@@ -19,7 +19,7 @@ func (s *Server) listTokens(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"tokens": tokens})
 }
 
-// createToken 返回的 token 明文只出现这一次，服务器只保存哈希
+// createToken returns the plaintext token only once; the server stores only its hash.
 func (s *Server) createToken(w http.ResponseWriter, r *http.Request) {
 	var body struct{ Name, Scope string }
 	if !readJSON(w, r, &body) {

@@ -18,7 +18,7 @@ const collator = computed(() => new Intl.Collator(locale.value, { numeric: true,
 function build(entries: Entry[]): TreeNode[] {
   const root: TreeNode[] = []
   const dirs = new Map<string, TreeNode>()
-  // 先按路径排序，保证父目录先于子项出现
+  // Sort paths first so parents precede their children.
   for (const e of [...entries].sort((a, b) => a.path.length - b.path.length)) {
     const node: TreeNode = { name: basename(e.path), path: e.path, dir: e.dir, icon: e.icon, children: [] }
     if (e.dir) dirs.set(e.path, node)
@@ -36,14 +36,14 @@ export const tree = computed(() => build(ws.entries.filter(entry => !hiddenAsset
 
 export const treeIconTarget = shallowRef<{ path: string, anchor: HTMLElement } | null>(null)
 
-// null 表示无接收目标，空字符串表示根目录；文件行指向它的直接父目录。
+// null means no drop target; an empty string means the root. File rows target their direct parent folder.
 export const dropDirectory = ref<string | null>(null)
 
 const EXPANDED_KEY = 'rawmark.expanded'
 export const expanded = reactive(new Set<string>(JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? '[]') as string[]))
 watch(expanded, () => localStorage.setItem(EXPANDED_KEY, JSON.stringify([...expanded])))
 
-// 打开或新建笔记时展开其所在的各级目录
+// Expand ancestor folders when opening or creating a note.
 watch(
   () => [ws.active, ws.renaming, ws.image],
   (paths) => {

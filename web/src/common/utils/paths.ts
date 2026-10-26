@@ -29,7 +29,7 @@ export function noteTitle(path: string): string {
   return basename(path).replace(/\.md$/, '')
 }
 
-// 把笔记中的图片地址解析为可加载的 URL：绝对地址原样返回，相对地址基于笔记所在目录走 /api/v1/raw
+// Resolve note image sources to loadable URLs: preserve absolute URLs and resolve relative paths against the note folder through the raw-resource endpoint.
 export function resolveAssetUrl(notePath: string, src: string): string {
   if (/^[a-z][a-z\d+.-]*:/i.test(src) || src.startsWith('/') || src.startsWith('#')) return src
   const parts = dirname(notePath) ? dirname(notePath).split('/') : []
@@ -42,7 +42,7 @@ export function resolveAssetUrl(notePath: string, src: string): string {
       try {
         decoded = decodeURIComponent(seg)
       } catch {
-        // 非法的百分号序列按原样使用
+        // Preserve invalid percent-escape sequences as written.
       }
       parts.push(decoded)
     }
@@ -50,7 +50,7 @@ export function resolveAssetUrl(notePath: string, src: string): string {
   return `/api/v1/raw/${encodePath(parts.join('/'))}`
 }
 
-// 导航隐藏普通共享附件与笔记附件，不改变这些目录的读写契约。
+// Hide shared and note-specific attachment folders from navigation without changing their read/write contracts.
 export function hiddenAssetPath(path: string): boolean {
   return path.split('/').some(part => part === 'assets' || part.endsWith('.assets'))
 }

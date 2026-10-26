@@ -5,7 +5,7 @@ const paths = new Set(FILES)
 globalThis.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE)
-    // 逐批下载，避免同时请求数百个语法包和字体。
+    // Download in batches instead of requesting hundreds of syntax packages and fonts concurrently.
     for (let i = 0; i < FILES.length; i += 16) {
       await cache.addAll(FILES.slice(i, i + 16).map(url => new Request(url, { cache: 'reload' })))
     }
@@ -28,7 +28,7 @@ function clientUsesCurrentShell(client) {
 }
 
 async function cleanCaches() {
-  // 安装中的新版本也使用独立缓存，旧 worker 不能把它当作过期资源删除。
+  // Installing versions use independent caches too; old workers must not delete them as obsolete resources.
   if (globalThis.registration.installing || globalThis.registration.waiting) return
   const clients = await globalThis.clients.matchAll({ type: 'window', includeUncontrolled: true })
   if (!(await Promise.all(clients.map(clientUsesCurrentShell))).every(Boolean)) return
@@ -42,7 +42,7 @@ globalThis.addEventListener('activate', (event) => {
   event.waitUntil(cleanCaches())
 })
 
-// 激活会更换所有页面的控制器，但只由点击更新的页面主动刷新。
+// Activation changes every page's controller, but only the page requesting the update refreshes itself.
 globalThis.addEventListener('message', (event) => {
   if (event.data === 'ACTIVATE') event.waitUntil(globalThis.skipWaiting())
   if (event.data === 'CLEANUP') event.waitUntil(cleanCaches())
@@ -52,14 +52,14 @@ globalThis.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
   if (request.method !== 'GET' || url.origin !== globalThis.location.origin) return
-  // 只匹配构建产物与应用入口，不缓存 API、笔记图片或插件。
+  // Match only build assets and application entry points; never cache APIs, note images, or plugins.
   const entry = request.mode === 'navigate' && (url.pathname === '/' || url.pathname === '/index.html')
   if (!entry && !paths.has(url.pathname) && !url.pathname.startsWith('/assets/')) return
   event.respondWith((async () => {
     const cache = await caches.open(CACHE)
     const cached = await cache.match(entry ? '/index.html' : url.pathname)
     if (cached) return cached
-    // 旧标签页尚未刷新时，按原来的哈希加载旧语法包与字体。
+    // Unrefreshed old tabs load old syntax packages and fonts by their original hashes.
     if (url.pathname.startsWith('/assets/')) {
       for (const name of await caches.keys()) {
         if (!name.startsWith('rawmark-shell-')) continue

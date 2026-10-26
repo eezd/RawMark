@@ -20,7 +20,7 @@ async function update() {
       return
     }
     if (!activated.value && worker) {
-      // 等待新版激活后，仅刷新主动点击更新的页面。
+      // After the new version activates, refresh only the page that requested the update.
       await new Promise<void>((resolve, reject) => {
         const finish = () => {
           if (worker.state !== 'activated' && worker.state !== 'redundant') return
@@ -39,7 +39,7 @@ async function update() {
       })
       activated.value = true
     }
-    // 激活期间仍可能继续输入，刷新前再次确认；保留按钮供保存后重试。
+    // Typing may continue during activation; confirm again before refreshing and keep the button for retrying after save.
     if (await props.beforeReload()) location.reload()
     else toast(translate('common.some_changes_or_operations_are_a5fda9'))
   } catch {

@@ -1,7 +1,7 @@
 import type { AsyncCleanup, Awaitable, MountContext } from '@@/plugin-api'
 import { t as translate } from '@@/i18n/runtime'
 
-// 每次挂载使用独立容器；超时或停用后的异步渲染只能修改已脱离页面的容器。
+// Each mount gets its own container; asynchronous rendering after timeout or disable can only modify a detached container.
 export function mountContent(
   parent: HTMLElement,
   mount: (context: MountContext) => Awaitable<void | AsyncCleanup>,

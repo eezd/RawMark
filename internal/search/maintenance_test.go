@@ -41,7 +41,7 @@ func TestRebuildSupersedesQueuedOldSnapshot(t *testing.T) {
 	f := newFixture(t)
 	f.write("old.md", "old")
 	f.sync()
-	f.idx.Update(map[string]string{}) // 尚未消费的旧扫描不应在手动重建后删除新索引。
+	f.idx.Update(map[string]string{}) // An unconsumed old scan must not delete the new index after a manual rebuild.
 	f.write("new.md", "中文新笔记")
 	if err := f.idx.Rebuild(context.Background()); err != nil {
 		t.Fatal(err)

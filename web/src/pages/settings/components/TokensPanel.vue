@@ -23,7 +23,7 @@ const rules: FormRules<typeof fields> = { name: [{ required: true, whitespace: t
 }, trigger: 'blur' }] }
 const user = useUserStore()
 const busy = ref(false)
-// 刚创建的令牌明文，只在本次对话框中显示
+// Plaintext of the newly created token, shown only in this dialog session.
 const created = ref<string | null>(null)
 const fmt = computed(() => new Intl.DateTimeFormat(locale.value, { dateStyle: 'short', timeStyle: 'short' }))
 

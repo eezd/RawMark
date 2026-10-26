@@ -31,7 +31,7 @@ it('匿名深链保留完整回跳地址，登录后恢复身份并注册路由'
   expect(router.currentRoute.value.path).toBe('/login')
   expect(router.currentRoute.value.query.redirect).toBe('/?note=a#heading')
   user.setToken('rms_valid')
-  // 登录组件已恢复身份时，守卫依然必须安装动态路由。
+  // The guard must install dynamic routes even when the sign-in component has already restored identity.
   await user.getInfo()
   await router.replace({ path: '/login', query: router.currentRoute.value.query, force: true })
   expect(router.currentRoute.value.fullPath).toBe('/?note=a#heading')

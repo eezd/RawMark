@@ -71,7 +71,7 @@ func uploadedPackage(t *testing.T, f *fixture, kind string, data []byte) string 
 		t.Fatalf("创建上传失败: %d", res.StatusCode)
 	}
 	id := decode[struct{ ID string }](t, res).ID
-	// 跨多个分块验证偏移，不引入测试开关。
+	// Verify offsets across multiple chunks without introducing test switches.
 	offset := 0
 	for offset < len(data) {
 		end := min(offset+137, len(data))
@@ -192,7 +192,7 @@ func TestFullBackupRestoresFilesDatabaseAndInvalidatesSessions(t *testing.T) {
 	root := t.TempDir()
 	vault := filepath.Join(root, "vault")
 	os.MkdirAll(vault, 0700)
-	// 解包后落入目标实例，目标的环境路径与源实例不同。
+	// Extract into the target instance, whose environment paths differ from the source.
 	if err = backup.CopyTree(filepath.Join(stage, "vault"), vault); err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +273,7 @@ func TestSettingsPackageDatabaseFailureRollsBack(t *testing.T) {
 	f.store.SetSetting(settingsKey, `{"fontSize":24}`)
 	data := exportedPackage(t, f, "settings")
 	f.store.SetSetting(settingsKey, `{"fontSize":18}`)
-	// 通过实际 SQLite 约束制造提交失败，验证备份和事务边界。
+	// Use an actual SQLite constraint to force commit failure and verify backup and transaction boundaries.
 	raw, err := sql.Open("sqlite", filepath.Join(filepath.Dir(f.root), "rawmark.db"))
 	if err != nil {
 		t.Fatal(err)

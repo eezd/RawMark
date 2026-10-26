@@ -1,5 +1,5 @@
-// Package search 维护笔记的全文索引。索引存放在独立的数据库文件中，内容完全由仓库文件派生，
-// 删除后会在下次启动时重建；结构变化时也直接重建而不做迁移。
+// Package search maintains a full-text note index in a separate database, derived entirely from vault files.
+// A deleted index is rebuilt at startup; structural changes also trigger rebuilding rather than migration.
 package search
 
 import (
@@ -20,7 +20,7 @@ import (
 	"rawmark/internal/vault"
 )
 
-// 表结构或派生元数据的解析规则变化时递增，旧索引会被丢弃重建。
+// Increment when schema or derived-metadata parsing changes; old indexes are discarded and rebuilt.
 const schemaVersion = 3
 
 const schema = `
@@ -30,7 +30,7 @@ CREATE TABLE docs (
   rev  TEXT NOT NULL,
   metadata TEXT NOT NULL
 );
--- trigram 分词不依赖空格断词，中文可按任意片段检索；不足 3 个字符的词改用 LIKE
+-- Trigram tokenization needs no word separators and supports Chinese fragments; use LIKE for terms shorter than three characters.
 CREATE VIRTUAL TABLE docs_fts USING fts5(path, body, tokenize = 'trigram');
 `
 
@@ -42,7 +42,7 @@ const (
 
 type Result struct {
 	Path string `json:"path"`
-	// 第一处匹配所在行（从 1 开始）与该行的摘录；只有文件名匹配时 Line 为 0
+	// First matching line (1-based) and its excerpt; Line is 0 when only the filename matches.
 	Line    int    `json:"line"`
 	Snippet string `json:"snippet"`
 }
@@ -60,12 +60,12 @@ type Index struct {
 	v         *vault.Vault
 
 	mu             sync.Mutex
-	pending        map[string]string // 待同步的最新快照（路径 -> rev）
+	pending        map[string]string // Latest pending snapshot (path -> rev).
 	wake           chan struct{}
 	pendingVersion uint64
 
-	work  sync.Mutex     // 串行化同步、重建和数据库维护
-	known map[string]doc // 已索引的笔记，仅由同步协程访问
+	work  sync.Mutex     // Serialize synchronization, rebuilding, and database maintenance.
+	known map[string]doc // Indexed notes, accessed only by the synchronization goroutine.
 }
 
 func Open(path string, v *vault.Vault) (*Index, error) {
@@ -112,7 +112,7 @@ func (x *Index) init() error {
 
 func (x *Index) Close() error { return x.db.Close() }
 
-// Update 提交仓库的最新快照（笔记路径 -> rev），立即返回；同步在后台进行，多次提交只处理最新一次
+// Update submits the latest vault snapshot (note path -> rev) and returns immediately; background synchronization consumes only the latest submission.
 func (x *Index) Update(files map[string]string) {
 	x.mu.Lock()
 	x.pending = files
@@ -124,7 +124,7 @@ func (x *Index) Update(files map[string]string) {
 	}
 }
 
-// Run 执行后台同步，直到 ctx 结束
+// Run processes background synchronization until ctx ends.
 func (x *Index) Run(ctx context.Context) {
 	for {
 		select {
@@ -143,7 +143,7 @@ func (x *Index) Run(ctx context.Context) {
 	}
 }
 
-// sync 让索引与快照一致：只读取新增或 rev 变化的笔记
+// sync reconciles the index with the snapshot, reading only new notes or changed revisions.
 func (x *Index) sync(files map[string]string) error {
 	x.work.Lock()
 	defer x.work.Unlock()
@@ -175,7 +175,7 @@ func (x *Index) syncLocked(files map[string]string) error {
 		}
 		content, rev, err := x.v.Read(p)
 		if errors.Is(err, vault.ErrNotFound) {
-			continue // 快照之后被删除，下一次快照会处理
+			continue // Deleted after the snapshot; the next snapshot will handle it.
 		}
 		if err != nil {
 			return err
@@ -210,8 +210,8 @@ func remove(tx *sql.Tx, id int64) error {
 	return err
 }
 
-// Search 查找同时包含所有词（空白分隔，不区分大小写）的笔记，词可出现在路径或正文中。
-// 路径（文件名或目录名）命中第一个词的排在前面，其余按相关度排序
+// Search finds notes containing every whitespace-separated term, case-insensitively, in paths or contents.
+// Path matches (file or folder names) for the first term rank first; remaining results sort by relevance.
 func (x *Index) Search(query string, limit int) ([]Result, error) {
 	terms := strings.Fields(query)
 	if len(terms) == 0 {
@@ -263,7 +263,7 @@ func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
-// snippet 返回正文中第一处匹配所在的行号与摘录（过长的行截取匹配附近的一段）
+// snippet returns the first matching line number and an excerpt, truncating long lines around the match.
 func snippet(body string, terms []string) (int, string) {
 	folded := make([][]rune, len(terms))
 	for i, t := range terms {
@@ -298,7 +298,7 @@ func snippet(body string, terms []string) (int, string) {
 	return 0, ""
 }
 
-// fold 逐字符转小写，保持字符数不变，便于在原文中按位置截取
+// fold lowercases rune by rune, preserving character count for slicing the original text by position.
 func fold(rs []rune) []rune {
 	out := make([]rune, len(rs))
 	for i, r := range rs {

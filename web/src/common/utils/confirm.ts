@@ -3,7 +3,7 @@ import { ElMessageBox } from 'element-plus'
 import { pinia } from '@/pinia'
 import { useUserStore } from '@/pinia/stores/user'
 
-/** 确认等待期间换会话时，旧操作视为取消。 */
+/** Treat the old operation as canceled if the session changes while awaiting confirmation. */
 export async function confirmAction(message: string, title = translate('common.confirm_action_f8347f')): Promise<boolean> {
   const user = useUserStore(pinia)
   const version = user.getSessionVersion()

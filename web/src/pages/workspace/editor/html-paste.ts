@@ -1,9 +1,9 @@
 import { t as translate } from '@@/i18n/runtime'
-/* eslint-disable no-control-regex -- 粘贴链接必须识别并移除协议中的控制字符。 */
+/* eslint-disable no-control-regex -- Pasted links must detect and remove control characters in schemes. */
 import TurndownService from 'turndown'
 
 export async function htmlToMarkdown(html: string, importImage: (url: string) => Promise<string>, onError: (error: unknown) => void): Promise<string> {
-  // template 中的外部资源和脚本保持惰性，不让剪贴板 HTML 进入活动页面。
+  // Keep external resources and scripts inert inside template; clipboard HTML must not enter the active page.
   const template = document.createElement('template')
   template.innerHTML = html
   const fragment = template.content
@@ -32,7 +32,7 @@ export async function htmlToMarkdown(html: string, importImage: (url: string) =>
     images.set(src, group)
   }
   const sources = [...images]
-  // 网页常有多张图片；限制并行数量，避免一次粘贴占满浏览器连接和服务端下载内存。
+  // Web pages often contain many images; bound concurrency so one paste cannot exhaust browser connections or server download memory.
   for (let offset = 0; offset < sources.length; offset += 3) {
     await Promise.all(sources.slice(offset, offset + 3).map(async ([src, nodes]) => {
       try {
@@ -61,7 +61,7 @@ export async function htmlToMarkdown(html: string, importImage: (url: string) =>
       return `\n\n${[line(rows[0]), line(Array.from<string>({ length: columns }).fill('---')), ...rows.slice(1).map(line)].join('\n')}\n\n`
     },
   })
-  // 链接目标用尖括号包裹，避免 URL 中的括号截断 Markdown；不保留可执行协议。
+  // Wrap destinations in angle brackets so URL parentheses do not truncate Markdown; discard executable schemes.
   service.addRule('link', {
     filter: 'a',
     replacement: (content, node) => {

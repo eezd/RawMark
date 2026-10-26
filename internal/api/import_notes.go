@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) importNotes(w http.ResponseWriter, r *http.Request) {
-	// 总请求上限包含表单开销，文件总量另由 vault 校验。
+	// The total request limit includes form overhead; vault validates the aggregate file size separately.
 	r.Body = http.MaxBytesReader(w, r.Body, vault.MaxImportBytes+(1<<20))
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
 		var limit *http.MaxBytesError

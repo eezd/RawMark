@@ -8,7 +8,7 @@ const CACHE_LIMIT = 500
 let worker: Worker | undefined
 let nextId = 1
 const pending = new Map<number, { resolve: (tokens: TokenRun | null) => void, reject: (reason: unknown) => void }>()
-// 以"语言 + 代码"为键缓存结果；Map 保持插入顺序，超限时淘汰最早的条目
+// Cache by "language + code"; Map preserves insertion order, so evict the oldest entry when the limit is exceeded.
 const cache = new Map<string, TokenRun | null>()
 
 function getWorker(): Worker {

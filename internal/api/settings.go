@@ -12,7 +12,7 @@ import (
 	"rawmark/internal/events"
 )
 
-// 应用设置：一份 JSON 对象，全部设备共用。内容由前端定义，服务端合并与保存，并校验由服务端执行的清理期限
+// Application settings are one JSON object shared across devices. The frontend defines contents; the server merges, saves, and validates server-enforced retention.
 const settingsKey = "app.settings"
 
 func (s *Server) readSettings() (map[string]json.RawMessage, error) {
@@ -34,8 +34,8 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, settings)
 }
 
-// patchSettings 按顶层键合并：请求中的键覆盖原值，值为 null 的键被删除。
-// 不同设备同时修改不同的设置不会互相覆盖；合并后通知其他设备重新读取
+// patchSettings merges top-level keys: supplied values replace existing values, and null removes a key.
+// Concurrent changes to different settings do not overwrite each other; notify other devices to reload after merging.
 func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxJSONBytes))
 	if err != nil {
@@ -86,7 +86,7 @@ func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, settings)
 }
 
-// changePassword 修改登录密码；当前会话保留，其他设备需重新登录
+// changePassword changes the login password, retaining the current session and requiring other devices to sign in again.
 func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	var body struct{ Current, Next string }
 	if !readJSON(w, r, &body) {

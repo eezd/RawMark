@@ -24,7 +24,7 @@ func insert(tx *sql.Tx, p, rev string, content []byte) (int64, error) {
 	return id, err
 }
 
-// Rebuild 与后台同步互斥，失败时事务和已知快照均保持原状。
+// Rebuild excludes background synchronization; failures leave both the transaction and known snapshot unchanged.
 func (x *Index) Rebuild(ctx context.Context) error {
 	x.work.Lock()
 	defer x.work.Unlock()

@@ -21,7 +21,7 @@ const results = ref<SearchResult[] | null>(null)
 const selected = ref(0)
 const terms = computed(() => query.value.split(/\s+/).filter(Boolean))
 
-// 只采用最后一次请求的结果，避免慢请求覆盖新结果
+// Use only the latest request's results so slow requests cannot overwrite newer results.
 let seq = 0
 let timer: ReturnType<typeof setTimeout> | undefined
 watch(query, (q) => {
@@ -50,7 +50,7 @@ async function run(q: string, id: number, version: number) {
   }
 }
 
-/** 把文本按搜索词（不区分大小写）切分，命中部分标记为高亮 */
+/** Split text by case-insensitive search terms and mark matching fragments for highlighting. */
 function segments(text: string): { text: string, hit: boolean }[] {
   const lower = text.toLowerCase()
   const words = terms.value.map(t => t.toLowerCase())

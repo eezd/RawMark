@@ -38,7 +38,7 @@ func TestOpenAPIResponseContracts(t *testing.T) {
 		}
 		return op
 	}
-	// 下载、原文、资源代理与 OpenAPI 本身不使用业务 JSON 外壳。
+	// Downloads, raw files, resource proxies, and OpenAPI itself do not use the business JSON envelope.
 	raw := map[string]bool{
 		"get /openapi.json": true, "get /files/{path}": true, "get /raw/{path}": true,
 		"get /plugins/{id}/assets/{revision}/{path}": true, "get /fonts/{id}/file": true,
@@ -133,7 +133,7 @@ func TestOpenAPIResponseContracts(t *testing.T) {
 	check("get", "/maintenance/status", f.do(f.admin, "GET", "/api/v1/maintenance/status", "", nil))
 	check("post", "/maintenance/uploads", f.do(f.admin, "POST", "/api/v1/maintenance/uploads", `{"kind":"settings","size":10}`, nil))
 	id := stagedPackage(t, f, "full", exportedPackage(t, f, "full"))
-	// 仅验证提交契约；合成实例不触发真实进程重启或恢复执行。
+	// Verify only the submission contract; the synthetic instance must not trigger a real process restart or restore.
 	f.server.Restart = func() {}
 	check("post", "/maintenance/restore", f.do(f.admin, "POST", "/api/v1/maintenance/restore", `{"id":"`+id+`","confirmed":true}`, nil))
 }

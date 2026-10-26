@@ -124,7 +124,7 @@ func TestPluginInstallBoundariesAndData(t *testing.T) {
 	if res := pluginUpload(t, f, f.admin, large); res.StatusCode != 400 {
 		t.Fatalf("解压超限得到 %d", res.StatusCode)
 	}
-	// 令牌即使有写权限，也不能植入或读取插件代码及私有配置。
+	// Even write-capable API tokens cannot install or read plugin code or private configuration.
 	token := decode[struct{ Token string }](t, f.do(f.admin, "POST", "/api/v1/tokens", `{"name":"测试","scope":"write"}`, nil)).Token
 	for _, target := range []string{"/api/v1/plugins", base + "/data", asset} {
 		if code := f.status(guest, "GET", target, "", map[string]string{"Authorization": "Bearer " + token}); code != 403 {

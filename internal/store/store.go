@@ -1,4 +1,4 @@
-// Package store 保存应用自身的数据（设置、会话、API 令牌）。笔记内容不在这里，见 vault。
+// Package store persists application data (settings, sessions, API tokens). Note contents belong to vault.
 package store
 
 import (
@@ -55,7 +55,7 @@ func Open(path string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
-// Setting 读取设置项；不存在时 ok 为 false
+// Setting reads a setting; ok is false when it does not exist.
 func (s *Store) Setting(key string) (value string, ok bool, err error) {
 	err = s.db.QueryRow(`SELECT value FROM settings WHERE key = ?`, key).Scan(&value)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -69,7 +69,7 @@ func (s *Store) SetSetting(key, value string) error {
 	return err
 }
 
-// SetSettingIfAbsent 仅在设置项不存在时写入，返回是否写入成功（用于首次初始化，防止并发重复设置）
+// SetSettingIfAbsent writes only a missing key and reports whether it succeeded, preventing concurrent duplicate initialization.
 func (s *Store) SetSettingIfAbsent(key, value string) (bool, error) {
 	res, err := s.db.Exec(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING`, key, value)
 	if err != nil {
@@ -85,7 +85,7 @@ func (s *Store) CreateSession(tokenHash string, expires time.Time) error {
 	return err
 }
 
-// SessionExpiry 只读取有效会话，不延长固定有效期。
+// SessionExpiry reads only valid sessions without extending their fixed expiry.
 func (s *Store) SessionExpiry(tokenHash string, now time.Time) (time.Time, bool, error) {
 	var expires int64
 	err := s.db.QueryRow(`SELECT expires_at FROM sessions WHERE token_hash = ? AND expires_at > ?`, tokenHash, now.Unix()).Scan(&expires)
@@ -100,7 +100,7 @@ func (s *Store) DeleteSession(tokenHash string) error {
 	return err
 }
 
-// DeleteOtherSessions 删除除 keepHash 之外的所有会话（修改密码后让其他设备重新登录）
+// DeleteOtherSessions deletes all sessions except keepHash, requiring other devices to sign in after a password change.
 func (s *Store) DeleteOtherSessions(keepHash string) error {
 	_, err := s.db.Exec(`DELETE FROM sessions WHERE token_hash <> ?`, keepHash)
 	return err
@@ -115,9 +115,9 @@ func (s *Store) DeleteExpiredSessions() error {
 	return err
 }
 
-// ---- API 令牌 ----
+// ---- API tokens ----
 
-// APIToken 为自动化调用的访问令牌，只保存哈希。Scope 为 read 或 write
+// APIToken is an automation access token stored only as a hash. Scope is read or write.
 type APIToken struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
@@ -150,7 +150,7 @@ func (s *Store) APITokens() ([]APIToken, error) {
 	return out, rows.Err()
 }
 
-// UseAPIToken 按哈希查找令牌并记录使用时间；不存在时 ok 为 false
+// UseAPIToken finds a token by hash and records its use time; ok is false when it does not exist.
 func (s *Store) UseAPIToken(hash string, now int64) (scope string, ok bool, err error) {
 	err = s.db.QueryRow(`UPDATE api_tokens SET last_used_at = ? WHERE token_hash = ? RETURNING scope`, now, hash).Scan(&scope)
 	if errors.Is(err, sql.ErrNoRows) {

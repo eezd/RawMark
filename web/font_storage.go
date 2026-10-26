@@ -7,7 +7,7 @@ import (
 	"io/fs"
 )
 
-// FontStorage 读取构建工具统计的内置可选字体大小，不包含默认 Maple。
+// FontStorage reads build-generated sizes for optional built-in fonts, excluding default Maple.
 func FontStorage() (int64, error) {
 	data, err := fs.ReadFile(Dist(), "font-storage.json")
 	if err != nil {

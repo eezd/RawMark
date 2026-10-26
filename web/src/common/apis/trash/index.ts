@@ -1,7 +1,7 @@
 import type * as Trash from './type'
 import { request } from '@/http/axios'
 
-/** 读取回收站。 */
+/** Read the recycle bin. */
 export function getTrashApi() {
   return request<Trash.TrashResponseData>({
     url: 'trash',
@@ -10,7 +10,7 @@ export function getTrashApi() {
   })
 }
 
-/** 恢复回收站条目。 */
+/** Restore a recycle-bin entry. */
 export function restoreTrashApi(id: string) {
   return request<Trash.RestoreTrashResponseData>({
     url: `trash/${encodeURIComponent(id)}/restore`,
@@ -19,7 +19,7 @@ export function restoreTrashApi(id: string) {
   })
 }
 
-/** 清空回收站并返回逐项结果。 */
+/** Empty the recycle bin and return per-entry results. */
 export function clearTrashApi() {
   return request<Trash.ClearTrashResponseData>({
     url: 'trash',
@@ -28,7 +28,7 @@ export function clearTrashApi() {
   })
 }
 
-/** 永久删除回收站条目。 */
+/** Permanently delete a recycle-bin entry. */
 export function purgeTrashApi(id: string) {
   return request<Trash.PurgeTrashResponseData>({
     url: `trash/${encodeURIComponent(id)}`,

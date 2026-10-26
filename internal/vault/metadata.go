@@ -32,7 +32,7 @@ type Metadata struct {
 
 var inlineTag = regexp.MustCompile(`#[\p{L}\p{N}_][\p{L}\p{N}_/-]*`)
 
-// LocalTarget 在链接边界解码 Markdown 和 URL，拒绝远程地址、绝对路径及越界路径。
+// LocalTarget decodes Markdown and URLs at the link boundary, rejecting remote URLs, absolute paths, and out-of-bounds paths.
 func LocalTarget(note, raw string) (string, *url.URL, bool) {
 	raw = html.UnescapeString(markdownEscape.ReplaceAllString(raw, "$1"))
 	u, err := url.Parse(raw)
@@ -46,7 +46,7 @@ func LocalTarget(note, raw string) (string, *url.URL, bool) {
 	return target, u, true
 }
 
-// Analyze 提取语义关系而不重新序列化正文；源位置保留为原文行号。
+// Analyze extracts semantic relationships without reserializing text; source positions remain original line numbers.
 func Analyze(note string, content []byte) Metadata {
 	m := Metadata{Title: strings.TrimSuffix(path.Base(note), NoteExt), Tags: []string{}, Links: []Reference{}, Assets: []Reference{}, Warnings: []string{}}
 	addWarning := func(key string, args ...any) {
@@ -138,7 +138,7 @@ func Analyze(note string, content []byte) Metadata {
 			return ast.WalkSkipChildren, nil
 		case *ast.Link:
 			addRef(node.Destination.Str(source), node.Pos())
-			// 链接文字中可以嵌套图片，仍须记录其资源引用。
+			// Link labels may contain nested images whose resource references must still be recorded.
 		case *ast.Image:
 			addRef(node.Destination.Str(source), node.Pos())
 			return ast.WalkSkipChildren, nil
@@ -156,7 +156,7 @@ func Analyze(note string, content []byte) Metadata {
 		}
 		return ast.WalkContinue, nil
 	})
-	// HTML 资源也可能被历史导入的笔记引用；清理不能漏掉它们。
+	// Historically imported notes may reference HTML resources; cleanup must include them.
 	excluded := nonProseRanges(root)
 	for _, span := range importLinkSpans(content) {
 		if !span.html {

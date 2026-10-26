@@ -22,7 +22,7 @@ function onSystem() {
 system.addEventListener('change', onSystem)
 onBeforeUnmount(() => system.removeEventListener('change', onSystem))
 const dark = computed(() => (fixedThemeMode(settings.theme) ?? (settings.colorMode === 'system' ? (systemDark.value ? 'dark' : 'light') : settings.colorMode)) === 'dark')
-// 思源色板顺序；只影响选中文字，不修改主题背景。
+// SiYuan palette order; affect only selected text, not the theme background.
 const foreground = computed(() => dark.value
   ? ['#f39993', '#ffd599', '#a6d5fa', '#b7dfb9', '#9aa0a6', '#3575f0', '#f3a92f', '#d23f31', '#f47c9c', '#4dd0e1', '#10df54', '#ecd424', '#1e1e1e']
   : ['#790600', '#8a4f00', '#005599', '#006b04', '#5f6368', '#3575f0', '#ff9200', '#d23f31', '#a40074', '#007080', '#006e2a', '#6b5a00', '#ffffff'])

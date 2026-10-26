@@ -23,13 +23,13 @@ interface TableModel {
   from: number
   to: number
   aligns: Align[]
-  // rows[0] 为表头，其余为表体；分隔行单独由 aligns 表示
+  // rows[0] is the header; remaining rows form the body. aligns separately represents the delimiter row.
   rows: RowLine[]
 }
 
-// ---- 解析与序列化 ----
+// ---- Parsing and serialization ----
 
-// 按未转义的 | 切分一行，去掉首尾可选的竖线
+// Split a line on unescaped | characters, removing optional leading/trailing pipes.
 function splitRow(line: string): string[] {
   const cells: string[] = []
   let cur = ''
@@ -100,7 +100,7 @@ function findTable(state: EditorState, pos: number): SyntaxNode | null {
   return null
 }
 
-// ---- 渲染组件 ----
+// ---- Rendered widget ----
 
 function renderCell(cell: HTMLElement, raw: string) {
   cell.innerHTML = renderInlineMarkdown(raw)
@@ -109,9 +109,9 @@ function renderCell(cell: HTMLElement, raw: string) {
 
 interface WidgetState {
   model: TableModel
-  // 最近编辑的单元格，工具栏操作以它为准
+  // The most recently edited cell, used as the target for toolbar actions.
   current: { r: number, c: number }
-  // 结构变更后需要聚焦的单元格（DOM 重建后生效）
+  // Cell to focus after a structural change, once the DOM is rebuilt.
   pendingFocus: { r: number, c: number } | null
 }
 
@@ -139,7 +139,7 @@ class TableWidget extends WidgetType {
     wrap.className = 'cm-rm-table-widget'
     wrap.lang = this.locale
     widgetStates.set(wrap, { model: this.model, current: { r: 0, c: 0 }, pendingFocus: null })
-    // 横向滚动放在内层，避免绝对定位的工具栏被裁剪
+    // Keep horizontal scrolling inside so the absolutely positioned toolbar is not clipped.
     const scroller = document.createElement('div')
     scroller.className = 'cm-rm-table-scroll'
     scroller.append(this.buildTable(view, wrap))
@@ -159,7 +159,7 @@ class TableWidget extends WidgetType {
     const sameShape
       = old.rows.length === this.model.rows.length && old.aligns.join() === this.model.aligns.join()
     if (!sameShape || st.pendingFocus) {
-      // 重建前记下正在编辑的单元格（如撤销改变了行数），重建后恢复焦点
+      // Remember the active cell before rebuilding, such as after undo changes row count, then restore focus.
       const editing = dom.querySelector<HTMLElement>('[contenteditable]')
       const focus
         = st.pendingFocus ?? (editing ? { r: Number(editing.dataset.r), c: Number(editing.dataset.c) } : null)
@@ -173,7 +173,7 @@ class TableWidget extends WidgetType {
       }
       return true
     }
-    // 形状不变：只刷新内容变化的单元格；正在编辑的单元格若与文档一致则不动，以免打断输入
+    // With the same shape, refresh only changed cells; leave the active cell untouched when it matches the document to preserve input.
     dom.querySelectorAll<HTMLElement>('[data-r]').forEach((cell) => {
       const r = Number(cell.dataset.r)
       const c = Number(cell.dataset.c)
@@ -226,7 +226,7 @@ class TableWidget extends WidgetType {
       if (danger) b.className = 'cm-rm-danger'
       b.innerHTML = svg(icon)
       b.append(label)
-      // mousedown 阻止默认行为，保持当前单元格的焦点与光标
+      // Prevent default on mousedown to preserve the active cell's focus and cursor.
       b.addEventListener('mousedown', (e) => {
         e.preventDefault()
         run()
@@ -266,7 +266,7 @@ function svg(body: string): string {
   return `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`
 }
 
-// 结构变更：基于文档中的最新表格重新生成整张表的源码，返回变更后应聚焦的单元格
+// For structural changes, regenerate the table's source from the latest document and return the cell to focus afterward.
 function mutate(
   view: EditorView,
   wrap: HTMLElement,
@@ -278,14 +278,14 @@ function mutate(
   const rows = model.rows.map(r => [...r.cells])
   const aligns = [...model.aligns]
   st.pendingFocus = f(rows, aligns, st.current)
-  // 结构变更单独成为一步撤销，不与前后的单元格输入合并
+  // Keep structural changes as a separate undo step, not merged with surrounding cell edits.
   view.dispatch({
     changes: { from: model.from, to: model.to, insert: serializeTable(aligns, rows) },
     annotations: isolateHistory.of('full'),
   })
 }
 
-// focusColumn 未指定时聚焦新行的同一列
+// Without focusColumn, focus the same column in the new row.
 function insertRow(view: EditorView, wrap: HTMLElement, focusColumn?: number) {
   return mutate(view, wrap, (rows, aligns, cur) => {
     rows.splice(cur.r + 1, 0, aligns.map(() => ''))
@@ -304,7 +304,7 @@ function insertColumn(view: EditorView, wrap: HTMLElement) {
 
 function deleteRow(view: EditorView, wrap: HTMLElement) {
   return mutate(view, wrap, (rows, _, cur) => {
-    // 表头行不能删除
+    // The header row cannot be deleted.
     if (cur.r === 0) return cur
     rows.splice(cur.r, 1)
     return { r: Math.min(cur.r, rows.length - 1), c: cur.c }
@@ -339,7 +339,7 @@ function placeCaretAtEnd(el: HTMLElement) {
   sel.addRange(range)
 }
 
-// 单元格编辑时显示该格的 Markdown 源码，失焦后恢复渲染
+// Show a cell's Markdown source while editing; restore rendered output on blur.
 function startEdit(cell: HTMLElement, st: WidgetState) {
   const r = Number(cell.dataset.r)
   const c = Number(cell.dataset.c)
@@ -416,7 +416,7 @@ function bindCell(view: EditorView, wrap: HTMLElement, cell: HTMLElement) {
       e.preventDefault()
       moveTo(r() + 1, c())
     } else if (e.key === 'Escape') {
-      // 退出表格，光标放到表格之后
+      // Exit the table and place the cursor after it.
       e.preventDefault()
       const model = currentModel(view, wrap)
       if (model) view.dispatch({ selection: { anchor: Math.min(model.to + 1, view.state.doc.length) } })
@@ -425,14 +425,14 @@ function bindCell(view: EditorView, wrap: HTMLElement, cell: HTMLElement) {
   })
 }
 
-// ---- 装饰 ----
+// ---- Decorations ----
 
-// 块级替换装饰跨越多行，只能由 StateField 提供，不能来自 ViewPlugin。
-// 与其他语法一致：编辑器获得焦点且光标在表格内时才显示源码（见 focus.ts）
+// Multiline block replacements must come from StateField, not ViewPlugin.
+// Match other syntax: show source only when the editor is focused and the cursor is inside the table (see focus.ts).
 function buildTables(state: EditorState): DecorationSet {
   const out: Range<Decoration>[] = []
   const sel = state.field(editorFocused) ? state.selection.ranges : []
-  // 只渲染顶层表格；引用、列表内的表格以源码显示
+  // Render only top-level tables; keep tables inside quotes or lists as source.
   for (let node = syntaxTree(state).topNode.firstChild; node; node = node.nextSibling) {
     if (node.name !== 'Table') continue
     if (sel.some(r => r.from <= node.to && r.to >= node.from)) continue

@@ -33,7 +33,7 @@ type fixture struct {
 	root   string
 	store  *store.Store
 	hub    *events.Hub
-	// 已登录的客户端
+	// Authenticated client.
 	admin *http.Client
 }
 
@@ -88,7 +88,7 @@ func TestEventsRejectRevokedCredentials(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer conn.CloseNow()
-			// 首条事件确认订阅已经建立，避免把握手和广播的时序当作鉴权结果。
+			// The first event confirms subscription before testing authorization, avoiding handshake/broadcast timing races.
 			f.hub.Broadcast(events.Event{Type: "tree"})
 			if _, _, err := conn.Read(ctx); err != nil {
 				t.Fatal(err)
@@ -238,7 +238,7 @@ func decode[T any](t *testing.T, res *http.Response) T {
 	return envelope.Data
 }
 
-// 文档与实际接口一一对应：新增接口忘记写文档、文档中残留已删除的接口都会失败
+// Documentation must match actual endpoints: missing new routes and obsolete documented routes both fail.
 func TestOpenAPICoversRoutes(t *testing.T) {
 	var spec struct {
 		Paths map[string]map[string]json.RawMessage
@@ -271,7 +271,7 @@ func TestOpenAPICoversRoutes(t *testing.T) {
 func TestAPIResponsesAreNotCached(t *testing.T) {
 	f := newFixture(t)
 	f.write("笔记.md", "# 正文")
-	// 登录状态与目录曾在 Firefox 离线时命中 HTTP 缓存，误进入无法加载的工作区。
+	// Firefox once cached identity and tree responses offline, incorrectly opening an unloadable workspace.
 	for _, path := range []string{"/api/v1/auth/state", "/api/v1/tree", "/api/v1/files/笔记.md", "/api/v1/raw/笔记.md"} {
 		res := f.do(f.admin, "GET", path, "", nil)
 		if res.StatusCode != http.StatusOK || res.Header.Get("Cache-Control") != "no-store" {
@@ -443,7 +443,7 @@ func TestSetupWithoutCode(t *testing.T) {
 	if status := f.status(newClient(), "POST", "/api/v1/auth/setup", `{"password":"replacement"}`, nil); status != 409 {
 		t.Fatalf("重复初始化必须拒绝: %d", status)
 	}
-	// 新建 Manager 模拟重启，不能重新开放密码设置。
+	// A new Manager simulates a restart and must not reopen password setup.
 	reopened := auth.New(st)
 	if err := reopened.Setup("replacement"); !errors.Is(err, auth.ErrAlreadySetUp) {
 		t.Fatalf("重启后不能覆盖密码: %v", err)

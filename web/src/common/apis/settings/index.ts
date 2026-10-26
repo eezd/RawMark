@@ -1,7 +1,7 @@
 import type * as Settings from './type'
 import { request } from '@/http/axios'
 
-/** 读取设置。 */
+/** Read settings. */
 export function getSettingsApi() {
   return request<Settings.SettingsResponseData>({
     url: 'settings',
@@ -10,7 +10,7 @@ export function getSettingsApi() {
   })
 }
 
-/** 更新设置。 */
+/** Update settings. */
 export function patchSettingsApi(data: Settings.SettingsData) {
   return request<Settings.SettingsResponseData>({
     url: 'settings',

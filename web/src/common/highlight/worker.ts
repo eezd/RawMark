@@ -1,7 +1,7 @@
 import type { HighlightRequest, HighlightResponse, TokenRun } from './protocol'
 import hljs from 'highlight.js'
 
-// 只转换 highlight.js 生成的 span 和转义文本，不向编辑器插入 HTML。
+// Convert only highlight.js-generated spans and escaped text; never insert HTML into the editor.
 function serialize(html: string): TokenRun {
   const root: TokenRun = []
   const stack = [root]
@@ -23,7 +23,7 @@ function serialize(html: string): TokenRun {
 function highlight(req: HighlightRequest): TokenRun | null {
   if (!hljs.getLanguage(req.lang)) return null
   const result = hljs.highlight(req.code, { language: req.lang, ignoreIllegals: true })
-  // 库的安全模式会随纯文本结果返回异常，仍需传递真实失败原因。
+  // The library's safe mode may return an exception alongside plain text; propagate the actual failure.
   if (result.errorRaised) throw result.errorRaised
   return serialize(result.value)
 }

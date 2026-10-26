@@ -4,7 +4,7 @@ import { typoraExtensions } from './extensions'
 
 const parser = base.configure([GFM, ...typoraExtensions])
 
-/** 列出指定类型节点覆盖的原文 */
+/** List original text covered by nodes of the specified type. */
 function nodes(src: string, name: string): string[] {
   const out: string[] = []
   parser.parse(src).iterate({
@@ -57,7 +57,7 @@ describe('typora 扩展语法', () => {
     expect(nodes('---\ntitle: a\n...\n正文', 'FrontMatter')).toEqual(['---\ntitle: a\n...'])
     expect(nodes('正文\n\n---\na: b\n---', 'FrontMatter')).toEqual([])
     expect(nodes('正文\n\n---\n', 'HorizontalRule')).toEqual(['---'])
-    // 闭合后的 --- 照常解析为分隔线
+    // After front matter closes, --- is parsed as a thematic break again.
     expect(nodes('---\na: 1\n---\n\n---\n', 'HorizontalRule')).toEqual(['---'])
   })
 })

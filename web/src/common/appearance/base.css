@@ -2,7 +2,7 @@
 @import 'highlight.js/styles/atom-one-dark.css';
 @import './maple-font.css';
 
-/* 基础主题。--rm-* 变量继续作为主题接口，字体在本地加载。 */
+/* Base theme. --rm-* variables remain the theme interface; fonts load locally. */
 :root {
   color-scheme: light;
   --rm-sidebar-width: 288px;
@@ -10,7 +10,7 @@
   --rm-font-heading: var(--rm-font-editor, var(--rm-font-text));
   --rm-font-mono: 'Maple Mono Normal NL NF CN', monospace;
   --rm-font-size: 16px;
-  /* 界面排版独立于正文；辅助文字随界面缩放，但不小于 13px。 */
+  /* Interface typography is independent of body text; secondary text scales with the interface but stays at least 13px. */
   --rm-ui-font-size: 14px;
   --rm-ui-font-small: max(13px, calc(var(--rm-ui-font-size) - 2px));
   --rm-ui-font-caption: max(13px, calc(var(--rm-ui-font-size) - 3px));
@@ -159,7 +159,7 @@ textarea {
   background: var(--rm-selection) !important;
 }
 
-/* 标题 */
+/* Headings. */
 .cm-line:is(.cm-rm-h1, .cm-rm-h2, .cm-rm-h3, .cm-rm-h4, .cm-rm-h5, .cm-rm-h6) {
   line-height: 1.4;
   padding-top: 1rem;
@@ -186,7 +186,7 @@ textarea {
   font-size: 1em;
 }
 
-/* Markdown 标记（激活行显示源码时） */
+/* Markdown markers shown as source on active lines. */
 .cm-rm-markup,
 .cm-rm-url {
   color: var(--rm-text-muted);
@@ -198,7 +198,7 @@ textarea {
   cursor: text;
 }
 
-/* 行内代码 */
+/* Inline code. */
 .cm-rm-inline-code {
   font-family: var(--rm-font-mono);
   font-size: 0.875em;
@@ -208,8 +208,8 @@ textarea {
   border-radius: 4px;
 }
 
-/* 代码块
- * 背景画在 ::before 上并置于选区图层之下：若直接给 .cm-line 设背景，会盖住 CodeMirror 绘制的选区 */
+/* Code blocks. Paint backgrounds on ::before below the selection
+ * layer; a background on .cm-line would cover CodeMirror's selection. */
 .cm-line.cm-rm-code {
   position: relative;
   font-family: var(--rm-font-mono);
@@ -246,7 +246,7 @@ textarea {
 .cm-line.cm-rm-code-begin.cm-rm-code-end::before {
   border-radius: 8px;
 }
-/* 围栏展开前后保持同一行高，语言标签与复制按钮不参与行高计算，避免代码内容跳动。 */
+/* Keep fence line heights unchanged when expanded; language labels and copy buttons must not affect line height or shift code. */
 .cm-rm-code-header {
   display: inline-flex;
   align-items: center;
@@ -291,14 +291,14 @@ textarea {
   color: var(--rm-text-muted);
 }
 
-/* 引用 */
+/* Blockquotes. */
 .cm-line.cm-rm-quote {
   border-left: 3px solid var(--rm-accent);
   padding: 5px 15px;
   background: color-mix(in srgb, var(--rm-accent) 4%, transparent);
 }
 
-/* 列表 */
+/* Lists. */
 .cm-rm-bullet {
   color: var(--rm-text-muted);
   display: inline-block;
@@ -311,7 +311,7 @@ textarea {
   cursor: pointer;
 }
 
-/* 分隔线 */
+/* Thematic breaks. */
 .cm-rm-hr {
   display: inline-block;
   width: 100%;
@@ -319,7 +319,7 @@ textarea {
   vertical-align: middle;
 }
 
-/* 图片 */
+/* Images. */
 .cm-rm-image {
   display: block;
 }
@@ -332,7 +332,7 @@ textarea {
   font-style: italic;
 }
 
-/* 表格：光标在表格内时以等宽源码显示，否则为可编辑的渲染表格 */
+/* Tables show monospaced source while the cursor is inside, otherwise an editable rendered table. */
 .cm-line.cm-rm-table {
   font-family: var(--rm-font-mono);
   font-size: 0.9em;
@@ -379,7 +379,7 @@ textarea {
 .cm-rm-table-widget a {
   color: var(--rm-accent-strong);
 }
-/* 工具栏占据表格上方的固定空间，只切换可见性，不遮挡表格也不引起跳动 */
+/* Reserve fixed space above tables for the toolbar; toggle visibility without covering the table or shifting its position. */
 .cm-rm-table-toolbar {
   display: flex;
   justify-content: flex-end;
@@ -452,7 +452,7 @@ textarea {
   .cm-editor .cm-content {
     padding: 16px 16px 40vh;
   }
-  /* 触屏没有悬停，工具栏常显，按钮加大触控热区 */
+  /* Touchscreens lack hover: keep the toolbar visible and enlarge button touch targets. */
   .cm-rm-table-toolbar {
     visibility: visible;
     opacity: 1;
@@ -463,7 +463,7 @@ textarea {
   }
 }
 
-/* ---- Typora 扩展语法 ---- */
+/* ---- Typora syntax extensions ---- */
 .cm-rm-highlight,
 .cm-rm-table-widget mark {
   background: var(--rm-highlight-bg);
@@ -505,7 +505,7 @@ textarea {
   font-size: 0.9em;
   color: var(--rm-text-muted);
 }
-/* 编辑时显示在源码下方的预览 */
+/* Preview displayed below source while editing. */
 .cm-rm-preview {
   margin: 4px 0 8px;
   padding: 8px 12px;
@@ -628,7 +628,7 @@ textarea {
   }
 }
 
-/* opacity 保留排版和字体请求；等待期间不显示备用字体，也覆盖 Teleport 到 body 的菜单。 */
+/* opacity preserves layout and font requests; hide fallback fonts while waiting, including menus teleported to body. */
 :root:is([data-rm-fonts='loading'], [data-rm-fonts='error']) body > :not(.rm-font-error) {
   opacity: 0;
   pointer-events: none;

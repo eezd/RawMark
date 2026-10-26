@@ -57,7 +57,7 @@ export const useUserStore = defineStore('user', () => {
     infoRequest = pending
     void pending.finally(() => {
       if (infoRequest === pending) infoRequest = undefined
-    }).catch(() => { /* 失败由原请求调用方处理。 */ })
+    }).catch(() => { /* The original request caller handles failures. */ })
     return pending
   }
   async function logout() {

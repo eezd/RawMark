@@ -2,7 +2,7 @@ import type * as Assets from './type'
 import { encodePath } from '@@/utils/paths'
 import { request } from '@/http/axios'
 
-/** 上传笔记图片。 */
+/** Upload an image for a note. */
 export function uploadImageApi(data: Assets.UploadImageRequestData) {
   const body = new FormData()
   body.append('file', data.file, data.file.name || 'image')
@@ -15,7 +15,7 @@ export function uploadImageApi(data: Assets.UploadImageRequestData) {
   })
 }
 
-/** 上传目录图片。 */
+/** Upload an image for a folder. */
 export function uploadFolderImageApi(data: Assets.FolderImageRequestData) {
   const body = new FormData()
   body.append('file', data.file)
@@ -28,7 +28,7 @@ export function uploadFolderImageApi(data: Assets.FolderImageRequestData) {
   })
 }
 
-/** 替换原路径图片。 */
+/** Replace an image at its existing path. */
 export function replaceImageApi(data: Assets.ReplaceImageRequestData) {
   const body = new FormData()
   body.append('file', data.file)
@@ -40,7 +40,7 @@ export function replaceImageApi(data: Assets.ReplaceImageRequestData) {
   })
 }
 
-/** 下载并导入远程图片。 */
+/** Download and import a remote image. */
 export function importImageApi(data: Assets.ImportImageRequestData) {
   return request<Assets.ImageResponseData>({
     url: 'assets/import',
@@ -51,7 +51,7 @@ export function importImageApi(data: Assets.ImportImageRequestData) {
   })
 }
 
-/** 核对引用后清理图片。 */
+/** Clean up images after checking references. */
 export function cleanupImagesApi(data: Assets.CleanupImagesRequestData) {
   return request<Assets.CleanupImagesResponseData>({
     url: 'assets/cleanup',

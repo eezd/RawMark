@@ -2,7 +2,7 @@ import type * as Files from './type'
 import { encodePath } from '@@/utils/paths'
 import { request } from '@/http/axios'
 
-/** 读取 Markdown 原文与版本。 */
+/** Read original Markdown and its revision. */
 export function getFileApi(path: string) {
   return request<string>({
     url: `files/${encodePath(path)}`,
@@ -13,7 +13,7 @@ export function getFileApi(path: string) {
   })
 }
 
-/** 按版本写入 Markdown。 */
+/** Write Markdown with a revision precondition. */
 export function writeFileApi(data: Files.WriteFileRequestData) {
   const headers: Record<string, string> = { 'Content-Type': 'text/markdown; charset=utf-8' }
   if (data.ifMatch === '') headers['If-None-Match'] = '*'
@@ -28,7 +28,7 @@ export function writeFileApi(data: Files.WriteFileRequestData) {
   })
 }
 
-/** 移入回收站。 */
+/** Move an item to the recycle bin. */
 export function deleteFileApi(path: string) {
   return request<Files.DeleteFileResponseData>({
     url: `files/${encodePath(path)}`,
@@ -37,7 +37,7 @@ export function deleteFileApi(path: string) {
   })
 }
 
-/** 创建文件夹。 */
+/** Create a folder. */
 export function createFolderApi(data: Files.FileRequestData) {
   return request<Files.FileOperationResponseData>({
     url: 'folders',
@@ -47,7 +47,7 @@ export function createFolderApi(data: Files.FileRequestData) {
   })
 }
 
-/** 移动文件或目录。 */
+/** Move a file or folder. */
 export function moveFileApi(data: Files.MoveRequestData) {
   return request<Files.FileOperationResponseData>({
     url: 'move',
@@ -57,7 +57,7 @@ export function moveFileApi(data: Files.MoveRequestData) {
   })
 }
 
-/** 导入 Markdown 或 ZIP。 */
+/** Import Markdown or a ZIP archive. */
 export function importNotesApi(data: Files.ImportRequestData) {
   const body = new FormData()
   body.append('dir', data.dir)
@@ -71,7 +71,7 @@ export function importNotesApi(data: Files.ImportRequestData) {
   })
 }
 
-/** 导出选中内容为 Markdown ZIP。 */
+/** Export selected contents as a Markdown ZIP. */
 export function exportFilesApi(data: Files.ExportRequestData) {
   return request<Blob>({
     url: 'export',
@@ -83,7 +83,7 @@ export function exportFilesApi(data: Files.ExportRequestData) {
   })
 }
 
-/** 下载原始文件。 */
+/** Download a raw file. */
 export function getRawFileApi(path: string) {
   return request<Blob>({
     url: `raw/${encodePath(path)}`,

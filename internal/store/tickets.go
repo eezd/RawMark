@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// ResourceTicket 只保存资源凭据哈希，所属登录会话是授权的最终依据。
+// ResourceTicket stores only a resource credential hash; the owning login session remains the final authority.
 type ResourceTicket struct {
 	Hash        string
 	SessionHash string
@@ -25,7 +25,7 @@ func (s *Store) Ticket(hash string, consume bool, now time.Time) (ResourceTicket
 	var t ResourceTicket
 	var expires int64
 	query := `SELECT token_hash,session_hash,kind,resource,revision,expires_at FROM resource_tickets WHERE token_hash = ? AND expires_at > ?`
-	// 事件握手票据原子消费；资源票据可在父会话有效期内读取。
+	// Event handshake tickets are consumed atomically; resource tickets remain readable while the parent session is valid.
 	if consume {
 		query = `DELETE FROM resource_tickets WHERE token_hash = ? AND expires_at > ? AND kind = 'events' RETURNING token_hash,session_hash,kind,resource,revision,expires_at`
 	}

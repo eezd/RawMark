@@ -18,7 +18,7 @@ func newVault(t *testing.T) *Vault {
 	return v
 }
 
-// 显式构造旧版独立附件，覆盖升级后的移动与回收站恢复。
+// Construct legacy dedicated attachments explicitly to cover moves and recycle-bin restores after upgrading.
 func legacyAsset(t *testing.T, v *Vault, note, name, content string) string {
 	t.Helper()
 	dir := filepath.Join(v.Root(), filepath.FromSlash(AssetsDir(note)))
@@ -85,7 +85,7 @@ func TestMoveRollsBackWhenAssetDestinationIsTooLong(t *testing.T) {
 		t.Fatal(err)
 	}
 	legacyAsset(t, v, "n.md", "x.png", "image")
-	// 笔记名可写入，但派生的 .assets 名超过文件系统的单段长度限制。
+	// The note name fits, but its derived .assets name exceeds the filesystem's per-segment length limit.
 	destination := strings.Repeat("a", 250) + ".md"
 	if _, err := v.Move("n.md", destination); err == nil {
 		t.Fatal("图片目录移动应失败")

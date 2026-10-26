@@ -1,4 +1,4 @@
-// Package vault 管理笔记仓库目录：文件即真源，所有路径以仓库根为基准、使用 "/" 分隔。
+// Package vault manages the note directory: files are the source of truth, and all paths are vault-relative with "/" separators.
 package vault
 
 import (
@@ -30,7 +30,7 @@ var (
 	ErrTooLarge    = i18n.New("file_is_too_large_5bfcab")
 )
 
-// ConflictError 表示 If-Match 校验失败，Rev 为服务端当前版本（文件不存在时为空）
+// ConflictError indicates a failed If-Match check; Rev is the current server revision (empty if the file does not exist).
 type ConflictError struct{ Rev string }
 
 func (e *ConflictError) Error() string { return i18n.New("version_conflict").Error() }
@@ -43,9 +43,9 @@ const (
 )
 
 type Vault struct {
-	root  string // 已解析符号链接的绝对路径
+	root  string // Absolute path with symlinks resolved.
 	trash string
-	// 串行化所有写操作，保证"检查版本 + 写入"、移动等复合操作的原子性
+	// Serialize writes to make compound operations such as revision-check/write and moves atomic.
 	mu sync.Mutex
 }
 
@@ -53,7 +53,7 @@ type Entry struct {
 	Path    string      `json:"path"`
 	Dir     bool        `json:"dir"`
 	Size    int64       `json:"size"`
-	ModTime int64       `json:"mtime"` // 毫秒
+	ModTime int64       `json:"mtime"` // Milliseconds.
 	Info    fs.FileInfo `json:"-"`
 	Icon    *TreeIcon   `json:"icon,omitempty"`
 }
@@ -62,8 +62,8 @@ type TrashItem struct {
 	ID        string `json:"id"`
 	Path      string `json:"path"`
 	Dir       bool   `json:"dir"`
-	DeletedAt int64  `json:"deletedAt"` // 毫秒
-	// 随笔记一起删除的 .assets 目录名（相对回收站条目目录）
+	DeletedAt int64  `json:"deletedAt"` // Milliseconds.
+	// .assets directory deleted with the note, relative to the recycle-bin entry directory.
 	Assets string `json:"assets,omitempty"`
 }
 
@@ -88,14 +88,14 @@ func Open(root string) (*Vault, error) {
 
 func (v *Vault) Root() string { return v.root }
 
-// Rev 为内容版本号：sha256 前 8 字节的十六进制
+// Rev is the content revision: the first eight SHA-256 bytes in hexadecimal.
 func Rev(content []byte) string {
 	sum := sha256.Sum256(content)
 	return hex.EncodeToString(sum[:8])
 }
 
-// CleanPath 校验客户端传入的相对路径：不允许绝对路径、空段、"."/".." 段以及以 "." 开头的隐藏段
-// （隐藏段包括 .rawmark 元数据目录与 .git 等，一律不经 API 暴露）
+// CleanPath validates client-relative paths: reject absolute paths, empty segments, "."/"..", and hidden segments starting with ".".
+// Hidden segments include .rawmark metadata and .git; none are exposed through the API.
 func CleanPath(p string) (string, error) {
 	if p == "" || strings.HasPrefix(p, "/") || strings.ContainsAny(p, "\\\x00") {
 		return "", ErrInvalidPath
@@ -110,7 +110,7 @@ func CleanPath(p string) (string, error) {
 
 func IsNote(p string) bool { return strings.HasSuffix(p, NoteExt) && len(p) > len(NoteExt) }
 
-// AssetsDir 返回笔记对应的 Typora 风格图片目录：a.md -> a.assets
+// AssetsDir returns the note's Typora-style image directory: a.md -> a.assets.
 func AssetsDir(note string) string { return strings.TrimSuffix(note, NoteExt) + AssetsExt }
 
 func (v *Vault) abs(rel string) (string, error) {
@@ -125,7 +125,7 @@ func (v *Vault) abs(rel string) (string, error) {
 	return p, nil
 }
 
-// checkInside 确认路径最深的已存在祖先在解析符号链接后仍位于仓库内，防止经符号链接逃逸
+// checkInside resolves the deepest existing ancestor and ensures it stays inside the vault, preventing symlink escapes.
 func (v *Vault) checkInside(p string) error {
 	for cur := p; ; {
 		real, err := filepath.EvalSymlinks(cur)
@@ -146,7 +146,7 @@ func (v *Vault) checkInside(p string) error {
 	}
 }
 
-// ---- 读写 ----
+// ---- Reading and writing ----
 
 func (v *Vault) Read(rel string) ([]byte, string, error) {
 	if !IsNote(rel) {
@@ -166,7 +166,7 @@ func (v *Vault) Read(rel string) ([]byte, string, error) {
 	return data, Rev(data), nil
 }
 
-// Stat 返回普通文件或目录的信息；不存在时返回 ErrNotFound
+// Stat returns regular-file or directory information, or ErrNotFound if missing.
 func (v *Vault) Stat(rel string) (fs.FileInfo, error) {
 	p, err := v.abs(rel)
 	if err != nil {
@@ -179,7 +179,7 @@ func (v *Vault) Stat(rel string) (fs.FileInfo, error) {
 	return info, err
 }
 
-// Precondition 对应 HTTP 条件请求：IfMatch 要求当前版本一致，IfNoneMatch 要求文件尚不存在；都为空则无条件覆盖
+// Precondition maps HTTP conditions: IfMatch requires the current revision; IfNoneMatch requires a new file; omitting both overwrites unconditionally.
 type Precondition struct {
 	IfMatch     string
 	IfNoneMatch bool
@@ -220,7 +220,7 @@ func (v *Vault) Write(rel string, content []byte, pre Precondition) (string, err
 	return Rev(content), nil
 }
 
-// atomicWrite 先写同目录临时文件并 fsync，再 rename 覆盖，保证不会留下写了一半的文件
+// atomicWrite writes and fsyncs a sibling temporary file before renaming it over the destination, preventing partial files.
 func atomicWrite(p string, data []byte) error {
 	dir := filepath.Dir(p)
 	f, err := os.CreateTemp(dir, tmpPrefix+"*")
@@ -228,7 +228,7 @@ func atomicWrite(p string, data []byte) error {
 		return err
 	}
 	tmp := f.Name()
-	defer os.Remove(tmp) // rename 成功后为空操作
+	defer os.Remove(tmp) // No-op after a successful rename.
 	if _, err := f.Write(data); err != nil {
 		f.Close()
 		return err
@@ -266,7 +266,7 @@ func (v *Vault) Mkdir(rel string) error {
 	return os.MkdirAll(p, 0o755)
 }
 
-// OpenRaw 打开仓库内的普通文件（图片等资源），调用方负责关闭
+// OpenRaw opens a regular vault file (such as an image); the caller must close it.
 func (v *Vault) OpenRaw(rel string) (*os.File, fs.FileInfo, error) {
 	p, err := v.abs(rel)
 	if err != nil {
@@ -290,9 +290,9 @@ func (v *Vault) OpenRaw(rel string) (*os.File, fs.FileInfo, error) {
 	return f, info, nil
 }
 
-// ---- 列表 ----
+// ---- Listing ----
 
-// IsImage 判断当前支持管理的图片扩展名，不用于验证文件内容。
+// IsImage recognizes extensions supported by image management; it does not validate file contents.
 func IsImage(p string) bool {
 	switch strings.ToLower(path.Ext(p)) {
 	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif", ".apng", ".bmp", ".ico", ".tif", ".tiff":
@@ -302,7 +302,7 @@ func IsImage(p string) bool {
 	}
 }
 
-// Tree 列出文件夹、笔记和图片，沿用 TreeAt 的隐藏路径与符号链接边界。
+// Tree lists folders, notes, and images within TreeAt's hidden-path and symlink boundaries.
 func (v *Vault) Tree() ([]Entry, error) {
 	entries, err := v.TreeAt("")
 	if err != nil {
@@ -327,7 +327,7 @@ func (v *Vault) Tree() ([]Entry, error) {
 	return visible, nil
 }
 
-// TreeAt 递归列出指定目录中的普通文件和子目录，路径相对此目录；空路径表示仓库根，不公开隐藏条目或符号链接。
+// TreeAt recursively lists regular files and subfolders relative to the selected directory. An empty path selects the vault root; hidden entries and symlinks are not exposed.
 func (v *Vault) TreeAt(rel string) ([]Entry, error) {
 	root := v.root
 	if rel != "" {
@@ -371,10 +371,10 @@ func (v *Vault) TreeAt(rel string) ([]Entry, error) {
 	return entries, err
 }
 
-// ---- 移动 / 重命名 ----
+// ---- Moving / renaming ----
 
-// Move 移动或重命名笔记、图片或文件夹，返回是否原子改写了移动主体（改变文件身份）。
-// 笔记的 .assets 目录随之移动；笔记改名时同步改写正文中指向自身图片目录的链接。
+// Move moves or renames a note, image, or folder and reports whether atomic rewriting changed the moved item's file identity.
+// The note's .assets directory follows it; renaming also rewrites links to its own image directory.
 func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 	src, err := v.abs(from)
 	if err != nil {
@@ -457,7 +457,7 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 			return false, err
 		}
 	}
-	// 笔记、目录和图片的移动都可能改变跨文件相对链接。
+	// Moving notes, folders, or images can change relative links between files.
 	links, err := v.moveLinkChanges(from, to, info.IsDir(), srcAssets != "", imageTargets)
 	if err != nil {
 		return false, err
@@ -517,7 +517,7 @@ func (v *Vault) Move(from, to string) (rewritten bool, err error) {
 	return rewritten, err
 }
 
-// ---- 回收站 ----
+// ---- Recycle bin ----
 
 func newTrashID() string {
 	var b [4]byte
@@ -527,7 +527,7 @@ func newTrashID() string {
 
 var trashIDPattern = regexp.MustCompile(`^\d{8}T\d{6}\.\d{3}-[0-9a-f]{8}$`)
 
-// Delete 把笔记（连同 .assets）、图片或文件夹移入回收站
+// Delete moves a note (with .assets), image, or folder to the recycle bin.
 func (v *Vault) Delete(rel string) (TrashItem, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -591,7 +591,7 @@ func (v *Vault) deleteLocked(rel string) (item TrashItem, err error) {
 				rollbackFailed = true
 			}
 		}
-		// 回滚失败时保留目录和元数据，避免继续删除仅存的恢复依据。
+		// Retain directories and metadata on rollback failure instead of deleting the last recovery information.
 		if !rollbackFailed {
 			if cleanup := os.RemoveAll(dir); cleanup != nil {
 				err = errors.Join(err, cleanup)
@@ -660,7 +660,7 @@ func (v *Vault) TrashList() ([]TrashItem, error) {
 	for _, d := range dirs {
 		item, err := v.readTrashItem(d.Name())
 		if errors.Is(err, ErrInvalidPath) || errors.Is(err, ErrNotFound) {
-			continue // 非本程序创建的目录或删除未完成的条目
+			continue // A directory not created by this application, or an incomplete deletion entry.
 		}
 		if err != nil {
 			return nil, err
@@ -711,7 +711,7 @@ func (v *Vault) Restore(id string) (item TrashItem, err error) {
 			return
 		}
 		if cleaning {
-			// 清理可能已删除元数据；先重建恢复依据，再撤回本次移动。
+			// Cleanup may have deleted metadata; recreate recovery information before undoing this move.
 			if rollback := os.MkdirAll(dir, 0o755); rollback != nil {
 				err = errors.Join(err, rollback)
 				return
@@ -756,12 +756,12 @@ func (v *Vault) Purge(id string) error {
 	return v.purgeTrashItemLocked(metadata)
 }
 
-// ---- 资源 ----
+// ---- Resources ----
 
 var extPattern = regexp.MustCompile(`^\.[a-z0-9]{1,8}$`)
 
-// SaveAsset 把上传的文件存入笔记同级的 assets 目录，以内容哈希命名（相同内容只存一份），
-// 返回可直接写入 Markdown 的相对链接
+// SaveAsset stores an upload in the note's sibling assets directory, named by content hash (identical contents are stored once),
+// and returns a relative link ready for Markdown.
 func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (string, error) {
 	if !IsNote(note) {
 		return "", ErrInvalidPath
@@ -772,7 +772,7 @@ func (v *Vault) SaveAsset(note, origName string, r io.Reader, limit int64) (stri
 	return v.saveAssetAt(path.Join(path.Dir(note), "assets"), origName, r, limit)
 }
 
-// SaveFolderAsset 为图片管理上传到当前目录的共享 assets 目录，沿用哈希去重。
+// SaveFolderAsset uploads to the current folder's shared assets directory for image management, using hash deduplication.
 func (v *Vault) SaveFolderAsset(folder, origName string, r io.Reader, limit int64) (string, error) {
 	if !IsImage(origName) {
 		return "", i18n.New("w_choose_an_image_file_544069", ErrInvalidPath)
@@ -822,7 +822,7 @@ func (v *Vault) saveAssetAt(relativeDir, origName string, r io.Reader, limit int
 	return "./" + EscapeLinkPath(path.Base(relativeDir)) + "/" + EscapeLinkPath(path.Base(target)), nil
 }
 
-// 管理界面允许替换图片，文件名不保证内容未变；只复用实际内容相同的普通文件。
+// Image management permits replacement, so filenames do not guarantee unchanged contents; reuse only regular files with matching contents.
 func (v *Vault) assetDestination(dir, name string, data []byte) (string, bool, error) {
 	base, ext := strings.TrimSuffix(name, path.Ext(name)), path.Ext(name)
 	for i := 0; ; i++ {
@@ -879,7 +879,7 @@ func sniffExt(data []byte) string {
 	}
 }
 
-// EscapeLinkPath 只转义会破坏 Markdown 链接目标的字符，中文等保持原样（与 Typora 写法一致）
+// EscapeLinkPath escapes only characters that break Markdown link destinations, preserving Unicode such as Chinese to match Typora.
 func EscapeLinkPath(s string) string {
 	return linkEscaper.Replace(s)
 }

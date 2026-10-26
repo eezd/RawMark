@@ -56,7 +56,7 @@ function render() {
   root.dataset.rmColorMode = dark ? 'dark' : 'light'
   root.dataset.rmTheme = appearancePaused ? 'default' : current.theme
   style('rm-theme', appearancePaused ? '' : themeCSS)
-  // 独立样式元素避免某个片段的未闭合语法吞掉其他片段。
+  // Separate style elements prevent unclosed syntax in one snippet from swallowing others.
   document.querySelectorAll('style[data-rm-snippet]').forEach(el => el.remove())
   if (!appearancePaused) {
     for (const snippet of current.cssSnippets) {

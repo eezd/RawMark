@@ -1,7 +1,7 @@
 import type * as Maintenance from './type'
 import { request } from '@/http/axios'
 
-/** 读取维护状态。 */
+/** Read maintenance status. */
 export function getMaintenanceStatusApi() {
   return request<Maintenance.MaintenanceResponseData>({
     url: 'maintenance/status',
@@ -10,7 +10,7 @@ export function getMaintenanceStatusApi() {
   })
 }
 
-/** 导出实例或设置备份。 */
+/** Export an instance or settings backup. */
 export function exportBackupApi(kind: Maintenance.BackupKind) {
   return request<Blob>({
     url: `maintenance/export/${kind}`,
@@ -21,7 +21,7 @@ export function exportBackupApi(kind: Maintenance.BackupKind) {
   })
 }
 
-/** 导出全部 Markdown 笔记。 */
+/** Export all Markdown notes. */
 export function exportNotesApi() {
   return request<Blob>({
     url: 'maintenance/notes/export',
@@ -32,7 +32,7 @@ export function exportNotesApi() {
   })
 }
 
-/** 导出系统日志。 */
+/** Export system logs. */
 export function exportLogsApi() {
   return request<Blob>({
     url: 'maintenance/logs/export',
@@ -43,7 +43,7 @@ export function exportLogsApi() {
   })
 }
 
-/** 创建备份上传。 */
+/** Create a backup upload. */
 export function startBackupUploadApi(data: Maintenance.BackupUploadRequestData) {
   return request<Maintenance.BackupUploadResponseData>({
     url: 'maintenance/uploads',
@@ -53,7 +53,7 @@ export function startBackupUploadApi(data: Maintenance.BackupUploadRequestData) 
   })
 }
 
-/** 顺序上传备份分块。 */
+/** Upload backup chunks sequentially. */
 export function uploadBackupChunkApi(data: Maintenance.BackupChunkRequestData) {
   return request<Maintenance.BackupChunkResponseData>({
     url: `maintenance/uploads/${encodeURIComponent(data.id)}`,
@@ -64,7 +64,7 @@ export function uploadBackupChunkApi(data: Maintenance.BackupChunkRequestData) {
   })
 }
 
-/** 校验完整备份。 */
+/** Validate the complete backup. */
 export function validateBackupApi(id: string) {
   return request<Maintenance.BackupSummaryResponseData>({
     url: `maintenance/uploads/${encodeURIComponent(id)}/validate`,
@@ -73,7 +73,7 @@ export function validateBackupApi(id: string) {
   })
 }
 
-/** 取消备份上传并清理暂存。 */
+/** Cancel a backup upload and remove staging files. */
 export function cancelBackupUploadApi(id: string) {
   return request<Maintenance.MaintenanceOperationResponseData>({
     url: `maintenance/uploads/${encodeURIComponent(id)}`,
@@ -82,7 +82,7 @@ export function cancelBackupUploadApi(id: string) {
   })
 }
 
-/** 导入已确认的设置备份。 */
+/** Import a confirmed settings backup. */
 export function importSettingsApi(id: string) {
   return request<Maintenance.MaintenanceOperationResponseData>({
     url: 'maintenance/settings/import',
@@ -92,7 +92,7 @@ export function importSettingsApi(id: string) {
   })
 }
 
-/** 恢复已确认的实例备份。 */
+/** Restore a confirmed instance backup. */
 export function restoreBackupApi(id: string) {
   return request<Maintenance.RestoreBackupResponseData>({
     url: 'maintenance/restore',
@@ -102,7 +102,7 @@ export function restoreBackupApi(id: string) {
   })
 }
 
-/** 备份后重置设置。 */
+/** Back up and reset settings. */
 export function resetSettingsApi() {
   return request<Maintenance.MaintenanceOperationResponseData>({
     url: 'maintenance/settings/reset',
@@ -112,7 +112,7 @@ export function resetSettingsApi() {
   })
 }
 
-/** 优化或重建派生索引。 */
+/** Optimize or rebuild the derived index. */
 export function maintainIndexApi(operation: 'optimize' | 'rebuild') {
   return request<Maintenance.MaintenanceOperationResponseData>({
     url: `maintenance/index/${operation}`,
@@ -121,7 +121,7 @@ export function maintainIndexApi(operation: 'optimize' | 'rebuild') {
   })
 }
 
-/** 清理非活动临时文件。 */
+/** Clean inactive temporary files. */
 export function clearTempApi() {
   return request<Maintenance.ClearTempResponseData>({
     url: 'maintenance/temp/clear',

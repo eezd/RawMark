@@ -1,10 +1,10 @@
 import { t as translate } from '@@/i18n/runtime'
-// 未成功保存到服务器的内容暂存在 IndexedDB，供下次启动时恢复
+// Keep content not yet saved to the server in IndexedDB for restoration on the next startup.
 
 export interface Draft {
   path: string
   content: string
-  // 本地修改所基于的服务器版本；新建文件时为空字符串
+  // Server revision underlying local changes; an empty string for new files.
   baseRev: string
   updatedAt: number
 }
@@ -43,7 +43,7 @@ export const drafts = {
       request.onsuccess = () => {
         const moving = request.result.filter(draft => draft.path === from || draft.path.startsWith(`${from}/`))
         for (const draft of moving) store.delete(draft.path)
-        // add 遇到目标路径已有草稿时中止整个事务，不能覆盖另一份未保存内容。
+        // add aborts the whole transaction if a draft already exists at the destination, preserving other unsaved contents.
         for (const draft of moving) store.add({ ...draft, path: to + draft.path.slice(from.length) })
       }
       transaction.oncomplete = () => resolve()

@@ -23,7 +23,7 @@ const menuPosition = ref({ left: 0, top: 0 })
 const input = ref<HTMLInputElement>()
 const draft = ref('')
 
-// 长按打开菜单：Android 会触发 contextmenu，iOS Safari 不会，统一用触摸计时
+// Use a touch timer for long-press menus consistently: Android fires contextmenu, but iOS Safari does not.
 const LONG_PRESS_MS = 500
 let pressTimer: ReturnType<typeof setTimeout> | undefined
 let pressStart: { x: number, y: number } | null = null
@@ -48,7 +48,7 @@ function cancelPress() {
 }
 
 function activate(event: MouseEvent) {
-  // 长按后松手产生的点击不打开笔记
+  // Do not open a note on the click generated when releasing a long press.
   if (longPressed) {
     longPressed = false
     return
@@ -138,7 +138,7 @@ function cancelRename() {
   ws.renaming = null
 }
 
-// ---- 拖放移动（桌面端） ----
+// ---- Drag-and-drop moves (desktop) ----
 function onDragStart(e: DragEvent) {
   e.dataTransfer?.setData('application/x-rawmark-path', props.node.path)
   e.dataTransfer!.effectAllowed = 'move'

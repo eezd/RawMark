@@ -160,7 +160,7 @@ async function restore(kind: BackupKind, event: Event) {
             if (((await getAuthStateApi()).data).setUp) {
               location.reload(); return
             }
-          } catch { /* 服务关闭和重新监听期间继续等待，最终超时会明确提示。 */ }
+          } catch { /* Keep waiting while the service stops and rebinds; report a final timeout explicitly. */ }
         }
         throw new Error(translate('settings.restore_request_submitted_the_service_b1d2c2'))
       }

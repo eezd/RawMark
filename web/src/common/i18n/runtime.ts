@@ -26,7 +26,7 @@ export function applyLocale(value: Locale) {
   if (typeof document !== 'undefined') document.documentElement.lang = value
 }
 
-/** 登录页仅缓存显示语言；登录后由服务器账户设置覆盖。 */
+/** The sign-in page caches display language only; server account settings override it after authentication. */
 export function chooseAnonymousLocale(value: Locale) {
   const cached = JSON.parse(localStorage.getItem('rawmark.settings') ?? '{}')
   localStorage.setItem('rawmark.settings', JSON.stringify({ ...cached, locale: value }))

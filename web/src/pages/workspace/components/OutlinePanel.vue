@@ -8,7 +8,7 @@ import { EditorView } from '@codemirror/view'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { activeTab, editorView, onEditorUpdate, ws } from '../workspace'
 
-// 大纲：当前笔记的标题列表，点击跳转；高亮光标所在的章节
+// Outline: list current note headings, jump on click, and highlight the section containing the cursor.
 interface Heading {
   level: number
   text: string
@@ -19,7 +19,7 @@ const headings = ref<Heading[]>([])
 const current = ref(-1)
 
 function collect(state: EditorState): Heading[] {
-  // 长文档的语法树可能尚未解析完，最多等 50ms，之后随编辑更新
+  // Long documents may not be fully parsed yet; wait up to 50ms and update on subsequent edits.
   const tree = ensureSyntaxTree(state, state.doc.length, 50) ?? syntaxTree(state)
   const out: Heading[] = []
   tree.iterate({
@@ -44,7 +44,7 @@ function refresh() {
     lastDoc = undefined
     return
   }
-  // 只移动光标时不重新收集标题
+  // Do not recollect headings for cursor-only changes.
   if (v.state.doc !== lastDoc) {
     headings.value = collect(v.state)
     lastDoc = v.state.doc
@@ -70,7 +70,7 @@ function jump(h: Heading) {
 let unsubscribe: (() => void) | undefined
 onMounted(() => {
   unsubscribe = onEditorUpdate(scheduleRefresh)
-  // 切换标签页时编辑器整体替换状态，不经过更新监听；等编辑器面板换好状态后再读
+  // Tab switches replace editor state without an update notification; read after the editor pane installs the new state.
   requestAnimationFrame(refresh)
 })
 onBeforeUnmount(() => {

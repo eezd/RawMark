@@ -23,7 +23,7 @@ type importLink struct {
 	html       bool
 }
 
-// 链接中的空白允许一次换行，但不能跨过段落。
+// Whitespace in links may include one newline but cannot cross paragraphs.
 func linkSpace(text []byte, pos int) int {
 	newline := false
 	for pos < len(text) {
@@ -42,7 +42,7 @@ func linkSpace(text []byte, pos int) int {
 	return pos
 }
 
-// linkDestination 返回地址区间和地址结束后的下标；地址本身不含尖括号。
+// linkDestination returns the destination range and the following index; angle brackets are excluded from the destination.
 func linkDestination(text []byte, pos int) (start, end, next int) {
 	start = linkSpace(text, pos)
 	if start == len(text) {
@@ -105,7 +105,7 @@ func linkTitleEnd(text []byte, pos int) int {
 	return -1
 }
 
-// importLinkSpans 共用于导入、导出和图片改名；返回原文字节位置，不重新序列化正文。
+// importLinkSpans serves import, export, and image renaming, returning original byte positions without reserializing text.
 func importLinkSpans(content []byte) []importLink {
 	var text []byte
 	var source []int
@@ -123,7 +123,7 @@ func importLinkSpans(content []byte) []importLink {
 		lastEnd = offset + len(line)
 		return line
 	})
-	// 行内代码可以跨行。遮住其中的标记，同时保留链接标签两侧的括号结构。
+	// Inline code can span lines. Mask its markers while preserving bracket structure around link labels.
 	masked := bytes.Repeat([]byte(" "), len(text))
 	pos := 0
 	for _, paragraph := range bytes.SplitAfter(text, []byte("\n\n")) {
@@ -171,7 +171,7 @@ func importLinkSpans(content []byte) []importLink {
 		}
 		add(start, end, false)
 		definitionEnd = next
-		// 引用定义及其标题不是行内正文，避免再次扫描标题中的示例标记。
+		// Reference definitions and their titles are not inline body text; avoid rescanning example markers in titles.
 		for i := m[0]; i < next; i++ {
 			if text[i] != '\n' && text[i] != '\r' {
 				text[i] = ' '
@@ -214,7 +214,7 @@ func importLinkSpans(content []byte) []importLink {
 				add(start, end, false)
 				i = close
 				if open == 0 || text[open-1] != '!' {
-					brackets = nil // 链接不能嵌套，图片可以位于链接标签内。
+					brackets = nil // Links cannot nest, but images can appear inside link labels.
 				}
 			}
 		}
@@ -277,7 +277,7 @@ func (v *Vault) importLinks(ctx context.Context, note string, content []byte, to
 			if err != nil {
 				return nil, nil, err
 			}
-			// 只统计新生成的副本；已有同名附件必须与哈希对应的内容一致。
+			// Count only newly generated copies; existing attachments with the same name must match the hash-derived contents.
 			dir := path.Join(path.Dir(note), "assets")
 			dest, exists, err := v.assetDestination(dir, assetName(data, path.Base(rel)), data)
 			if err != nil {

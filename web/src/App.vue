@@ -10,7 +10,7 @@ import { navigationError, router } from '@/router'
 const user = useUserStore()
 function retry() {
   const { path, query, hash } = router.resolve(navigationError.value!.path)
-  void router.replace({ path, query, hash, force: true }).catch(() => { /* 错误由路由错误界面展示。 */ })
+  void router.replace({ path, query, hash, force: true }).catch(() => { /* The router error interface displays failures. */ })
 }
 </script>
 

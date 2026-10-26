@@ -16,8 +16,8 @@ type imageTransfer struct {
 	removed        bool
 }
 
-// 调用方持有写锁，并在后续笔记移动失败时撤回新副本。
-// 旧的独立附件仍由 Move 连同目录移动；共享图片只在其他笔记不再引用时移走原件。
+// The caller holds the write lock and removes new copies if the subsequent note move fails.
+// Move still carries legacy dedicated attachments with their directory; remove shared originals only when no other note references them.
 func (v *Vault) copyNoteImages(from, to string) (transfers []imageTransfer, targets map[string]string, err error) {
 	content, _, err := v.Read(from)
 	if err != nil {
@@ -68,7 +68,7 @@ func (v *Vault) copyNoteImages(from, to string) (transfers []imageTransfer, targ
 		}
 		info, e := os.Lstat(source)
 		if os.IsNotExist(e) {
-			continue // 已缺失的图片保留链接，由缺失检查报告。
+			continue // Retain links to already-missing images for the missing-resource report.
 		}
 		if e != nil {
 			return transfers, targets, e

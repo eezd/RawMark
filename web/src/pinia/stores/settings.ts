@@ -10,14 +10,14 @@ import { applyLocale, DEFAULT_LOCALE, isLocale, t as translate } from '@@/i18n/r
 import { normalizeKeys } from '@@/utils/keys'
 import { isCancel } from 'axios'
 import { defineStore } from 'pinia'
-// 应用设置：服务器上一份 JSON，全部设备共用；修改立即保存，其他设备经事件推送同步。
-// 本地缓存上次的值，启动时先套用，避免页面先按默认值显示再跳变
+// Application settings are one server JSON object shared across devices; changes save immediately and sync through events.
+// Apply the last local cache at startup to avoid flashing default values before saved settings appear.
 import { reactive } from 'vue'
 import { pinia } from '@/pinia'
 import { useUserStore } from './user'
 
 export const TAB_SIZES = [2, 4, 8]
-// 0 为全宽
+// 0 means full width.
 export const CONTENT_WIDTHS = [
   { get label() {
     return translate('common.narrow_a614db')
@@ -48,7 +48,7 @@ export class SettingsAppearanceError extends Error {
   }
 }
 
-// 服务器上的设置可能由旧版本、API 或插件写入，取值不合法的项退回默认值
+// Server settings may come from older versions, APIs, or plugins; invalid values fall back to defaults.
 function sanitize(raw: Record<string, unknown>): Settings {
   const pick = <T>(v: unknown, allowed: T[], def: T) => (allowed.includes(v as T) ? (v as T) : def)
   const hiddenFonts = Array.isArray(raw.hiddenFonts) ? raw.hiddenFonts.filter((id): id is string => typeof id === 'string' && id !== 'maple' && Object.hasOwn(FONT_PRESETS, id)) : []
@@ -113,7 +113,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   applied({ ...settings })
-  // 缓存只提前应用明暗模式；主题和片段等服务器确认后再应用。
+  // Apply only cached light/dark mode early; wait for server confirmation before themes and snippets.
   applyAppearance({ ...settings, theme: 'default', cssSnippets: [] }, '')
 
   let settingsRequest = 0
@@ -122,14 +122,14 @@ export const useSettingsStore = defineStore('settings', () => {
     const version = user.getSessionVersion()
     const request = ++settingsRequest
     if (settingsSave.pending) {
-      // 推送可能先于 PATCH 响应到达；先等待现有写入，避免读取未保存的旧值。
+      // Events may precede PATCH responses; wait for existing writes before reading to avoid loading unsaved old values.
       await saveQueue
       user.assertSession(version)
       if (request !== settingsRequest) return
     }
     const [raw, fonts] = await Promise.all([getSettingsApi().then(({ data }) => data), getFontsApi().then(({ data }) => data.fonts)])
     user.assertSession(version)
-    // 目录与设置作为一批应用，迟到旧响应不能恢复已删除字体或覆盖新设置。
+    // Apply the catalog and settings together; late old responses must not restore deleted fonts or overwrite newer settings.
     if (request !== settingsRequest) return
     applyFontCatalog(parseFontCatalog(fonts))
     applied(sanitize(raw))
@@ -141,11 +141,11 @@ export const useSettingsStore = defineStore('settings', () => {
     await applySettingsAppearance()
   }
 
-  /** 修改设置：先在本地生效再保存，保存失败时由调用方提示并重新载入 */
+  /** Apply setting changes locally before saving; on failure the caller reports the error and reloads. */
   async function updateSettings(patch: Partial<Settings>) {
     ++settingsRequest
     applied({ ...settings, ...patch })
-    // 设置请求串行提交，防止快速切换和片段编辑的旧请求覆盖新值。
+    // Serialize setting requests so rapid switches or snippet edits cannot let old requests overwrite newer values.
     await saveSettings(patch)
     try {
       await applySettingsAppearance()
@@ -180,7 +180,7 @@ export const useSettingsStore = defineStore('settings', () => {
     return pending
   }
 
-  /** 维护前等待现有设置保存；失败时不得继续替换配置。 */
+  /** Wait for pending settings saves before maintenance; do not replace configuration if saving fails. */
   async function flushSettings() {
     await saveQueue
     if (settingsSave.result === 'error') throw new Error(translate('common.could_not_save_settings_1cdd7f', { p0: settingsSave.error }))

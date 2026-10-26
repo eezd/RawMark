@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# ---- 前端 ----
+# ---- Frontend ----
 FROM node:24-alpine AS web
 WORKDIR /src/web
 RUN corepack enable && corepack prepare pnpm@12.11.2 --activate
@@ -9,7 +9,7 @@ RUN pnpm install --frozen-lockfile
 COPY web/ ./
 RUN pnpm build
 
-# ---- 服务端（前端产物嵌入二进制） ----
+# ---- Backend (frontend assets embedded in the binary) ----
 FROM golang:1-alpine AS server
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -20,7 +20,7 @@ COPY web/embed.go web/font_storage.go ./web/
 COPY --from=web /src/web/dist ./web/dist
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/rawmark ./cmd/rawmark && mkdir -p /out/data
 
-# ---- 运行 ----
+# ---- Runtime ----
 FROM gcr.io/distroless/static:nonroot
 COPY --from=server /out/rawmark /rawmark
 COPY --from=server --chown=nonroot:nonroot /out/data /data

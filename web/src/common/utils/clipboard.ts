@@ -1,11 +1,11 @@
-// 写入剪贴板；Clipboard API 只在 HTTPS/localhost 可用，局域网 HTTP 访问时退回 execCommand
+// Write to the clipboard; Clipboard API requires HTTPS/localhost, so LAN HTTP falls back to execCommand.
 export async function copyText(text: string): Promise<boolean> {
   if (navigator.clipboard && window.isSecureContext) {
     try {
       await navigator.clipboard.writeText(text)
       return true
     } catch {
-      // 权限被拒时继续尝试旧方法
+      // Try the legacy method if permission is denied.
     }
   }
   const ta = document.createElement('textarea')

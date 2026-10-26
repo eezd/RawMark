@@ -1,8 +1,8 @@
 import type { ChangeSpec, EditorState, TransactionSpec } from '@codemirror/state'
-// Markdown 格式命令：快捷键与选区工具栏共用
+// Markdown formatting commands shared by shortcuts and the selection toolbar.
 import { EditorSelection } from '@codemirror/state'
 
-/** 只依赖状态与派发，便于在没有 DOM 的环境中测试 */
+/** Depend only on state and dispatch to allow testing without a DOM. */
 export interface FormatTarget {
   readonly state: EditorState
   dispatch: (spec: TransactionSpec) => void
@@ -10,13 +10,13 @@ export interface FormatTarget {
 export type FormatCommand = (target: FormatTarget) => boolean
 
 /**
- * 切换行内标记（粗体 **、斜体 *、删除线 ~~、行内代码 `）：选区两侧或选区首尾已有该标记时去掉，否则加上；
- * 没有选中文字时插入一对标记，光标放在中间
+ * Toggle inline markers (bold **, italic *, strikethrough ~~, inline code `): remove matching surrounding or edge
+ * markers, otherwise add them. With no selection, insert a pair and place the cursor between them.
  */
 export function toggleInline(mark: string): FormatCommand {
   const n = mark.length
   const ch = mark[0]
-  // 选区两侧连续的标记字符数；* 同时用于斜体与粗体：*** 两者都有，单数个才有斜体
+  // Count adjacent marker characters around the selection; * serves italic and bold: *** means both, and only odd counts imply italic.
   const runLength = (state: EditorState, pos: number, dir: 1 | -1) => {
     let k = 0
     while (state.sliceDoc(dir > 0 ? pos + k : pos - k - 1, dir > 0 ? pos + k + 1 : pos - k) === ch) k++
@@ -54,7 +54,7 @@ export function toggleInline(mark: string): FormatCommand {
   }
 }
 
-// 行首的块标记：缩进 + 标题 / 任务 / 无序列表 / 有序列表 / 引用（每行只识别一个）
+// Leading block marker: indentation plus heading/task/bullet/ordered-list/quote (recognize one per line).
 const LINE_PREFIX = /^(\s*)(#{1,6} |[-*+] \[[ x]\] |[-*+] |\d+[.)] |> )?/i
 
 type PrefixKind = 'heading' | 'task' | 'bullet' | 'ordered' | 'quote'
@@ -67,7 +67,7 @@ function kindOf(prefix: string): PrefixKind | null {
   return prefix.includes('[') ? 'task' : 'bullet'
 }
 
-/** 改写选区涉及的每一行的行首标记；next 返回新的标记 */
+/** Rewrite leading markers on every selected line; next returns the new marker. */
 function editPrefixes({ state, dispatch }: FormatTarget, next: (kinds: (PrefixKind | null)[], index: number) => string): boolean {
   const lineNumbers = new Set<number>()
   for (const r of state.selection.ranges) {
@@ -83,7 +83,7 @@ function editPrefixes({ state, dispatch }: FormatTarget, next: (kinds: (PrefixKi
     return { from, to: from + current.length, insert: next(kinds, i) }
   })
   const changes = state.changes(specs)
-  // 光标在行首时随新插入的标记后移；选区则向两端扩展，把新标记包含在内
+  // Move a line-start cursor after the inserted marker; expand selections outward to include new markers.
   const selection = EditorSelection.create(
     state.selection.ranges.map((r) => {
       if (r.empty) return EditorSelection.cursor(changes.mapPos(r.head, 1))
@@ -96,7 +96,7 @@ function editPrefixes({ state, dispatch }: FormatTarget, next: (kinds: (PrefixKi
   return true
 }
 
-/** 切换列表或引用：所选各行都已是该类型时去掉，否则全部改为该类型（替换原有的其他块标记） */
+/** Toggle a list or quote: remove the type if all selected lines have it; otherwise apply it to all, replacing other block markers. */
 export function toggleBlock(kind: Exclude<PrefixKind, 'heading'>): FormatCommand {
   return target =>
     editPrefixes(target, (kinds, i) => {
@@ -105,7 +105,7 @@ export function toggleBlock(kind: Exclude<PrefixKind, 'heading'>): FormatCommand
     })
 }
 
-/** 标题级别循环：正文 → 一级 → 二级 → 三级 → 正文；以第一行为准 */
+/** Cycle heading levels based on the first line: body -> level 1 -> level 2 -> level 3 -> body. */
 export const cycleHeading: FormatCommand = (target) => {
   const first = LINE_PREFIX.exec(target.state.doc.lineAt(target.state.selection.main.from).text)![2] ?? ''
   const level = kindOf(first) === 'heading' ? first.length - 1 : 0
@@ -113,7 +113,7 @@ export const cycleHeading: FormatCommand = (target) => {
   return editPrefixes(target, () => prefix)
 }
 
-/** 全部选中行已是指定标题时恢复正文，否则设置为指定级别。 */
+/** Return to body text if every selected line already has the requested heading level; otherwise apply that level. */
 export function toggleHeading(level: number): FormatCommand {
   return (target) => {
     const prefix = `${'#'.repeat(level)} `
@@ -128,7 +128,7 @@ export function toggleHeading(level: number): FormatCommand {
   }
 }
 
-/** 插入链接：选中文字作为链接文字，光标放到地址处；没有选中时光标放在文字处 */
+/** Insert a link using selected text as its label and focus the destination; without a selection, focus the label. */
 export const insertLink: FormatCommand = ({ state, dispatch }) => {
   const tr = state.changeByRange((r) => {
     const text = state.sliceDoc(r.from, r.to)

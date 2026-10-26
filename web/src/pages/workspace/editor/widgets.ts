@@ -32,7 +32,7 @@ export class CheckboxWidget extends WidgetType {
     el.type = 'checkbox'
     el.className = 'cm-rm-task'
     el.checked = this.checked
-    // 用 mousedown 并阻止默认行为：否则编辑器先移动光标，行被展开为源码，点击落空
+    // Use mousedown with preventDefault; otherwise the editor moves the cursor, expands the line to source, and loses the click.
     el.addEventListener('mousedown', (e) => {
       e.preventDefault()
       const pos = view.posAtDOM(el)
@@ -65,13 +65,13 @@ const COPY_ICON
 const CHECK_ICON
   = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
 
-// 代码块右上角：语言标签（未激活时）+ 复制按钮
+// Code-block top right: language label when inactive, plus a copy button.
 export class CodeHeaderWidget extends WidgetType {
   readonly locale = locale.value
   constructor(
     readonly lang: string,
     readonly showLang: boolean,
-    // 根据组件所在位置取出代码块内容，由调用方结合语法树实现
+    // Read code contents at the widget position; the caller implements this using the syntax tree.
     readonly codeAt: (view: EditorView, pos: number) => string | null,
   ) {
     super()
@@ -131,12 +131,12 @@ export class ImageWidget extends WidgetType {
     img.alt = this.alt
     img.loading = 'lazy'
     img.decoding = 'async'
-    // 图片加载完成后高度变化，需通知编辑器重新测量，否则光标定位会错位
+    // Image loading changes height; request editor remeasurement to keep cursor positioning correct.
     img.addEventListener('load', () => view.requestMeasure())
-    // 组件内的事件默认被编辑器忽略，需手动把光标移到图片语法处以展开源码
+    // The editor ignores widget events by default; move the cursor to image syntax manually to expand source.
     wrap.addEventListener('mousedown', (e) => {
       e.preventDefault()
-      // 先设光标再聚焦：focus() 会把编辑器选区写回 DOM，反之会读到残留在别处（如表格单元格）的 DOM 选区
+      // Set the cursor before focusing: focus() writes editor selection to the DOM; reversing this reads a stale DOM selection elsewhere, such as a table cell.
       view.dispatch({ selection: { anchor: view.posAtDOM(wrap) } })
       view.focus()
     })
@@ -153,9 +153,9 @@ export class ImageWidget extends WidgetType {
   }
 }
 
-// ---- 扩展语法（公式、Mermaid、emoji、脚注、目录） ----
+// ---- Extended syntax (math, Mermaid, emoji, footnotes, table of contents) ----
 
-// 点击渲染结果时把光标移到源码中（offset 为相对组件起点的位置）以展开编辑，做法同图片
+// Clicking rendered output moves the cursor into source at offset relative to the widget start, expanding editing as with images.
 function editOnMousedown(el: HTMLElement, view: EditorView, offset: number) {
   el.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return
@@ -173,8 +173,8 @@ function showRenderError(el: HTMLElement, err: unknown) {
 }
 
 /**
- * 公式。editOffset 为 null 时是编辑中显示在源码下方的预览（不响应点击，内容变化时原地更新），
- * 否则是替换源码的渲染结果，点击后光标移到源码 editOffset 处
+ * Math. A null editOffset means a preview below source during editing: no click handling, update in place
+ * on content changes. Otherwise it replaces source; clicking moves the cursor to editOffset in the source.
  */
 export class MathWidget extends WidgetType {
   readonly locale = locale.value
@@ -199,7 +199,7 @@ export class MathWidget extends WidgetType {
     return el
   }
 
-  // 只复用预览元素：从渲染结果切到编辑时，编辑器会尝试用新组件更新旧元素（旧元素带点击编辑的监听）
+  // Reuse preview elements only: switching rendered output to editing may update an old element that still has click-to-edit listeners.
   updateDOM(dom: HTMLElement, view: EditorView) {
     if (this.editOffset !== null || !dom.classList.contains('cm-rm-preview')) return false
     this.render(dom, view)
@@ -213,7 +213,7 @@ export class MathWidget extends WidgetType {
       return
     }
     el.classList.remove('cm-rm-placeholder')
-    // 加载 KaTeX 前先显示源码
+    // Show source until KaTeX loads.
     if (!el.firstChild) el.textContent = this.tex
     void renderMath(el, this.tex, this.display).then(() => view.requestMeasure())
   }
@@ -225,7 +225,7 @@ export class MathWidget extends WidgetType {
 
 const rendererMounts = new WeakMap<HTMLElement, () => void>()
 
-/** 通用代码块预览；editOffset 与公式组件使用相同的点击编辑约定。 */
+/** Generic code-block preview; editOffset follows the math widget's click-to-edit contract. */
 export class CodeRendererWidget extends WidgetType {
   readonly locale = locale.value
   constructor(
@@ -306,7 +306,7 @@ export class EmojiWidget extends WidgetType {
   toDOM(view: EditorView) {
     const el = document.createElement('span')
     el.className = 'cm-rm-emoji'
-    // 名称表加载前或名称未知时显示原文
+    // Show original text until the name table loads or when the name is unknown.
     el.textContent = `:${this.name}:`
     void emojiFor(this.name).then((e) => {
       if (e) el.textContent = e
@@ -376,7 +376,7 @@ export class TocWidget extends WidgetType {
       })
       el.append(item)
     }
-    // 点击目录空白处展开 [TOC] 源码
+    // Clicking empty table-of-contents space expands [TOC] source.
     editOnMousedown(el, view, 0)
     return el
   }

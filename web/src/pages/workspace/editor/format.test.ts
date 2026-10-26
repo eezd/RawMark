@@ -3,7 +3,7 @@ import { EditorSelection, EditorState } from '@codemirror/state'
 import { describe, expect, it } from 'vitest'
 import { cycleHeading, insertLink, toggleBlock, toggleBold, toggleCode, toggleItalic } from './format'
 
-// 用 | 标记光标、[ ] 标记选区，执行命令后以同样的形式返回结果
+// Mark the cursor with | and selection with [ ]; return the result in the same notation after executing the command.
 function run(cmd: FormatCommand, doc: string): string {
   const ranges: { anchor: number, head: number }[] = []
   let text = ''
@@ -59,7 +59,7 @@ describe('行首标记', () => {
   it('多行：有序列表按行编号，保留缩进', () => {
     expect(run(toggleBlock('ordered'), '[a\n  b\nc]')).toBe('[1. a\n  2. b\n3. c]')
     expect(run(toggleBlock('ordered'), '[1. a\n2. b]')).toBe('[a\nb]')
-    // 部分行已是该类型时统一加上
+    // Apply the type consistently when only some lines already have it.
     expect(run(toggleBlock('bullet'), '[- a\nb]')).toBe('[- a\n- b]')
   })
   it('标题循环', () => {

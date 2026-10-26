@@ -12,7 +12,7 @@ type CleanupSkip struct {
 	Cause  error  `json:"-"`
 }
 
-// CleanupImages 在写锁内重新扫描引用；派生索引不作为删除依据。
+// CleanupImages rescans references under the write lock; the derived index never authorizes deletion.
 func (v *Vault) CleanupImages(paths []string) (CleanupResult, error) {
 	result := CleanupResult{Deleted: []TrashItem{}, Skipped: []CleanupSkip{}}
 	v.mu.Lock()

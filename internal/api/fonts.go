@@ -235,7 +235,7 @@ func (s *Server) deleteFont(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer root.Close()
-	// 先撤下资源；设置写失败时恢复，避免留下指向已删除字体的设置。
+	// Remove the resource first and restore it if settings fail to save, avoiding references to a deleted font.
 	removed := ".remove-" + id
 	if err := root.Rename(id, removed); err != nil {
 		internalError(w, r, err)

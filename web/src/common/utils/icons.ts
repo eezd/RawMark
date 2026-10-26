@@ -1,4 +1,4 @@
-// 线性图标（24×24 视框，描边绘制）
+// Outline icons (24x24 viewBox, stroke-based drawing).
 export const iconPaths = {
   plus: 'M12 5v14M5 12h14',
   eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',

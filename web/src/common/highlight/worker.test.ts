@@ -1,4 +1,4 @@
-/* eslint-disable no-template-curly-in-string -- 测试样例需要保留源码中的模板插值。 */
+/* eslint-disable no-template-curly-in-string -- Test fixtures must retain source template interpolation. */
 import type { HighlightResponse, TokenRun } from './protocol'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 

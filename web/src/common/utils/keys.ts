@@ -1,12 +1,12 @@
 import { t as translate } from '@@/i18n/runtime'
-// 应用、编辑器和快捷键录入共用同一套按键表示。
+// The application, editor, and shortcut recorder share one key representation.
 export const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
 const punctuation: Record<string, string> = { BracketLeft: '[', BracketRight: ']', Backquote: '`' }
 const modifiers = ['Mod', 'Ctrl', 'Meta', 'Alt', 'Shift']
 
 function physicalCharacter(event: KeyboardEvent): string | undefined {
   if (/^Digit\d$/.test(event.code)) return event.code.slice(5)
-  // macOS Option 会把 Q/O/U 等变成其他字符，快捷键仍按原物理字母匹配。
+  // macOS Option transforms letters such as Q/O/U; shortcuts still match the original physical letter.
   if (isMac && event.altKey && /^Key[A-Z]$/.test(event.code)) return event.code.slice(3)
   return punctuation[event.code]
 }
@@ -35,7 +35,7 @@ export function matchKeys(event: KeyboardEvent, value: string): boolean {
 export function recordedKeys(event: KeyboardEvent): string | null {
   if (['Control', 'Meta', 'Alt', 'Shift', 'AltGraph', 'Dead', 'Process', 'Unidentified'].includes(event.key) || event.isComposing) return null
   const parts: string[] = []
-  // 同时按下两种修饰键时保留物理组合，避免同步后 Mod 与另一键重合。
+  // Preserve physical combinations when both modifiers are held so synchronized Mod bindings do not collapse onto the other key.
   if (event.ctrlKey) parts.push(isMac || event.metaKey ? 'Ctrl' : 'Mod')
   if (event.metaKey) parts.push(!isMac || event.ctrlKey ? 'Meta' : 'Mod')
   if (event.altKey) parts.push('Alt')

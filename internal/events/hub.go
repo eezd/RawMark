@@ -1,4 +1,4 @@
-// Package events 把仓库变更广播给所有在线客户端（WebSocket）。
+// Package events broadcasts vault changes to all connected clients over WebSocket.
 package events
 
 import (
@@ -7,13 +7,13 @@ import (
 	"sync"
 )
 
-// Event 为推送给客户端的消息
+// Event is a message pushed to clients.
 //
-//	tree     目录结构变化（新增/删除/移动），客户端重新拉取目录树
-//	changed  笔记内容变化，Rev 为新版本
-//	deleted  笔记被删除
-//	moved    文件或目录被移动（From -> Path），目录事件包含其子项的路径映射
-//	settings 应用设置变化，客户端重新读取
+//	tree     Directory structure changed (create/delete/move); clients reload the tree.
+//	changed  Note contents changed; Rev contains the new revision.
+//	deleted  A note was deleted.
+//	moved    A file or folder moved (From -> Path); folder events include child path mappings.
+//	settings Application settings changed; clients reload them.
 type Event struct {
 	Type string `json:"type"`
 	Path string `json:"path,omitempty"`
@@ -29,7 +29,7 @@ type Hub struct {
 
 func NewHub() *Hub { return &Hub{clients: map[chan []byte]struct{}{}} }
 
-// Subscribe 返回消息通道与取消函数；通道在客户端跟不上时会被关闭，客户端应重连并全量同步
+// Subscribe returns a message channel and cancel function. Slow clients are disconnected and must reconnect and fully sync.
 func (h *Hub) Subscribe() (<-chan []byte, func()) {
 	ch := make(chan []byte, 64)
 	h.mu.Lock()
@@ -71,7 +71,7 @@ func (h *Hub) Broadcast(events ...Event) {
 	}
 }
 
-// Close 禁止新订阅，并通知现有连接关闭，供实例恢复重新打开数据库使用。
+// Close rejects new subscriptions and closes existing connections so instance recovery can reopen databases.
 func (h *Hub) Close() {
 	h.mu.Lock()
 	defer h.mu.Unlock()

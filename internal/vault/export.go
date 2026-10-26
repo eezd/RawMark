@@ -14,8 +14,8 @@ import (
 	"strings"
 )
 
-// Export 在临时文件中完成导出，成功后由调用方关闭并删除文件。
-// ZIP 保留仓库相对路径，正文不改写；只导出原始文件，不解析或下载外部资源。
+// Export builds an export in a temporary file; the caller must close and remove it after success.
+// ZIP entries retain vault-relative paths and unchanged text. Export only source files; do not parse or download external resources.
 func (v *Vault) Export(ctx context.Context, paths []string) (result *os.File, name string, err error) {
 	if len(paths) == 0 {
 		return nil, "", i18n.New("w_choose_content_to_export_170d5e", ErrInvalidPath)
@@ -46,7 +46,7 @@ func (v *Vault) Export(ctx context.Context, paths []string) (result *os.File, na
 			files[path.Join(p, entry.Path)] = entry.Dir
 		}
 	}
-	// 仅收集已选笔记的附件，不追踪链接到的其他笔记。
+	// Collect attachments only for selected notes, without following links to other notes.
 	notes := make([]string, 0)
 	for p, dir := range files {
 		if !dir && IsNote(p) {
@@ -165,7 +165,7 @@ func (v *Vault) Export(ctx context.Context, paths []string) (result *os.File, na
 	return tmp, name, nil
 }
 
-// 附件可能通过 ../ 指向其他目录，但不能读取隐藏路径或经符号链接绕过范围。
+// Attachments may use ../ to reference other folders, but cannot expose hidden paths or escape scope through symlinks.
 func (v *Vault) exportPath(rel string) error {
 	full, err := v.abs(rel)
 	if err != nil {

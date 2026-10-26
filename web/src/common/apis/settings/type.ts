@@ -1,3 +1,3 @@
-/** 保留插件写入的未知设置，应用端按已知字段校验。 */
+/** Preserve unknown plugin settings; the application validates known fields. */
 export type SettingsData = Record<string, unknown>
 export type SettingsResponseData = ApiResponseData<SettingsData>

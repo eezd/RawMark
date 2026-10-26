@@ -40,7 +40,7 @@ func TestThemeBoundaries(t *testing.T) {
 	if !strings.Contains(theme["css"], "#faf6ed") {
 		t.Fatal("未读取到主题 CSS")
 	}
-	// CSS 符号链接不能读取主题目录之外的应用数据。
+	// CSS symlinks must not expose application data outside the theme directory.
 	if err := os.Remove(filepath.Join(dir, "theme.css")); err != nil {
 		t.Fatal(err)
 	}

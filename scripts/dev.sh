@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# 一键启动开发环境：Go 后端（go run -tags dev）+ Vite 前端（热更新），Ctrl+C 同时退出。
+# Start Go (go run -tags dev) and Vite with hot updates; Ctrl+C stops both.
 #
-# 用法：scripts/dev.sh [--host]
-#   --host  前端监听所有网卡，便于手机/平板通过局域网访问
+# Usage: scripts/dev.sh [--host]
+#   --host  Listen on all interfaces for LAN access from phones/tablets.
 #
-# 环境变量：
-#   RAWMARK_DATA  开发数据目录，默认 <仓库>/.dev-data
-#   API_PORT      后端端口，默认 8080（Vite 代理读取同一变量）
-#   WEB_PORT      前端端口，默认 5173
+# Environment variables:
+#   RAWMARK_DATA  Development data directory; defaults to <repository>/.dev-data.
+#   API_PORT      Backend port; defaults to 8080 (also used by the Vite proxy).
+#   WEB_PORT      Frontend port; defaults to 5173.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,7 +32,7 @@ for arg in "$@"; do
   esac
 done
 
-# Go 默认安装位置可能不在非登录 shell 的 PATH 中
+# The default Go installation may be missing from PATH in non-login shells.
 [[ -d /usr/local/go/bin ]] && export PATH="$PATH:/usr/local/go/bin"
 
 fail() {
@@ -54,11 +54,11 @@ port_in_use() {
 port_in_use "$API_PORT" && fail "端口 $API_PORT 已被占用（后端）"
 port_in_use "$WEB_PORT" && fail "端口 $WEB_PORT 已被占用（前端）"
 
-# 由 pnpm 核对锁定依赖；已有依赖时复用本地缓存。
+# Let pnpm verify locked dependencies and reuse cached packages when available.
 echo "==> 核对前端依赖"
 pnpm -C web install --frozen-lockfile
 
-# 退出时结束本脚本启动的所有子进程（包括 go run 编译出的服务进程）
+# On exit, stop every child started here, including the service compiled by go run.
 cleanup() {
   trap - EXIT INT TERM
   echo
@@ -67,13 +67,13 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# 给两路日志加前缀，便于区分
+# Prefix both log streams to distinguish them.
 prefix() { sed -u "s/^/[$1] /"; }
 
 echo "==> 启动后端 http://127.0.0.1:$API_PORT（数据目录 $RAWMARK_DATA）"
 RAWMARK_ADDR="127.0.0.1:$API_PORT" go run -tags dev ./cmd/rawmark 2>&1 | prefix server &
 
-# 等后端就绪后再启动前端，避免首次编译期间前端请求失败
+# Wait for the backend before starting Vite to avoid failed requests during initial compilation.
 for _ in $(seq 1 120); do
   curl -fs "http://127.0.0.1:$API_PORT/api/v1/health" >/dev/null 2>&1 && break
   sleep 0.5
@@ -83,5 +83,5 @@ curl -fs "http://127.0.0.1:$API_PORT/api/v1/health" >/dev/null 2>&1 || fail "后
 echo "==> 启动前端 http://localhost:$WEB_PORT"
 (cd web && exec pnpm exec vite "${VITE_ARGS[@]}") 2>&1 | prefix web &
 
-# 任一进程退出（如后端崩溃）即整体停止
+# Stop everything if either process exits, such as after a backend crash.
 wait -n

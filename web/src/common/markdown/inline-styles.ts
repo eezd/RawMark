@@ -6,7 +6,7 @@ export const HOLLOW = '0.2px currentColor'
 export const SHADOW = '1px 1px 2px currentColor'
 export type InlineStyles = Partial<Record<'color' | 'background-color' | 'font-family' | 'font-size' | '-webkit-text-stroke' | '-webkit-text-fill-color' | 'text-shadow', string>>
 
-/** 笔记是外部输入；仅允许工具栏实际生成的样式，不开放通用 HTML/CSS。 */
+/** Notes are external input; allow only styles actually produced by the toolbar, not general HTML/CSS. */
 export function parseInlineStyles(value: string): InlineStyles | null {
   const result: InlineStyles = {}
   for (const declaration of value.split(';')) {

@@ -1,4 +1,4 @@
-// 父目录已经选中时不重复操作其内部项。
+// Do not operate on descendants when their parent folder is already selected.
 export function minimalPaths(paths: Iterable<string>): string[] {
   const out: string[] = []
   const roots = new Set<string>()

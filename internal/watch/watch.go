@@ -1,5 +1,5 @@
-// Package watch 监听仓库目录的变化（包括 RawMark 自身的写入和外部编辑器/同步工具的修改），
-// 与上一次快照比较后把差异作为事件广播。所有变更都经由文件系统这一条路径，客户端据 rev 识别自己的写入。
+// Package watch monitors vault changes, including RawMark writes and external editor/sync-tool changes,
+// and broadcasts differences from the previous snapshot. All changes flow through the filesystem; clients recognize their own writes by rev.
 package watch
 
 import (
@@ -22,7 +22,7 @@ import (
 
 const (
 	debounce = 100 * time.Millisecond
-	// inotify 在 Docker Desktop 的绑定挂载、NFS 等环境下不可靠，定期全量扫描兜底
+	// inotify is unreliable on Docker Desktop bind mounts, NFS, and similar setups; periodically perform a full scan.
 	rescanInterval = 5 * time.Minute
 )
 
@@ -43,8 +43,8 @@ type Watcher struct {
 	onScan  func(notes map[string]string)
 }
 
-// Start 开始监听。onScan 在首次扫描及之后每次有变化的扫描后调用，参数为全部笔记的路径 -> rev（用于更新搜索索引）
-// 返回退出通知，实例恢复须等文件监听停止后再替换笔记库。
+// Start begins watching. onScan receives all note paths -> rev after the first scan and each changed scan, for search indexing.
+// Return a shutdown notification; instance recovery must wait for watching to stop before replacing the vault.
 func Start(ctx context.Context, v *vault.Vault, hub *events.Hub, onScan func(notes map[string]string)) (<-chan struct{}, error) {
 	fw, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -82,7 +82,7 @@ func (w *Watcher) loop(ctx context.Context) {
 			if !ok {
 				return
 			}
-			// 事件队列溢出等情况会丢事件，立即全量扫描补齐
+			// Queue overflows can lose events; immediately rescan to recover them.
 			slog.Warn("文件监听出错，执行全量扫描", "err", err)
 			timer.Reset(debounce)
 		case <-timer.C:
@@ -126,7 +126,7 @@ func notes(snap map[string]fileState) map[string]string {
 	return out
 }
 
-// scan 读取当前目录树；内容版本只对新出现或大小/修改时间变化的文件重新计算
+// scan reads the current tree and recalculates revisions only for new files or changes in size/modification time.
 func (w *Watcher) scan() (map[string]fileState, error) {
 	entries, err := w.v.TreeAt("")
 	if err != nil {
@@ -145,7 +145,7 @@ func (w *Watcher) scan() (map[string]fileState, error) {
 			} else {
 				data, err := os.ReadFile(abs)
 				if errors.Is(err, fs.ErrNotExist) {
-					continue // 扫描期间被删除，下一轮会处理
+					continue // Deleted during scanning; the next pass will handle it.
 				}
 				if err != nil {
 					return nil, i18n.New("could_not_read_note_s_708ab5", e.Path, err)
@@ -166,13 +166,13 @@ func (w *Watcher) scan() (map[string]fileState, error) {
 	}
 	for d := range w.watched {
 		if !dirs[d] {
-			delete(w.watched, d) // 目录已删除，inotify 会自动移除监听
+			delete(w.watched, d) // The directory was deleted; inotify removes its watch automatically.
 		}
 	}
 	return next, nil
 }
 
-// diff 按文件系统身份识别移动，内容相同不代表同一个文件。
+// diff identifies moves by filesystem identity; identical contents do not imply the same file.
 func diff(prev, next map[string]fileState) []events.Event {
 	var evs []events.Event
 	structural := false
@@ -184,7 +184,7 @@ func diff(prev, next map[string]fileState) []events.Event {
 		structural = true
 		removed[p] = old
 	}
-	candidates := map[string]string{} // 新路径 -> 唯一的原路径
+	candidates := map[string]string{} // New path -> unique original path.
 	destinations := map[string]int{}
 	for p, cur := range next {
 		old, existed := prev[p]
@@ -206,7 +206,7 @@ func diff(prev, next map[string]fileState) []events.Event {
 		case old.dir != cur.dir:
 			structural = true
 		case !cur.dir && cur.rev == "" && (old.size != cur.size || old.mtime != cur.mtime || !os.SameFile(old.info, cur.info)):
-			// 图片没有正文版本号；替换后仍需刷新列表元数据与预览。
+			// Images lack text revisions; replacements must still refresh list metadata and previews.
 			if vault.IsImage(p) {
 				structural = true
 			}
@@ -229,7 +229,7 @@ func diff(prev, next map[string]fileState) []events.Event {
 				move.From = parent.Path + strings.TrimPrefix(move.From, parent.From)
 			}
 		}
-		// 先应用父目录映射；子项另有改名时，从映射后的路径继续移动。
+		// Apply parent-directory mappings first; independently renamed children then move from their mapped paths.
 		if move.From != move.Path {
 			emitted = append(emitted, move)
 		}

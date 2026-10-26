@@ -26,7 +26,7 @@ watch(() => user.sessionVersion, () => {
     if (!isNavigationFailure(error)) console.error('认证导航失败', error)
   })
 })
-// 即使身份恢复暂时失败，也挂载可重试的错误界面。
+// Mount a retryable error interface even if identity restoration temporarily fails.
 void router.isReady().catch(() => {}).finally(() => {
   app.mount('#app'); void registerPwa()
 })

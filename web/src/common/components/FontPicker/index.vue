@@ -67,7 +67,7 @@ async function importFont(event: Event) {
   try {
     if (file.size > 30 * 1024 * 1024) throw new Error(translate('common.font_files_must_not_exceed_cc001c'))
     if (!/\.(ttf|otf|woff2?)$/i.test(file.name)) throw new Error(translate('common.choose_a_ttf_otf_woff_eb6ab7'))
-    // 让浏览器校验实际字体；无效字体不会上传或进入页面的字体加载集合。
+    // Let the browser validate the actual font; invalid fonts are neither uploaded nor added to the page's loading set.
     const data = await file.arrayBuffer()
     try {
       await new FontFace('rawmark-import-check', data).load()

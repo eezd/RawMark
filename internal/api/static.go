@@ -12,19 +12,19 @@ import (
 	"time"
 )
 
-// 应用页面的 CSP：CodeMirror 通过 <style> 注入样式，需要 'unsafe-inline'；
-// 笔记中可引用外部图片，img-src 放开 http/https
+// Application CSP: CodeMirror injects <style> elements and requires 'unsafe-inline';
+// notes may reference external images, so img-src allows http/https.
 const appCSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
 	"img-src 'self' data: blob: https: http:; connect-src 'self'; worker-src 'self' blob:; font-src 'self' data:; " +
 	"object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 
 type staticFile struct {
 	data    []byte
-	gzipped []byte // 压缩后不变小时为 nil
+	gzipped []byte // nil when compression does not reduce size.
 }
 
-// staticHandler 提供前端构建产物：带哈希的 assets/ 长期缓存，其余每次校验；
-// 文本资源首次请求时压缩并缓存在内存（嵌入的文件不会变化）
+// staticHandler serves frontend builds: hashed assets/ files use long-lived caching; other files revalidate on every request.
+// Text resources are compressed and cached in memory on first request (embedded files never change).
 type staticHandler struct {
 	fsys    fs.FS
 	started time.Time
@@ -42,14 +42,14 @@ func (h *staticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
-	// 已移除的公开入口不能回退到应用首页。
+	// Removed public entry points must not fall back to the application home page.
 	if name == "s" || strings.HasPrefix(name, "s/") || name == "share.html" {
 		writeError(w, 404, message(w, "page_not_found_e75737"))
 		return
 	}
 	f, err := h.load(name)
 	if err != nil {
-		// 前端路由：未知路径一律返回入口页面
+		// Frontend routing: unknown paths return the entry page.
 		name = "index.html"
 		if f, err = h.load(name); err != nil {
 			writeError(w, 404, message(w, "frontend_resources_are_missing_2c9b3e"))
@@ -66,7 +66,7 @@ func (h *staticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		hd.Set("Content-Security-Policy", appCSP)
 	}
 	if path.Ext(name) == ".webmanifest" {
-		// Go 的 MIME 表未必包含此扩展名，不能让 ServeContent 对压缩后的数据嗅探类型。
+		// Go's MIME table may lack this extension; do not let ServeContent sniff the compressed bytes.
 		hd.Set("Content-Type", "application/manifest+json")
 	} else if ct := mime.TypeByExtension(path.Ext(name)); ct != "" {
 		hd.Set("Content-Type", ct)
