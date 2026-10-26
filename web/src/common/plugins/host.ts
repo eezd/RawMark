@@ -5,6 +5,7 @@ import { getTreeApi } from '@@/apis/tree'
 import { readNoteFile } from '@@/utils/note-files'
 import { pluginResourceURL } from '@@/utils/resource-tickets'
 
+import { CanceledError, isCancel } from 'axios'
 import { reactive } from 'vue'
 import { allCommands, registerCommand } from '../utils/commands'
 import { editorExtensions, markdownSyntax, pluginEvents, pluginsPaused, registerCodeRenderer, registerEntry, settingTabs, sidebarViews } from './registry'
@@ -255,12 +256,12 @@ async function pump() {
 }
 
 export async function refreshPlugins() {
-  if (!running) return
+  if (!running) throw new CanceledError('插件宿主已停止')
   const currentSession = session
   const sequence = ++request
   try {
     const installed = (await getPluginsApi()).data.plugins
-    if (!running || currentSession !== session || sequence !== request) return
+    if (!running || currentSession !== session || sequence !== request) throw new CanceledError('插件刷新已过期')
     pluginState.installed = installed
     pluginState.error = ''
     pluginState.errorCause = undefined
@@ -276,23 +277,26 @@ export async function refreshPlugins() {
     }
     void pump()
   } catch (cause) {
-    if (!running || currentSession !== session || sequence !== request) return
-    pluginState.error = '读取插件列表失败，请检查连接后重试'
+    if (!running || currentSession !== session || sequence !== request) throw new CanceledError('插件刷新已过期')
+    if (isCancel(cause)) throw cause
+    pluginState.error = `读取插件列表失败：${cause instanceof Error ? cause.message : String(cause)}`
     pluginState.errorCause = cause
-    adapter.notice(pluginState.error)
     for (const instance of instances.values()) {
       status(instance.info.id, 'paused')
       void stop(instance)
     }
+    throw cause
   }
 }
 
 export function startPlugins(value: Adapter) {
   adapter = value
   running = true
-  session++
+  const currentSession = ++session
   faults.clear()
-  void refreshPlugins()
+  void refreshPlugins().catch((cause) => {
+    if (running && currentSession === session && !isCancel(cause)) value.notice(pluginState.error)
+  })
 }
 
 export function stopPlugins() {
@@ -305,7 +309,7 @@ export function stopPlugins() {
 
 export function retryPlugin(id: string) {
   faults.delete(id)
-  void refreshPlugins()
+  return refreshPlugins()
 }
 
 export function pluginEditorFailure(error: unknown) {

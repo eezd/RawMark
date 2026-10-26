@@ -9,7 +9,6 @@ import { pluginsPaused, settingTabs } from '@@/plugins/registry'
 import { confirmAction } from '@@/utils/confirm'
 import { isCancel } from 'axios'
 import { computed, onMounted, ref } from 'vue'
-import { ApiError } from '@/http/axios'
 
 const busy = ref(false)
 const error = ref('')
@@ -18,17 +17,16 @@ const selected = ref('')
 const currentTab = computed(() => settingTabs.get(selected.value))
 const labels: Record<string, string> = { loading: '加载中', active: '运行中', error: '故障停用', disabled: '已停用', paused: '临时跳过' }
 
-async function perform(operation?: () => Promise<unknown>, confirmation?: string) {
+async function perform(operation: () => Promise<unknown> = refreshPlugins, confirmation?: string) {
   if (busy.value) return
   busy.value = true
   error.value = ''
   try {
     if (confirmation && !await confirmAction(confirmation)) return
-    if (operation) await operation()
-    await refreshPlugins()
+    await operation()
   } catch (err) {
     if (isCancel(err)) return
-    error.value = err instanceof ApiError ? err.message : '插件操作失败，请检查连接后重试'
+    error.value = err instanceof Error ? err.message : String(err)
   } finally {
     busy.value = false
   }
@@ -39,15 +37,21 @@ async function install(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
-  await perform(() => installPluginApi(file), '插件在页面内拥有完整权限，可读取和修改全部笔记及账户数据。仅安装你信任的插件。确认安装？')
+  await perform(async () => {
+    await installPluginApi(file); await refreshPlugins()
+  }, '插件在页面内拥有完整权限，可读取和修改全部笔记及账户数据。仅安装你信任的插件。确认安装？')
 }
 
 async function remove(plugin: InstalledPlugin) {
-  await perform(() => uninstallPluginApi(plugin.id), `卸载插件“${plugin.name}”？将停用并删除插件文件，保留插件数据。`)
+  await perform(async () => {
+    await uninstallPluginApi(plugin.id); await refreshPlugins()
+  }, `卸载插件“${plugin.name}”？将停用并删除插件文件，保留插件数据。`)
 }
 
 function toggle(plugin: InstalledPlugin) {
-  void perform(() => togglePluginApi({ id: plugin.id, enabled: !plugin.enabled }))
+  void perform(async () => {
+    await togglePluginApi({ id: plugin.id, enabled: !plugin.enabled }); await refreshPlugins()
+  })
 }
 onMounted(() => perform())
 </script>
@@ -93,7 +97,7 @@ onMounted(() => perform())
     <!-- @vue-generic {InstalledPlugin} -->
     <el-table-column label="操作" width="130">
       <template #default="{ row: plugin }">
-        <el-button v-if="plugin.enabled && pluginState.status[plugin.id]?.phase === 'error'" text :disabled="busy || pluginsPaused" @click="retryPlugin(plugin.id)">
+        <el-button v-if="plugin.enabled && pluginState.status[plugin.id]?.phase === 'error'" text :disabled="busy || pluginsPaused" @click="perform(() => retryPlugin(plugin.id))">
           重试
         </el-button><el-button text type="danger" :disabled="busy" @click="remove(plugin)">
           卸载

@@ -993,9 +993,9 @@ async function handleEvents(evs: VaultEvent[]) {
       void loadSettings().catch((err) => {
         if (!isCancel(err)) toast(`同步设置失败：${errorText(err)}`)
       })
-      void refreshPlugins()
+      await refreshPlugins()
     } else if (ev.type === 'plugins') {
-      void refreshPlugins()
+      await refreshPlugins()
     } else if (ev.type === 'changed') {
       const tab = tabOf(ev.path!)
       // 自己保存产生的事件 rev 与本地一致；有本地修改时不覆盖，交由下次保存的冲突检测处理
@@ -1123,7 +1123,7 @@ export async function startWorkspace() {
     eventQueue = eventQueue.then(() => {
       if (!stopped) return work()
     }).catch((err) => {
-      if (!isCancel(err)) toast(`同步失败：${errorText(err)}`)
+      if (!stopped && version === user.getSessionVersion() && !isCancel(err)) toast(`同步失败：${errorText(err)}`)
     })
   }
   const stopEvents = connectEventsApi({ onEvents: events => enqueue(() => handleEvents(events)), onResync: () => enqueue(resync) })

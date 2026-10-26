@@ -44,14 +44,15 @@ onMounted(async () => {
 async function prepare() {
   await Promise.all([props.prepareMaintenance(), flushSettings()])
 }
-async function perform(label: string, action: () => Promise<void>) {
+async function perform(label: string, action: (version: number) => Promise<void>) {
   if (busy.value) return
   const version = user.getSessionVersion()
   busy.value = true; progress.value = label; error.value = ''; message.value = ''
   try {
     await prepare()
     user.assertSession(version)
-    await action()
+    await action(version)
+    user.assertSession(version)
     if (mounted) {
       emit('changed'); last.value = (await getMaintenanceStatusApi()).data
     }
@@ -85,8 +86,21 @@ async function exportMarkdown() {
 async function exportSystemLogs() {
   await perform('正在导出日志…', async () => download(await exportLogsApi(), 'rawmark-system-logs.zip'))
 }
-async function syncPreferences() {
-  await loadSettings(); await reloadTheme(); await refreshPlugins()
+async function syncPreferences(completed: string, version: number) {
+  try {
+    user.assertSession(version)
+    await loadSettings()
+    user.assertSession(version)
+    await reloadTheme()
+    user.assertSession(version)
+    await refreshPlugins()
+    user.assertSession(version)
+  } catch (cause) {
+    user.assertSession(version)
+    if (isCancel(cause)) throw cause
+    throw new Error(`${completed}，但同步失败：${cause instanceof Error ? cause.message : String(cause)}`, { cause })
+  }
+  message.value = completed
 }
 async function reset() {
   if (busy.value) return
@@ -98,8 +112,8 @@ async function reset() {
     busy.value = false
   }
   if (!confirmed) return
-  await perform('正在重置设置…', async () => {
-    await resetSettingsApi(); await syncPreferences(); message.value = '设置已重置，原设置已备份'
+  await perform('正在重置设置…', async (version) => {
+    await resetSettingsApi(); await syncPreferences('设置已重置，原设置已备份', version)
   })
 }
 async function restore(kind: BackupKind, event: Event) {
@@ -132,7 +146,7 @@ async function restore(kind: BackupKind, event: Event) {
       progress.value = kind === 'full' ? '正在恢复实例，请勿关闭页面…' : '正在导入设置…'
       if (kind === 'settings') {
         await importSettingsApi(id); submitted = true
-        await syncPreferences(); message.value = '设置与资源已导入，原设置已备份'
+        await syncPreferences('设置与资源已导入，原设置已备份', version)
       } else {
         await restoreBackupApi(id); submitted = true
         user.invalidate(version)
