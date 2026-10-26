@@ -1,6 +1,11 @@
-# 本地交接文件与设计文档不入库
+# 本地交接文件与历史设计文档不入库；公开文档单独放行
 CONTEXT.md
-docs/
+docs/*
+!docs/guide.md
+!docs/deployment.md
+!docs/development.md
+!docs/api.md
+!docs/images/
 
 # 前端
 node_modules/
