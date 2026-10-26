@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import type { Settings } from '../../pinia/stores/settings'
+import type { Settings } from '../../../pinia/stores/settings'
 import { preferencesApi } from '@@/apis/preferences'
 import { toast } from '@@/utils/notifications'
 import { isCancel } from 'axios'
 import { computed, ref } from 'vue'
 import { useUserStore } from '@/pinia/stores/user'
-import { loadSettings, settings, SettingsAppearanceError, updateSettings } from '../../pinia/stores/settings'
-import { customFonts, loadFonts } from '../appearance/fonts'
-import { FONT_PRESETS } from '../appearance/typography'
-import Icon from './Icon.vue'
+import { loadSettings, settings, SettingsAppearanceError, updateSettings } from '../../../pinia/stores/settings'
+import { customFonts, loadFonts } from '../../appearance/fonts'
+import { FONT_PRESETS } from '../../appearance/typography'
+import Icon from '../Icon/index.vue'
 
 const props = defineProps<{ id: string, setting: 'uiFont' | 'textFont' | 'codeFont' }>()
 const user = useUserStore()

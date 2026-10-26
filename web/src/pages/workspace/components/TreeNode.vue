@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TreeNode } from '../tree'
 import { computed, nextTick, ref, watch } from 'vue'
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { basename, dirname, inAssetDir, isImage, joinPath } from '../../../common/utils/paths'
 import { batchFiles, exportFiles } from '../batch'
 import { contextSelection, dropDirectory, expanded, selectedPaths, selectPath, treeIconTarget } from '../tree'

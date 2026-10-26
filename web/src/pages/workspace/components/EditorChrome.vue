@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { runCommand } from '../../../common/utils/commands'
 import { toggleSourceMode, ws } from '../workspace'
 </script>

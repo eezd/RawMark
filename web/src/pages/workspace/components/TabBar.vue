@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Tab } from '../workspace'
 import { nextTick, ref } from 'vue'
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { commandTitle } from '../../../common/utils/commands'
 import { noteTitle } from '../../../common/utils/paths'
 import { closeTab, createNote, ws } from '../workspace'

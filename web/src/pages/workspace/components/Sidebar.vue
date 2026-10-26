@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import Icon from '../../../common/components/Icon.vue'
-import PluginMount from '../../../common/components/PluginMount.vue'
+import Icon from '../../../common/components/Icon/index.vue'
+import PluginMount from '../../../common/components/PluginMount/index.vue'
 import { sidebarViews } from '../../../common/plugins/registry'
 import { commandTitle } from '../../../common/utils/commands'
 import { basename } from '../../../common/utils/paths'

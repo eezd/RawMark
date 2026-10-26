@@ -2,7 +2,7 @@
 import type { Command } from '../../../common/utils/commands'
 import { toast } from '@@/utils/notifications'
 import { computed, nextTick, ref, watch } from 'vue'
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { allCommands, commandKeys, formatKeys, shortcutConflict } from '../../../common/utils/commands'
 import { recordedKeys } from '../../../common/utils/keys'
 import { loadSettings, settings, SettingsAppearanceError, updateSettings } from '../../../pinia/stores/settings'

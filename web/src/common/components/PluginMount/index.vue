@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { OwnedView } from '../plugins/registry'
+import type { OwnedView } from '../../plugins/registry'
 import { onBeforeUnmount, ref, watch } from 'vue'
-import { mountContent } from '../plugins/mount'
+import { mountContent } from '../../plugins/mount'
 
 const props = defineProps<{ view: OwnedView }>()
 const container = ref<HTMLElement>()

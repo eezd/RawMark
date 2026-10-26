@@ -3,7 +3,7 @@ import type { EditorState } from '@codemirror/state'
 import { ensureSyntaxTree, syntaxTree } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { activeTab, editorView, onEditorUpdate, ws } from '../workspace'
 
 // 大纲：当前笔记的标题列表，点击跳转；高亮光标所在的章节

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { basename, dirname, inAssetDir, joinPath, noteTitle } from '../../../common/utils/paths'
 import { batchFiles } from '../batch'
 import { fuzzyMatch, segments } from '../fuzzy'

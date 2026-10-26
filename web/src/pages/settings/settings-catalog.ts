@@ -1,4 +1,4 @@
-import type { IconName } from '../../common/components/Icon.vue'
+import type { IconName } from '../../common/components/Icon/index.vue'
 import type { SettingsSection } from '@/pinia/stores/settings'
 
 export const SETTINGS_SECTIONS: { id: SettingsSection, title: string, icon: IconName, description: string }[] = [

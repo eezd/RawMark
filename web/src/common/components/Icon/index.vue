@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { IconName } from '../utils/icons'
-import { iconPaths } from '../utils/icons'
+import type { IconName } from '../../utils/icons'
+import { iconPaths } from '../../utils/icons'
 
-export type { IconName } from '../utils/icons'
+export type { IconName } from '../../utils/icons'
 defineProps<{ name: IconName, size?: number }>()
 </script>
 

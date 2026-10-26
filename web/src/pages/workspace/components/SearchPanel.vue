@@ -3,7 +3,7 @@ import type { SearchResult } from '@/pages/workspace/apis/type'
 import { toast } from '@@/utils/notifications'
 import { computed, onMounted, ref, watch } from 'vue'
 import { workspaceApi } from '@/pages/workspace/apis'
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { dirname, noteTitle } from '../../../common/utils/paths'
 import { openAt, ws } from '../workspace'
 

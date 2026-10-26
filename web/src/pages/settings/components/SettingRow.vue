@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { SettingId } from '../settings-catalog'
 import { computed } from 'vue'
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { SETTING_ITEMS } from '../settings-catalog'
 
 const props = defineProps<{ id: SettingId, control?: string, resettable?: boolean }>()

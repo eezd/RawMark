@@ -3,7 +3,7 @@ import type { InstalledPlugin } from '@@/apis/plugins/type'
 import { pluginsApi } from '@@/apis/plugins'
 import { computed, ref } from 'vue'
 import { ApiError } from '@/http/axios'
-import PluginMount from '../../../common/components/PluginMount.vue'
+import PluginMount from '../../../common/components/PluginMount/index.vue'
 import { pluginState, refreshPlugins, retryPlugin } from '../../../common/plugins/host'
 import { pluginsPaused, settingTabs } from '../../../common/plugins/registry'
 

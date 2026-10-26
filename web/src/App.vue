@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Toasts from '@@/components/Toasts.vue'
+import Toasts from '@@/components/Toasts/index.vue'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { useUserStore } from '@/pinia/stores/user'
 import { navigationError, router } from '@/router'

@@ -5,7 +5,7 @@ import { isCancel } from 'axios'
 import { onMounted, ref } from 'vue'
 import { ApiError } from '@/http/axios'
 import { settingsApi } from '@/pages/settings/apis'
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { copyText } from '../../../common/utils/clipboard'
 
 const tokens = ref<ApiToken[] | null>(null)

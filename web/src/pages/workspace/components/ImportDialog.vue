@@ -2,7 +2,7 @@
 import type { ImportResult } from '@/pages/workspace/apis/type'
 import { computed, onMounted, ref } from 'vue'
 import { ApiError } from '@/http/axios'
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { dirname } from '../../../common/utils/paths'
 import { expanded } from '../tree'
 import { importNotes } from '../workspace'

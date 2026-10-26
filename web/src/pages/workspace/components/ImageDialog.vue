@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { ApiError } from '@/http/axios'
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { basename, dirname, isImage, joinPath } from '../../../common/utils/paths'
 import { imageUrl, move, remove, replaceImage, ws } from '../workspace'
 

@@ -2,7 +2,7 @@
 import type { Entry } from '@@/apis/vault/type'
 import { toast } from '@@/utils/notifications'
 import { computed, onMounted, ref } from 'vue'
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { basename, hiddenAssetPath, imageInFolder, isImage } from '../../../common/utils/paths'
 import { metadata, refreshMetadata } from '../metadata'
 import { cleanupImages, imageUrl, openReference, uploadFolderImages, ws } from '../workspace'

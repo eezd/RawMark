@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Captcha } from '@@/apis/auth'
 import { authApi } from '@@/apis/auth'
-import AppStatus from '@@/components/AppStatus.vue'
+import AppStatus from '@@/components/AppStatus/index.vue'
 import { isCancel } from 'axios'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

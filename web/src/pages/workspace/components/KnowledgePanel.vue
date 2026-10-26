@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import Icon from '../../../common/components/Icon.vue'
+import Icon from '../../../common/components/Icon/index.vue'
 import { metadata, refreshMetadata } from '../metadata'
 import { openNote, openReference, ws } from '../workspace'
 
