@@ -1,11 +1,11 @@
+import type { TokenRun } from '@@/highlight/client'
 import type { EditorState, Range } from '@codemirror/state'
 import type { DecorationSet, ViewUpdate } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
-import type { TokenRun } from '../../../common/highlight/client'
+import { cachedTokens, requestTokens } from '@@/highlight/client'
 import { syntaxTree } from '@codemirror/language'
 import { StateEffect, StateField } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin } from '@codemirror/view'
-import { cachedTokens, requestTokens } from '../../../common/highlight/client'
 
 interface CodeBlock {
   // 代码内容（不含围栏行）在文档中的范围

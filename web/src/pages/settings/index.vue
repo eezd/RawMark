@@ -1,163 +1,65 @@
 <script setup lang="ts">
-import type { Settings } from '../../pinia/stores/settings'
-
 import type { SettingSearchResult } from './settings-catalog'
 import type { SettingsSection } from '@/pinia/stores/settings'
-import { toast } from '@@/utils/notifications'
-import { isCancel } from 'axios'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { ApiError } from '@/http/axios'
-import { settingsApi } from '@/pages/settings/apis'
-import { UI_FONT_SIZE } from '../../common/appearance/typography'
-import FontPicker from '../../common/components/FontPicker/index.vue'
-import Icon from '../../common/components/Icon/index.vue'
-import { runCommand } from '../../common/utils/commands'
-import { installApp, installPrompt } from '../../common/utils/pwa'
-import { CONTENT_WIDTHS, DEFAULTS, loadSettings, settings, SettingsAppearanceError, settingsSave, TAB_SIZES, updateSettings } from '../../pinia/stores/settings'
-import AppearanceSettings from './components/AppearanceSettings.vue'
+import Icon from '@@/components/Icon/index.vue'
+import { runCommand } from '@@/utils/commands'
+import { installApp, installPrompt } from '@@/utils/pwa'
+import { computed, nextTick, ref } from 'vue'
+import { useSettingsStore } from '@/pinia/stores/settings'
+import AccountSettings from './components/AccountSettings.vue'
+import EditorSettings from './components/EditorSettings.vue'
+import InterfaceSettings from './components/InterfaceSettings.vue'
 import PluginsPanel from './components/PluginsPanel.vue'
 import SettingRow from './components/SettingRow.vue'
 import ShortcutSettings from './components/ShortcutSettings.vue'
 import StoragePanel from './components/StoragePanel.vue'
-import TokensPanel from './components/TokensPanel.vue'
 import TrashPanel from './components/TrashPanel.vue'
 import { searchSettings, SETTINGS_SECTIONS } from './settings-catalog'
 
 const props = defineProps<{ prepareMaintenance: () => Promise<void>, restoreNote: (id: string) => Promise<void> }>()
 const emit = defineEmits<{ importNotes: [] }>()
+const { settingsSave } = useSettingsStore()
 const buildVersion = import.meta.env.DEV ? '开发版' : document.querySelector<HTMLMetaElement>('meta[name="rawmark-version"]')?.content
 if (!buildVersion) throw new Error('缺少应用构建版本信息')
-
 const model = defineModel<SettingsSection | 'index' | null>({ required: true })
-const section = computed(() => (model.value === 'index' || model.value === null ? 'appearance' : model.value))
-// 手机上一次只显示分组列表或分组内容
+const section = computed(() => model.value === 'index' || model.value === null ? 'appearance' : model.value)
 const showList = ref(model.value === 'index')
 const current = computed(() => SETTINGS_SECTIONS.find(s => s.id === section.value)!)
 const query = ref('')
 const searching = computed(() => !!query.value.trim())
 const results = computed(() => searchSettings(query.value))
-const dialog = ref<HTMLElement>()
 const content = ref<HTMLElement>()
 const heading = ref<HTMLElement>()
-const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
 const preferenceSection = computed(() => ['appearance', 'editor', 'shortcuts', 'trash'].includes(section.value))
 const saveLabel = computed(() => settingsSave.pending ? '保存中…' : settingsSave.result === 'error' ? '保存失败' : settingsSave.result === 'saved' ? '已保存' : '修改自动保存')
-
 async function open(id: SettingsSection) {
-  query.value = ''
-  model.value = id
-  showList.value = false
+  query.value = ''; model.value = id; showList.value = false
   await nextTick()
   content.value!.scrollTop = 0
   heading.value!.focus({ preventScroll: true })
 }
-
 async function locate(result: SettingSearchResult) {
   await open(result.section)
   if (!result.id) return
   const target = document.getElementById(`rm-setting-${result.id}`)!
-  // 设置可能位于 CSS 或排版预览的折叠区内。
   for (let parent = target.parentElement; parent && parent !== content.value; parent = parent.parentElement) {
     if (parent instanceof HTMLDetailsElement) parent.open = true
   }
   if (target instanceof HTMLDetailsElement) target.open = true
   await nextTick()
-  target.focus({ preventScroll: true })
-  target.scrollIntoView({ block: 'center' })
+  target.focus({ preventScroll: true }); target.scrollIntoView({ block: 'center' })
 }
-
 function back() {
-  query.value = ''
-  showList.value = true
-  void nextTick(() => dialog.value!.querySelector<HTMLInputElement>('.rm-settings-search input')!.focus())
+  query.value = ''; showList.value = true
 }
-
 function close() {
   model.value = null
-}
-
-function onKey(e: KeyboardEvent) {
-  if (e.isComposing) return
-  if (e.key === 'Escape') {
-    e.preventDefault(); e.stopPropagation(); close()
-  }
-  if (e.key !== 'Tab') return
-  const controls = [...dialog.value!.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex="0"]')].filter(el => el.getClientRects().length > 0 && !el.closest('[hidden]'))
-  const first = controls[0]; const last = controls.at(-1)
-  if (e.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement as HTMLElement))) {
-    e.preventDefault(); last?.focus()
-  } else if (!e.shiftKey && (document.activeElement === last || !controls.includes(document.activeElement as HTMLElement))) {
-    e.preventDefault(); first?.focus()
-  }
-}
-onMounted(() => dialog.value!.focus({ preventScroll: true }))
-onBeforeUnmount(() => {
-  if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
-})
-
-async function change(patch: Partial<Settings>) {
-  try {
-    await updateSettings(patch)
-  } catch (err) {
-    if (isCancel(err)) return
-    if (err instanceof SettingsAppearanceError) {
-      toast(err.message); return
-    }
-    toast(`保存设置失败：${err instanceof ApiError ? err.message : '网络错误，请检查连接'}`)
-    void loadSettings().catch((error) => {
-      if (!isCancel(error)) toast(`重新读取设置失败：${error instanceof Error ? error.message : '网络错误'}`)
-    })
-  }
-}
-
-function changeFont(event: Event) {
-  const input = event.target as HTMLInputElement
-  const value = input.valueAsNumber
-  if (!Number.isFinite(value) || value <= 0) {
-    if (event.type === 'input') return
-    toast('字号必须为正数')
-    input.value = String(settings.fontSize)
-    return
-  }
-  if (value !== settings.fontSize) void change({ fontSize: value })
-}
-
-function changeUIFont(event: Event) {
-  const input = event.target as HTMLInputElement
-  const value = input.valueAsNumber
-  if (!Number.isInteger(value) || value < UI_FONT_SIZE.min || value > UI_FONT_SIZE.max) {
-    toast(`界面字号须为 ${UI_FONT_SIZE.min}–${UI_FONT_SIZE.max} 之间的整数`)
-    input.value = String(settings.uiFontSize)
-    return
-  }
-  if (value !== settings.uiFontSize) void change({ uiFontSize: value })
-}
-
-// ---- 修改登录密码 ----
-const pw = ref({ current: '', next: '', confirm: '' })
-const pwError = ref('')
-const pwBusy = ref(false)
-
-async function changePassword() {
-  pwError.value = ''
-  if (pw.value.next.length < 8) return void (pwError.value = '新密码至少 8 位')
-  if (pw.value.next !== pw.value.confirm) return void (pwError.value = '两次输入的新密码不一致')
-  pwBusy.value = true
-  try {
-    await settingsApi.changePassword(pw.value.current, pw.value.next)
-    pw.value = { current: '', next: '', confirm: '' }
-    toast('登录密码已修改，其他设备需要重新登录')
-  } catch (err) {
-    pwError.value = err instanceof ApiError ? err.message : '网络错误，请检查连接'
-  } finally {
-    pwBusy.value = false
-  }
 }
 </script>
 
 <template>
-  <div class="rm-dialog-backdrop rm-settings-backdrop" @click.self="close">
-    <div ref="dialog" class="rm-dialog rm-settings" :class="{ 'show-list': showList, searching }" role="dialog" aria-modal="true" aria-label="设置" tabindex="-1" @keydown="onKey">
+  <el-dialog :model-value="model !== null" class="rm-settings-modal" title="设置" :show-close="false" :close-on-click-modal="true" align-center destroy-on-close @close="close">
+    <div class="rm-settings" :class="{ 'show-list': showList, searching }">
       <nav class="rm-settings-nav" aria-label="设置分类">
         <div class="rm-dialog-head">
           <h2>设置</h2>
@@ -165,7 +67,11 @@ async function changePassword() {
             <Icon name="close" />
           </button>
         </div>
-        <label class="rm-settings-search"><Icon name="search" /><input v-model="query" type="search" aria-label="搜索设置" placeholder="搜索设置"><button v-if="query" class="rm-icon-btn" aria-label="清空设置搜索" @click="query = ''"><Icon name="close" /></button></label>
+        <el-input v-model="query" class="rm-settings-search" type="search" clearable aria-label="搜索设置" placeholder="搜索设置">
+          <template #prefix>
+            <Icon name="search" />
+          </template>
+        </el-input>
         <div class="rm-settings-categories">
           <button v-for="s in SETTINGS_SECTIONS" :key="s.id" class="rm-settings-tab" :class="{ on: s.id === section && !searching }" :aria-current="s.id === section && !searching ? 'page' : undefined" @click="open(s.id)">
             <Icon :name="s.icon" />{{ s.title }}
@@ -199,90 +105,9 @@ async function changePassword() {
           </div>
           <div v-show="!searching" class="rm-settings-page">
             <PluginsPanel v-if="section === 'plugins'" />
-            <template v-else-if="section === 'appearance'">
-              <SettingRow id="ui-font" control="rm-ui-font" resettable @reset="change({ uiFont: DEFAULTS.uiFont })">
-                <FontPicker id="rm-ui-font" setting="uiFont" />
-              </SettingRow>
-              <SettingRow id="ui-font-size" control="rm-ui-font-size" resettable @reset="change({ uiFontSize: DEFAULTS.uiFontSize })">
-                <label class="rm-font-input"><input id="rm-ui-font-size" type="number" :min="UI_FONT_SIZE.min" :max="UI_FONT_SIZE.max" step="1" :value="settings.uiFontSize" @blur="changeUIFont" @keydown.enter="($event.target as HTMLInputElement).blur()"> px</label>
-              </SettingRow>
-              <SettingRow id="glass-opacity" control="rm-glass-opacity" resettable @reset="change({ glassOpacity: DEFAULTS.glassOpacity })">
-                <input id="rm-glass-opacity" type="range" min="0.4" max="1" step="0.05" :value="settings.glassOpacity" @change="change({ glassOpacity: Number(($event.target as HTMLInputElement).value) })"><output for="rm-glass-opacity">{{ Math.round(settings.glassOpacity * 100) }}%</output>
-              </SettingRow>
-              <AppearanceSettings />
-            </template>
-
-            <template v-else-if="section === 'editor'">
-              <h3 class="rm-settings-group-title">
-                正文与代码
-              </h3>
-              <SettingRow id="text-font" control="rm-text-font" resettable @reset="change({ textFont: DEFAULTS.textFont })">
-                <FontPicker id="rm-text-font" setting="textFont" />
-              </SettingRow>
-              <SettingRow id="code-font" control="rm-code-font" resettable @reset="change({ codeFont: DEFAULTS.codeFont })">
-                <FontPicker id="rm-code-font" setting="codeFont" />
-              </SettingRow>
-              <SettingRow id="font-size" control="rm-font-size" resettable @reset="change({ fontSize: DEFAULTS.fontSize })">
-                <label class="rm-font-input"><input id="rm-font-size" type="number" min="0" step="any" :value="settings.fontSize" @input="changeFont" @blur="changeFont" @keydown.enter="($event.target as HTMLInputElement).blur()"> px</label>
-              </SettingRow>
-              <SettingRow id="content-width" resettable @reset="change({ contentWidth: DEFAULTS.contentWidth })">
-                <div class="rm-segmented" role="radiogroup" aria-label="正文宽度">
-                  <button v-for="w in CONTENT_WIDTHS" :key="w.value" role="radio" :aria-checked="settings.contentWidth === w.value" :class="{ on: settings.contentWidth === w.value }" @click="change({ contentWidth: w.value })">
-                    {{ w.label }}
-                  </button>
-                </div>
-              </SettingRow>
-              <SettingRow id="line-height" control="rm-line-height" resettable @reset="change({ lineHeight: DEFAULTS.lineHeight })">
-                <input id="rm-line-height" type="range" min="1.2" max="2.5" step="0.05" :value="settings.lineHeight" @change="change({ lineHeight: Number(($event.target as HTMLInputElement).value) })"><output for="rm-line-height">{{ settings.lineHeight.toFixed(2) }}</output>
-              </SettingRow>
-              <details id="rm-setting-typography-preview" class="rm-settings-details" tabindex="-1">
-                <summary>排版预览</summary><article class="rm-typography-preview">
-                  <h2>让文字自由呼吸</h2><p>用简洁的记录，连接每一个想法。Markdown 文件始终属于你。</p><p>真实内容，自然排版，专注当下的灵感。</p><code>const idea = 'Hello, RawMark'</code>
-                </article>
-              </details>
-              <h3 class="rm-settings-group-title">
-                编辑行为
-              </h3>
-              <SettingRow id="selection-toolbar" control="rm-selection-toolbar">
-                <el-switch id="rm-selection-toolbar" :model-value="settings.selectionToolbar" @change="change({ selectionToolbar: Boolean($event) })" />
-              </SettingRow>
-              <SettingRow id="spellcheck" control="rm-spellcheck">
-                <el-switch id="rm-spellcheck" :model-value="settings.spellcheck" @change="change({ spellcheck: Boolean($event) })" />
-              </SettingRow>
-              <SettingRow id="tab-size" control="rm-tab-size" resettable @reset="change({ tabSize: DEFAULTS.tabSize })">
-                <el-select id="rm-tab-size" :model-value="settings.tabSize" @change="change({ tabSize: $event })">
-                  <el-option v-for="n in TAB_SIZES" :key="n" :value="n" :label="`${n} 列`" />
-                </el-select>
-              </SettingRow>
-            </template>
-
-            <template v-else-if="section === 'account'">
-              <form id="rm-setting-password" class="rm-auth-card rm-settings-form" tabindex="-1" @submit.prevent="changePassword">
-                <h3>修改登录密码</h3>
-                <p class="rm-share-note">
-                  修改后其他设备需要重新登录。
-                </p>
-                <label><span>当前密码</span><el-input v-model="pw.current" type="password" autocomplete="current-password" required show-password /></label>
-                <label><span>新密码</span><el-input v-model="pw.next" type="password" autocomplete="new-password" required show-password /></label>
-                <label><span>确认新密码</span><el-input v-model="pw.confirm" type="password" autocomplete="new-password" required show-password /></label>
-                <p v-if="pwError" class="rm-auth-error" role="alert">
-                  {{ pwError }}
-                </p>
-                <el-button class="rm-btn rm-btn-primary" native-type="submit" :disabled="pwBusy">
-                  修改密码
-                </el-button>
-              </form>
-              <section id="rm-setting-tokens" tabindex="-1">
-                <h3 class="rm-settings-group-title">
-                  API 令牌
-                </h3><TokensPanel />
-              </section>
-              <SettingRow id="logout">
-                <el-button class="rm-btn" @click="close(), runCommand('app.logout')">
-                  <Icon name="logout" />退出
-                </el-button>
-              </SettingRow>
-            </template>
+            <InterfaceSettings v-else-if="section === 'appearance'" />
+            <EditorSettings v-else-if="section === 'editor'" />
+            <AccountSettings v-else-if="section === 'account'" @logout="close(), runCommand('app.logout')" />
 
             <ShortcutSettings v-else-if="section === 'shortcuts'" />
 
@@ -308,5 +133,400 @@ async function changePassword() {
         </div>
       </section>
     </div>
-  </div>
+  </el-dialog>
 </template>
+
+<style scoped lang="scss">
+.rm-settings {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  max-width: 960px;
+  height: min(720px, 82dvh);
+  max-height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--rm-divider);
+  background: color-mix(in srgb, var(--rm-bg) calc(var(--rm-glass-opacity) * 100%), transparent);
+  backdrop-filter: blur(20px);
+  outline: none;
+}
+.rm-settings-nav {
+  box-sizing: border-box;
+  flex: none;
+  width: 192px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--rm-divider);
+  background: color-mix(in srgb, var(--rm-sidebar-bg) 70%, transparent);
+}
+.rm-settings :deep(.rm-dialog-head) {
+  flex: none;
+  box-sizing: border-box;
+  min-height: 52px;
+  gap: 8px;
+  padding: 8px 16px;
+}
+.rm-settings :deep(.rm-dialog-head h2) {
+  font-size: var(--rm-ui-font-size);
+  font-weight: 600;
+  min-width: 0;
+  outline: none;
+}
+.rm-settings-close-list,
+.rm-settings-back {
+  display: none;
+}
+.rm-settings-search {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: var(--rm-control-size);
+  margin: 0 8px 8px;
+  padding: 0 6px;
+  border: 1px solid var(--rm-divider);
+  border-radius: 6px;
+  background: var(--rm-bg);
+}
+.rm-settings-search > .rm-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--rm-text-muted);
+}
+.rm-settings-search input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--rm-control-size);
+  padding: 4px 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--rm-text);
+  font: inherit;
+}
+.rm-settings-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.rm-settings-search:focus-within {
+  border-color: var(--rm-accent);
+}
+.rm-settings-categories {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+}
+.rm-settings-tab {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--rm-control-size);
+  margin: 2px 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--rm-text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.rm-settings-tab .rm-icon {
+  flex: none;
+}
+.rm-settings-tab:hover {
+  background: var(--rm-hover);
+}
+.rm-settings-tab.on {
+  background: var(--rm-active);
+  color: var(--rm-accent-strong);
+}
+.rm-settings-nav-foot {
+  margin-top: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--rm-ui-font-small);
+  color: var(--rm-text-muted);
+}
+.rm-settings-nav-foot small {
+  font-size: inherit;
+  overflow-wrap: anywhere;
+}
+.rm-settings-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rm-settings-body > .rm-dialog-head {
+  border-bottom: 1px solid var(--rm-divider);
+}
+.rm-settings-save {
+  flex: none;
+  font-size: var(--rm-ui-font-small);
+  color: var(--rm-text-muted);
+}
+.rm-settings-save.error {
+  color: var(--rm-danger);
+}
+.rm-settings-content {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 0 24px 16px;
+}
+.rm-settings-page {
+  min-width: 0;
+}
+.rm-settings :deep(.rm-setting) {
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rm-divider);
+  font-size: var(--rm-ui-font-size);
+}
+:deep(.rm-setting-info) {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+:deep(.rm-setting-info p) {
+  margin: 4px 0 0;
+  color: var(--rm-text-muted);
+  font-size: var(--rm-ui-font-small);
+  line-height: var(--rm-ui-line-height);
+  overflow-wrap: anywhere;
+}
+:deep(.rm-setting-control) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-width: 0;
+  margin-left: auto;
+}
+:deep(.rm-setting-control output) {
+  min-width: 42px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+:deep(.rm-setting-control code) {
+  overflow-wrap: anywhere;
+}
+:deep(.rm-setting-reset) {
+  flex: none;
+  color: var(--rm-text-muted);
+}
+:deep(.rm-settings-group-title) {
+  margin: 20px 0 0;
+  font-size: var(--rm-ui-font-size);
+  font-weight: 600;
+  color: var(--rm-text-muted);
+}
+:deep(.rm-settings-group-title:first-child) {
+  margin-top: 16px;
+}
+:deep(.rm-settings-details) {
+  margin: 12px 0;
+}
+:deep(.rm-settings-details > summary) {
+  padding: 8px 0;
+  min-height: var(--rm-control-size);
+  box-sizing: border-box;
+  cursor: pointer;
+  font-size: var(--rm-ui-font-size);
+  color: var(--rm-text-muted);
+}
+:deep(.rm-typography-preview) {
+  margin: 8px 0 0;
+  padding: 16px;
+  border: 1px solid var(--rm-divider);
+  border-radius: 8px;
+  background: var(--rm-sidebar-bg);
+  font: var(--rm-font-size)/var(--rm-line-height) var(--rm-font-editor, var(--rm-font-text));
+  overflow-wrap: anywhere;
+}
+:deep(.rm-typography-preview h2) {
+  margin-top: 0;
+  font-family: var(--rm-font-heading);
+  font-size: 1.5em;
+}
+:deep(.rm-typography-preview p) {
+  margin: 0;
+}
+:deep(.rm-typography-preview p + p) {
+  margin-top: 1lh;
+}
+:deep(.rm-typography-preview code) {
+  font-family: var(--rm-font-mono);
+  font-size: 0.9em;
+  color: var(--rm-inline-code-text);
+}
+.rm-settings :deep(.rm-share-note),
+.rm-settings :deep(.rm-appearance-note) {
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.rm-settings :deep(.rm-token-created) {
+  margin: 12px 0;
+}
+.rm-settings :deep(.rm-snippet-form) {
+  padding: 12px 0;
+}
+.rm-settings :deep(.rm-plugin-view) {
+  padding: 12px 0;
+}
+.rm-settings-unavailable {
+  max-width: 240px;
+  font-size: var(--rm-ui-font-small);
+  color: var(--rm-text-muted);
+}
+.rm-settings-result-count {
+  margin: 12px 0;
+  font-size: var(--rm-ui-font-small);
+  color: var(--rm-text-muted);
+}
+.rm-settings-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--rm-divider);
+  background: none;
+  color: var(--rm-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.rm-settings-result:hover {
+  background: var(--rm-hover);
+}
+.rm-settings-result > span {
+  flex: 1;
+  min-width: 0;
+}
+.rm-settings-result strong {
+  font-weight: 500;
+}
+.rm-settings-result small {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--rm-ui-font-small);
+  color: var(--rm-text-muted);
+  overflow-wrap: anywhere;
+}
+.rm-settings-result > .rm-icon {
+  flex: none;
+  color: var(--rm-text-muted);
+}
+
+@media (max-width: 767px) {
+  .rm-settings {
+    height: 100dvh;
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--rm-bg);
+  }
+  .rm-settings-nav {
+    display: none;
+    width: 100%;
+    border-right: 0;
+  }
+  .rm-settings.show-list .rm-settings-nav {
+    display: flex;
+  }
+  .rm-settings.show-list .rm-settings-body {
+    display: none;
+  }
+  .rm-settings.show-list.searching {
+    flex-direction: column;
+  }
+  .rm-settings.show-list.searching .rm-settings-body {
+    display: flex;
+  }
+  .rm-settings.show-list.searching
+    :is(.rm-settings-categories, .rm-settings-nav-foot, .rm-settings-body > .rm-dialog-head) {
+    display: none;
+  }
+  .rm-settings.show-list:not(.searching) .rm-settings-nav {
+    flex: 1;
+  }
+  .rm-settings :deep(.rm-dialog-head) {
+    padding: 8px 12px;
+  }
+  .rm-settings-close-list,
+  .rm-settings-back {
+    display: inline-flex;
+  }
+  .rm-settings-content {
+    padding: 0 16px 16px;
+  }
+  .rm-settings-search {
+    min-height: 44px;
+  }
+  .rm-settings-tab {
+    min-height: 44px;
+  }
+  .rm-settings-save {
+    max-width: 6em;
+  }
+  .rm-settings :deep(.rm-setting-info) {
+    flex-basis: 100%;
+  }
+  .rm-settings :deep(.rm-setting-control) {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+:global(.rm-settings-modal.el-dialog) {
+  width: min(960px, calc(100vw - 48px));
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+}
+:global(.rm-settings-modal > .el-dialog__header) {
+  display: none;
+}
+:global(.rm-settings-modal > .el-dialog__body) {
+  padding: 0;
+  max-height: none;
+  overflow: hidden;
+}
+.rm-settings {
+  max-height: none;
+  border-radius: 12px;
+}
+.rm-settings-search {
+  width: calc(100% - 16px);
+  padding: 0;
+  border: none;
+  background: none;
+}
+@media (max-width: 767px) {
+  :global(.rm-settings-modal.el-dialog) {
+    width: 100%;
+    max-width: 100vw;
+    margin: 0;
+    border-radius: 0;
+  }
+  .rm-settings {
+    border-radius: 0;
+  }
+}
+</style>

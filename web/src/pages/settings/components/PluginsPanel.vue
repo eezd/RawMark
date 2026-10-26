@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import type { InstalledPlugin } from '@@/apis/plugins/type'
-import { pluginsApi } from '@@/apis/plugins'
-import { computed, ref } from 'vue'
+import { installPluginApi, togglePluginApi, uninstallPluginApi } from '@@/apis/plugins'
+
+import PluginMount from '@@/components/PluginMount/index.vue'
+
+import { pluginState, refreshPlugins, retryPlugin } from '@@/plugins/host'
+import { pluginsPaused, settingTabs } from '@@/plugins/registry'
+import { confirmAction } from '@@/utils/confirm'
+import { isCancel } from 'axios'
+import { computed, onMounted, ref } from 'vue'
 import { ApiError } from '@/http/axios'
-import PluginMount from '../../../common/components/PluginMount/index.vue'
-import { pluginState, refreshPlugins, retryPlugin } from '../../../common/plugins/host'
-import { pluginsPaused, settingTabs } from '../../../common/plugins/registry'
 
 const busy = ref(false)
 const error = ref('')
@@ -14,12 +18,16 @@ const selected = ref('')
 const currentTab = computed(() => settingTabs.get(selected.value))
 const labels: Record<string, string> = { loading: '加载中', active: '运行中', error: '故障停用', disabled: '已停用', paused: '临时跳过' }
 
-async function perform(operation: () => Promise<unknown>) {
+async function perform(operation?: () => Promise<unknown>, confirmation?: string) {
+  if (busy.value) return
   busy.value = true
   error.value = ''
   try {
-    await operation(); await refreshPlugins()
+    if (confirmation && !await confirmAction(confirmation)) return
+    if (operation) await operation()
+    await refreshPlugins()
   } catch (err) {
+    if (isCancel(err)) return
     error.value = err instanceof ApiError ? err.message : '插件操作失败，请检查连接后重试'
   } finally {
     busy.value = false
@@ -31,18 +39,17 @@ async function install(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
-  if (!window.confirm('插件在页面内拥有完整权限，可读取和修改全部笔记及账户数据。仅安装你信任的插件。确认安装？')) return
-  await perform(() => pluginsApi.installPlugin(file))
+  await perform(() => installPluginApi(file), '插件在页面内拥有完整权限，可读取和修改全部笔记及账户数据。仅安装你信任的插件。确认安装？')
 }
 
 async function remove(plugin: InstalledPlugin) {
-  if (!window.confirm(`卸载插件“${plugin.name}”？将停用并删除插件文件，保留插件数据。`)) return
-  await perform(() => pluginsApi.uninstallPlugin(plugin.id))
+  await perform(() => uninstallPluginApi(plugin.id), `卸载插件“${plugin.name}”？将停用并删除插件文件，保留插件数据。`)
 }
 
 function toggle(plugin: InstalledPlugin) {
-  void perform(() => pluginsApi.togglePlugin(plugin.id, !plugin.enabled))
+  void perform(() => togglePluginApi({ id: plugin.id, enabled: !plugin.enabled }))
 }
+onMounted(() => perform())
 </script>
 
 <template>
@@ -51,7 +58,7 @@ function toggle(plugin: InstalledPlugin) {
   </p>
   <div class="rm-setting">
     <span class="rm-setting-label">已安装插件</span>
-    <el-button class="rm-btn" :disabled="busy" @click="perform(() => refreshPlugins())">
+    <el-button class="rm-btn" :disabled="busy" @click="perform()">
       刷新列表
     </el-button>
     <el-button class="rm-btn" :disabled="busy" @click="fileInput?.click()">
@@ -68,34 +75,51 @@ function toggle(plugin: InstalledPlugin) {
   <p v-if="!pluginState.installed.length && !pluginState.error" class="rm-appearance-note">
     尚未安装插件。
   </p>
-  <div v-for="plugin in pluginState.installed" :key="plugin.id" class="rm-plugin-row">
-    <label><input type="checkbox" :checked="plugin.enabled" :disabled="busy" @change="toggle(plugin)">
-      <span>{{ plugin.name }} <small>{{ plugin.version }} · {{ labels[pluginState.status[plugin.id]?.phase] ?? (plugin.enabled ? '等待加载' : '已停用') }}</small></span>
-    </label>
-    <el-button v-if="plugin.enabled && pluginState.status[plugin.id]?.phase === 'error'" class="rm-btn" :disabled="busy || pluginsPaused" @click="retryPlugin(plugin.id)">
-      重试
-    </el-button>
-    <el-button class="rm-btn rm-btn-danger" :disabled="busy" @click="remove(plugin)">
-      卸载
-    </el-button>
-    <p v-if="pluginState.status[plugin.id]?.error" class="rm-auth-error">
-      {{ pluginState.status[plugin.id].error }}
-    </p>
-  </div>
+  <el-table :data="pluginState.installed" row-key="id" empty-text="尚未安装插件" :aria-busy="busy">
+    <!-- @vue-generic {InstalledPlugin} -->
+    <el-table-column label="插件" min-width="170">
+      <template #default="{ row: plugin }">
+        <strong>{{ plugin.name }}</strong><small class="rm-plugin-version">{{ plugin.version }} · {{ labels[pluginState.status[plugin.id]?.phase] ?? (plugin.enabled ? '等待加载' : '已停用') }}</small><p v-if="pluginState.status[plugin.id]?.error" class="rm-auth-error">
+          {{ pluginState.status[plugin.id].error }}
+        </p>
+      </template>
+    </el-table-column>
+    <!-- @vue-generic {InstalledPlugin} -->
+    <el-table-column label="启用" width="72">
+      <template #default="{ row: plugin }">
+        <el-switch :model-value="plugin.enabled" :disabled="busy" :aria-label="`启用 ${plugin.name}`" @change="toggle(plugin)" />
+      </template>
+    </el-table-column>
+    <!-- @vue-generic {InstalledPlugin} -->
+    <el-table-column label="操作" width="130">
+      <template #default="{ row: plugin }">
+        <el-button v-if="plugin.enabled && pluginState.status[plugin.id]?.phase === 'error'" text :disabled="busy || pluginsPaused" @click="retryPlugin(plugin.id)">
+          重试
+        </el-button><el-button text type="danger" :disabled="busy" @click="remove(plugin)">
+          卸载
+        </el-button>
+      </template>
+    </el-table-column>
+  </el-table>
   <p class="rm-appearance-note">
     若插件导致界面无法操作，在应用地址末尾加 <code>?disable-plugins</code> 可跳过加载并打开此页。卸载保留插件数据。
   </p>
   <template v-if="settingTabs.size">
     <div class="rm-setting">
       <label for="rm-plugin-tab" class="rm-setting-label">插件设置</label>
-      <select id="rm-plugin-tab" v-model="selected">
-        <option value="">
-          选择插件设置页
-        </option><option v-for="[id, tab] in settingTabs" :key="id" :value="id">
-          {{ tab.title }}
-        </option>
-      </select>
+      <el-select id="rm-plugin-tab" v-model="selected" clearable placeholder="选择插件设置页">
+        <el-option v-for="[id, tab] in settingTabs" :key="id" :value="id" :label="tab.title" />
+      </el-select>
     </div>
     <PluginMount v-if="currentTab" :key="selected" :view="currentTab" />
   </template>
 </template>
+
+<style scoped lang="scss">
+.rm-plugin-version {
+  display: block;
+  color: var(--rm-text-muted);
+  font-size: var(--rm-ui-font-small);
+  margin-top: 4px;
+}
+</style>

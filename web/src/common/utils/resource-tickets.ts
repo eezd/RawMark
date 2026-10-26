@@ -1,6 +1,6 @@
+import { createResourceTicketApi } from '@@/apis/auth'
 import { pinia } from '@/pinia'
 import { useUserStore } from '@/pinia/stores/user'
-import { authApi } from './index'
 
 let version = -1
 let imageRoot = ''
@@ -14,10 +14,10 @@ export async function prepareResources() {
   }
   if (imageRoot && fontRoot) return
   if (!pending) {
-    const request = Promise.all([authApi.ticket({ kind: 'images' }), authApi.ticket({ kind: 'fonts' })]).then(([images, fonts]) => {
+    const request = Promise.all([createResourceTicketApi({ kind: 'images' }), createResourceTicketApi({ kind: 'fonts' })]).then(([images, fonts]) => {
       user.assertSession(current)
-      imageRoot = images.url
-      fontRoot = fonts.url
+      imageRoot = images.data.url
+      fontRoot = fonts.data.url
     })
     pending = request
     void request.finally(() => {
@@ -36,5 +36,5 @@ export function fontResourceRoot(): string {
   return fontRoot
 }
 export async function pluginResourceURL(pluginId: string, revision: string): Promise<string> {
-  return `${(await authApi.ticket({ kind: 'plugin', pluginId, revision })).url}main.js`
+  return `${(await createResourceTicketApi({ kind: 'plugin', pluginId, revision })).data.url}main.js`
 }

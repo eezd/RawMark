@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import type { Command } from '../../../common/utils/commands'
+import type { Command } from '@@/utils/commands'
+import Icon from '@@/components/Icon/index.vue'
+import { allCommands, commandKeys, formatKeys, shortcutConflict } from '@@/utils/commands'
+import { recordedKeys } from '@@/utils/keys'
 import { toast } from '@@/utils/notifications'
 import { computed, nextTick, ref, watch } from 'vue'
-import Icon from '../../../common/components/Icon/index.vue'
-import { allCommands, commandKeys, formatKeys, shortcutConflict } from '../../../common/utils/commands'
-import { recordedKeys } from '../../../common/utils/keys'
-import { loadSettings, settings, SettingsAppearanceError, updateSettings } from '../../../pinia/stores/settings'
+import { pinia } from '@/pinia'
+import { SettingsAppearanceError, useSettingsStore } from '@/pinia/stores/settings'
+
+const { loadSettings, settings, updateSettings } = useSettingsStore(pinia)
 
 const commands = computed(allCommands)
 const query = ref('')
@@ -76,7 +79,7 @@ async function reset(command: Command) {
 <template>
   <div class="rm-shortcut-settings">
     <div class="rm-shortcut-toolbar">
-      <input v-model="query" type="search" aria-label="搜索快捷键" placeholder="搜索命令或快捷键"><el-button class="rm-btn" :disabled="busy" @click="recording = null; error = ''; save({})">
+      <el-input v-model="query" type="search" clearable aria-label="搜索快捷键" placeholder="搜索命令或快捷键" /><el-button class="rm-btn" :disabled="busy" @click="recording = null; error = ''; save({})">
         重置全部快捷键
       </el-button>
     </div>

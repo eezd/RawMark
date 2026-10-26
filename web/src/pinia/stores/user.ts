@@ -1,4 +1,5 @@
-import { authApi } from '@@/apis/auth'
+import { getCurrentUserApi, logoutApi } from '@@/apis/auth'
+
 import { CanceledError } from 'axios'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -41,7 +42,7 @@ export const useUserStore = defineStore('user', () => {
     if (infoRequest) return infoRequest
     const version = sessionVersion.value
     const pending = (async () => {
-      const data = await authApi.me()
+      const data = (await getCurrentUserApi()).data
       assertSession(version)
       if (!data || !Array.isArray(data.permissions)
         || data.permissions.some(value => typeof value !== 'string')
@@ -60,7 +61,7 @@ export const useUserStore = defineStore('user', () => {
   }
   async function logout() {
     const version = sessionVersion.value
-    await authApi.logout()
+    await logoutApi()
     assertSession(version)
     invalidate(version)
   }

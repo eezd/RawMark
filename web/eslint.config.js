@@ -43,5 +43,12 @@ export default antfu(
       'unicorn/no-instanceof-builtins': 'off',
     },
   },
+  {
+    files: ['src/**/*.{ts,vue}'],
+    ignores: ['src/common/apis/**', 'src/http/**', 'src/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { paths: [{ name: '@/http/axios', importNames: ['request'], message: '业务请求统一放在 common/apis/<resource>/index.ts。' }, { name: 'axios', importNames: ['default'], message: '复用 http/axios 的统一请求处理。' }] }],
+    },
+  },
   { files: ['src/service-worker.js'], languageOptions: { globals: { __PRECACHE__: 'readonly' } } },
 )

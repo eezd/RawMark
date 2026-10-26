@@ -1,7 +1,10 @@
 // 命令注册表：命令面板列出的操作与全局快捷键都来自这里；插件也通过 registerCommand 添加命令
 import { shallowReactive } from 'vue'
-import { settings } from '../../pinia/stores/settings'
+import { pinia } from '@/pinia'
+import { useSettingsStore } from '@/pinia/stores/settings'
 import { formatKeys, matchKeys, physicalKeys } from './keys'
+
+const { settings } = useSettingsStore(pinia)
 
 export { formatKeys, matchKeys } from './keys'
 

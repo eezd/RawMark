@@ -1,4 +1,4 @@
-import { vaultApi } from '@@/apis/vault'
+import { readNoteFile } from '@@/utils/note-files'
 import { toasts } from '@@/utils/notifications'
 import { isCancel } from 'axios'
 // @vitest-environment happy-dom
@@ -7,7 +7,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { pinia } from '@/pinia'
 import { usePermissionStore } from '@/pinia/stores/permission'
 import { useUserStore } from '@/pinia/stores/user'
-import { ApiError, requestJSON, requestRaw } from './axios'
+import { ApiError, request } from './axios'
 
 const user = useUserStore(pinia)
 const permission = usePermissionStore(pinia)
@@ -21,7 +21,7 @@ afterEach(() => {
 
 it('使用 Bearer 和统一 JSON，省略 Cookie 且禁止缓存', async () => {
   const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(payload({ path: 'a.md' }))
-  expect(await requestJSON('POST', '/test', { json: { a: 1 } })).toEqual({ path: 'a.md' })
+  expect(await request({ method: 'post', url: '/test', data: { a: 1 } })).toEqual({ code: 0, data: { path: 'a.md' }, message: '成功' })
   const req = fetch.mock.calls[0]![0] as Request
   expect(req.headers.get('Authorization')).toBe('Bearer rms_test')
   expect(req.credentials).toBe('omit')
@@ -33,11 +33,11 @@ it('401 清理当前身份及动态路由，403 保留身份，错误只提示�
   permission.install(router, ['vault:read'])
   expect(router.hasRoute('Workspace')).toBe(true)
   vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(payload(null, 403, 40300, '权限不足')).mockResolvedValueOnce(payload(null, 401, 40100, '登录已失效'))
-  await expect(requestJSON('GET', '/test')).rejects.toMatchObject({ status: 403, code: 40300 })
+  await expect(request({ method: 'get', url: '/test' })).rejects.toMatchObject({ status: 403, code: 40300 })
   expect(user.token).toBe('rms_test')
   expect(router.hasRoute('Workspace')).toBe(true)
   expect(toasts.map(item => item.text)).toEqual(['权限不足'])
-  await expect(requestJSON('GET', '/test')).rejects.toMatchObject({ status: 401 })
+  await expect(request({ method: 'get', url: '/test' })).rejects.toMatchObject({ status: 401 })
   expect(user.token).toBe('')
   expect(router.hasRoute('Workspace')).toBe(false)
   expect(toasts.map(item => item.text)).toEqual(['权限不足', '登录已失效'])
@@ -47,7 +47,7 @@ it.each([200, 401, 403])('旧会话的 HTTP %s 响应不得覆盖或注销新会
   vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise((resolve) => {
     finish = resolve
   }))
-  const result = requestJSON('GET', '/slow').catch(error => error)
+  const result = request({ method: 'get', url: '/slow' }).catch(error => error)
   await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
   user.setToken('rms_new')
   finish(payload({ old: true }, status, status === 200 ? 0 : status * 100))
@@ -76,17 +76,17 @@ it('身份恢复失败交给登录或路由页面展示，请求层不重复提�
 })
 it('业务失败明确拒绝，保留冲突版本，由调用方显示时请求层不重复提示', async () => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(payload({ rev: 'current' }, 412, 41200, '版本冲突'))
-  await expect(requestJSON('PUT', '/file', { errorOwner: 'caller' })).rejects.toMatchObject({ status: 412, code: 41200, data: { rev: 'current' } })
+  await expect(request({ method: 'put', url: '/file', errorOwner: 'caller' })).rejects.toMatchObject({ status: 412, code: 41200, data: { rev: 'current' } })
   expect(toasts).toHaveLength(0)
 })
 it('拒绝旧 JSON 格式及 HTTP 成功中的业务失败，文件与204保留原语义', async () => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('{"ok":true}')).mockResolvedValueOnce(payload(null, 200, 40900, '操作失败')).mockResolvedValueOnce(new Response('正文', { headers: { ETag: '"rev"' } })).mockResolvedValueOnce(new Response(null, { status: 204 }))
-  await expect(requestJSON('GET', '/old')).rejects.toBeInstanceOf(ApiError)
-  await expect(requestJSON('GET', '/business')).rejects.toMatchObject({ code: 40900 })
-  const raw = await requestRaw('GET', '/raw/a.md')
-  expect(await raw.text()).toBe('正文')
-  expect(raw.headers.get('ETag')).toBe('"rev"')
-  expect(await requestJSON('POST', '/auth/logout')).toBeNull()
+  await expect(request({ method: 'get', url: '/old' })).rejects.toBeInstanceOf(ApiError)
+  await expect(request({ method: 'get', url: '/business' })).rejects.toMatchObject({ code: 40900 })
+  const raw = await request<string>({ method: 'get', url: '/raw/a.md', responseType: 'text', returnResponse: true })
+  expect(raw.data).toBe('正文')
+  expect(raw.headers.get('etag')).toBe('"rev"')
+  expect(await request({ method: 'post', url: '/auth/logout' })).toBeUndefined()
 })
 it('服务端注销失败保留身份；成功才清除本地身份', async () => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(payload(null, 500, 50000, '注销失败')).mockResolvedValueOnce(new Response(null, { status: 204 }))
@@ -102,7 +102,7 @@ it('读取笔记的原始响应解码期间切换会话，旧正文仍须拒绝'
   vi.spyOn(Response.prototype, 'text').mockImplementation(() => new Promise((resolve) => {
     finish = resolve
   }))
-  const pending = vaultApi.readFile('note.md').catch(error => error)
+  const pending = readNoteFile('note.md').catch(error => error)
   await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
   user.setToken('rms_new')
   finish('旧正文')

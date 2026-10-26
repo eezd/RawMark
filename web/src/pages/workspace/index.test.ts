@@ -6,11 +6,13 @@ import { CanceledError } from 'axios'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { pinia } from '@/pinia'
-import * as preferences from '@/pinia/stores/settings'
+import { useSettingsStore } from '@/pinia/stores/settings'
 import { useUserStore } from '@/pinia/stores/user'
 import Sidebar from './components/Sidebar.vue'
 import Workspace from './index.vue'
 import { flushAll, readyToReload } from './workspace'
+
+const preferences = useSettingsStore(pinia)
 
 vi.mock('./workspace', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./workspace')>()

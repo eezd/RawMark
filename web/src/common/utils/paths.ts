@@ -1,4 +1,6 @@
-import { encodePath } from '@/http/axios'
+export function encodePath(path: string): string {
+  return path.split('/').map(encodeURIComponent).join('/')
+}
 
 export const NOTE_EXT = '.md'
 

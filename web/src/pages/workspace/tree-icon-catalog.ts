@@ -1,5 +1,5 @@
+import type { IconName } from '@@/utils/icons'
 import type { Gemoji } from 'gemoji'
-import type { IconName } from '../../common/utils/icons'
 
 export const iconLabels: Record<IconName, string> = {
   plus: '加号',

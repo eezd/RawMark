@@ -6,3 +6,10 @@ export interface InstalledPlugin {
   revision: string
   enabled: boolean
 }
+
+export interface TogglePluginRequestData { id: string, enabled: boolean }
+export interface PluginDataRequestData { id: string, data: unknown }
+export type PluginsResponseData = ApiResponseData<{ plugins: InstalledPlugin[] }>
+export type PluginResponseData = ApiResponseData<InstalledPlugin>
+export type PluginDataResponseData = ApiResponseData<{ data: unknown }>
+export type PluginOperationResponseData = ApiResponseData<{ ok: boolean }>

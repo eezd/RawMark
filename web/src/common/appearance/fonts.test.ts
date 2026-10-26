@@ -20,7 +20,7 @@ describe('导入字体资源边界', () => {
   })
 })
 
-vi.mock('@@/apis/auth/resources', () => ({
+vi.mock('@@/utils/resource-tickets', () => ({
   prepareResources: async () => {},
   imageResourceRoot: () => '/api/v1/resources/test-images/images/',
   fontResourceRoot: () => '/api/v1/resources/test-fonts/fonts/',

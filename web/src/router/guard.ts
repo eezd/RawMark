@@ -1,5 +1,6 @@
 import type { Router } from 'vue-router'
-import { authApi } from '@@/apis/auth'
+import { getAuthStateApi } from '@@/apis/auth'
+
 import { isCancel } from 'axios'
 import { pinia } from '@/pinia'
 import { usePermissionStore } from '@/pinia/stores/permission'
@@ -17,7 +18,7 @@ export function registerNavigationGuard(router: Router) {
     if (!user.token) {
       let setUp: boolean
       try {
-        ({ setUp } = await authApi.state())
+        ({ setUp } = (await getAuthStateApi()).data)
         user.assertSession(version)
       } catch (error) {
         if (isCancel(error)) return false

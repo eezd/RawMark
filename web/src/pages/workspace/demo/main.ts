@@ -1,4 +1,4 @@
-import { watchFontLoading } from '../../../common/appearance/font-loading'
+import { watchFontLoading } from '@@/appearance/font-loading'
 // 编辑器演示页（无需登录），用于性能与交互的自动化测试
 import { createEditorState, createEditorView } from '../editor'
 import sample from './sample.md?raw'

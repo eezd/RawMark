@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { Entry } from '@@/apis/vault/type'
+import type { Entry } from '@@/apis/tree/type'
+import Icon from '@@/components/Icon/index.vue'
 import { toast } from '@@/utils/notifications'
+import { basename, hiddenAssetPath, imageInFolder, isImage } from '@@/utils/paths'
 import { computed, onMounted, ref } from 'vue'
-import Icon from '../../../common/components/Icon/index.vue'
-import { basename, hiddenAssetPath, imageInFolder, isImage } from '../../../common/utils/paths'
 import { metadata, refreshMetadata } from '../metadata'
 import { cleanupImages, imageUrl, openReference, uploadFolderImages, ws } from '../workspace'
 
@@ -106,21 +106,11 @@ async function clean() {
       </el-button>
     </header>
     <div class="rm-media-mobile-filters">
-      <select v-model="ws.imagesAll" aria-label="资源范围">
-        <option :value="false">
-          当前目录
-        </option><option :value="true">
-          整个知识库
-        </option>
-      </select><select v-model="usage" aria-label="引用状态">
-        <option value="all">
-          全部图片
-        </option><option value="used" :disabled="!certain">
-          已被引用
-        </option><option value="unused" :disabled="!certain">
-          未被引用
-        </option>
-      </select><el-button class="rm-btn" :disabled="busy || !certain" @click="proposeCleanup">
+      <el-select v-model="ws.imagesAll" aria-label="资源范围">
+        <el-option :value="false" label="当前目录" /><el-option :value="true" label="整个知识库" />
+      </el-select><el-select v-model="usage" aria-label="引用状态">
+        <el-option value="all" label="全部图片" /><el-option value="used" :disabled="!certain" label="已被引用" /><el-option value="unused" :disabled="!certain" label="未被引用" />
+      </el-select><el-button class="rm-btn" :disabled="busy || !certain" @click="proposeCleanup">
         清理孤立图片
       </el-button>
     </div>
@@ -138,26 +128,20 @@ async function clean() {
       </aside>
       <div class="rm-media-content">
         <div class="rm-media-toolbar">
-          <label class="rm-media-search"><Icon name="search" /><input v-model="query" type="search" placeholder="搜索图片名称或路径…" aria-label="搜索图片"></label><select v-model="format" aria-label="图片格式">
-            <option value="">
-              所有格式
-            </option><option v-for="type in types" :key="type" :value="type">
-              {{ type.toUpperCase() }}
-            </option>
-          </select><select v-model="sort" aria-label="图片排序">
-            <option value="modified">
-              最近修改
-            </option><option value="name">
-              名称
-            </option><option value="size">
-              文件大小
-            </option>
-          </select><button class="rm-icon-btn" :title="list ? '切换网格' : '切换列表'" @click="list = !list">
+          <el-input v-model="query" class="rm-media-search" type="search" clearable placeholder="搜索图片名称或路径…" aria-label="搜索图片">
+            <template #prefix>
+              <Icon name="search" />
+            </template>
+          </el-input><el-select v-model="format" aria-label="图片格式">
+            <el-option value="" label="所有格式" /><el-option v-for="type in types" :key="type" :value="type" :label="type.toUpperCase()" />
+          </el-select><el-select v-model="sort" aria-label="图片排序">
+            <el-option value="modified" label="最近修改" /><el-option value="name" label="名称" /><el-option value="size" label="文件大小" />
+          </el-select><button class="rm-icon-btn" :title="list ? '切换网格' : '切换列表'" @click="list = !list">
             <Icon :name="list ? 'grid' : 'outline'" />
           </button>
         </div>
         <div class="rm-media-upload">
-          <label>上传至 <select v-model="uploadDir" aria-label="上传目录"><option value="">根目录 / assets</option><option v-for="folder in directories" :key="folder.path" :value="folder.path">{{ folder.path }} / assets</option></select></label><input ref="picker" type="file" accept="image/*" multiple hidden @change="upload"><el-button class="rm-btn rm-btn-primary" :disabled="busy" @click="picker?.click()">
+          <label>上传至 <el-select v-model="uploadDir" aria-label="上传目录"><el-option value="" label="根目录 / assets" /><el-option v-for="folder in directories" :key="folder.path" :value="folder.path" :label="`${folder.path} / assets`" /></el-select></label><input ref="picker" type="file" accept="image/*" multiple hidden @change="upload"><el-button class="rm-btn rm-btn-primary" :disabled="busy" @click="picker?.click()">
             <Icon name="plus" />{{ busy ? '处理中…' : '上传图片' }}
           </el-button>
         </div>
@@ -198,33 +182,52 @@ async function clean() {
         </p>
       </aside>
     </div>
-    <div v-if="cleanupCandidates" class="rm-dialog-backdrop" @click.self="!busy && (cleanupCandidates = null)">
-      <section class="rm-dialog rm-cleanup-dialog" role="dialog" aria-label="确认清理孤立图片">
-        <div class="rm-dialog-head">
-          <h2>清理候选 · {{ cleanupCandidates.length }} 张</h2><button class="rm-icon-btn" :disabled="busy" title="关闭" @click="cleanupCandidates = null">
-            <Icon name="close" />
-          </button>
-        </div><p class="rm-share-note">
-          服务端会再次读取最新笔记；仍有引用的图片将跳过。确认后移入回收站。
-        </p><ul>
-          <li v-for="image in cleanupCandidates" :key="image.path">
-            <label><input v-model="cleanupSelected" type="checkbox" :value="image.path" :disabled="busy">{{ image.path }} <small>{{ size(image.size) }}</small></label>
-          </li>
-        </ul><p v-if="!cleanupCandidates.length" class="rm-share-note">
-          当前范围没有可清理的孤立图片。
-        </p><div class="rm-cleanup-actions">
-          <el-button class="rm-btn" :disabled="busy" @click="cleanupCandidates = null">
-            取消
-          </el-button><el-button class="rm-btn rm-btn-primary" :disabled="busy || !cleanupSelected.length" @click="clean">
-            移入回收站（{{ cleanupSelected.length }}）
-          </el-button>
-        </div>
-      </section>
-    </div>
+    <el-dialog :model-value="cleanupCandidates !== null" :title="`清理候选 · ${cleanupCandidates?.length ?? 0} 张`" width="640px" class="rm-cleanup-dialog" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy" :before-close="() => { if (!busy) cleanupCandidates = null }" @close="cleanupCandidates = null">
+      <p class="rm-share-note">
+        服务端会再次读取最新笔记；仍有引用的图片将跳过。确认后移入回收站。
+      </p><ul>
+        <li v-for="image in cleanupCandidates ?? []" :key="image.path">
+          <el-checkbox-group v-model="cleanupSelected">
+            <el-checkbox :value="image.path" :disabled="busy">
+              {{ image.path }} <small>{{ size(image.size) }}</small>
+            </el-checkbox>
+          </el-checkbox-group>
+        </li>
+      </ul><p v-if="!cleanupCandidates?.length" class="rm-share-note">
+        当前范围没有可清理的孤立图片。
+      </p><div class="rm-cleanup-actions">
+        <el-button class="rm-btn" :disabled="busy" @click="cleanupCandidates = null">
+          取消
+        </el-button><el-button class="rm-btn rm-btn-primary" :disabled="busy || !cleanupSelected.length" @click="clean">
+          移入回收站（{{ cleanupSelected.length }}）
+        </el-button>
+      </div>
+    </el-dialog>
   </section>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+.rm-media-toolbar :deep(.el-select) {
+  width: 130px;
+}
+.rm-media-upload :deep(.el-select) {
+  width: 240px;
+  max-width: 100%;
+}
+.rm-media-mobile-filters :deep(.el-select) {
+  width: 130px;
+}
+.rm-media-search.el-input {
+  padding: 0;
+  border: 0;
+}
+:deep(.el-checkbox) {
+  height: auto;
+  white-space: normal;
+}
+:deep(.el-checkbox__label) {
+  overflow-wrap: anywhere;
+}
 .rm-media-library {
   display: flex;
   flex-direction: column;

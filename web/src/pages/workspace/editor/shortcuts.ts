@@ -1,6 +1,6 @@
 import type { Command, KeyBinding } from '@codemirror/view'
+import { typoraKeys } from '@@/utils/typora-keys'
 import { indentLess, indentMore, redo, selectAll, undo } from '@codemirror/commands'
-import { typoraKeys } from '../../../common/utils/typora-keys'
 import { selectCodeBlock } from './codeblocks'
 import { insertLink, toggleBlock, toggleBold, toggleCode, toggleHeading, toggleItalic } from './format'
 import { toggleSelectionMark, toggleUnderline } from './inline-styles'

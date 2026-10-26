@@ -1,6 +1,7 @@
-import type { CustomFont } from '@@/apis/preferences/type'
-import { fontResourceRoot, prepareResources } from '@@/apis/auth/resources'
-import { preferencesApi } from '@@/apis/preferences'
+import type { CustomFont } from '@@/apis/fonts/type'
+import { getFontsApi } from '@@/apis/fonts'
+import { fontResourceRoot, prepareResources } from '@@/utils/resource-tickets'
+
 import { shallowRef } from 'vue'
 
 export const customFonts = shallowRef<CustomFont[]>([])
@@ -23,5 +24,5 @@ export function parseFontCatalog(value: unknown): CustomFont[] {
 
 export async function loadFonts() {
   await prepareResources()
-  applyFontCatalog(parseFontCatalog(await preferencesApi.fonts()))
+  applyFontCatalog(parseFontCatalog((await getFontsApi()).data.fonts))
 }

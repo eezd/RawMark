@@ -1,8 +1,10 @@
 import type { InstalledPlugin } from '@@/apis/plugins/type'
 import type { AsyncCleanup, JSONValue, PluginAPI, PluginView, PluginWorkspace, VaultEvents } from '@@/plugin-api'
-import { pluginResourceURL } from '@@/apis/auth/resources'
-import { pluginsApi } from '@@/apis/plugins'
-import { vaultApi } from '@@/apis/vault'
+import { getPluginDataApi, getPluginsApi, savePluginDataApi } from '@@/apis/plugins'
+import { getTreeApi } from '@@/apis/tree'
+import { readNoteFile } from '@@/utils/note-files'
+import { pluginResourceURL } from '@@/utils/resource-tickets'
+
 import { reactive } from 'vue'
 import { allCommands, registerCommand } from '../utils/commands'
 import { editorExtensions, markdownSyntax, pluginEvents, pluginsPaused, registerCodeRenderer, registerEntry, settingTabs, sidebarViews } from './registry'
@@ -144,10 +146,10 @@ async function createAPI(instance: Instance): Promise<PluginAPI> {
     },
     vault: {
       list: () => {
-        check(); return vaultApi.tree()
+        check(); return getTreeApi().then(({ data }) => data.entries)
       },
       read: (path) => {
-        check(); return vaultApi.readFile(path)
+        check(); return readNoteFile(path)
       },
       write: (path, content, options) => {
         check(); return adapter.writeNote(path, content, options)
@@ -177,10 +179,10 @@ async function createAPI(instance: Instance): Promise<PluginAPI> {
     },
     data: {
       load: async () => {
-        check(); return (await pluginsApi.pluginData(id)).data as JSONValue
+        check(); return ((await getPluginDataApi(id)).data).data as JSONValue
       },
       save: async (data) => {
-        check(); await pluginsApi.savePluginData(id, data)
+        check(); await savePluginDataApi({ id, data })
       },
     },
     notice: (message) => {
@@ -257,7 +259,7 @@ export async function refreshPlugins() {
   const currentSession = session
   const sequence = ++request
   try {
-    const installed = await pluginsApi.plugins()
+    const installed = (await getPluginsApi()).data.plugins
     if (!running || currentSession !== session || sequence !== request) return
     pluginState.installed = installed
     pluginState.error = ''

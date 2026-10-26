@@ -1,8 +1,9 @@
 import type { App } from 'vue'
+import * as treeApi from '@@/apis/tree'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // @vitest-environment happy-dom
 import { createApp, nextTick } from 'vue'
-import { workspaceApi } from '@/pages/workspace/apis'
+
 import Sidebar from './components/Sidebar.vue'
 import { expanded, selectedPaths, treeIconTarget } from './tree'
 import * as workspace from './workspace'
@@ -134,7 +135,7 @@ describe('文件树图标操作', () => {
 
 it('图标请求沿用认证、禁缓存和 null 重置契约', async () => {
   const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"code":0,"data":{},"message":"成功"}'))
-  await workspaceApi.setTreeIcon('folder/a.md', null)
+  await treeApi.setTreeIconApi({ path: 'folder/a.md', icon: null })
   const request = fetch.mock.calls[0]![0] as Request
   expect(request.url).toBe('http://localhost:3000/api/v1/tree-icon')
   expect(request.method).toBe('PUT')

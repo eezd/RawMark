@@ -1,16 +1,18 @@
-import { authApi } from '@@/apis/auth'
+import * as authApi from '@@/apis/auth'
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { pinia } from '@/pinia'
 import { useUserStore } from '@/pinia/stores/user'
+import { apiSuccess } from '../../tests/api-response'
 import { loginRedirect, registerNavigationGuard } from './guard'
 import { constantRoutes } from './routes'
 
 const user = useUserStore(pinia)
 const identity = { permissions: ['vault:read', 'vault:write', 'instance:manage'], expiresAt: '2030-01-01T00:00:00Z' }
 beforeEach(() => {
-  user.setToken(''); vi.spyOn(authApi, 'state').mockResolvedValue({ setUp: true }); vi.spyOn(authApi, 'me').mockResolvedValue(identity)
+  user.setToken(''); vi.spyOn(authApi, 'getAuthStateApi').mockResolvedValue(apiSuccess({ setUp: true })); vi.spyOn(authApi, 'getCurrentUserApi').mockResolvedValue(apiSuccess(identity))
 })
 afterEach(() => {
   user.setToken(''); vi.restoreAllMocks()
@@ -34,22 +36,22 @@ it('匿名深链保留完整回跳地址，登录后恢复身份并注册路由'
 })
 it('刷新时恢复后端身份；无权限进入403，保留Token', async () => {
   user.setToken('rms_valid')
-  vi.mocked(authApi.me).mockResolvedValue({ ...identity, permissions: [] })
+  vi.mocked(authApi.getCurrentUserApi).mockResolvedValue(apiSuccess({ ...identity, permissions: [] }))
   const router = makeRouter()
   await router.push('/')
   expect(router.currentRoute.value.path).toBe('/403')
   expect(user.token).toBe('rms_valid')
 })
 it('未初始化进入设置密码页；匿名登录挑战无需虚构用户', async () => {
-  vi.mocked(authApi.state).mockResolvedValue({ setUp: false })
+  vi.mocked(authApi.getAuthStateApi).mockResolvedValue(apiSuccess({ setUp: false }))
   const router = makeRouter()
   await router.push('/login')
   expect(router.currentRoute.value.path).toBe('/setup')
-  expect(authApi.me).not.toHaveBeenCalled()
+  expect(authApi.getCurrentUserApi).not.toHaveBeenCalled()
 })
 it('身份恢复的网络失败必须拒绝，不能伪装成匿名或成功', async () => {
   user.setToken('rms_valid')
-  vi.mocked(authApi.me).mockRejectedValue(new Error('网络断开'))
+  vi.mocked(authApi.getCurrentUserApi).mockRejectedValue(new Error('网络断开'))
   const router = makeRouter()
   router.onError(() => {})
   await expect(router.push('/')).rejects.toThrow('网络断开')

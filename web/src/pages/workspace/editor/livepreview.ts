@@ -2,10 +2,10 @@ import type { EditorState, Range } from '@codemirror/state'
 import type { DecorationSet, EditorView, ViewUpdate } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
 import type { TocEntry } from './widgets'
+import { inlineStyleText, stylesFromTag } from '@@/markdown/inline-styles'
 import { syntaxTree } from '@codemirror/language'
 import { Facet, StateEffect } from '@codemirror/state'
 import { Decoration, ViewPlugin } from '@codemirror/view'
-import { inlineStyleText, stylesFromTag } from '../../../common/markdown/inline-styles'
 import { codeContentRange, fencedCodeAt, fenceLanguage } from './codeblocks'
 import {
   BulletWidget,

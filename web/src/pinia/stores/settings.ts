@@ -1,15 +1,18 @@
-import type { Appearance } from '../../common/appearance/appearance'
-import { preferencesApi } from '@@/apis/preferences'
+import type { Appearance } from '@@/appearance/appearance'
+import { getFontsApi } from '@@/apis/fonts'
+import { getSettingsApi, patchSettingsApi } from '@@/apis/settings'
+import { getThemeApi } from '@@/apis/themes'
+
+import { appearancePaused, applyAppearance, sanitizeAppearance } from '@@/appearance/appearance'
+import { applyFontCatalog, customFonts, parseFontCatalog } from '@@/appearance/fonts'
+import { applyDisplaySettings, DISPLAY_DEFAULTS, FONT_PRESETS, sanitizeDisplaySettings } from '@@/appearance/typography'
+import { normalizeKeys } from '@@/utils/keys'
 import { isCancel } from 'axios'
 import { defineStore } from 'pinia'
 // 应用设置：服务器上一份 JSON，全部设备共用；修改立即保存，其他设备经事件推送同步。
 // 本地缓存上次的值，启动时先套用，避免页面先按默认值显示再跳变
 import { reactive } from 'vue'
 import { pinia } from '@/pinia'
-import { appearancePaused, applyAppearance, sanitizeAppearance } from '../../common/appearance/appearance'
-import { applyFontCatalog, customFonts, parseFontCatalog } from '../../common/appearance/fonts'
-import { applyDisplaySettings, DISPLAY_DEFAULTS, FONT_PRESETS, sanitizeDisplaySettings } from '../../common/appearance/typography'
-import { normalizeKeys } from '../../common/utils/keys'
 import { useUserStore } from './user'
 
 export const TAB_SIZES = [2, 4, 8]
@@ -28,12 +31,6 @@ export type Settings = typeof DEFAULTS & Appearance & { shortcuts: Record<string
 
 const CACHE_KEY = 'rawmark.settings'
 
-export const useSettingsStore = defineStore('settings', () => {
-  const settings = reactive<Settings>(sanitize(JSON.parse(localStorage.getItem(CACHE_KEY) ?? '{}')))
-  const settingsSave = reactive({ pending: 0, result: 'idle' as 'idle' | 'saved' | 'error', error: '' })
-  return { settings, settingsSave, loadSettings, updateSettings, flushSettings }
-})
-export const { settings, settingsSave } = useSettingsStore(pinia)
 export type SettingsSection = 'appearance' | 'editor' | 'account' | 'shortcuts' | 'trash' | 'plugins' | 'about' | 'storage'
 
 export class SettingsAppearanceError extends Error {
@@ -73,103 +70,110 @@ function sanitizeShortcuts(raw: unknown): Record<string, string[]> {
   return out
 }
 
-let currentTheme = ''
-let currentCSS = ''
-let appearanceRequest = 0
+export const useSettingsStore = defineStore('settings', () => {
+  const settings = reactive<Settings>(sanitize(JSON.parse(localStorage.getItem(CACHE_KEY) ?? '{}')))
+  const settingsSave = reactive({ pending: 0, result: 'idle' as 'idle' | 'saved' | 'error', error: '' })
 
-async function applySettingsAppearance() {
-  const request = ++appearanceRequest
-  const theme = settings.theme
-  if (appearancePaused || theme === 'default') {
-    currentTheme = theme
-    currentCSS = ''
-  } else if (theme !== currentTheme) {
-    const data = await preferencesApi.theme(theme)
-    if (request !== appearanceRequest) return
-    currentCSS = data.css
-    currentTheme = theme
+  let currentTheme = ''
+  let currentCSS = ''
+  let appearanceRequest = 0
+
+  async function applySettingsAppearance() {
+    const request = ++appearanceRequest
+    const theme = settings.theme
+    if (appearancePaused || theme === 'default') {
+      currentTheme = theme
+      currentCSS = ''
+    } else if (theme !== currentTheme) {
+      const data = (await getThemeApi(theme)).data
+      if (request !== appearanceRequest) return
+      currentCSS = data.css
+      currentTheme = theme
+    }
+    applyAppearance({ ...settings }, currentCSS)
   }
-  applyAppearance({ ...settings }, currentCSS)
-}
 
-function applied(next: Settings) {
-  Object.assign(settings, next)
-  localStorage.setItem(CACHE_KEY, JSON.stringify(settings))
-  const root = document.documentElement.style
-  applyDisplaySettings(settings)
-  root.setProperty('--rm-sidebar-width', `${settings.sidebarWidth}px`)
-}
+  function applied(next: Settings) {
+    Object.assign(settings, next)
+    localStorage.setItem(CACHE_KEY, JSON.stringify(settings))
+    const root = document.documentElement.style
+    applyDisplaySettings(settings)
+    root.setProperty('--rm-sidebar-width', `${settings.sidebarWidth}px`)
+  }
 
-applied({ ...settings })
-// 缓存只提前应用明暗模式；主题和片段等服务器确认后再应用。
-applyAppearance({ ...settings, theme: 'default', cssSnippets: [] }, '')
+  applied({ ...settings })
+  // 缓存只提前应用明暗模式；主题和片段等服务器确认后再应用。
+  applyAppearance({ ...settings, theme: 'default', cssSnippets: [] }, '')
 
-let settingsRequest = 0
-export async function loadSettings() {
-  const user = useUserStore(pinia)
-  const version = user.getSessionVersion()
-  const request = ++settingsRequest
-  if (settingsSave.pending) {
-    // 推送可能先于 PATCH 响应到达；先等待现有写入，避免读取未保存的旧值。
-    await saveQueue
+  let settingsRequest = 0
+  async function loadSettings() {
+    const user = useUserStore(pinia)
+    const version = user.getSessionVersion()
+    const request = ++settingsRequest
+    if (settingsSave.pending) {
+      // 推送可能先于 PATCH 响应到达；先等待现有写入，避免读取未保存的旧值。
+      await saveQueue
+      user.assertSession(version)
+      if (request !== settingsRequest) return
+    }
+    const [raw, fonts] = await Promise.all([getSettingsApi().then(({ data }) => data), getFontsApi().then(({ data }) => data.fonts)])
     user.assertSession(version)
+    // 目录与设置作为一批应用，迟到旧响应不能恢复已删除字体或覆盖新设置。
     if (request !== settingsRequest) return
-  }
-  const [raw, fonts] = await Promise.all([preferencesApi.settings(), preferencesApi.fonts()])
-  user.assertSession(version)
-  // 目录与设置作为一批应用，迟到旧响应不能恢复已删除字体或覆盖新设置。
-  if (request !== settingsRequest) return
-  applyFontCatalog(parseFontCatalog(fonts))
-  applied(sanitize(raw))
-  await applySettingsAppearance()
-}
-
-export async function reloadTheme() {
-  currentTheme = ''
-  await applySettingsAppearance()
-}
-
-/** 修改设置：先在本地生效再保存，保存失败时由调用方提示并重新载入 */
-export async function updateSettings(patch: Partial<Settings>) {
-  ++settingsRequest
-  applied({ ...settings, ...patch })
-  // 设置请求串行提交，防止快速切换和片段编辑的旧请求覆盖新值。
-  await saveSettings(patch)
-  try {
+    applyFontCatalog(parseFontCatalog(fonts))
+    applied(sanitize(raw))
     await applySettingsAppearance()
-  } catch (cause) {
-    if (isCancel(cause)) throw cause
-    throw new SettingsAppearanceError(cause)
   }
-}
 
-let saveQueue: Promise<unknown> = Promise.resolve()
-function saveSettings(patch: Partial<Settings>) {
-  const user = useUserStore(pinia)
-  const version = user.getSessionVersion()
-  settingsSave.pending++
-  const pending = saveQueue.then(async () => {
+  async function reloadTheme() {
+    currentTheme = ''
+    await applySettingsAppearance()
+  }
+
+  /** 修改设置：先在本地生效再保存，保存失败时由调用方提示并重新载入 */
+  async function updateSettings(patch: Partial<Settings>) {
+    ++settingsRequest
+    applied({ ...settings, ...patch })
+    // 设置请求串行提交，防止快速切换和片段编辑的旧请求覆盖新值。
+    await saveSettings(patch)
     try {
-      user.assertSession(version)
-      await preferencesApi.patchSettings(patch)
-      user.assertSession(version)
-      settingsSave.result = 'saved'
-      settingsSave.error = ''
+      await applySettingsAppearance()
     } catch (cause) {
       if (isCancel(cause)) throw cause
-      settingsSave.result = 'error'
-      settingsSave.error = cause instanceof Error ? cause.message : String(cause)
-      throw cause
-    } finally {
-      settingsSave.pending--
+      throw new SettingsAppearanceError(cause)
     }
-  })
-  saveQueue = pending.catch(() => {})
-  return pending
-}
+  }
 
-/** 维护前等待现有设置保存；失败时不得继续替换配置。 */
-export async function flushSettings() {
-  await saveQueue
-  if (settingsSave.result === 'error') throw new Error(`设置保存失败：${settingsSave.error}`)
-}
+  let saveQueue: Promise<unknown> = Promise.resolve()
+  function saveSettings(patch: Partial<Settings>) {
+    const user = useUserStore(pinia)
+    const version = user.getSessionVersion()
+    settingsSave.pending++
+    const pending = saveQueue.then(async () => {
+      try {
+        user.assertSession(version)
+        await patchSettingsApi(patch)
+        user.assertSession(version)
+        settingsSave.result = 'saved'
+        settingsSave.error = ''
+      } catch (cause) {
+        if (isCancel(cause)) throw cause
+        settingsSave.result = 'error'
+        settingsSave.error = cause instanceof Error ? cause.message : String(cause)
+        throw cause
+      } finally {
+        settingsSave.pending--
+      }
+    })
+    saveQueue = pending.catch(() => {})
+    return pending
+  }
+
+  /** 维护前等待现有设置保存；失败时不得继续替换配置。 */
+  async function flushSettings() {
+    await saveQueue
+    if (settingsSave.result === 'error') throw new Error(`设置保存失败：${settingsSave.error}`)
+  }
+
+  return { settings, settingsSave, loadSettings, updateSettings, flushSettings, reloadTheme }
+})

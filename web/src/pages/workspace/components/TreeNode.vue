@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { TreeNode } from '../tree'
+import Icon from '@@/components/Icon/index.vue'
+import { basename, dirname, inAssetDir, isImage, joinPath } from '@@/utils/paths'
 import { computed, nextTick, ref, watch } from 'vue'
-import Icon from '../../../common/components/Icon/index.vue'
-import { basename, dirname, inAssetDir, isImage, joinPath } from '../../../common/utils/paths'
 import { batchFiles, exportFiles } from '../batch'
 import { contextSelection, dropDirectory, expanded, selectedPaths, selectPath, treeIconTarget } from '../tree'
 import { createFolder, createNote, move, openNote, renameTarget, ws } from '../workspace'

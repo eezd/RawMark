@@ -1,6 +1,6 @@
-import type { Entry, TreeIcon } from '@@/apis/vault/type'
+import type { Entry, TreeIcon } from '@@/apis/tree/type'
+import { basename, dirname, hiddenAssetPath } from '@@/utils/paths'
 import { computed, reactive, ref, shallowRef, watch } from 'vue'
-import { basename, dirname, hiddenAssetPath } from '../../common/utils/paths'
 import { rangePaths } from './selection'
 import { ws } from './workspace'
 

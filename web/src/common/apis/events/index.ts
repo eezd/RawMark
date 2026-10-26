@@ -1,17 +1,13 @@
-import { authApi } from '@@/apis/auth'
+import type { EventHandlers } from './type'
+
+import { createResourceTicketApi } from '@@/apis/auth'
+
 // 订阅仓库事件；每次连接领取一次性票据，重连后补全量同步。
 import { isCancel } from 'axios'
 import { pinia } from '@/pinia'
 import { useUserStore } from '@/pinia/stores/user'
 
-export interface VaultEvent {
-  type: 'tree' | 'changed' | 'deleted' | 'moved' | 'settings' | 'plugins' | 'indexed'
-  path?: string
-  from?: string
-  rev?: string
-}
-
-export function connectEvents(handlers: { onEvents: (evs: VaultEvent[]) => void, onResync: () => void }): () => void {
+export function connectEventsApi(handlers: EventHandlers): () => void {
   const user = useUserStore(pinia)
   const version = user.getSessionVersion()
   let socket: WebSocket | undefined
@@ -29,7 +25,7 @@ export function connectEvents(handlers: { onEvents: (evs: VaultEvent[]) => void,
     if (stopped || connecting) return
     connecting = true
     try {
-      const ticket = await authApi.ticket({ kind: 'events' })
+      const ticket = (await createResourceTicketApi({ kind: 'events' })).data
       user.assertSession(version)
       if (stopped) return
       const url = new URL(ticket.url, location.origin)

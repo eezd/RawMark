@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { Tab } from '../workspace'
+import Icon from '@@/components/Icon/index.vue'
+import { commandTitle } from '@@/utils/commands'
+import { noteTitle } from '@@/utils/paths'
 import { nextTick, ref } from 'vue'
-import Icon from '../../../common/components/Icon/index.vue'
-import { commandTitle } from '../../../common/utils/commands'
-import { noteTitle } from '../../../common/utils/paths'
 import { closeTab, createNote, ws } from '../workspace'
 
 // 拖动排序：拖到某个标签的左半边插到它前面，右半边插到它后面

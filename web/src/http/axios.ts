@@ -1,6 +1,6 @@
-import type { AxiosResponse, Method } from 'axios'
+import type { AxiosRequestConfig, AxiosResponse } from 'axios'
 import { reportError } from '@@/utils/notifications'
-import axios, { CanceledError, isAxiosError, isCancel } from 'axios'
+import axios, { AxiosHeaders, CanceledError, isAxiosError, isCancel } from 'axios'
 import { pinia } from '@/pinia'
 import { useUserStore } from '@/pinia/stores/user'
 
@@ -9,26 +9,19 @@ export class ApiError extends Error {
     super(message)
   }
 }
-interface Options {
-  json?: unknown
-  body?: BodyInit
-  headers?: Record<string, string>
-  keepalive?: boolean
-  auth?: boolean
+interface RequestConfig extends Omit<AxiosRequestConfig<unknown>, 'auth'> {
+  anonymous?: boolean
   errorOwner?: 'request' | 'caller'
-  signal?: AbortSignal
+  /** 原文和下载需要 ETag、Content-Disposition 等响应头。 */
+  returnResponse?: boolean
 }
 const instance = axios.create({ baseURL: '/api/v1', adapter: 'fetch', withCredentials: false })
-export function encodePath(path: string): string {
-  return path.split('/').map(encodeURIComponent).join('/')
-}
-interface Envelope { code: number, data: unknown, message: string }
-function envelope(value: unknown, status: number): Envelope {
+function envelope(value: unknown, status: number): ApiResponseData<unknown> {
   if (!value || typeof value !== 'object' || !('code' in value) || typeof value.code !== 'number'
     || !Number.isInteger(value.code) || !('data' in value) || !('message' in value) || typeof value.message !== 'string') {
     throw new ApiError(status, '服务器响应协议无效')
   }
-  return value as Envelope
+  return value as ApiResponseData<unknown>
 }
 function errorData(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
@@ -49,57 +42,39 @@ async function failure(error: unknown): Promise<ApiError> {
     const data = envelope(body, response.status)
     return new ApiError(response.status, data.message, errorData(data.data), data.code)
   } catch (cause) {
-    return cause instanceof ApiError ? cause : new ApiError(response.status, '服务器响应协议无效')
+    if (cause instanceof ApiError) return cause
+    throw cause
   }
 }
-async function execute<T>(method: string, url: string, options: Options, raw: boolean, decode: (response: AxiosResponse) => Promise<T>): Promise<T> {
+export function request<T>(config: RequestConfig & { returnResponse: true }): Promise<AxiosResponse<T, unknown, AxiosHeaders>>
+export function request<T>(config: RequestConfig): Promise<T>
+export async function request<T>(config: RequestConfig): Promise<T | AxiosResponse<T, unknown, AxiosHeaders>> {
   const user = useUserStore(pinia)
   const version = user.getSessionVersion()
-  const token = options.auth === false ? '' : user.token
+  const token = config.anonymous === true ? '' : user.token
+  const headers = new AxiosHeaders(config.headers as ConstructorParameters<typeof AxiosHeaders>[0])
+  headers.set('Authorization', token ? `Bearer ${token}` : undefined)
   try {
-    const response = await instance.request({
-      method: method as Method,
-      url,
-      headers: { 'Content-Type': options.json !== undefined ? 'application/json' : null, ...options.headers, 'Authorization': token ? `Bearer ${token}` : undefined },
-      data: options.json !== undefined ? JSON.stringify(options.json) : options.body,
-      responseType: raw ? 'blob' : 'text',
-      signal: options.signal ? AbortSignal.any([user.getSessionSignal(), options.signal]) : user.getSessionSignal(),
-      fetchOptions: { credentials: 'omit', cache: 'no-store', keepalive: options.keepalive },
+    const response = await instance.request<T, AxiosResponse<T, unknown, AxiosHeaders>>({
+      ...config,
+      headers,
+      signal: config.signal ? AbortSignal.any([user.getSessionSignal(), config.signal as AbortSignal]) : user.getSessionSignal(),
+      fetchOptions: { ...config.fetchOptions, credentials: 'omit', cache: 'no-store' },
     })
     user.assertSession(version)
-    const result = await decode(response)
-    user.assertSession(version)
-    return result
+    if (response.status === 204) return config.returnResponse ? response : undefined as T
+    if (!config.responseType || config.responseType === 'json') {
+      const result = envelope(response.data, response.status)
+      if (result.code !== 0) throw new ApiError(response.status, result.message, errorData(result.data), result.code)
+    }
+    return config.returnResponse ? response : response.data
   } catch (cause) {
     if (isCancel(cause)) throw cause
     if (version !== user.getSessionVersion()) throw new CanceledError('会话已变化')
     const error = await failure(cause)
     user.assertSession(version)
     if (error.status === 401 && token) user.invalidate(version)
-    if (options.errorOwner !== 'caller') reportError(error)
+    if (config.errorOwner !== 'caller') reportError(error)
     throw error
   }
-}
-export function requestJSON<T>(method: string, url: string, options: Options = {}): Promise<T> {
-  return execute(method, url, options, false, async (response) => {
-    if (response.status === 204) return null as T
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(response.data)
-    } catch {
-      throw new ApiError(response.status, '服务器返回了无效 JSON')
-    }
-    const result = envelope(parsed, response.status)
-    if (result.code !== 0) throw new ApiError(response.status, result.message, errorData(result.data), result.code)
-    return result.data as T
-  })
-}
-export function requestRaw(method: string, url: string, options: Options = {}): Promise<Response> {
-  return execute(method, url, options, true, async (response) => {
-    const headers = new Headers()
-    for (const [key, value] of Object.entries(response.headers)) {
-      if (value != null) headers.set(key, String(value))
-    }
-    return new Response(response.status === 204 ? null : response.data, { status: response.status, headers })
-  })
 }

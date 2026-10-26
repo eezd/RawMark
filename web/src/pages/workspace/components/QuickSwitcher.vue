@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import Icon from '../../../common/components/Icon/index.vue'
-import { availableCommands, commandKeys, formatKeys } from '../../../common/utils/commands'
-import { dirname, NOTE_EXT, noteTitle } from '../../../common/utils/paths'
+import type { InputInstance } from 'element-plus'
+import Icon from '@@/components/Icon/index.vue'
+import { availableCommands, commandKeys, formatKeys } from '@@/utils/commands'
+import { dirname, NOTE_EXT, noteTitle } from '@@/utils/paths'
+import { computed, ref, watch } from 'vue'
 import { fuzzyMatch, segments } from '../fuzzy'
 import { createNoteAt, openAt, ws } from '../workspace'
 
@@ -22,7 +23,7 @@ interface Item {
   run: () => void
 }
 
-const input = ref<HTMLInputElement>()
+const input = ref<InputInstance>()
 const list = ref<HTMLElement>()
 const query = ref(ws.switcher ?? '')
 const selected = ref(0)
@@ -148,45 +149,38 @@ function onKeydown(e: KeyboardEvent) {
   e.preventDefault()
 }
 
-onMounted(() => input.value?.focus())
+function opened() {
+  input.value?.focus()
+}
 </script>
 
 <template>
-  <div class="rm-switcher-backdrop" @mousedown.self="cancel">
-    <div class="rm-switcher" role="dialog" :aria-label="commandMode ? '命令面板' : '快速打开'">
-      <div class="rm-search-box">
+  <el-dialog :model-value="true" :title="commandMode ? '命令面板' : '快速打开'" width="560px" class="rm-picker-dialog" @close="cancel" @opened="opened">
+    <el-input ref="input" v-model="query" :placeholder="commandMode ? '输入命令名称' : '输入笔记名称，回车打开或新建；输入 > 执行命令'" :aria-label="commandMode ? '搜索命令' : '搜索笔记'" enterkeyhint="go" @keydown="onKeydown($event as KeyboardEvent)">
+      <template #prefix>
         <Icon :name="commandMode ? 'command' : 'search'" />
-        <input
-          ref="input"
-          v-model="query"
-          class="rm-search-input"
-          :placeholder="commandMode ? '输入命令名称' : '输入笔记名称，回车打开或新建；输入 > 执行命令'"
-          enterkeyhint="go"
-          @keydown="onKeydown"
-          @blur="close"
-        >
-      </div>
-      <ul v-if="items.length" ref="list" class="rm-switcher-list" @mousedown.prevent>
-        <li
-          v-for="(item, i) in items"
-          :key="item.key"
-          class="rm-switcher-item"
-          :class="{ active: i === selected }"
-          @click="choose(i)"
-          @mousemove="selected = i"
-        >
-          <Icon :name="item.icon" />
-          <span class="rm-switcher-title">
-            <span v-for="(s, j) in segments(item.title, item.titleHits)" :key="j" :class="{ 'rm-search-hit': s.hit }">{{ s.text }}</span>
-          </span>
-          <span v-if="item.detail" class="rm-switcher-dir" :class="{ 'rm-switcher-keys': item.icon === 'command' }">
-            <span v-for="(s, j) in segments(item.detail, item.detailHits)" :key="j" :class="{ 'rm-search-hit': s.hit }">{{ s.text }}</span>
-          </span>
-        </li>
-      </ul>
-      <p v-else class="rm-tree-empty">
-        {{ commandMode ? '没有匹配的命令' : '还没有笔记' }}
-      </p>
-    </div>
-  </div>
+      </template>
+    </el-input>
+    <ul v-if="items.length" ref="list" class="rm-switcher-list" @mousedown.prevent>
+      <li
+        v-for="(item, i) in items"
+        :key="item.key"
+        class="rm-switcher-item"
+        :class="{ active: i === selected }"
+        @click="choose(i)"
+        @mousemove="selected = i"
+      >
+        <Icon :name="item.icon" />
+        <span class="rm-switcher-title">
+          <span v-for="(s, j) in segments(item.title, item.titleHits)" :key="j" :class="{ 'rm-search-hit': s.hit }">{{ s.text }}</span>
+        </span>
+        <span v-if="item.detail" class="rm-switcher-dir" :class="{ 'rm-switcher-keys': item.icon === 'command' }">
+          <span v-for="(s, j) in segments(item.detail, item.detailHits)" :key="j" :class="{ 'rm-search-hit': s.hit }">{{ s.text }}</span>
+        </span>
+      </li>
+    </ul>
+    <p v-else class="rm-tree-empty">
+      {{ commandMode ? '没有匹配的命令' : '还没有笔记' }}
+    </p>
+  </el-dialog>
 </template>

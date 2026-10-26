@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { confirmAction } from '@@/utils/confirm'
+import { basename, dirname, isImage, joinPath } from '@@/utils/paths'
+import { computed, ref, watch } from 'vue'
 import { ApiError } from '@/http/axios'
-import Icon from '../../../common/components/Icon/index.vue'
-import { basename, dirname, isImage, joinPath } from '../../../common/utils/paths'
 import { imageUrl, move, remove, replaceImage, ws } from '../workspace'
 
 const props = defineProps<{ path: string }>()
-const dialog = ref<HTMLElement>()
 const picker = ref<HTMLInputElement>()
 const busy = ref(false)
 const error = ref('')
@@ -27,7 +26,6 @@ watch(path, (p) => {
 watch(src, () => {
   loadError.value = false; dimensions.value = ''
 })
-onMounted(() => dialog.value?.focus())
 
 function close() {
   if (!busy.value) ws.image = null
@@ -53,7 +51,8 @@ async function rename() {
   busy.value = true
   error.value = ''
   try {
-    await move(path.value, to)
+    const result = await move(path.value, to, 'caller')
+    if (!result.ok) error.value = result.error
   } catch (err) {
     error.value = err instanceof Error ? err.message : '修改后同步失败，请检查目录'
   } finally {
@@ -72,10 +71,10 @@ async function replace(event: Event) {
   if (!file.name.toLowerCase().endsWith(extension.value.toLowerCase())) {
     error.value = '请选择与原图片扩展名相同的文件'; return
   }
-  if (!confirm('替换会影响所有引用此路径的笔记，旧图片不会进入回收站。确定替换？')) return
   busy.value = true
   error.value = ''
   try {
+    if (!await confirmAction('替换会影响所有引用此路径的笔记，旧图片不会进入回收站。确定替换？')) return
     await replaceImage(path.value, file)
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '网络错误，替换结果尚未确认，请检查图片后再重试'
@@ -85,9 +84,10 @@ async function replace(event: Event) {
 }
 
 async function trash() {
-  if (busy.value || !confirm('将图片移入回收站？引用它的笔记会暂时无法显示此图片，恢复后可重新显示。')) return
+  if (busy.value) return
   busy.value = true
   try {
+    if (!await confirmAction('将图片移入回收站？引用它的笔记会暂时无法显示此图片，恢复后可重新显示。')) return
     await remove(path.value)
   } finally {
     busy.value = false
@@ -96,70 +96,62 @@ async function trash() {
 </script>
 
 <template>
-  <div class="rm-dialog-backdrop" @click.self="close" @keydown.esc.stop.prevent="close">
-    <section ref="dialog" class="rm-dialog rm-image-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-label="图片管理" :aria-busy="busy">
-      <div class="rm-dialog-head">
-        <h2>图片管理</h2>
-        <button class="rm-icon-btn" title="关闭" :disabled="busy" @click="close">
-          <Icon name="close" />
-        </button>
+  <el-dialog :model-value="true" title="图片管理" width="860px" class="rm-image-dialog" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy" :before-close="close" @close="close">
+    <div class="rm-image-body">
+      <p class="rm-image-path">
+        {{ path }}
+      </p>
+      <div class="rm-image-preview">
+        <p v-if="!entry">
+          图片已不存在，请刷新目录
+        </p>
+        <p v-else-if="loadError" role="alert">
+          图片无法预览，文件可能损坏或浏览器不支持此格式。
+        </p>
+        <img v-else :key="src" :src="src" :alt="basename(path)" @load="loaded" @error="loadError = true">
       </div>
-      <div class="rm-image-body">
-        <p class="rm-image-path">
-          {{ path }}
-        </p>
-        <div class="rm-image-preview">
-          <p v-if="!entry">
-            图片已不存在，请刷新目录
-          </p>
-          <p v-else-if="loadError" role="alert">
-            图片无法预览，文件可能损坏或浏览器不支持此格式。
-          </p>
-          <img v-else :key="src" :src="src" :alt="basename(path)" @load="loaded" @error="loadError = true">
-        </div>
-        <div class="rm-image-navigation">
-          <el-button class="rm-btn" :disabled="busy || index <= 0" @click="select(-1)">
-            上一张
-          </el-button>
-          <span>{{ index + 1 }} / {{ siblings.length }} · {{ dimensions }} {{ size }}</span>
-          <el-button class="rm-btn" :disabled="busy || index >= siblings.length - 1" @click="select(1)">
-            下一张
-          </el-button>
-        </div>
-        <form class="rm-image-rename" @submit.prevent="rename">
-          <label for="rm-image-name">图片名称</label>
-          <div>
-            <input id="rm-image-name" v-model="name" :disabled="busy || !entry" required>
-            <span>{{ extension }}</span>
-            <el-button class="rm-btn" :disabled="busy || !entry || name.trim() + extension === basename(path)">
-              重命名
-            </el-button>
-          </div>
-        </form>
-        <p class="rm-image-hint">
-          改名会更新笔记中的本地引用；替换保留原路径，请选择同格式图片（最大 50 MB）。
-        </p>
-        <p v-if="error" class="rm-auth-error" role="alert">
-          {{ error }}
-        </p>
-        <div class="rm-image-actions">
-          <input ref="picker" type="file" :accept="extension" hidden :disabled="busy" @change="replace">
-          <el-button class="rm-btn" :disabled="busy || !entry" @click="ws.moving = path">
-            移动到…
-          </el-button>
-          <el-button class="rm-btn rm-btn-danger" :disabled="busy || !entry" @click="trash">
-            移入回收站
-          </el-button>
-          <el-button class="rm-btn rm-btn-primary" :disabled="busy || !entry" @click="picker?.click()">
-            {{ busy ? '处理中…' : '替换图片' }}
-          </el-button>
-        </div>
+      <div class="rm-image-navigation">
+        <el-button class="rm-btn" :disabled="busy || index <= 0" @click="select(-1)">
+          上一张
+        </el-button>
+        <span>{{ index + 1 }} / {{ siblings.length }} · {{ dimensions }} {{ size }}</span>
+        <el-button class="rm-btn" :disabled="busy || index >= siblings.length - 1" @click="select(1)">
+          下一张
+        </el-button>
       </div>
-    </section>
-  </div>
+      <form class="rm-image-rename" @submit.prevent="rename">
+        <label for="rm-image-name">图片名称</label>
+        <div>
+          <el-input id="rm-image-name" v-model="name" :disabled="busy || !entry" required />
+          <span>{{ extension }}</span>
+          <el-button native-type="submit" class="rm-btn" :disabled="busy || !entry || name.trim() + extension === basename(path)">
+            重命名
+          </el-button>
+        </div>
+      </form>
+      <p class="rm-image-hint">
+        改名会更新笔记中的本地引用；替换保留原路径，请选择同格式图片（最大 50 MB）。
+      </p>
+      <p v-if="error" class="rm-auth-error" role="alert">
+        {{ error }}
+      </p>
+      <div class="rm-image-actions">
+        <input ref="picker" type="file" :accept="extension" hidden :disabled="busy" @change="replace">
+        <el-button class="rm-btn" :disabled="busy || !entry" @click="ws.moving = path">
+          移动到…
+        </el-button>
+        <el-button class="rm-btn rm-btn-danger" :disabled="busy || !entry" @click="trash">
+          移入回收站
+        </el-button>
+        <el-button class="rm-btn rm-btn-primary" :disabled="busy || !entry" @click="picker?.click()">
+          {{ busy ? '处理中…' : '替换图片' }}
+        </el-button>
+      </div>
+    </div>
+  </el-dialog>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .rm-image-dialog {
   max-width: 860px;
   width: min(860px, calc(100vw - 24px));
@@ -168,7 +160,7 @@ async function trash() {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 0 20px 20px;
+  padding: 0;
   overflow-y: auto;
   font-size: var(--rm-ui-font-size);
 }

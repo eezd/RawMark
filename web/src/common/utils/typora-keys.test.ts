@@ -23,7 +23,7 @@ describe('typora 默认快捷键', () => {
     try {
       const { typoraKeys } = await import('./typora-keys')
       const { physicalKeys, matchKeys, recordedKeys } = await import('./keys')
-      const { editorCommands } = await import('../../pages/workspace/editor/shortcuts')
+      const { editorCommands } = await import('@/pages/workspace/editor/shortcuts')
       const ids = [...editorCommands.map(c => c.id), 'note.new', 'note.save', 'tab.close', 'app.settings', 'view.sidebar', 'view.source', 'view.focus', 'app.quickOpen', 'view.outline', 'note.insertImage']
       const keys = ids.flatMap(id => typoraKeys(id).map(physicalKeys))
       expect(new Set(keys).size).toBe(keys.length)

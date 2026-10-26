@@ -1,36 +1,42 @@
-import type { Entry, TreeIcon } from '@@/apis/vault/type'
+import type { VaultEvent } from '@@/apis/events/type'
+import type { Entry, TreeIcon } from '@@/apis/tree/type'
 import type { PluginAPI } from '@@/plugin-api'
-import type { VaultEvent } from './events'
 import type { SettingsSection } from '@/pinia/stores/settings'
-import { imageResourceRoot, prepareResources } from '@@/apis/auth/resources'
-import { trashApi } from '@@/apis/trash'
-import { vaultApi } from '@@/apis/vault'
+import { cleanupImagesApi, importImageApi, replaceImageApi, uploadFolderImageApi, uploadImageApi } from '@@/apis/assets'
+import { connectEventsApi } from '@@/apis/events'
+import { createFolderApi, deleteFileApi, getRawFileApi, importNotesApi, moveFileApi, writeFileApi } from '@@/apis/files'
+import { restoreTrashApi } from '@@/apis/trash'
+import { getTreeApi, setTreeIconApi } from '@@/apis/tree'
+import { appearancePaused } from '@@/appearance/appearance'
+
+// 工作区状态与操作：目录树、标签页、保存队列、冲突处理、实时同步。
+// 文件操作一律先更新界面再请求服务器，失败时回滚，保证"操作即时生效"。
+import { decodeLinkDestination } from '@@/markdown/links'
+import { pluginEditorFailure, refreshPlugins, startPlugins, stopPlugins } from '@@/plugins/host'
+import { notePath, pluginEvents, pluginRefresh, pluginsPaused, setPluginEditorHandlers } from '@@/plugins/registry'
+import { handleShortcut, registerCommand } from '@@/utils/commands'
+import { readNoteFile } from '@@/utils/note-files'
 import { toast } from '@@/utils/notifications'
+
+import { basename, dirname, encodePath, isImage, joinPath, NOTE_EXT, resolveAssetUrl } from '@@/utils/paths'
+import { imageResourceRoot, prepareResources } from '@@/utils/resource-tickets'
+import { typoraKeys } from '@@/utils/typora-keys'
+import { trackVisualViewport } from '@@/utils/viewport'
 import { Annotation, EditorState, Transaction } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { CanceledError, isCancel } from 'axios'
 import { nextTick, reactive, watch } from 'vue'
-import { ApiError, encodePath, requestRaw } from '@/http/axios'
-import { workspaceApi } from '@/pages/workspace/apis'
+import { ApiError } from '@/http/axios'
 import { pinia } from '@/pinia'
+import { useSettingsStore } from '@/pinia/stores/settings'
 import { useUserStore } from '@/pinia/stores/user'
-import { appearancePaused } from '../../common/appearance/appearance'
-// 工作区状态与操作：目录树、标签页、保存队列、冲突处理、实时同步。
-// 文件操作一律先更新界面再请求服务器，失败时回滚，保证"操作即时生效"。
-import { decodeLinkDestination } from '../../common/markdown/links'
-import { pluginEditorFailure, refreshPlugins, startPlugins, stopPlugins } from '../../common/plugins/host'
-import { notePath, pluginEvents, pluginRefresh, pluginsPaused, setPluginEditorHandlers } from '../../common/plugins/registry'
-import { handleShortcut, registerCommand } from '../../common/utils/commands'
-import { basename, dirname, isImage, joinPath, NOTE_EXT, resolveAssetUrl } from '../../common/utils/paths'
-import { typoraKeys } from '../../common/utils/typora-keys'
-import { trackVisualViewport } from '../../common/utils/viewport'
-import { loadSettings, settings } from '../../pinia/stores/settings'
 import { drafts } from './drafts'
 import { createEditorState, insertImageFiles, languageCompartment, pasteImages, pluginCompartment, pluginEditorExtensions, pluginLanguage, preferencesCompartment, previewCompartment, previewExtensions } from './editor'
 import { refreshImages } from './editor/livepreview'
 import { editorCommands } from './editor/shortcuts'
-import { connectEvents } from './events'
 import { refreshMetadata } from './metadata'
+
+const { loadSettings, settings } = useSettingsStore(pinia)
 
 export type TabStatus = 'loading' | 'ready' | 'conflict' | 'deleted' | 'error'
 
@@ -227,11 +233,11 @@ function buildState(path: string, doc: string): EditorState {
         },
         upload: (file) => {
           if (!isCurrentNote()) throw new CanceledError('粘贴所属笔记已关闭')
-          return workspaceApi.upload(ref.path, file)
+          return uploadImageApi({ note: ref.path, file }).then(({ data }) => data.link)
         },
         importImage: (url) => {
           if (!isCurrentNote()) throw new CanceledError('粘贴所属笔记已关闭')
-          return workspaceApi.importImage(ref.path, url)
+          return importImageApi({ note: ref.path, url }).then(({ data }) => data.link)
         },
         update: (change) => {
           if (!isCurrentNote()) return
@@ -281,7 +287,7 @@ const pluginWrite: PluginAPI['vault']['write'] = async (path, content, options) 
   if (!options || (!('create' in options && options.create === true) && !('ifMatch' in options && typeof options.ifMatch === 'string' && options.ifMatch.length > 0))) throw new ApiError(400, '写入必须指定非空版本号或明确新建')
   const initialRevision = tab?.rev
   const initialSequence = saved?.seq ?? 0
-  const rev = await workspaceApi.writeFile(path, content, 'create' in options ? '' : options.ifMatch)
+  const rev = (await writeFileApi({ path, content, ifMatch: 'create' in options ? '' : options.ifMatch })).data.rev
   // 用户可能已完成下一次保存，或已收到更新版本；迟到响应不能退回正文与 rev。
   if (tab && tabOf(path) === tab && tab.rev === initialRevision && (slots.get(path)?.seq ?? 0) === initialSequence && !tab.dirty && tab.status === 'ready' && !slots.get(path)?.inflight) {
     replaceDoc(path, content); tab.rev = rev
@@ -358,7 +364,7 @@ export async function flush(path: string, keepalive = false): Promise<void> {
     // 草稿只是兜底，写入失败不影响保存本身
     const draftSaved = drafts.put({ path, content, baseRev, updatedAt: Date.now() }).catch(err => console.warn('写入本地草稿失败', err))
     try {
-      const rev = await workspaceApi.writeFile(path, content, baseRev, keepalive)
+      const rev = (await writeFileApi({ path, content, ifMatch: baseRev, keepalive })).data.rev
       await draftSaved
       user.assertSession(version)
       tab.rev = rev
@@ -412,7 +418,7 @@ export async function useServerVersion(path: string) {
   const tab = tabOf(path)
   if (!tab) return
   try {
-    const { content, rev } = await vaultApi.readFile(path)
+    const { content, rev } = await readNoteFile(path)
     replaceDoc(path, content)
     const s = slot(path)
     s.savedSeq = s.seq
@@ -438,7 +444,7 @@ export async function keepLocalVersion(path: string) {
   const seq = s.seq
   s.inflight = (async () => {
     try {
-      const rev = await workspaceApi.writeFile(path, content, tab.conflictRev ?? '')
+      const rev = (await writeFileApi({ path, content, ifMatch: tab.conflictRev ?? '' })).data.rev
       s.savedSeq = seq
       Object.assign(tab, { rev, status: 'ready', dirty: s.seq !== seq, conflictRev: undefined, saveError: undefined })
       if (s.seq === seq) await drafts.delete(path)
@@ -524,7 +530,7 @@ export async function openNote(path: string) {
   ws.tabs.push(tab)
   ws.active = path
   try {
-    const { content, rev } = await vaultApi.readFile(path)
+    const { content, rev } = await readNoteFile(path)
     editorStates.set(path, buildState(path, content))
     const t = tabOf(path)
     if (t) Object.assign(t, { rev, status: 'ready' })
@@ -651,7 +657,7 @@ async function fetchTree() {
   const edits = localTreeEdits
   let entries: Entry[]
   try {
-    entries = await vaultApi.tree()
+    entries = (await getTreeApi()).data.entries
     user.assertSession(version)
   } catch (err) {
     if (isCancel(err)) return
@@ -707,7 +713,7 @@ async function withOp<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 export async function saveTreeIcon(path: string, icon: TreeIcon | null) {
-  await withOp(() => workspaceApi.setTreeIcon(path, icon))
+  await withOp(() => setTreeIconApi({ path, icon }).then(({ data }) => data))
   try {
     await refreshTree()
   } catch (err) {
@@ -745,7 +751,7 @@ async function createNoteFile(path: string, content: string): Promise<boolean> {
   ws.entries.push(...added.map((p, i) => ({ path: p, dir: i > 0, size: 0, mtime: Date.now() })))
   return withOp(async () => {
     try {
-      const rev = await workspaceApi.writeFile(path, content, '')
+      const rev = (await writeFileApi({ path, content, ifMatch: '' })).data.rev
       ws.tabs.push({ path, rev, status: 'ready', dirty: false })
       editorStates.set(path, buildState(path, content))
       ws.active = path
@@ -762,7 +768,7 @@ async function createNoteFile(path: string, content: string): Promise<boolean> {
 
 export async function importNotes(dir: string, folder: string, files: File[]) {
   // refreshTree 必须等 withOp 结束，否则会等待自身释放操作计数。
-  const result = await withOp(() => workspaceApi.importNotes(dir, folder, files))
+  const result = await withOp(() => importNotesApi({ dir, folder, files }).then(({ data }) => data))
   ws.searchOpen = false
   try {
     await refreshTree()
@@ -779,7 +785,7 @@ export async function createFolder(dir: string) {
   ws.renaming = path
   await withOp(async () => {
     try {
-      await workspaceApi.mkdir(path)
+      await createFolderApi({ path })
     } catch (err) {
       if (isCancel(err)) return
       ws.entries = ws.entries.filter(e => e.path !== path)
@@ -798,37 +804,37 @@ export function renameTarget(path: string, name: string): string | null {
 }
 
 export type FileResult = { ok: true } | { ok: false, error: string }
-function operationFailed(error: string): FileResult {
-  toast(error)
+function operationFailed(error: string, owner: 'operation' | 'caller'): FileResult {
+  if (owner === 'operation') toast(error)
   return { ok: false, error }
 }
 
-export async function move(from: string, to: string): Promise<FileResult> {
+export async function move(from: string, to: string, errorOwner: 'operation' | 'caller' = 'operation'): Promise<FileResult> {
   const version = user.getSessionVersion()
   if (from === to) return { ok: true }
-  if (creating.has(from) && !(await creating.get(from))) return operationFailed('笔记尚未创建成功')
+  if (creating.has(from) && !(await creating.get(from))) return operationFailed('笔记尚未创建成功', errorOwner)
   user.assertSession(version)
   if (ws.entries.some(e => e.path === to)) {
-    return operationFailed(`“${basename(to)}”已存在`)
+    return operationFailed(`“${basename(to)}”已存在`, errorOwner)
   }
   const result = await withOp<FileResult>(async () => {
     // 移动会更新仓库中的相对链接，先保存全部已打开笔记，沿用版本冲突保护。
     const impacted = () => ws.tabs.map(t => t.path)
     const busy = () => impacted().some(p => slots.get(p)?.uploads || slots.get(p)?.paused)
     if (busy()) {
-      return operationFailed('笔记正在处理粘贴、上传或移动，请完成后再移动')
+      return operationFailed('笔记正在处理粘贴、上传或移动，请完成后再移动', errorOwner)
     }
     // 先保存待保存的修改，确保移动的是最新内容；移动期间暂停保存，避免写到旧路径
     await Promise.all(impacted().map(p => flush(p)))
     user.assertSession(version)
     // 等待保存时仍可能开始粘贴，须在取得移动占用前再次检查。
     if (busy()) {
-      return operationFailed('笔记正在处理粘贴、上传或移动，请完成后再移动')
+      return operationFailed('笔记正在处理粘贴、上传或移动，请完成后再移动', errorOwner)
     }
     if (impacted().some((p) => {
       const tab = tabOf(p); return tab && (tab.dirty || tab.status !== 'ready')
     })) {
-      return operationFailed('请先保存笔记并解决冲突，再移动文件')
+      return operationFailed('请先保存笔记并解决冲突，再移动文件', errorOwner)
     }
     const paused = impacted().map(slot)
     paused.forEach(s => s.paused++)
@@ -846,7 +852,7 @@ export async function move(from: string, to: string): Promise<FileResult> {
       remapRecent(from, to)
       if (ws.image) ws.image = remapPath(ws.image, from, to) ?? ws.image
       if (ws.images) ws.images = remapPath(ws.images, from, to) ?? ws.images
-      await workspaceApi.move(from, to)
+      await moveFileApi({ from, to })
     } catch (err) {
       if (isCancel(err)) throw err
       if (remapped) {
@@ -863,7 +869,7 @@ export async function move(from: string, to: string): Promise<FileResult> {
           toast(`恢复原路径草稿失败：${cause instanceof Error ? cause.message : errorText(cause)}`)
         }
       }
-      return operationFailed(`移动失败：${err instanceof Error ? err.message : errorText(err)}`)
+      return operationFailed(`移动失败：${err instanceof Error ? err.message : errorText(err)}`, errorOwner)
     } finally {
       paused.forEach(s => s.paused--)
     }
@@ -873,7 +879,7 @@ export async function move(from: string, to: string): Promise<FileResult> {
       if (!tab) return
       if (tab.dirty) {
         // 移动期间又有输入：本地内容仍含旧链接，交给用户选择
-        const { rev } = await vaultApi.readFile(p)
+        const { rev } = await readNoteFile(p)
         if (rev !== tab.rev) Object.assign(tab, { status: 'conflict', conflictRev: rev })
       } else {
         await syncOpenTab(tab)
@@ -890,10 +896,10 @@ export async function move(from: string, to: string): Promise<FileResult> {
   return result
 }
 
-export async function remove(path: string): Promise<FileResult> {
+export async function remove(path: string, errorOwner: 'operation' | 'caller' = 'operation'): Promise<FileResult> {
   const version = user.getSessionVersion()
   const entry = ws.entries.find(e => e.path === path)
-  if (!entry) return operationFailed('文件已不存在')
+  if (!entry) return operationFailed('文件已不存在', errorOwner)
   return withOp<FileResult>(async () => {
     const paths = affected(path)
     await Promise.all(paths.map(p => flush(p)))
@@ -901,18 +907,18 @@ export async function remove(path: string): Promise<FileResult> {
     if (paths.some((p) => {
       const tab = tabOf(p); return tab && (tab.dirty || tab.status !== 'ready')
     })) {
-      return operationFailed('请先保存笔记并解决冲突，再删除文件')
+      return operationFailed('请先保存笔记并解决冲突，再删除文件', errorOwner)
     }
     const snapshot = ws.entries
     ws.entries = ws.entries.filter(e => remapPath(e.path, path, path) === null) // 去掉自身及其下所有条目
     for (const p of paths) {
       if (!(await closeTab(p))) {
-        ws.entries = snapshot; return operationFailed('关闭笔记失败，未删除文件')
+        ws.entries = snapshot; return operationFailed('关闭笔记失败，未删除文件', errorOwner)
       }
     }
     user.assertSession(version)
     try {
-      const item = await workspaceApi.deleteFile(path)
+      const item = (await deleteFileApi(path)).data
       if (ws.image && remapPath(ws.image, path, path) !== null) ws.image = null
       toast(`已删除“${basename(path).replace(/\.md$/, '')}”`, {
         label: '撤销',
@@ -922,14 +928,14 @@ export async function remove(path: string): Promise<FileResult> {
     } catch (err) {
       if (isCancel(err)) throw err
       ws.entries = snapshot
-      return operationFailed(`删除失败：${errorText(err)}`)
+      return operationFailed(`删除失败：${errorText(err)}`, errorOwner)
     }
   })
 }
 
 export async function restore(id: string) {
   try {
-    const item = await trashApi.restore(id)
+    const item = (await restoreTrashApi(id)).data
     await refreshTree()
     if (!item.dir && item.path.endsWith(NOTE_EXT)) void openNote(item.path)
     else if (!item.dir && isImage(item.path)) ws.image = item.path
@@ -946,7 +952,7 @@ export function imageUrl(path: string): string {
 }
 
 export async function replaceImage(path: string, file: File) {
-  await withOp(() => workspaceApi.replaceImage(path, file))
+  await withOp(() => replaceImageApi({ path, file }).then(({ data }) => data))
   try {
     await refreshTree()
   } catch (err) {
@@ -961,7 +967,7 @@ async function syncOpenTab(tab: Tab) {
   const s = slots.get(tab.path)
   if (tab.status !== 'ready' || tab.dirty || s?.inflight) return
   try {
-    const { content, rev } = await vaultApi.readFile(tab.path)
+    const { content, rev } = await readNoteFile(tab.path)
     if (rev === tab.rev || tab.dirty) return
     replaceDoc(tab.path, content)
     tab.rev = rev
@@ -1056,7 +1062,7 @@ async function recoverDrafts() {
   for (const d of await drafts.all()) {
     user.assertSession(version)
     try {
-      const { content, rev } = await vaultApi.readFile(d.path)
+      const { content, rev } = await readNoteFile(d.path)
       if (content === d.content) {
         await drafts.delete(d.path)
         continue
@@ -1120,7 +1126,7 @@ export async function startWorkspace() {
       if (!isCancel(err)) toast(`同步失败：${errorText(err)}`)
     })
   }
-  const stopEvents = connectEvents({ onEvents: events => enqueue(() => handleEvents(events)), onResync: () => enqueue(resync) })
+  const stopEvents = connectEventsApi({ onEvents: events => enqueue(() => handleEvents(events)), onResync: () => enqueue(resync) })
   disconnect = () => {
     stopped = true; stopEvents()
   }
@@ -1336,8 +1342,8 @@ async function openMarkdownLink(note: string, href: string) {
     toast(`链接目标不存在：${target}`); return
   }
   if (!target.endsWith('.md')) {
-    const response = await requestRaw('GET', `/raw/${encodePath(target)}`, { errorOwner: 'caller' })
-    const url = URL.createObjectURL(await response.blob())
+    const response = await getRawFileApi(target)
+    const url = URL.createObjectURL(response.data)
     const link = Object.assign(document.createElement('a'), { href: url, download: basename(target) }); link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
     return
   }
@@ -1377,7 +1383,7 @@ export async function uploadFolderImages(folder: string, files: File[]) {
     for (const file of files) {
       try {
         user.assertSession(version)
-        await workspaceApi.uploadFolderImage(folder, file); uploaded++
+        await uploadFolderImageApi({ folder, file }); uploaded++
       } catch (error) {
         if (isCancel(error)) throw error
         failures.push(`${file.name}：${errorText(error)}`)
@@ -1393,7 +1399,7 @@ export async function cleanupImages(paths: string[]) {
   await flushAll()
   user.assertSession(version)
   if (!readyToReload()) throw new Error('仍有未保存内容或正在处理粘贴、上传与文件操作，请完成后再清理')
-  const result = await withOp(() => workspaceApi.cleanupImages(paths))
+  const result = await withOp(() => cleanupImagesApi({ paths }).then(({ data }) => data))
   await refreshTree()
   await refreshMetadata()
   return result

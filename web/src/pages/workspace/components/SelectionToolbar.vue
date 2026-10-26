@@ -1,14 +1,17 @@
 <script setup lang="ts">
+import type { InlineStyles } from '@@/markdown/inline-styles'
 import type { EditorSelection } from '@codemirror/state'
-import type { InlineStyles } from '../../../common/markdown/inline-styles'
 import type { FormatCommand } from '../editor/format'
+import Icon from '@@/components/Icon/index.vue'
+import InlineAppearance from '@@/components/InlineAppearance/index.vue'
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import Icon from '../../../common/components/Icon/index.vue'
-import InlineAppearance from '../../../common/components/InlineAppearance/index.vue'
-import { settings } from '../../../pinia/stores/settings'
+import { pinia } from '@/pinia'
+import { useSettingsStore } from '@/pinia/stores/settings'
 import { insertLink } from '../editor/format'
 import { applyInlineStyles, canFormatSelection, clearInlineStyles, selectionAppearance, toggleSelectionMark, toggleUnderline } from '../editor/inline-styles'
 import { activeTab, editorView, onEditorUpdate, ws } from '../workspace'
+
+const { settings } = useSettingsStore(pinia)
 
 const root = ref<HTMLElement>()
 const floating = ref<{ left: number, top: number, maxHeight: number, maxWidth: number } | null>(null)

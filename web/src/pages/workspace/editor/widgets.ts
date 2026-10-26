@@ -1,8 +1,8 @@
-import type { OwnedRenderer } from '../../../common/plugins/registry'
+import type { OwnedRenderer } from '@@/plugins/registry'
+import { emojiFor, renderMath } from '@@/markdown/render'
+import { mountContent } from '@@/plugins/mount'
+import { copyText } from '@@/utils/clipboard'
 import { EditorView, WidgetType } from '@codemirror/view'
-import { emojiFor, renderMath } from '../../../common/markdown/render'
-import { mountContent } from '../../../common/plugins/mount'
-import { copyText } from '../../../common/utils/clipboard'
 
 export class BulletWidget extends WidgetType {
   eq() {

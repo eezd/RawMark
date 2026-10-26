@@ -1,11 +1,14 @@
+import * as filesApi from '@@/apis/files'
 import { toasts } from '@@/utils/notifications'
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { pinia } from '@/pinia'
 import { useUserStore } from '@/pinia/stores/user'
-import { workspaceApi } from './apis'
+
 import { batchFiles, exportFiles } from './batch'
 import { flush, remove } from './workspace'
+
+vi.mock('@@/utils/confirm', () => ({ confirmAction: vi.fn(async () => true) }))
 
 vi.mock('./workspace', () => ({ move: vi.fn(), remove: vi.fn(), refreshTree: vi.fn().mockResolvedValue(undefined), flush: vi.fn(), ws: { tabs: [{ path: 'a.md', dirty: false, status: 'ready' }] } }))
 const user = useUserStore(pinia)
@@ -22,6 +25,7 @@ it('切换会话后批量操作停止，不以新身份继续下一项', async (
     finish = resolve
   }))
   const pending = batchFiles('delete', ['a.md', 'b.md'])
+  await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
   user.setToken('rms_new')
   finish({ ok: true })
   await pending
@@ -33,7 +37,7 @@ it('等待笔记保存时换会话，不再使用新身份导出旧选择', asyn
   vi.mocked(flush).mockImplementation(() => new Promise((resolve) => {
     finish = resolve
   }))
-  const request = vi.spyOn(workspaceApi, 'exportFiles')
+  const request = vi.spyOn(filesApi, 'exportFilesApi')
   const pending = exportFiles(['a.md'])
   user.setToken('rms_new')
   finish()

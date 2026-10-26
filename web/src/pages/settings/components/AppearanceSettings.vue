@@ -1,16 +1,22 @@
 <script setup lang="ts">
-import type { Theme } from '@@/apis/preferences/type'
-import type { CssSnippet } from '../../../common/appearance/appearance'
-import type { Settings } from '../../../pinia/stores/settings'
-import { preferencesApi } from '@@/apis/preferences'
+import type { Theme } from '@@/apis/themes/type'
+import type { CssSnippet } from '@@/appearance/appearance'
+
+import type { Settings } from '@/pinia/stores/settings'
+import { getThemesApi } from '@@/apis/themes'
+import { appearancePaused, fixedThemeMode } from '@@/appearance/appearance'
+import { DISPLAY_DEFAULTS } from '@@/appearance/typography'
+import { confirmAction } from '@@/utils/confirm'
+
 import { toast } from '@@/utils/notifications'
 import { isCancel } from 'axios'
 import { computed, onMounted, ref } from 'vue'
 import { ApiError } from '@/http/axios'
-import { appearancePaused, fixedThemeMode } from '../../../common/appearance/appearance'
-import { DISPLAY_DEFAULTS } from '../../../common/appearance/typography'
-import { loadSettings, reloadTheme, settings, SettingsAppearanceError, updateSettings } from '../../../pinia/stores/settings'
+import { pinia } from '@/pinia'
+import { SettingsAppearanceError, useSettingsStore } from '@/pinia/stores/settings'
 import SettingRow from './SettingRow.vue'
+
+const { loadSettings, reloadTheme, settings, updateSettings } = useSettingsStore(pinia)
 
 const themes = ref<Theme[]>([{ id: 'default', name: '默认', version: '1' }])
 const error = ref('')
@@ -23,7 +29,7 @@ const fixedMode = computed(() => fixedThemeMode(settings.theme))
 async function refreshThemes() {
   error.value = ''
   try {
-    themes.value = await preferencesApi.themes()
+    themes.value = (await getThemesApi()).data.themes
     await reloadTheme()
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '读取主题失败，请检查网络'
@@ -75,9 +81,15 @@ async function toggle(snippet: CssSnippet) {
 }
 
 async function remove(snippet: CssSnippet) {
-  if (!window.confirm(`删除 CSS 片段“${snippet.name}”？`)) return
-  if (await change({ cssSnippets: settings.cssSnippets.filter(s => s.id !== snippet.id) })) {
-    if (editing.value === snippet.id) editing.value = null
+  if (busy.value) return
+  busy.value = true
+  try {
+    if (!await confirmAction(`删除 CSS 片段“${snippet.name}”？`)) return
+    if (await change({ cssSnippets: settings.cssSnippets.filter(s => s.id !== snippet.id) })) {
+      if (editing.value === snippet.id) editing.value = null
+    }
+  } finally {
+    busy.value = false
   }
 }
 
@@ -94,24 +106,16 @@ async function reset() {
     已临时停用主题和 CSS。可恢复默认外观后重新打开页面。
   </p>
   <SettingRow id="theme-select" control="rm-theme-select">
-    <select id="rm-theme-select" :value="settings.theme" :disabled="busy" @change="change({ theme: ($event.target as HTMLSelectElement).value })">
-      <option v-for="theme in themes" :key="theme.id" :value="theme.id">
-        {{ theme.name }}
-      </option>
-      <option v-if="missingTheme" :value="settings.theme">
-        {{ settings.theme }}（不可用）
-      </option>
-    </select>
+    <el-select id="rm-theme-select" :model-value="settings.theme" :disabled="busy" @change="change({ theme: $event })">
+      <el-option v-for="theme in themes" :key="theme.id" :value="theme.id" :label="theme.name" />
+      <el-option v-if="missingTheme" :value="settings.theme" :label="`${settings.theme}（不可用）`" />
+    </el-select>
     <el-button class="rm-btn" :disabled="busy" @click="refreshThemes">
       刷新列表
     </el-button>
   </SettingRow>
   <SettingRow id="color-mode">
-    <div class="rm-segmented" role="radiogroup" aria-label="明暗模式">
-      <button v-for="mode in [{ id: 'light', title: '浅色' }, { id: 'dark', title: '深色' }, { id: 'system', title: '跟随系统' }]" :key="mode.id" role="radio" :aria-checked="(fixedMode ?? settings.colorMode) === mode.id" :class="{ on: (fixedMode ?? settings.colorMode) === mode.id }" :disabled="busy || !!fixedMode" @click="change({ colorMode: mode.id as Settings['colorMode'] })">
-        {{ mode.title }}
-      </button>
-    </div>
+    <el-segmented :model-value="fixedMode ?? settings.colorMode" :disabled="busy || !!fixedMode" :options="[{ value: 'light', label: '浅色' }, { value: 'dark', label: '深色' }, { value: 'system', label: '跟随系统' }]" aria-label="明暗模式" @change="change({ colorMode: $event as Settings['colorMode'] })" />
   </SettingRow>
   <p v-if="error" class="rm-appearance-note rm-auth-error" role="alert">
     {{ error }}
@@ -127,7 +131,9 @@ async function reset() {
       </el-button>
     </SettingRow>
     <div v-for="snippet in settings.cssSnippets" :key="snippet.id" class="rm-snippet-row">
-      <label><input type="checkbox" :checked="snippet.enabled" :disabled="busy" @change="toggle(snippet)">{{ snippet.name }}</label>
+      <el-checkbox :model-value="snippet.enabled" :disabled="busy" @change="toggle(snippet)">
+        {{ snippet.name }}
+      </el-checkbox>
       <el-button class="rm-btn" :disabled="busy" @click="edit(snippet)">
         编辑
       </el-button>
@@ -135,9 +141,9 @@ async function reset() {
         删除
       </el-button>
     </div>
-    <form v-if="editing !== null" class="rm-snippet-form" @submit.prevent="saveSnippet">
-      <label>片段名称<input v-model="draft.name" aria-label="片段名称" maxlength="100" required></label>
-      <label>CSS<textarea v-model="draft.css" aria-label="CSS" rows="9" spellcheck="false" placeholder=":root { --rm-accent: #805ad5; }" /></label>
+    <el-form v-if="editing !== null" class="rm-snippet-form" label-position="top" @submit.prevent="saveSnippet">
+      <label>片段名称<el-input v-model="draft.name" aria-label="片段名称" maxlength="100" required /></label>
+      <label>CSS<el-input v-model="draft.css" type="textarea" aria-label="CSS" :rows="9" spellcheck="false" placeholder=":root { --rm-accent: #805ad5; }" /></label>
       <div>
         <el-button class="rm-btn" :disabled="busy" native-type="submit">
           保存并应用
@@ -145,7 +151,7 @@ async function reset() {
           取消
         </el-button>
       </div>
-    </form>
+    </el-form>
     <SettingRow id="reset-appearance">
       <el-button class="rm-btn" :disabled="busy" @click="reset">
         恢复默认外观与排版

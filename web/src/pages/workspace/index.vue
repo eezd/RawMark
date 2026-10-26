@@ -1,21 +1,22 @@
 <script setup lang="ts">
 import AppStatus from '@@/components/AppStatus/index.vue'
+import Icon from '@@/components/Icon/index.vue'
+import { registerCommand } from '@@/utils/commands'
 import { toast } from '@@/utils/notifications'
+import { noteTitle } from '@@/utils/paths'
 import { isCancel } from 'axios'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError } from '@/http/axios'
+import SettingsDialog from '@/pages/settings/index.vue'
+import { pinia } from '@/pinia'
+import { SettingsAppearanceError, SIDEBAR_WIDTH, useSettingsStore } from '@/pinia/stores/settings'
 import { useUserStore } from '@/pinia/stores/user'
-import Icon from '../../common/components/Icon/index.vue'
-import { registerCommand } from '../../common/utils/commands'
-import { noteTitle } from '../../common/utils/paths'
-import { settings, SettingsAppearanceError, SIDEBAR_WIDTH, updateSettings } from '../../pinia/stores/settings'
-import SettingsDialog from '../settings/index.vue'
 import EditorChrome from './components/EditorChrome.vue'
 import EditorPane from './components/EditorPane.vue'
 import ImageDialog from './components/ImageDialog.vue'
-import ImageGallery from './components/ImageGallery.vue'
 
+import ImageGallery from './components/ImageGallery.vue'
 import ImportDialog from './components/ImportDialog.vue'
 import KnowledgePanel from './components/KnowledgePanel.vue'
 import MoveDialog from './components/MoveDialog.vue'
@@ -26,6 +27,8 @@ import SelectionToolbar from './components/SelectionToolbar.vue'
 import Sidebar from './components/Sidebar.vue'
 import TabBar from './components/TabBar.vue'
 import { flushAll, readyToReload, restore, startWorkspace, stopWorkspace, ws } from './workspace'
+
+const { settings, updateSettings } = useSettingsStore(pinia)
 
 async function prepareReload() {
   await flushAll(); return readyToReload()

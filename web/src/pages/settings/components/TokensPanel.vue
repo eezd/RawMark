@@ -1,17 +1,23 @@
 <script setup lang="ts">
-import type { ApiToken } from '@/pages/settings/apis/type'
+import type { ApiToken } from '@@/apis/tokens/type'
+import type { FormInstance, FormRules } from 'element-plus'
+
+import { createTokenApi, deleteTokenApi, getTokensApi } from '@@/apis/tokens'
+import { copyText } from '@@/utils/clipboard'
+import { confirmAction } from '@@/utils/confirm'
 import { toast } from '@@/utils/notifications'
 import { isCancel } from 'axios'
-import { onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ApiError } from '@/http/axios'
-import { settingsApi } from '@/pages/settings/apis'
-import Icon from '../../../common/components/Icon/index.vue'
-import { copyText } from '../../../common/utils/clipboard'
+import { useUserStore } from '@/pinia/stores/user'
 
 const tokens = ref<ApiToken[] | null>(null)
-const failed = ref(false)
-const name = ref('')
-const scope = ref<ApiToken['scope']>('read')
+const error = ref('')
+const loading = ref(false)
+const form = ref<FormInstance>()
+const fields = reactive({ name: '', scope: 'read' as ApiToken['scope'] })
+const rules: FormRules<typeof fields> = { name: [{ required: true, whitespace: true, message: '请输入令牌名称', trigger: 'blur' }] }
+const user = useUserStore()
 const busy = ref(false)
 // 刚创建的令牌明文，只在本次对话框中显示
 const created = ref<string | null>(null)
@@ -22,20 +28,28 @@ function errorText(err: unknown) {
 }
 
 async function load() {
+  if (loading.value) return
+  loading.value = true; error.value = ''
   try {
-    tokens.value = await settingsApi.tokens()
-  } catch {
-    failed.value = true
+    tokens.value = (await getTokensApi()).data.tokens
+  } catch (cause) {
+    if (!isCancel(cause)) error.value = `读取 API 令牌失败：${errorText(cause)}`
+  } finally {
+    loading.value = false
   }
 }
 
 async function create() {
+  if (busy.value) return
   busy.value = true
+  const owner = user.getSessionVersion()
   try {
-    const res = await settingsApi.createToken(name.value.trim(), scope.value)
+    if (!await new Promise<boolean>(resolve => form.value!.validate(valid => resolve(valid)))) return
+    user.assertSession(owner)
+    const res = (await createTokenApi({ name: fields.name.trim(), scope: fields.scope })).data
     tokens.value = [res.info, ...(tokens.value ?? [])]
     created.value = res.token
-    name.value = ''
+    fields.name = ''; form.value!.clearValidate()
   } catch (err) {
     if (isCancel(err)) return
     toast(`创建失败：${errorText(err)}`)
@@ -49,13 +63,17 @@ async function copy() {
 }
 
 async function revoke(t: ApiToken) {
-  if (!confirm(`吊销“${t.name}”？使用它的脚本将立即无法访问。`)) return
+  if (busy.value) return
+  busy.value = true
   try {
-    await settingsApi.deleteToken(t.id)
+    if (!await confirmAction(`吊销“${t.name}”？使用它的脚本将立即无法访问。`)) return
+    await deleteTokenApi(t.id)
     tokens.value = tokens.value!.filter(x => x.id !== t.id)
   } catch (err) {
     if (isCancel(err)) return
     toast(`吊销失败：${errorText(err)}`)
+  } finally {
+    busy.value = false
   }
 }
 
@@ -64,15 +82,19 @@ onMounted(load)
 
 <template>
   <div>
-    <form class="rm-share-form" @submit.prevent="create">
-      <el-input v-model="name" type="text" autocomplete="off" placeholder="名称，如：备份脚本" aria-label="名称" required maxlength="100" />
-      <el-select v-model="scope" aria-label="权限">
-        <el-option value="read" label="只读" /><el-option value="write" label="读写" />
-      </el-select>
+    <el-form ref="form" class="rm-token-form" :model="fields" :rules="rules" :disabled="busy" label-position="top" @submit.prevent="create">
+      <el-form-item label="名称" prop="name">
+        <el-input v-model="fields.name" autocomplete="off" placeholder="如：备份脚本" maxlength="100" />
+      </el-form-item>
+      <el-form-item label="权限">
+        <el-select v-model="fields.scope" aria-label="权限">
+          <el-option value="read" label="只读" /><el-option value="write" label="读写" />
+        </el-select>
+      </el-form-item>
       <el-button class="rm-btn rm-btn-primary" native-type="submit" :disabled="busy">
         创建
       </el-button>
-    </form>
+    </el-form>
     <div v-if="created" class="rm-token-created">
       <p>令牌只显示这一次，请立即保存：</p>
       <div class="rm-token-value">
@@ -86,25 +108,59 @@ onMounted(load)
       调用时带上请求头 <code>Authorization: Bearer 令牌</code>；只读令牌只能读取。接口说明见
       <a href="/api/v1/openapi.json" target="_blank" rel="noopener">openapi.json</a>。
     </p>
-    <p v-if="failed" class="rm-tree-empty">
-      读取 API 令牌失败
+    <p v-if="error" class="rm-auth-error" role="alert">
+      {{ error }} <el-button text :disabled="loading" @click="load">
+        重试
+      </el-button>
     </p>
-    <p v-else-if="tokens && !tokens.length" class="rm-tree-empty">
-      还没有 API 令牌
+    <p v-if="loading" role="status">
+      读取中…
     </p>
-    <ul v-else class="rm-trash-list">
-      <li v-for="t in tokens ?? []" :key="t.id">
-        <Icon name="key" />
-        <div class="rm-trash-info">
-          <span class="rm-trash-path">{{ t.name }} · {{ t.scope === 'write' ? '读写' : '只读' }}</span>
-          <span class="rm-trash-time">
-            {{ fmt.format(t.createdAt) }} 创建 · {{ t.lastUsedAt ? `${fmt.format(t.lastUsedAt)} 最近使用` : '从未使用' }}
-          </span>
-        </div>
-        <el-button class="rm-btn rm-btn-danger" @click="revoke(t)">
-          吊销
-        </el-button>
-      </li>
-    </ul>
+    <el-table v-else-if="tokens" :data="tokens" row-key="id" empty-text="还没有 API 令牌">
+      <!-- @vue-generic {ApiToken} -->
+      <el-table-column label="名称" min-width="140">
+        <template #default="{ row: token }">
+          <strong>{{ token.name }}</strong><small class="rm-token-time">{{ fmt.format(token.createdAt) }} 创建 · {{ token.lastUsedAt ? `${fmt.format(token.lastUsedAt)} 最近使用` : '从未使用' }}</small>
+        </template>
+      </el-table-column>
+      <!-- @vue-generic {ApiToken} -->
+      <el-table-column label="权限" width="70">
+        <template #default="{ row: token }">
+          {{ token.scope === 'write' ? '读写' : '只读' }}
+        </template>
+      </el-table-column>
+      <!-- @vue-generic {ApiToken} -->
+      <el-table-column label="操作" width="70">
+        <template #default="{ row: token }">
+          <el-button text type="danger" :disabled="busy" @click="revoke(token)">
+            吊销
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
   </div>
 </template>
+
+<style scoped lang="scss">
+.rm-token-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+.rm-token-form :deep(.el-form-item) {
+  flex: 1 1 140px;
+  margin-bottom: 0;
+  min-width: 0;
+}
+.rm-token-form :deep(.el-select) {
+  width: 100%;
+}
+.rm-token-time {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--rm-ui-font-small);
+  color: var(--rm-text-muted);
+}
+</style>

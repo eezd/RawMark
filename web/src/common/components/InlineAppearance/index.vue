@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import type { InlineStyles } from '../../markdown/inline-styles'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { settings } from '../../../pinia/stores/settings'
+import { pinia } from '@/pinia'
+import { useSettingsStore } from '@/pinia/stores/settings'
 import { fixedThemeMode } from '../../appearance/appearance'
 import { HOLLOW, INLINE_FONTS, SHADOW } from '../../markdown/inline-styles'
 
 const props = defineProps<{ styles: InlineStyles, baseSize: number }>()
+
 const emit = defineEmits<{ change: [patch: InlineStyles], clear: [] }>()
+
+const { settings } = useSettingsStore(pinia)
+
 const system = matchMedia('(prefers-color-scheme: dark)')
 const systemDark = ref(system.matches)
 function onSystem() {

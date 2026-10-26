@@ -1,10 +1,10 @@
+import type { InlineStyles } from '@@/markdown/inline-styles'
 import type { EditorState } from '@codemirror/state'
 import type { SyntaxNode } from '@lezer/common'
-import type { InlineStyles } from '../../../common/markdown/inline-styles'
 import type { FormatCommand } from './format'
+import { inlineStyleText, stylesFromTag } from '@@/markdown/inline-styles'
 import { ensureSyntaxTree, language } from '@codemirror/language'
 import { EditorSelection } from '@codemirror/state'
-import { inlineStyleText, stylesFromTag } from '../../../common/markdown/inline-styles'
 
 interface Wrapper { marks: { from: number, to: number }[] }
 interface Segment {

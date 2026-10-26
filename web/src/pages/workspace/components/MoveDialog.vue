@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import Icon from '../../../common/components/Icon/index.vue'
-import { basename, dirname, inAssetDir, joinPath, noteTitle } from '../../../common/utils/paths'
+import type { InputInstance } from 'element-plus'
+import Icon from '@@/components/Icon/index.vue'
+import { basename, dirname, inAssetDir, joinPath, noteTitle } from '@@/utils/paths'
+import { isCancel } from 'axios'
+import { computed, ref, watch } from 'vue'
 import { batchFiles } from '../batch'
 import { fuzzyMatch, segments } from '../fuzzy'
 import { minimalPaths } from '../selection'
@@ -11,10 +13,12 @@ import { move, ws } from '../workspace'
 const props = defineProps<{ path: string | string[] }>()
 const emit = defineEmits<{ close: [] }>()
 
-const input = ref<HTMLInputElement>()
+const input = ref<InputInstance>()
 const list = ref<HTMLElement>()
 const query = ref('')
 const selected = ref(0)
+const busy = ref(false)
+const error = ref('')
 const paths = computed(() => minimalPaths(typeof props.path === 'string' ? [props.path] : props.path))
 const title = computed(() => paths.value.length > 1 ? `${paths.value.length} 项` : noteTitle(paths.value[0]))
 
@@ -38,59 +42,71 @@ const items = computed(() => {
 watch(query, () => (selected.value = 0))
 watch(selected, i => list.value?.children[i]?.scrollIntoView({ block: 'nearest' }))
 
-function choose(i: number) {
+async function choose(i: number) {
   const target = items.value[i]
-  if (!target) return
-  emit('close')
-  if (paths.value.length === 1) void move(paths.value[0], joinPath(target.path, basename(paths.value[0])))
-  else void batchFiles('move', paths.value, target.path)
+  if (!target || busy.value) return
+  busy.value = true; error.value = ''
+  try {
+    if (paths.value.length === 1) {
+      const result = await move(paths.value[0], joinPath(target.path, basename(paths.value[0])), 'caller')
+      if (!result.ok) {
+        error.value = result.error; return
+      }
+    } else if (!await batchFiles('move', paths.value, target.path)) {
+      error.value = '部分项目移动失败，请核对目录后重试'; return
+    }
+    emit('close')
+  } catch (cause) {
+    if (!isCancel(cause)) error.value = String(cause)
+  } finally {
+    busy.value = false
+  }
 }
-
+function close() {
+  if (!busy.value) emit('close')
+}
+function opened() {
+  if (!matchMedia('(pointer: coarse)').matches) input.value?.focus()
+}
 function onKeydown(e: KeyboardEvent) {
   const n = items.value.length
-  if (e.key === 'Escape') emit('close')
+  if (e.key === 'Escape') close()
   else if (e.key === 'ArrowDown' && n) selected.value = (selected.value + 1) % n
   else if (e.key === 'ArrowUp' && n) selected.value = (selected.value - 1 + n) % n
   else if (e.key === 'Enter' && !e.isComposing && n) choose(selected.value)
   else return
   e.preventDefault()
 }
-
-onMounted(() => {
-  // 触屏设备上不自动弹出键盘，文件夹不多时直接点选更方便
-  if (!matchMedia('(pointer: coarse)').matches) input.value?.focus()
-})
 </script>
 
 <template>
-  <div class="rm-switcher-backdrop" @mousedown.self="emit('close')">
-    <div class="rm-switcher" role="dialog" :aria-label="`移动“${title}”`">
-      <div class="rm-search-box">
+  <el-dialog :model-value="true" :title="`移动“${title}”`" width="560px" class="rm-picker-dialog" :show-close="!busy" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :before-close="close" @close="close" @opened="opened">
+    <el-input ref="input" v-model="query" :disabled="busy" :placeholder="`把“${title}”移动到…`" aria-label="搜索目标文件夹" enterkeyhint="go" @keydown="onKeydown($event as KeyboardEvent)">
+      <template #prefix>
         <Icon name="folder" />
-        <input ref="input" v-model="query" class="rm-search-input" :placeholder="`把“${title}”移动到…`" enterkeyhint="go" @keydown="onKeydown">
-        <button class="rm-icon-btn" title="取消" @click="emit('close')">
-          <Icon name="close" />
-        </button>
-      </div>
-      <ul v-if="items.length" ref="list" class="rm-switcher-list">
-        <li
-          v-for="(item, i) in items"
-          :key="item.path"
-          class="rm-switcher-item"
-          :class="{ active: i === selected }"
-          @click="choose(i)"
-          @mousemove="selected = i"
-        >
-          <Icon name="folder" />
-          <span class="rm-switcher-title">
-            <template v-if="item.path === ''">根目录</template>
-            <span v-for="(s, j) in segments(item.path, item.hits)" v-else :key="j" :class="{ 'rm-search-hit': s.hit }">{{ s.text }}</span>
-          </span>
-        </li>
-      </ul>
-      <p v-else class="rm-tree-empty">
-        没有可移动到的文件夹
-      </p>
-    </div>
-  </div>
+      </template>
+    </el-input>
+    <p v-if="error" role="alert" class="rm-auth-error">
+      {{ error }}
+    </p>
+    <ul v-if="items.length" ref="list" class="rm-switcher-list">
+      <li
+        v-for="(item, i) in items"
+        :key="item.path"
+        class="rm-switcher-item"
+        :class="{ active: i === selected }"
+        @click="choose(i)"
+        @mousemove="selected = i"
+      >
+        <Icon name="folder" />
+        <span class="rm-switcher-title">
+          <template v-if="item.path === ''">根目录</template>
+          <span v-for="(s, j) in segments(item.path, item.hits)" v-else :key="j" :class="{ 'rm-search-hit': s.hit }">{{ s.text }}</span>
+        </span>
+      </li>
+    </ul>
+    <p v-else class="rm-tree-empty">
+      没有可移动到的文件夹
+    </p>
+  </el-dialog>
 </template>

@@ -3,9 +3,9 @@
   --el-font-size-base: var(--rm-ui-font-size);
   --el-color-primary: var(--rm-accent);
   --el-bg-color: var(--rm-bg);
-  --el-bg-color-overlay: var(--rm-panel);
+  --el-bg-color-overlay: var(--rm-bg);
   --el-text-color-primary: var(--rm-text);
-  --el-border-color: var(--rm-border);
+  --el-border-color: var(--rm-divider);
   --el-border-radius-base: 8px;
 }
 .el-button {
@@ -30,9 +30,6 @@
   }
 }
 
-.rm-settings .el-select {
-  width: 120px;
-}
 .el-button + .el-button {
   margin-left: 0;
 }
@@ -40,4 +37,70 @@
   display: inline-flex;
   align-items: center;
   gap: inherit;
+}
+
+/* 复用 RawMark 主题，弹出层与页面使用相同的字体、色彩和密度。 */
+:root {
+  --el-font-size-small: var(--rm-ui-font-small);
+  --el-font-size-extra-small: var(--rm-ui-font-small);
+  --el-text-color-regular: var(--rm-text);
+  --el-text-color-secondary: var(--rm-text-muted);
+  --el-text-color-placeholder: var(--rm-text-muted);
+  --el-border-color-light: var(--rm-divider);
+  --el-border-color-lighter: var(--rm-divider);
+  --el-border-color-extra-light: var(--rm-divider);
+  --el-fill-color: var(--rm-active);
+  --el-fill-color-light: var(--rm-hover);
+  --el-fill-color-lighter: var(--rm-hover);
+  --el-fill-color-blank: var(--rm-bg);
+  --el-bg-color-overlay: var(--rm-bg);
+  --el-dialog-padding-primary: 20px;
+  --el-component-size: var(--rm-control-size);
+  --el-mask-color: color-mix(in srgb, var(--rm-bg) 30%, transparent);
+  --el-box-shadow-light: var(--rm-shadow);
+  --el-color-primary-light-3: color-mix(in srgb, var(--rm-accent) 70%, var(--rm-bg));
+  --el-color-primary-light-5: color-mix(in srgb, var(--rm-accent) 50%, var(--rm-bg));
+  --el-color-primary-light-7: color-mix(in srgb, var(--rm-accent) 30%, var(--rm-bg));
+  --el-color-primary-light-8: color-mix(in srgb, var(--rm-accent) 20%, var(--rm-bg));
+  --el-color-primary-light-9: color-mix(in srgb, var(--rm-accent) 10%, var(--rm-bg));
+}
+.el-dialog {
+  max-width: calc(100vw - 24px);
+  color: var(--rm-text);
+  border: 1px solid var(--rm-divider);
+  border-radius: 12px;
+  box-shadow: var(--rm-shadow);
+}
+.el-dialog__body {
+  max-height: 72dvh;
+  overflow: auto;
+}
+.el-dialog__title {
+  font-size: var(--rm-ui-font-heading);
+}
+.el-form-item__label {
+  color: var(--rm-text);
+}
+.el-select {
+  min-width: 0;
+}
+.rm-font-picker .el-select {
+  width: 100%;
+}
+.rm-picker-dialog .rm-switcher-list {
+  max-height: 50dvh;
+  margin-top: 12px;
+}
+.el-message-box {
+  max-width: calc(100vw - 32px);
+}
+@media (max-width: 767px), (pointer: coarse) {
+  .el-input__inner,
+  .el-textarea__inner {
+    font-size: max(16px, var(--rm-ui-font-size));
+  }
+}
+
+.el-popper.is-light {
+  backdrop-filter: blur(20px);
 }

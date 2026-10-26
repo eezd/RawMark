@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import type { StorageUsage } from '@/pages/settings/apis/type'
+import type { StorageUsage } from '@@/apis/storage/type'
+
+import { getStorageApi } from '@@/apis/storage'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { settingsApi } from '@/pages/settings/apis'
+
 import MaintenancePanel from './MaintenancePanel.vue'
 import SettingRow from './SettingRow.vue'
 
@@ -39,7 +41,7 @@ async function scan() {
   busy.value = true
   error.value = ''
   try {
-    const next = await settingsApi.storage()
+    const next = (await getStorageApi()).data
     if (mounted) usage.value = next
   } catch (cause) {
     if (mounted) error.value = `统计失败：${String(cause)}`

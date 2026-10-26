@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import Icon from '@@/components/Icon/index.vue'
 import { computed, ref, watch } from 'vue'
-import Icon from '../../../common/components/Icon/index.vue'
 import { metadata, refreshMetadata } from '../metadata'
 import { openNote, openReference, ws } from '../workspace'
 
@@ -74,13 +74,9 @@ watch(() => ws.view, () => {
       </el-button>
     </header>
     <div class="rm-knowledge-tools">
-      <label><Icon name="search" /><input v-model="query" type="search" placeholder="搜索笔记…" aria-label="搜索笔记"></label><select v-model="tag" aria-label="筛选标签">
-        <option value="">
-          全部标签
-        </option><option v-for="[name, count] in tags" :key="name" :value="name">
-          #{{ name }} · {{ count }}
-        </option>
-      </select><label v-if="ws.view === 'graph'"><input v-model="local" type="checkbox" :disabled="!ws.active">仅当前笔记关联</label>
+      <label><Icon name="search" /><input v-model="query" type="search" placeholder="搜索笔记…" aria-label="搜索笔记"></label><el-select v-model="tag" aria-label="筛选标签">
+        <el-option value="" label="全部标签" /><el-option v-for="[name, count] in tags" :key="name" :value="name" :label="`#${name} · ${count}`" />
+      </el-select><label v-if="ws.view === 'graph'"><input v-model="local" type="checkbox" :disabled="!ws.active">仅当前笔记关联</label>
     </div>
     <p v-if="metadata.error" role="alert">
       {{ metadata.error }} <el-button class="rm-btn" @click="refreshMetadata">

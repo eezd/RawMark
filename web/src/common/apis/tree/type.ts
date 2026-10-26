@@ -9,3 +9,7 @@ export interface Entry {
   mtime: number
   icon?: TreeIcon
 }
+
+export interface TreeIconRequestData { path: string, icon: TreeIcon | null }
+export type TreeResponseData = ApiResponseData<{ entries: Entry[] }>
+export type TreeIconResponseData = ApiResponseData<{ ok: boolean }>
