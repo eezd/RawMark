@@ -3,13 +3,15 @@ import type { SearchResult } from '@@/apis/search/type'
 
 import { searchApi } from '@@/apis/search'
 import Icon from '@@/components/Icon/index.vue'
-import { toast } from '@@/utils/notifications'
+import { reportError } from '@@/utils/notifications'
 
 import { dirname, noteTitle } from '@@/utils/paths'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useUserStore } from '@/pinia/stores/user'
 import { openAt, ws } from '../workspace'
 
 const SEARCH_DELAY = 150
+const user = useUserStore()
 
 const input = ref<HTMLInputElement>()
 const query = ref('')
@@ -21,23 +23,28 @@ const terms = computed(() => query.value.split(/\s+/).filter(Boolean))
 let seq = 0
 let timer: ReturnType<typeof setTimeout> | undefined
 watch(query, (q) => {
+  const id = ++seq
+  const version = user.getSessionVersion()
   clearTimeout(timer)
-  timer = setTimeout(() => void run(q), SEARCH_DELAY)
+  results.value = null
+  timer = setTimeout(() => void run(q, id, version), SEARCH_DELAY)
+}, { flush: 'sync' })
+onBeforeUnmount(() => {
+  clearTimeout(timer)
+  seq++
 })
 
-async function run(q: string) {
-  const id = ++seq
-  if (!q.trim()) {
-    results.value = null
-    return
-  }
+async function run(q: string, id: number, version: number) {
+  if (!q.trim()) return
   try {
+    user.assertSession(version)
     const r = (await searchApi({ q })).data.results
+    user.assertSession(version)
     if (id !== seq) return
     results.value = r
     selected.value = 0
-  } catch {
-    if (id === seq) toast('搜索失败')
+  } catch (cause) {
+    if (id === seq) reportError(cause)
   }
 }
 
