@@ -382,5 +382,7 @@
   "invalid_link_encoding_2c6a7e": "链接编码无效",
   "link_target_does_not_exist_2503d1": "链接目标不存在：{p0}",
   "finish_saving_pasting_uploading_or_e67d3d": "仍有未保存内容或正在处理粘贴、上传与文件操作，请完成后再清理",
-  "block_quote": "引用"
+  "block_quote": "引用",
+  "asset_library": "图片库",
+  "knowledge_connections": "知识关联"
 }

@@ -120,5 +120,6 @@
   "page_not_found_e75737": "页面不存在",
   "network_error": "网络错误",
   "move": "移动",
-  "network_or_local_storage_error": "网络或本地存储错误"
+  "network_or_local_storage_error": "网络或本地存储错误",
+  "language": "语言"
 }

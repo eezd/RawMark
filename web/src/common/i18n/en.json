@@ -120,5 +120,6 @@
   "page_not_found_e75737": "Page not found",
   "network_error": "Network error",
   "move": "Move",
-  "network_or_local_storage_error": "Network or local storage error"
+  "network_or_local_storage_error": "Network or local storage error",
+  "language": "Language"
 }

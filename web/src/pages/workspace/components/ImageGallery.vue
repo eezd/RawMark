@@ -103,7 +103,7 @@ async function clean() {
 <template>
   <section class="rm-media-library" :aria-label="translate('workspace.image_library_92329a')" @keydown.esc.stop="!busy && (ws.images = null)">
     <header class="rm-media-header">
-      <div><small>ASSET LIBRARY</small><h1>{{ translate('workspace.images_and_visual_resources_794f97') }}</h1><p>{{ ws.imagesAll ? translate('workspace.entire_vault_a8e1f0') : translate('workspace.current_folder_and_direct_attachments_c2a863', { p0: dir || translate('workspace.root_folder_42ee28') }) }} · {{ scopeImages.length }} {{ translate('workspace.images_b62646') }} {{ size(totalSize) }}</p></div><el-button class="rm-btn" :disabled="busy" @click="ws.images = null; ws.view = 'notes'">
+      <div><small>{{ translate('workspace.asset_library') }}</small><h1>{{ translate('workspace.images_and_visual_resources_794f97') }}</h1><p>{{ ws.imagesAll ? translate('workspace.entire_vault_a8e1f0') : translate('workspace.current_folder_and_direct_attachments_c2a863', { p0: dir || translate('workspace.root_folder_42ee28') }) }} · {{ scopeImages.length }} {{ translate('workspace.images_b62646') }} {{ size(totalSize) }}</p></div><el-button class="rm-btn" :disabled="busy" @click="ws.images = null; ws.view = 'notes'">
         {{ translate('workspace.back_to_notes_38461a') }}
       </el-button>
     </header>

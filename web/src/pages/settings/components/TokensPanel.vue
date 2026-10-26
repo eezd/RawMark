@@ -110,7 +110,7 @@ onMounted(load)
     </div>
     <p class="rm-share-note">
       {{ translate('settings.send_the_request_header_02d3d2') }} <code>{{ translate('settings.authorization_bearer_token_3abd9b') }}</code>{{ translate('settings.read_only_tokens_can_only_38418a') }}
-      <a href="/api/v1/openapi.json" target="_blank" rel="noopener">openapi.json</a>。
+      <a href="/api/v1/openapi.json" target="_blank" rel="noopener">openapi.json</a>
     </p>
     <p v-if="error" class="rm-auth-error" role="alert">
       {{ error }} <el-button text :disabled="loading" @click="load">

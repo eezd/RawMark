@@ -382,5 +382,7 @@
   "invalid_link_encoding_2c6a7e": "Invalid link encoding",
   "link_target_does_not_exist_2503d1": "Link target does not exist: {p0}",
   "finish_saving_pasting_uploading_or_e67d3d": "Finish saving, pasting, uploading, or working with files before cleaning up",
-  "block_quote": "Block quote"
+  "block_quote": "Block quote",
+  "asset_library": "ASSET LIBRARY",
+  "knowledge_connections": "KNOWLEDGE CONNECTIONS"
 }

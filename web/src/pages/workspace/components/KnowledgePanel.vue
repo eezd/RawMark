@@ -71,7 +71,7 @@ watch(() => ws.view, () => {
 <template>
   <section class="rm-knowledge-panel">
     <header class="rm-knowledge-heading">
-      <div><span class="rm-eyebrow">KNOWLEDGE CONNECTIONS</span><h1>{{ ws.view === 'graph' ? translate('workspace.let_knowledge_connect_22f6c5') : translate('workspace.tags_02b344') }}</h1><p>{{ metadata.notes.length }} {{ translate('workspace.notes_connect_your_ideas_with_9f4998') }}</p></div><el-button class="rm-btn" @click="ws.view = 'notes'">
+      <div><span class="rm-eyebrow">{{ translate('workspace.knowledge_connections') }}</span><h1>{{ ws.view === 'graph' ? translate('workspace.let_knowledge_connect_22f6c5') : translate('workspace.tags_02b344') }}</h1><p>{{ metadata.notes.length }} {{ translate('workspace.notes_connect_your_ideas_with_9f4998') }}</p></div><el-button class="rm-btn" @click="ws.view = 'notes'">
         {{ translate('workspace.back_to_notes_38461a') }}
       </el-button>
     </header>
