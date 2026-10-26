@@ -1,71 +1,73 @@
-# 使用指南
+# User guide
 
-[返回项目首页](../README.zh-CN.md) · [部署与维护](deployment.md) · [API 与认证](api.md)
+**English** · [简体中文](guide.zh-CN.md)
 
-RawMark 是单用户笔记工作台，笔记保存在服务器上。多个浏览器可以访问同一个实例；它不是多人协作系统，目前没有公开分享功能。
+[Project home](../README.md) · [Deployment and maintenance](deployment.md) · [API and authentication](api.md)
 
-## 开始写作
+RawMark is a single-user workspace with notes stored on your server. Multiple browsers can access the same instance, but it is not a collaboration system and currently has no public sharing feature.
 
-首次访问设置密码，之后通过密码和图片验证码登录。在侧栏「文件目录」标题或空白处右键，可以搜索、新建笔记、新建目录、导入文档、打开标签索引或管理图片；点击标题同样可以打开菜单，便于触屏使用。
+## Start writing
 
-编辑器默认使用即时预览，点击右上角图标切换源码模式、打开大纲或进入专注写作。支持标准 Markdown、表格、任务列表、代码块、数学公式、Mermaid、脚注和 YAML 元数据。
+Set a password on first use. Subsequent sign-ins require your password and an image captcha. Right-click the **Files** heading or empty space in the sidebar to search, create notes or folders, import documents, open the tag index, or manage images. You can also click the heading to open the menu on a touchscreen.
 
-正文修改自动保存，保存失败或版本冲突会明确提示。外部程序修改笔记时会同步到页面；出现冲突时请核对内容，不要直接覆盖仍需保留的版本。
+The editor opens in live preview mode. Use the icons at the top right to switch to source mode, open the outline, or enter focus mode. Supported syntax includes standard Markdown, tables, task lists, code blocks, math, Mermaid, footnotes, and YAML metadata.
 
-选中文字后可使用外观、加粗、斜体、下划线、删除线、高亮与链接。局部外观和下划线以受限的标准 HTML 标签存入 Markdown，源码和导出会保留；其他阅读器是否呈现这些样式取决于其 HTML 支持。
+Changes save automatically. Save failures and version conflicts are reported explicitly. Changes made by external programs sync to the page; if a conflict occurs, compare the contents before overwriting a version you still need.
 
-## 整理笔记
+Select text to apply appearance styles, bold, italic, underline, strikethrough, highlight, or links. Local appearance styles and underlines are stored as restricted standard HTML tags in Markdown and preserved in source mode and exports. Rendering in other readers depends on their HTML support.
 
-- **文件与文件夹**：右键重命名、移动、删除或导出。拖到文件夹行会移入该文件夹，拖到笔记行会移入该笔记所在目录。
-- **多选**：Ctrl/Cmd 点击切换选择，Shift 点击选择可见范围，再通过右键菜单批量操作。部分操作失败会逐项报告。
-- **标签页**：支持固定和关闭其他标签；固定标签不会被「关闭其他标签页」关闭。打开的标签及固定状态在当前浏览器保存，刷新或重启后恢复。
-- **图标**：文件夹默认 📂、文件默认 📄，点击图标或右键「修改图标」选择表情或内置图标。
-- **标签和搜索**：正文 `#标签`、YAML `tags` 可用于归类；全文搜索用于查找笔记。文章标题生成右侧大纲。
+## Organize notes
 
-应用内重命名和移动会维护笔记中的本地链接与图片引用。直接在文件系统中操作时，不保证链接、图标等元数据跟随；这些操作优先在 RawMark 内完成。
+- **Files and folders:** right-click to rename, move, delete, or export. Dropping onto a folder row moves the item into that folder; dropping onto a note row moves it into that note's parent folder.
+- **Multiple selection:** Ctrl/Cmd-click toggles selection; Shift-click selects a visible range. Use the context menu for bulk actions. Partial failures are reported individually.
+- **Tabs:** pin notes or close other tabs. Pinned tabs survive “Close other tabs.” Open tabs and their pinned state are stored in the current browser and restored after refreshes and restarts.
+- **Icons:** folders default to 📂 and files to 📄. Click an icon or choose the change-icon context action to select an emoji or a built-in icon.
+- **Tags and search:** use inline `#tags` or YAML `tags` to categorize notes, and full-text search to find them. Headings populate the document outline on the right.
 
-## 导入与导出
+Renaming and moving items within RawMark updates local links and image references. Direct filesystem operations do not guarantee that links, icons, or other metadata follow; prefer performing these operations in RawMark.
 
-在目录或文件夹菜单选择「导入」，支持多个 UTF-8 `.md` 文件或单个 ZIP，总上传上限为 100 MiB。
+## Import and export
 
-ZIP 会导入到同名新文件夹，保留笔记层级。本地图片归入各笔记同级的 `assets/`，并改写引用；同名不同内容不会覆盖。缺失的本地链接会提示，远程图片不会自动下载。可以用思源笔记等工具导出的 Markdown ZIP 迁入，具体排版仍取决于其 Markdown 内容。
+Choose the import action from the directory or folder menu. Import supports multiple UTF-8 `.md` files or one ZIP archive, with a total upload limit of 100 MiB.
 
-导出时，单篇无附件笔记直接下载 `.md`；其他情况下载保留层级、原文与本地附件的 ZIP，不下载远程资源。选中项存在缺失附件时会报错，便于先修复再导出。
+A ZIP imports into a new folder named after the archive, preserving the note hierarchy. Local images move into an `assets/` folder alongside each note, and references are rewritten. Files with the same name but different contents are not overwritten. Missing local links are reported; remote images are not downloaded automatically. Markdown ZIP exports from tools such as SiYuan can be imported, with formatting determined by their Markdown contents.
 
-整个笔记库的普通 Markdown 导出在「设置 → 存储空间」，缺失附件记录于导出包的 `.rawmark-export/missing-assets.json`。这个报告不会在重新导入时成为笔记。
+Exporting a single note without attachments downloads an `.md` file. Other selections download a ZIP preserving the hierarchy, original text, and local attachments; remote resources are not downloaded. Missing attachments in a selection cause an error so you can repair them before exporting.
 
-## 图片管理
+A plain Markdown export of the entire vault is available under **Settings → Storage**. Missing attachments are recorded in `.rawmark-export/missing-assets.json` inside the archive. This report does not become a note when reimported.
 
-粘贴、上传和导入的图片默认保存在笔记同级的 `assets/`，同目录相同内容去重，正文使用相对路径。侧栏隐藏附件目录，右键文件夹选择「图片管理」即可查看，也可切换整个知识库。
+## Manage images
 
-图片管理提供检索、排序、网格/列表、批量上传、预览、引用查看、重命名、移动和替换。重命名或移动会更新笔记引用；替换保留路径，要求相同扩展名、最大 50 MiB，旧图片不会进入回收站。
+Pasted, uploaded, and imported images default to the note's sibling `assets/` folder. Identical contents in the same folder are deduplicated, and notes use relative paths. Attachment folders are hidden from the sidebar. Right-click a folder to open its image manager; you can also switch to the entire vault.
 
-笔记跨目录移动时图片跟随，仍被其他笔记引用的原图保留。**删除单篇笔记不会顺便删除共享图片**。清理孤立图片会先展示候选，再核对全库引用，将符合条件的图片移入回收站。旧版 `笔记名.assets/` 附件目录仍可读取、移动与恢复。
+The image manager provides search, sorting, grid/list views, bulk uploads, previews, reference lookup, renaming, moving, and replacement. Renaming or moving an image updates note references. Replacement keeps the path, requires the same extension, and has a 50 MiB limit; the old image is not sent to the recycle bin.
 
-## 外观、字体与快捷键
+Images follow notes moved between folders. Originals still referenced by other notes are retained. **Deleting a single note does not also delete shared images.** Unreferenced-image cleanup shows candidates first, rechecks references across the vault, then sends eligible images to the recycle bin. Legacy `note-name.assets/` folders can still be read, moved, and restored.
 
-在「设置 → 外观」切换明暗模式、主题，调整界面字体和字号、玻璃透明度或 CSS 片段；正文与代码字体、正文宽度、行高等位于编辑器设置。设置保存在服务器，多个设备共享；标签页等本机状态单独保存。
+## Appearance, fonts, and shortcuts
 
-默认字体为 Maple Mono Normal NL NF CN v7.9，不可删除。界面、正文和代码可分别选择字体，各字体选择器支持导入 TTF、OTF、WOFF、WOFF2（单个不超过 30 MiB）及删除导入字体。页面等待所需字体加载后显示，失败会提示刷新。代码块固定使用 highlight.js 的 Atom One Dark，与页面明暗模式独立。
+Use **Settings → Appearance** to change light/dark mode, themes, interface font and size, glass opacity, or CSS snippets. Text and code fonts, text width, and line height are in the editor settings. Settings are stored on the server and shared across devices; local state such as tabs is stored separately.
 
-快捷键默认参考 Typora 的 Windows/Linux 或 macOS 组合，无对应项及插件命令默认留空。可以搜索、添加、逐条删除、单项或全部重置，冲突绑定会被拒绝。Ctrl/Cmd+1～6 设置对应标题，再次触发同级标题恢复正文；浏览器保留键可自行改绑。
+The default font is Maple Mono Normal NL NF CN v7.9 and cannot be deleted. Interface, text, and code fonts can be selected independently. Each font selector supports importing TTF, OTF, WOFF, and WOFF2 files (up to 30 MiB each) and deleting imported fonts. The page waits for required fonts to load before appearing and offers a refresh action if loading fails. Code blocks always use highlight.js with Atom One Dark, independently of the page's light/dark mode.
 
-手机设置采用分类和内容两级布局。应用安装入口位于「设置 → 关于」；PWA 缓存静态外壳，**不代表支持离线编辑与离线同步**。
+Default shortcuts follow Typora's Windows/Linux or macOS bindings. Actions without a corresponding binding and plugin commands default to unassigned. Search, add, remove individual bindings, or reset one action or all shortcuts; conflicting bindings are rejected. Ctrl/Cmd+1–6 sets the corresponding heading level; repeating the same level returns to body text. Browser-reserved shortcuts can be rebound.
 
-## 回收站与存储空间
+On phones, settings use separate category and content views. App installation is available under **Settings → About**. The PWA caches the static shell; **this does not provide offline editing or offline synchronization**.
 
-删除的内容进入回收站，支持恢复和清空全部。默认保留 30 天，设置为 0 则不自动删除；修改期限同样影响已有条目，清理在启动时及每小时执行。
+## Recycle bin and storage
 
-「存储空间」自动展示数据目录、外置笔记库和可选字体占用；字体统计不含默认 Maple，附件与回收站计入笔记库。这里还可导出/导入完整实例、笔记和设置，优化/重建索引、清理临时文件、重置设置及导出日志。
+Deleted content goes to the recycle bin, which supports restoring items and emptying all contents. Retention defaults to 30 days; set it to 0 to disable automatic deletion. Changing the retention period also affects existing entries. Cleanup runs at startup and hourly.
 
-完整实例恢复会替换当前业务数据并要求重新登录；替换前请先备份，具体范围、限制与恢复注意事项见[部署与维护](deployment.md#备份与恢复)。
+**Storage** automatically displays usage for the data directory, external vault, and optional fonts. Font totals exclude the default Maple font; attachments and the recycle bin count toward the vault. You can also export/import the full instance, notes, and settings; optimize/rebuild the index; clean temporary files; reset settings; and export logs.
 
-## 插件与界面恢复
+A full-instance restore replaces current application data and requires signing in again. Back up first. See [Deployment and maintenance](deployment.md#backup-and-restore) for scope, limits, and restore precautions.
 
-插件由实例管理者安装，属于有完整前端权限的扩展，请只安装可信来源；不提供沙箱隔离保证。开发入口见[开发指南](development.md#主题字体与插件)。
+## Plugins and interface recovery
 
-插件导致界面异常时，可在地址后加 `?disable-plugins` 暂停插件并进入管理。主题或 CSS 片段导致界面不可用时，可加 `?reset-appearance` 临时停用自定义外观，再进入设置恢复默认。这些入口不自动删除笔记或丢弃编辑内容。
+Plugins are installed by the instance owner and have full frontend privileges. Only install trusted code; there is no sandbox isolation guarantee. See the [development guide](development.md#themes-fonts-and-plugins) for development details.
 
-## 界面语言
+If a plugin breaks the interface, append `?disable-plugins` to the URL to pause plugins and access management. If a theme or CSS snippet makes the interface unusable, append `?reset-appearance` to temporarily disable custom appearance, then restore defaults in settings. These entry points do not automatically delete notes or discard edited content.
 
-默认使用英文。在 **Settings → Appearance → Language** 选择 **简体中文**；中文界面对应「设置 → 外观 → 语言」。更改立即生效并保存在账户设置中，所有设备共用，不改写笔记内容或已有文件名。登录页也可以临时切换语言，登录后以账户偏好为准。
+## Interface language
+
+English is the default. Choose **简体中文** under **Settings → Appearance → Language**; in Chinese, the path is **设置 → 外观 → 语言**. Changes take effect immediately and are saved in account settings across devices without rewriting notes or existing filenames. The sign-in page also offers a temporary language choice; account preferences take precedence after sign-in.

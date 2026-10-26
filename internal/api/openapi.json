@@ -3,7 +3,7 @@
   "info": {
     "title": "RawMark API",
     "version": "1",
-    "description": "RawMark单用户API。普通JSON统一{code,data,message}，code=0成功；保留HTTP语义。登录会话固定30天；API令牌保留read/write权限。受保护API只接受Bearer，不接受Cookie。文件、下载、事件、204与OpenAPI文档不包装。 响应提示支持Accept-Language: en或zh-CN（按q权重选择，缺省英文），Content-Language返回实际语言；状态码与业务码不变。/settings的locale为账户语言，支持en、zh-CN，null删除覆盖。"
+    "description": "RawMark single-user API. Ordinary JSON uses {code,data,message}, with code=0 for success; HTTP semantics are preserved. Login sessions last a fixed 30 days; API tokens retain read/write permissions. Protected APIs accept Bearer authentication only, not Cookies. Files, downloads, events, 204 responses, and OpenAPI are not wrapped. Messages support Accept-Language: en or zh-CN (selected by q weight; default English), and Content-Language reports the selected language; HTTP statuses and business codes do not change. The /settings locale field stores account language (en or zh-CN); null removes the override."
   },
   "servers": [
     {
@@ -18,16 +18,16 @@
   "paths": {
     "/health": {
       "get": {
-        "summary": "健康检查",
+        "summary": "Health check",
         "tags": [
-          "系统"
+          "System"
         ],
         "security": [
           {}
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -57,16 +57,16 @@
     },
     "/openapi.json": {
       "get": {
-        "summary": "本文档",
+        "summary": "This document",
         "tags": [
-          "系统"
+          "System"
         ],
         "security": [
           {}
         ],
         "responses": {
           "200": {
-            "description": "OpenAPI 文档",
+            "description": "OpenAPI document",
             "content": {
               "application/json": {
                 "schema": {
@@ -80,16 +80,16 @@
     },
     "/auth/state": {
       "get": {
-        "summary": "是否已经初始化",
+        "summary": "Query initialization status",
         "tags": [
-          "登录"
+          "Authentication"
         ],
         "security": [
           {}
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -127,9 +127,9 @@
     },
     "/auth/setup": {
       "post": {
-        "summary": "首次设置密码并返回Bearer会话",
+        "summary": "Set the initial password and return a Bearer session",
         "tags": [
-          "登录"
+          "Authentication"
         ],
         "security": [
           {}
@@ -154,7 +154,7 @@
         },
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -193,7 +193,7 @@
             }
           },
           "400": {
-            "description": "密码过短",
+            "description": "Password too short",
             "content": {
               "application/json": {
                 "schema": {
@@ -203,7 +203,7 @@
             }
           },
           "409": {
-            "description": "已初始化",
+            "description": "Already initialized",
             "content": {
               "application/json": {
                 "schema": {
@@ -213,14 +213,14 @@
             }
           }
         },
-        "description": "仅未初始化实例可设置密码；首次成功后自动登录，已初始化时返回 409。"
+        "description": "Only uninitialized instances may set a password. The first successful setup signs in automatically; initialized instances return 409."
       }
     },
     "/auth/login": {
       "post": {
-        "summary": "验证码及密码登录，返回Bearer会话",
+        "summary": "Sign in with captcha and password; return a Bearer session",
         "tags": [
-          "登录"
+          "Authentication"
         ],
         "security": [
           {}
@@ -253,7 +253,7 @@
         },
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -292,7 +292,7 @@
             }
           },
           "401": {
-            "description": "密码错误",
+            "description": "Incorrect password",
             "content": {
               "application/json": {
                 "schema": {
@@ -302,7 +302,7 @@
             }
           },
           "429": {
-            "description": "失败次数过多",
+            "description": "Too many failed attempts",
             "content": {
               "application/json": {
                 "schema": {
@@ -312,7 +312,7 @@
             }
           },
           "400": {
-            "description": "验证码错误、已使用或过期（40001/40002）",
+            "description": "Incorrect, used, or expired captcha (40001/40002)",
             "content": {
               "application/json": {
                 "schema": {
@@ -326,9 +326,9 @@
     },
     "/auth/logout": {
       "post": {
-        "summary": "退出登录",
+        "summary": "Sign out",
         "tags": [
-          "登录"
+          "Authentication"
         ],
         "security": [
           {
@@ -337,16 +337,16 @@
         ],
         "responses": {
           "204": {
-            "description": "服务端会话已撤销"
+            "description": "Server session revoked"
           }
         }
       }
     },
     "/auth/password": {
       "post": {
-        "summary": "修改登录密码；当前会话保留，其他设备需重新登录",
+        "summary": "Change the login password; retain the current session and require other devices to sign in again",
         "tags": [
-          "登录"
+          "Authentication"
         ],
         "security": [
           {
@@ -377,7 +377,7 @@
         },
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -403,7 +403,7 @@
             }
           },
           "400": {
-            "description": "新密码过短",
+            "description": "New password too short",
             "content": {
               "application/json": {
                 "schema": {
@@ -413,7 +413,7 @@
             }
           },
           "401": {
-            "description": "当前密码错误",
+            "description": "Incorrect current password",
             "content": {
               "application/json": {
                 "schema": {
@@ -423,7 +423,7 @@
             }
           },
           "429": {
-            "description": "失败次数过多",
+            "description": "Too many failed attempts",
             "content": {
               "application/json": {
                 "schema": {
@@ -437,13 +437,13 @@
     },
     "/settings": {
       "get": {
-        "summary": "应用设置（全部设备共用的一份 JSON 对象）",
+        "summary": "Application settings (one JSON object shared across devices)",
         "tags": [
-          "设置"
+          "Settings"
         ],
         "responses": {
           "200": {
-            "description": "设置",
+            "description": "Settings",
             "content": {
               "application/json": {
                 "schema": {
@@ -472,16 +472,16 @@
         }
       },
       "patch": {
-        "summary": "合并修改设置",
+        "summary": "Merge settings changes",
         "tags": [
-          "设置"
+          "Settings"
         ],
         "security": [
           {
             "bearer": []
           }
         ],
-        "description": "按顶层键合并：请求中的键覆盖原值，值为 null 的键被删除。成功后经 WebSocket 推送 settings 事件。 trashRetentionDays 为非负安全整数（默认30，0为永不自动删除），null恢复默认。期限适用于已有和新回收站条目，服务启动及每小时按原删除时间永久清理。",
+        "description": "Merge top-level keys: supplied values replace existing values, and null removes a key. On success, broadcast a settings event over WebSocket. trashRetentionDays is a nonnegative safe integer (default 30; 0 disables automatic deletion); null restores the default. Retention applies to existing and new recycle-bin entries. Startup and hourly cleanup permanently delete expired entries based on their original deletion times.",
         "requestBody": {
           "required": true,
           "content": {
@@ -506,7 +506,7 @@
         },
         "responses": {
           "200": {
-            "description": "合并后的设置",
+            "description": "Merged settings",
             "content": {
               "application/json": {
                 "schema": {
@@ -533,7 +533,7 @@
             }
           },
           "400": {
-            "description": "不是 JSON 对象，或自动删除期限无效",
+            "description": "Not a JSON object, or invalid retention period",
             "content": {
               "application/json": {
                 "schema": {
@@ -543,7 +543,7 @@
             }
           },
           "413": {
-            "description": "超过 1 MB",
+            "description": "Exceeds 1 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -557,13 +557,13 @@
     },
     "/tree": {
       "get": {
-        "summary": "全部笔记、图片与文件夹（含 .assets，不含隐藏条目或符号链接）",
+        "summary": "All notes, images, and folders (including .assets, excluding hidden entries and symlinks)",
         "tags": [
-          "笔记"
+          "Notes"
         ],
         "responses": {
           "200": {
-            "description": "目录树",
+            "description": "Directory tree",
             "content": {
               "application/json": {
                 "schema": {
@@ -605,23 +605,23 @@
           "name": "path",
           "in": "path",
           "required": true,
-          "description": "仓库内的相对路径，如 `目录/笔记.md`（各段需 URL 编码）",
+          "description": "Vault-relative path, such as `folder/note.md` (URL-encode each segment)",
           "schema": {
             "type": "string"
           }
         }
       ],
       "get": {
-        "summary": "读取笔记",
+        "summary": "Read a note",
         "tags": [
-          "笔记"
+          "Notes"
         ],
         "responses": {
           "200": {
-            "description": "Markdown 原文",
+            "description": "Original Markdown",
             "headers": {
               "ETag": {
-                "description": "内容版本（rev），带双引号",
+                "description": "Content revision (rev), enclosed in double quotes",
                 "schema": {
                   "type": "string"
                 }
@@ -636,7 +636,7 @@
             }
           },
           "404": {
-            "description": "不存在",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -648,11 +648,11 @@
         }
       },
       "put": {
-        "summary": "写入笔记（不存在的上级目录会自动创建）",
+        "summary": "Write a note (missing parent folders are created automatically)",
         "tags": [
-          "笔记"
+          "Notes"
         ],
-        "description": "请求体整体作为笔记内容。`If-Match: \"rev\"` 要求当前版本一致，否则返回 412 与最新 rev；`If-None-Match: *` 要求笔记尚不存在；都不带则直接覆盖。",
+        "description": "Use the entire request body as note content. `If-Match: \"rev\"` requires the current revision; otherwise return 412 with the latest rev. `If-None-Match: *` requires a new note. Omitting both overwrites unconditionally.",
         "parameters": [
           {
             "name": "If-Match",
@@ -684,7 +684,7 @@
         },
         "responses": {
           "200": {
-            "description": "已写入",
+            "description": "Written",
             "content": {
               "application/json": {
                 "schema": {
@@ -715,7 +715,7 @@
             },
             "headers": {
               "ETag": {
-                "description": "内容版本（rev），带双引号",
+                "description": "Content revision (rev), enclosed in double quotes",
                 "schema": {
                   "type": "string"
                 }
@@ -723,7 +723,7 @@
             }
           },
           "400": {
-            "description": "路径无效",
+            "description": "Invalid path",
             "content": {
               "application/json": {
                 "schema": {
@@ -733,7 +733,7 @@
             }
           },
           "409": {
-            "description": "If-None-Match 时已存在",
+            "description": "Already exists with If-None-Match",
             "content": {
               "application/json": {
                 "schema": {
@@ -743,7 +743,7 @@
             }
           },
           "412": {
-            "description": "版本冲突",
+            "description": "Revision conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -766,7 +766,7 @@
                         },
                         "rev": {
                           "type": "string",
-                          "description": "服务器上的当前版本；为空表示已不存在"
+                          "description": "Current server revision; empty if the file no longer exists"
                         }
                       }
                     },
@@ -779,7 +779,7 @@
             }
           },
           "413": {
-            "description": "超过 20 MB",
+            "description": "Exceeds 20 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -791,13 +791,13 @@
         }
       },
       "delete": {
-        "summary": "把笔记、图片或文件夹移入回收站（笔记连同 .assets）",
+        "summary": "Move a note, image, or folder to the recycle bin (notes include their .assets directory)",
         "tags": [
-          "笔记"
+          "Notes"
         ],
         "responses": {
           "200": {
-            "description": "回收站条目",
+            "description": "Recycle-bin entry",
             "content": {
               "application/json": {
                 "schema": {
@@ -823,7 +823,7 @@
             }
           },
           "404": {
-            "description": "不存在",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -837,11 +837,11 @@
     },
     "/move": {
       "post": {
-        "summary": "移动或重命名笔记、图片或文件夹",
+        "summary": "Move or rename a note, image, or folder",
         "tags": [
-          "笔记"
+          "Notes"
         ],
-        "description": "笔记的 .assets 目录随之移动，改名时改写本篇图片目录链接；图片移动或改名保持扩展名，并更新仓库笔记中的本地引用。维护笔记中的本地入链及相对出链。",
+        "description": "A note's .assets directory follows its move; renaming rewrites links to that image directory. Image moves/renames preserve the extension and update local references in vault notes. Maintain local inbound links and relative outbound links.",
         "requestBody": {
           "required": true,
           "content": {
@@ -866,7 +866,7 @@
         },
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -892,7 +892,7 @@
             }
           },
           "404": {
-            "description": "源不存在",
+            "description": "Source not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -902,7 +902,7 @@
             }
           },
           "409": {
-            "description": "目标已存在",
+            "description": "Destination already exists",
             "content": {
               "application/json": {
                 "schema": {
@@ -916,9 +916,9 @@
     },
     "/folders": {
       "post": {
-        "summary": "新建文件夹",
+        "summary": "Create a folder",
         "tags": [
-          "笔记"
+          "Notes"
         ],
         "requestBody": {
           "required": true,
@@ -940,7 +940,7 @@
         },
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -966,7 +966,7 @@
             }
           },
           "409": {
-            "description": "已存在",
+            "description": "Already exists",
             "content": {
               "application/json": {
                 "schema": {
@@ -980,16 +980,16 @@
     },
     "/assets": {
       "post": {
-        "summary": "上传图片到笔记的 .assets 目录",
+        "summary": "Upload an image to the note's sibling assets directory",
         "tags": [
-          "图片"
+          "Images"
         ],
         "parameters": [
           {
             "name": "note",
             "in": "query",
             "required": false,
-            "description": "所属笔记路径",
+            "description": "Owning note path",
             "schema": {
               "type": "string"
             }
@@ -997,7 +997,7 @@
           {
             "name": "folder",
             "in": "query",
-            "description": "文件夹图片管理上传目标，空字符串表示根目录；与 note 互斥",
+            "description": "Folder upload destination for image management; an empty string means the root. Mutually exclusive with note.",
             "schema": {
               "type": "string"
             }
@@ -1024,7 +1024,7 @@
         },
         "responses": {
           "200": {
-            "description": "相对笔记所在目录的链接，可直接写入 Markdown",
+            "description": "Link relative to the note's folder, ready for Markdown",
             "content": {
               "application/json": {
                 "schema": {
@@ -1055,7 +1055,7 @@
             }
           },
           "413": {
-            "description": "超过 50 MB",
+            "description": "Exceeds 50 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -1065,16 +1065,16 @@
             }
           }
         },
-        "description": "note 与 folder 必须且只能指定一个；note 上传到笔记附件目录，folder 上传到目录的 assets 子目录。"
+        "description": "Specify exactly one of note and folder. note uploads to the note's sibling assets directory; folder uploads to that folder's assets subdirectory."
       }
     },
     "/assets/import": {
       "post": {
-        "summary": "下载公网图片到笔记的 .assets 目录",
+        "summary": "Download a public image to the note's sibling assets directory",
         "tags": [
-          "图片"
+          "Images"
         ],
-        "description": "仅接受公网 HTTP/HTTPS 地址，实际连接及重定向均校验；不携带登录凭据或使用环境代理。重定向链最多 5 个请求、2 次下载尝试，单次超时 10 秒；仅超时、429 和 5xx 重试。支持 PNG/JPEG/GIF/WebP，按文件签名识别，最大 50 MB。",
+        "description": "Accept only public HTTP/HTTPS URLs; validate actual connections and redirects. Do not forward login credentials or use environment proxies. At most 5 requests per redirect chain, 2 download attempts, and a 10-second timeout per attempt; retry only timeouts, 429, and 5xx. Support PNG/JPEG/GIF/WebP, detected by file signature, up to 50 MB.",
         "parameters": [
           {
             "name": "note",
@@ -1106,7 +1106,7 @@
         },
         "responses": {
           "200": {
-            "description": "相对笔记所在目录的图片链接",
+            "description": "Image link relative to the note's folder",
             "content": {
               "application/json": {
                 "schema": {
@@ -1137,7 +1137,7 @@
             }
           },
           "400": {
-            "description": "来源地址或笔记路径无效，或目标不是公网",
+            "description": "Invalid source URL or note path, or nonpublic destination",
             "content": {
               "application/json": {
                 "schema": {
@@ -1147,7 +1147,7 @@
             }
           },
           "404": {
-            "description": "所属笔记不存在",
+            "description": "Owning note not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1157,7 +1157,7 @@
             }
           },
           "413": {
-            "description": "图片超过 50 MB",
+            "description": "Image exceeds 50 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -1167,7 +1167,7 @@
             }
           },
           "422": {
-            "description": "不支持的图片类型",
+            "description": "Unsupported image type",
             "content": {
               "application/json": {
                 "schema": {
@@ -1177,7 +1177,7 @@
             }
           },
           "502": {
-            "description": "来源请求失败",
+            "description": "Source request failed",
             "content": {
               "application/json": {
                 "schema": {
@@ -1195,20 +1195,20 @@
           "name": "path",
           "in": "path",
           "required": true,
-          "description": "仓库内的相对路径，如 `目录/笔记.md`（各段需 URL 编码）",
+          "description": "Vault-relative path, such as `folder/note.md` (URL-encode each segment)",
           "schema": {
             "type": "string"
           }
         }
       ],
       "get": {
-        "summary": "读取仓库中的原始文件（图片等）",
+        "summary": "Read a raw vault file, such as an image",
         "tags": [
-          "图片"
+          "Images"
         ],
         "responses": {
           "200": {
-            "description": "文件内容",
+            "description": "File contents",
             "content": {
               "application/octet-stream": {
                 "schema": {
@@ -1219,7 +1219,7 @@
             }
           },
           "404": {
-            "description": "不存在",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1233,11 +1233,11 @@
     },
     "/search": {
       "get": {
-        "summary": "全文搜索",
+        "summary": "Full-text search",
         "tags": [
-          "笔记"
+          "Notes"
         ],
-        "description": "空格分隔多个词，全部命中才返回；最多 50 条。",
+        "description": "Space-separated terms must all match; return at most 50 results.",
         "parameters": [
           {
             "name": "q",
@@ -1250,7 +1250,7 @@
         ],
         "responses": {
           "200": {
-            "description": "结果",
+            "description": "Results",
             "content": {
               "application/json": {
                 "schema": {
@@ -1288,13 +1288,13 @@
     },
     "/trash": {
       "get": {
-        "summary": "回收站列表",
+        "summary": "List the recycle bin",
         "tags": [
-          "回收站"
+          "Recycle bin"
         ],
         "responses": {
           "200": {
-            "description": "条目",
+            "description": "Entries",
             "content": {
               "application/json": {
                 "schema": {
@@ -1330,14 +1330,14 @@
         }
       },
       "delete": {
-        "summary": "清空回收站全部条目",
-        "description": "永久删除，不可恢复；结果逐项报告，失败条目保留。只读令牌禁止。",
+        "summary": "Empty all recycle-bin entries",
+        "description": "Permanent and irreversible deletion. Report per-entry results and retain failed entries. Read-only tokens are forbidden.",
         "tags": [
-          "回收站"
+          "Recycle bin"
         ],
         "responses": {
           "200": {
-            "description": "包含成功及失败的逐项结果",
+            "description": "Per-entry success and failure results",
             "content": {
               "application/json": {
                 "schema": {
@@ -1377,13 +1377,13 @@
         }
       ],
       "post": {
-        "summary": "从回收站恢复",
+        "summary": "Restore from the recycle bin",
         "tags": [
-          "回收站"
+          "Recycle bin"
         ],
         "responses": {
           "200": {
-            "description": "恢复的条目",
+            "description": "Restored entry",
             "content": {
               "application/json": {
                 "schema": {
@@ -1409,7 +1409,7 @@
             }
           },
           "404": {
-            "description": "不存在",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1419,7 +1419,7 @@
             }
           },
           "409": {
-            "description": "原位置已有同名文件",
+            "description": "A file already exists at the original path",
             "content": {
               "application/json": {
                 "schema": {
@@ -1443,13 +1443,13 @@
         }
       ],
       "delete": {
-        "summary": "彻底删除回收站条目",
+        "summary": "Permanently delete a recycle-bin entry",
         "tags": [
-          "回收站"
+          "Recycle bin"
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -1475,7 +1475,7 @@
             }
           },
           "404": {
-            "description": "不存在",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1489,23 +1489,23 @@
     },
     "/events": {
       "get": {
-        "summary": "WebSocket：仓库变更推送",
+        "summary": "WebSocket vault-change events",
         "tags": [
-          "笔记"
+          "Notes"
         ],
-        "description": "升级为 WebSocket 后，服务器推送 JSON 数组，元素为 Event。客户端不发送消息。",
+        "description": "After upgrading to WebSocket, the server sends JSON arrays of Event objects. Clients send no messages.",
         "responses": {
           "101": {
-            "description": "切换为 WebSocket"
+            "description": "Upgrade to WebSocket"
           }
         }
       }
     },
     "/tokens": {
       "get": {
-        "summary": "API 令牌列表",
+        "summary": "List API tokens",
         "tags": [
-          "API 令牌"
+          "API tokens"
         ],
         "security": [
           {
@@ -1514,7 +1514,7 @@
         ],
         "responses": {
           "200": {
-            "description": "令牌",
+            "description": "Tokens",
             "content": {
               "application/json": {
                 "schema": {
@@ -1550,9 +1550,9 @@
         }
       },
       "post": {
-        "summary": "创建 API 令牌",
+        "summary": "Create an API token",
         "tags": [
-          "API 令牌"
+          "API tokens"
         ],
         "security": [
           {
@@ -1587,7 +1587,7 @@
         },
         "responses": {
           "200": {
-            "description": "token 明文只返回这一次",
+            "description": "Plaintext token is returned only once",
             "content": {
               "application/json": {
                 "schema": {
@@ -1621,7 +1621,7 @@
             }
           },
           "400": {
-            "description": "名称或范围无效",
+            "description": "Invalid name or scope",
             "content": {
               "application/json": {
                 "schema": {
@@ -1645,9 +1645,9 @@
         }
       ],
       "delete": {
-        "summary": "吊销 API 令牌",
+        "summary": "Revoke an API token",
         "tags": [
-          "API 令牌"
+          "API tokens"
         ],
         "security": [
           {
@@ -1656,7 +1656,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -1682,7 +1682,7 @@
             }
           },
           "404": {
-            "description": "不存在",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1696,13 +1696,13 @@
     },
     "/themes": {
       "get": {
-        "summary": "列出主题（含内置默认主题）",
+        "summary": "List themes, including built-in defaults",
         "tags": [
-          "外观"
+          "Appearance"
         ],
         "responses": {
           "200": {
-            "description": "主题列表",
+            "description": "Theme list",
             "content": {
               "application/json": {
                 "schema": {
@@ -1740,9 +1740,9 @@
     },
     "/themes/{id}": {
       "get": {
-        "summary": "读取主题 CSS",
+        "summary": "Read theme CSS",
         "tags": [
-          "外观"
+          "Appearance"
         ],
         "parameters": [
           {
@@ -1756,7 +1756,7 @@
         ],
         "responses": {
           "200": {
-            "description": "主题信息与 CSS",
+            "description": "Theme metadata and CSS",
             "content": {
               "application/json": {
                 "schema": {
@@ -1794,16 +1794,16 @@
             }
           },
           "404": {
-            "description": "主题不存在或文件不完整"
+            "description": "Theme not found or incomplete files"
           }
         }
       }
     },
     "/plugins": {
       "get": {
-        "summary": "列出已安装插件及启用状态",
+        "summary": "List installed plugins and their enabled state",
         "tags": [
-          "插件"
+          "Plugins"
         ],
         "security": [
           {
@@ -1812,7 +1812,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -1846,20 +1846,20 @@
             }
           },
           "401": {
-            "description": "需要登录会话"
+            "description": "Login session required"
           },
           "400": {
-            "description": "请求或插件包无效"
+            "description": "Invalid request or plugin archive"
           },
           "403": {
-            "description": "不接受 API 令牌"
+            "description": "API tokens are not accepted"
           }
         }
       },
       "post": {
-        "summary": "安装 ZIP 插件；安装后默认停用，同 id 拒绝覆盖",
+        "summary": "Install a ZIP plugin; disabled by default after installation; reject an existing id",
         "tags": [
-          "插件"
+          "Plugins"
         ],
         "security": [
           {
@@ -1868,7 +1868,7 @@
         ],
         "responses": {
           "201": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -1894,19 +1894,19 @@
             }
           },
           "401": {
-            "description": "需要登录会话"
+            "description": "Login session required"
           },
           "400": {
-            "description": "请求或插件包无效"
+            "description": "Invalid request or plugin archive"
           },
           "403": {
-            "description": "不接受 API 令牌"
+            "description": "API tokens are not accepted"
           },
           "409": {
-            "description": "同名插件已安装"
+            "description": "A plugin with this name is already installed"
           },
           "413": {
-            "description": "ZIP 超过 10 MiB"
+            "description": "ZIP exceeds 10 MiB"
           }
         },
         "requestBody": {
@@ -1932,9 +1932,9 @@
     },
     "/plugins/{id}": {
       "patch": {
-        "summary": "修改全设备插件启用偏好",
+        "summary": "Change plugin enablement preferences across devices",
         "tags": [
-          "插件"
+          "Plugins"
         ],
         "security": [
           {
@@ -1943,7 +1943,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -1969,16 +1969,16 @@
             }
           },
           "401": {
-            "description": "需要登录会话"
+            "description": "Login session required"
           },
           "400": {
-            "description": "请求或插件包无效"
+            "description": "Invalid request or plugin archive"
           },
           "403": {
-            "description": "不接受 API 令牌"
+            "description": "API tokens are not accepted"
           },
           "404": {
-            "description": "插件或指定版本的资源不存在"
+            "description": "Plugin or requested resource version not found"
           }
         },
         "parameters": [
@@ -2011,9 +2011,9 @@
         }
       },
       "delete": {
-        "summary": "停用并卸载插件包，保留插件私有数据",
+        "summary": "Disable and uninstall a plugin package while retaining private plugin data",
         "tags": [
-          "插件"
+          "Plugins"
         ],
         "security": [
           {
@@ -2022,7 +2022,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -2048,16 +2048,16 @@
             }
           },
           "401": {
-            "description": "需要登录会话"
+            "description": "Login session required"
           },
           "400": {
-            "description": "请求或插件包无效"
+            "description": "Invalid request or plugin archive"
           },
           "403": {
-            "description": "不接受 API 令牌"
+            "description": "API tokens are not accepted"
           },
           "404": {
-            "description": "插件或指定版本的资源不存在"
+            "description": "Plugin or requested resource version not found"
           }
         },
         "parameters": [
@@ -2074,9 +2074,9 @@
     },
     "/plugins/{id}/data": {
       "get": {
-        "summary": "读取插件私有 JSON，无数据时为 null",
+        "summary": "Read private plugin JSON; null when no data exists",
         "tags": [
-          "插件"
+          "Plugins"
         ],
         "security": [
           {
@@ -2085,7 +2085,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -2117,16 +2117,16 @@
             }
           },
           "401": {
-            "description": "需要登录会话"
+            "description": "Login session required"
           },
           "400": {
-            "description": "请求或插件包无效"
+            "description": "Invalid request or plugin archive"
           },
           "403": {
-            "description": "不接受 API 令牌"
+            "description": "API tokens are not accepted"
           },
           "404": {
-            "description": "插件或指定版本的资源不存在"
+            "description": "Plugin or requested resource version not found"
           }
         },
         "parameters": [
@@ -2141,9 +2141,9 @@
         ]
       },
       "put": {
-        "summary": "替换插件私有 JSON，最多 1 MiB",
+        "summary": "Replace private plugin JSON, up to 1 MiB",
         "tags": [
-          "插件"
+          "Plugins"
         ],
         "security": [
           {
@@ -2152,7 +2152,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -2184,16 +2184,16 @@
             }
           },
           "401": {
-            "description": "需要登录会话"
+            "description": "Login session required"
           },
           "400": {
-            "description": "请求或插件包无效"
+            "description": "Invalid request or plugin archive"
           },
           "403": {
-            "description": "不接受 API 令牌"
+            "description": "API tokens are not accepted"
           },
           "404": {
-            "description": "插件或指定版本的资源不存在"
+            "description": "Plugin or requested resource version not found"
           }
         },
         "parameters": [
@@ -2226,9 +2226,9 @@
     },
     "/plugins/{id}/assets/{revision}/{path}": {
       "get": {
-        "summary": "鉴权读取指定安装版本的包内资源",
+        "summary": "Read authenticated package resources for a specific installed version",
         "tags": [
-          "插件"
+          "Plugins"
         ],
         "security": [
           {
@@ -2237,19 +2237,19 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "Success"
           },
           "401": {
-            "description": "需要登录会话"
+            "description": "Login session required"
           },
           "400": {
-            "description": "请求或插件包无效"
+            "description": "Invalid request or plugin archive"
           },
           "403": {
-            "description": "不接受 API 令牌"
+            "description": "API tokens are not accepted"
           },
           "404": {
-            "description": "插件或指定版本的资源不存在"
+            "description": "Plugin or requested resource version not found"
           }
         },
         "parameters": [
@@ -2282,11 +2282,11 @@
     },
     "/import": {
       "post": {
-        "summary": "导入 Markdown 文件或 ZIP 知识库",
+        "summary": "Import Markdown files or a ZIP vault",
         "tags": [
-          "文件"
+          "Files"
         ],
-        "description": "多选 .md 或单个 ZIP，总上传不超过 100 MB；ZIP 必须指定新建文件夹名称。目标目录必须存在，冲突不覆盖。解压及整理后上限 512 MiB、10,000 项，单篇笔记 20 MiB、附件 50 MiB。Markdown 与 ZIP 文件名须为 UTF-8。ZIP 层级保留，本地图片生成笔记独立附件，原附件保留；外部链接不下载，缺失本地目标以警告返回。",
+        "description": "Accept multiple .md files or one ZIP, up to 100 MB total. ZIP imports require a new folder name. The destination directory must exist; conflicts do not overwrite. After extraction and organization: up to 512 MiB, 10,000 entries, 20 MiB per note, and 50 MiB per attachment. Markdown and ZIP filenames must be UTF-8. Preserve ZIP hierarchy; normalize local images into sibling assets directories and rewrite references. Remove migrated originals only when unreferenced; retain other attachments. Do not download external links; return warnings for missing local targets.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2299,11 +2299,11 @@
                 "properties": {
                   "dir": {
                     "type": "string",
-                    "description": "目标目录，空字符串为根目录"
+                    "description": "Destination folder; an empty string means the root"
                   },
                   "folder": {
                     "type": "string",
-                    "description": "ZIP 的新建文件夹名称；普通 Markdown 留空"
+                    "description": "New folder name for ZIP import; leave empty for plain Markdown"
                   },
                   "files": {
                     "type": "array",
@@ -2319,7 +2319,7 @@
         },
         "responses": {
           "201": {
-            "description": "导入成功",
+            "description": "Import succeeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -2353,7 +2353,7 @@
                         },
                         "assets": {
                           "type": "integer",
-                          "description": "附件文件总数，包含原始附件和独立副本"
+                          "description": "Total retained attachment files, including shared images and other original attachments"
                         },
                         "warnings": {
                           "type": "array",
@@ -2372,44 +2372,44 @@
             }
           },
           "400": {
-            "description": "格式、路径或编码无效"
+            "description": "Invalid format, path, or encoding"
           },
           "401": {
-            "description": "未登录或令牌无效"
+            "description": "Not signed in or invalid token"
           },
           "403": {
-            "description": "只读令牌不能导入"
+            "description": "Read-only tokens cannot import"
           },
           "404": {
-            "description": "目标目录不存在"
+            "description": "Destination folder not found"
           },
           "409": {
-            "description": "目标已存在，不覆盖"
+            "description": "Destination already exists; no overwrite"
           },
           "413": {
-            "description": "超过上传、解压、文件数量或单文件大小限制"
+            "description": "Upload, expanded-size, entry-count, or per-file size limit exceeded"
           }
         }
       }
     },
     "/assets/{path}": {
       "put": {
-        "summary": "原位替换已有图片，保留路径和引用",
+        "summary": "Replace an existing image in place, preserving its path and references",
         "tags": [
-          "图片"
+          "Images"
         ],
         "parameters": [
           {
             "name": "path",
             "in": "path",
             "required": true,
-            "description": "仓库中的图片路径",
+            "description": "Image path within the vault",
             "schema": {
               "type": "string"
             }
           }
         ],
-        "description": "multipart file 字段的扩展名须与目标图片一致；不创建新文件，最大 50 MB。旧图片不会进入回收站。",
+        "description": "The multipart file extension must match the target image. Do not create new files; maximum 50 MB. The old image is not sent to the recycle bin.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2431,7 +2431,7 @@
         },
         "responses": {
           "200": {
-            "description": "替换成功",
+            "description": "Replacement succeeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -2457,23 +2457,23 @@
             }
           },
           "400": {
-            "description": "非法路径、空文件或扩展名不一致"
+            "description": "Invalid path, empty file, or mismatched extension"
           },
           "404": {
-            "description": "目标图片不存在"
+            "description": "Target image not found"
           },
           "413": {
-            "description": "超过 50 MB"
+            "description": "Exceeds 50 MB"
           }
         }
       }
     },
     "/export": {
       "post": {
-        "summary": "导出原始 Markdown 和本地附件",
-        "description": "接收非空路径列表；单篇无附件返回 .md，目录、多选或含附件返回 ZIP。ZIP 保留仓库相对路径；不下载外部资源，不跟随其他未选中笔记。缺失附件或非法路径返回错误。此 POST 接口不修改数据，只读令牌可调用。",
+        "summary": "Export original Markdown and local attachments",
+        "description": "Accept a nonempty path list. Return .md for a single note without attachments; folders, multiple selections, or notes with attachments return ZIP. ZIP preserves vault-relative paths. Do not download external resources or follow unselected notes. Missing attachments or invalid paths return errors. This POST does not modify data and accepts read-only tokens.",
         "tags": [
-          "文件"
+          "Files"
         ],
         "requestBody": {
           "required": true,
@@ -2499,7 +2499,7 @@
         },
         "responses": {
           "200": {
-            "description": "原始 Markdown 或 ZIP 附件",
+            "description": "Original Markdown or ZIP attachment",
             "content": {
               "application/zip": {
                 "schema": {
@@ -2515,17 +2515,17 @@
             }
           },
           "400": {
-            "description": "路径无效"
+            "description": "Invalid path"
           },
           "404": {
-            "description": "文件或附件不存在"
+            "description": "File or attachment not found"
           }
         }
       }
     },
     "/metadata": {
       "get": {
-        "summary": "读取笔记关系、标签与资源引用索引",
+        "summary": "Read the note-relationship, tag, and resource-reference index",
         "security": [
           {
             "bearer": []
@@ -2533,7 +2533,7 @@
         ],
         "responses": {
           "200": {
-            "description": "索引就绪状态与元数据列表，不含笔记正文",
+            "description": "Index readiness and metadata list, excluding note contents",
             "content": {
               "application/json": {
                 "schema": {
@@ -2578,7 +2578,7 @@
     },
     "/assets/cleanup": {
       "post": {
-        "summary": "重新核对全库引用后，将孤立图片移入回收站",
+        "summary": "Recheck vault-wide references and move unreferenced images to the recycle bin",
         "requestBody": {
           "required": true,
           "content": {
@@ -2604,7 +2604,7 @@
         },
         "responses": {
           "200": {
-            "description": "已移入回收站的图片及跳过原因",
+            "description": "Images moved to the recycle bin and reasons for skipped items",
             "content": {
               "application/json": {
                 "schema": {
@@ -2630,16 +2630,16 @@
             }
           },
           "400": {
-            "description": "请求无效，或笔记元数据异常，无法确认引用"
+            "description": "Invalid request or note metadata prevents reference verification"
           }
         }
       }
     },
     "/tree-icon": {
       "put": {
-        "summary": "设置单个文件或目录的图标，null 恢复默认",
+        "summary": "Set a file or folder icon; null restores the default",
         "tags": [
-          "文件"
+          "Files"
         ],
         "requestBody": {
           "required": true,
@@ -2672,7 +2672,7 @@
         },
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -2698,19 +2698,19 @@
             }
           },
           "400": {
-            "description": "非法路径或图标"
+            "description": "Invalid path or icon"
           },
           "404": {
-            "description": "文件不存在"
+            "description": "File not found"
           }
         }
       }
     },
     "/fonts": {
       "get": {
-        "summary": "列出已导入字体",
+        "summary": "List imported fonts",
         "tags": [
-          "设置"
+          "Settings"
         ],
         "security": [
           {
@@ -2719,7 +2719,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -2756,17 +2756,17 @@
             }
           },
           "401": {
-            "description": "未登录"
+            "description": "Not signed in"
           },
           "403": {
-            "description": "只接受登录会话"
+            "description": "Login sessions only"
           }
         }
       },
       "post": {
-        "summary": "导入字体，按内容去重（TTF/OTF/WOFF/WOFF2，上限30 MB）",
+        "summary": "Import a font with content deduplication (TTF/OTF/WOFF/WOFF2, up to 30 MB)",
         "tags": [
-          "设置"
+          "Settings"
         ],
         "security": [
           {
@@ -2775,7 +2775,7 @@
         ],
         "responses": {
           "201": {
-            "description": "新字体已导入",
+            "description": "New font imported",
             "content": {
               "application/json": {
                 "schema": {
@@ -2801,13 +2801,13 @@
             }
           },
           "401": {
-            "description": "未登录"
+            "description": "Not signed in"
           },
           "403": {
-            "description": "只接受登录会话"
+            "description": "Login sessions only"
           },
           "200": {
-            "description": "相同内容的字体已存在，返回原字体",
+            "description": "Identical font contents already exist; return the original font",
             "content": {
               "application/json": {
                 "schema": {
@@ -2866,9 +2866,9 @@
         }
       ],
       "delete": {
-        "summary": "删除导入字体，将使用它的界面、正文和代码字体恢复Maple；Maple不可删除",
+        "summary": "Delete an imported font and reset interface, text, and code fonts using it to Maple; Maple cannot be deleted",
         "tags": [
-          "设置"
+          "Settings"
         ],
         "security": [
           {
@@ -2877,7 +2877,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -2903,10 +2903,10 @@
             }
           },
           "401": {
-            "description": "未登录"
+            "description": "Not signed in"
           },
           "403": {
-            "description": "只接受登录会话"
+            "description": "Login sessions only"
           }
         }
       }
@@ -2923,9 +2923,9 @@
         }
       ],
       "get": {
-        "summary": "读取导入字体文件",
+        "summary": "Read an imported font file",
         "tags": [
-          "设置"
+          "Settings"
         ],
         "security": [
           {
@@ -2934,23 +2934,23 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "Success"
           },
           "401": {
-            "description": "未登录"
+            "description": "Not signed in"
           },
           "403": {
-            "description": "只接受登录会话"
+            "description": "Login sessions only"
           }
         }
       }
     },
     "/storage": {
       "get": {
-        "summary": "按需统计存储空间",
-        "description": "只接受登录会话。统计数据目录和实际笔记库的普通文件字节，嵌套去重，不跟随内部符号链接；附件/回收站是笔记库的子项，totalSize不重复累加。calculatedAt为统计完成时间（Unix毫秒）。扫描失败返回错误，不返回部分结果。",
+        "summary": "Calculate storage usage on demand",
+        "description": "Login sessions only. Count regular-file bytes in the data directory and actual vault, deduplicating nested roots and ignoring internal symlinks. Attachments/recycle bin are subsets of the vault and do not add to totalSize twice. calculatedAt is the completion time in Unix milliseconds. Scanning failures return errors, not partial results.",
         "tags": [
-          "设置"
+          "Settings"
         ],
         "security": [
           {
@@ -2959,7 +2959,7 @@
         ],
         "responses": {
           "200": {
-            "description": "统计结果",
+            "description": "Storage totals",
             "content": {
               "application/json": {
                 "schema": {
@@ -2985,19 +2985,19 @@
             }
           },
           "403": {
-            "description": "只接受登录会话"
+            "description": "Login sessions only"
           },
           "500": {
-            "description": "扫描失败"
+            "description": "Scan failed"
           }
         }
       }
     },
     "/maintenance/status": {
       "get": {
-        "summary": "维护状态",
+        "summary": "Maintenance status",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -3006,7 +3006,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -3032,7 +3032,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -3042,7 +3042,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -3056,9 +3056,9 @@
     },
     "/maintenance/export/{kind}": {
       "post": {
-        "summary": "导出完整实例或设置包",
+        "summary": "Export a full instance or settings archive",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -3067,7 +3067,7 @@
         ],
         "responses": {
           "200": {
-            "description": "ZIP下载",
+            "description": "ZIP download",
             "content": {
               "application/zip": {
                 "schema": {
@@ -3078,7 +3078,7 @@
             }
           },
           "400": {
-            "description": "操作或输入无效",
+            "description": "Invalid operation or input",
             "content": {
               "application/json": {
                 "schema": {
@@ -3088,7 +3088,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -3098,7 +3098,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -3108,7 +3108,7 @@
             }
           },
           "503": {
-            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "description": "Maintenance in progress, insufficient disk space, or operation unsupported by the current service",
             "content": {
               "application/json": {
                 "schema": {
@@ -3118,7 +3118,7 @@
             }
           },
           "500": {
-            "description": "文件系统、数据库或其他内部故障",
+            "description": "Filesystem, database, or other internal failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -3142,9 +3142,9 @@
     },
     "/maintenance/notes/export": {
       "post": {
-        "summary": "导出普通 Markdown 笔记库",
+        "summary": "Export a plain Markdown vault",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -3153,7 +3153,7 @@
         ],
         "responses": {
           "200": {
-            "description": "ZIP下载",
+            "description": "ZIP download",
             "content": {
               "application/zip": {
                 "schema": {
@@ -3164,7 +3164,7 @@
             }
           },
           "400": {
-            "description": "操作或输入无效",
+            "description": "Invalid operation or input",
             "content": {
               "application/json": {
                 "schema": {
@@ -3174,7 +3174,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -3184,7 +3184,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -3194,7 +3194,7 @@
             }
           },
           "503": {
-            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "description": "Maintenance in progress, insufficient disk space, or operation unsupported by the current service",
             "content": {
               "application/json": {
                 "schema": {
@@ -3204,7 +3204,7 @@
             }
           },
           "500": {
-            "description": "文件系统、数据库或其他内部故障",
+            "description": "Filesystem, database, or other internal failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -3218,9 +3218,9 @@
     },
     "/maintenance/uploads": {
       "post": {
-        "summary": "创建备份上传，压缩上限2GiB，分块上限8MiB",
+        "summary": "Create a backup upload, up to 2 GiB compressed and 8 MiB per chunk",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -3229,7 +3229,7 @@
         ],
         "responses": {
           "400": {
-            "description": "操作或输入无效",
+            "description": "Invalid operation or input",
             "content": {
               "application/json": {
                 "schema": {
@@ -3239,7 +3239,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -3249,7 +3249,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -3259,7 +3259,7 @@
             }
           },
           "503": {
-            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "description": "Maintenance in progress, insufficient disk space, or operation unsupported by the current service",
             "content": {
               "application/json": {
                 "schema": {
@@ -3269,7 +3269,7 @@
             }
           },
           "201": {
-            "description": "返回上传id",
+            "description": "Return upload id",
             "content": {
               "application/json": {
                 "schema": {
@@ -3303,7 +3303,7 @@
             }
           },
           "500": {
-            "description": "文件系统、数据库或其他内部故障",
+            "description": "Filesystem, database, or other internal failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -3345,9 +3345,9 @@
     },
     "/maintenance/uploads/{id}": {
       "put": {
-        "summary": "顺序追加备份分块",
+        "summary": "Append backup chunks sequentially",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -3356,7 +3356,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -3390,7 +3390,7 @@
             }
           },
           "400": {
-            "description": "操作或输入无效",
+            "description": "Invalid operation or input",
             "content": {
               "application/json": {
                 "schema": {
@@ -3400,7 +3400,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -3410,7 +3410,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -3420,7 +3420,7 @@
             }
           },
           "503": {
-            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "description": "Maintenance in progress, insufficient disk space, or operation unsupported by the current service",
             "content": {
               "application/json": {
                 "schema": {
@@ -3430,7 +3430,7 @@
             }
           },
           "500": {
-            "description": "文件系统、数据库或其他内部故障",
+            "description": "Filesystem, database, or other internal failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -3472,9 +3472,9 @@
         }
       },
       "delete": {
-        "summary": "取消当前会话的上传",
+        "summary": "Cancel an upload owned by the current session",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -3483,7 +3483,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -3509,7 +3509,7 @@
             }
           },
           "400": {
-            "description": "操作或输入无效",
+            "description": "Invalid operation or input",
             "content": {
               "application/json": {
                 "schema": {
@@ -3519,7 +3519,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -3529,7 +3529,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -3539,7 +3539,7 @@
             }
           },
           "503": {
-            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "description": "Maintenance in progress, insufficient disk space, or operation unsupported by the current service",
             "content": {
               "application/json": {
                 "schema": {
@@ -3549,7 +3549,7 @@
             }
           },
           "500": {
-            "description": "文件系统、数据库或其他内部故障",
+            "description": "Filesystem, database, or other internal failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -3573,9 +3573,9 @@
     },
     "/maintenance/uploads/{id}/validate": {
       "post": {
-        "summary": "校验归档并生成摘要，展开上限8GiB/100000项",
+        "summary": "Validate an archive and produce a summary, up to 8 GiB expanded and 100,000 entries",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -3584,7 +3584,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -3610,7 +3610,7 @@
             }
           },
           "400": {
-            "description": "操作或输入无效",
+            "description": "Invalid operation or input",
             "content": {
               "application/json": {
                 "schema": {
@@ -3620,7 +3620,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -3630,7 +3630,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -3640,7 +3640,7 @@
             }
           },
           "503": {
-            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "description": "Maintenance in progress, insufficient disk space, or operation unsupported by the current service",
             "content": {
               "application/json": {
                 "schema": {
@@ -3650,7 +3650,7 @@
             }
           },
           "500": {
-            "description": "文件系统、数据库或其他内部故障",
+            "description": "Filesystem, database, or other internal failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -3674,9 +3674,9 @@
     },
     "/maintenance/settings/import": {
       "post": {
-        "summary": "确认后导入设置和资源，操作前备份",
+        "summary": "Import confirmed settings and resources after creating a backup",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -3685,7 +3685,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -3711,7 +3711,7 @@
             }
           },
           "400": {
-            "description": "操作或输入无效",
+            "description": "Invalid operation or input",
             "content": {
               "application/json": {
                 "schema": {
@@ -3721,7 +3721,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -3731,7 +3731,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -3741,7 +3741,7 @@
             }
           },
           "503": {
-            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "description": "Maintenance in progress, insufficient disk space, or operation unsupported by the current service",
             "content": {
               "application/json": {
                 "schema": {
@@ -3751,7 +3751,7 @@
             }
           },
           "500": {
-            "description": "文件系统、数据库或其他内部故障",
+            "description": "Filesystem, database, or other internal failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -3788,9 +3788,9 @@
     },
     "/maintenance/settings/reset": {
       "post": {
-        "summary": "确认后重置偏好，保留插件存储",
+        "summary": "Reset confirmed preferences while retaining plugin storage",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -3799,7 +3799,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -3825,7 +3825,7 @@
             }
           },
           "400": {
-            "description": "操作或输入无效",
+            "description": "Invalid operation or input",
             "content": {
               "application/json": {
                 "schema": {
@@ -3835,7 +3835,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -3845,7 +3845,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -3855,7 +3855,7 @@
             }
           },
           "503": {
-            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "description": "Maintenance in progress, insufficient disk space, or operation unsupported by the current service",
             "content": {
               "application/json": {
                 "schema": {
@@ -3865,7 +3865,7 @@
             }
           },
           "500": {
-            "description": "文件系统、数据库或其他内部故障",
+            "description": "Filesystem, database, or other internal failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -3898,9 +3898,9 @@
     },
     "/maintenance/restore": {
       "post": {
-        "summary": "确认后恢复完整实例，操作前备份并重新登录",
+        "summary": "Restore a confirmed full instance after backup; require signing in again",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -3909,7 +3909,7 @@
         ],
         "responses": {
           "400": {
-            "description": "操作或输入无效",
+            "description": "Invalid operation or input",
             "content": {
               "application/json": {
                 "schema": {
@@ -3919,7 +3919,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -3929,7 +3929,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -3939,7 +3939,7 @@
             }
           },
           "503": {
-            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "description": "Maintenance in progress, insufficient disk space, or operation unsupported by the current service",
             "content": {
               "application/json": {
                 "schema": {
@@ -3949,7 +3949,7 @@
             }
           },
           "202": {
-            "description": "已提交恢复；服务将短暂维护并要求重新登录",
+            "description": "Restore submitted; the service will briefly enter maintenance and require signing in again",
             "content": {
               "application/json": {
                 "schema": {
@@ -3983,7 +3983,7 @@
             }
           },
           "500": {
-            "description": "文件系统、数据库或其他内部故障",
+            "description": "Filesystem, database, or other internal failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -4020,9 +4020,9 @@
     },
     "/maintenance/index/{operation}": {
       "post": {
-        "summary": "优化或重建索引",
+        "summary": "Optimize or rebuild the index",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -4031,7 +4031,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -4057,7 +4057,7 @@
             }
           },
           "400": {
-            "description": "操作或输入无效",
+            "description": "Invalid operation or input",
             "content": {
               "application/json": {
                 "schema": {
@@ -4067,7 +4067,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -4077,7 +4077,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -4087,7 +4087,7 @@
             }
           },
           "503": {
-            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "description": "Maintenance in progress, insufficient disk space, or operation unsupported by the current service",
             "content": {
               "application/json": {
                 "schema": {
@@ -4097,7 +4097,7 @@
             }
           },
           "500": {
-            "description": "文件系统、数据库或其他内部故障",
+            "description": "Filesystem, database, or other internal failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -4121,9 +4121,9 @@
     },
     "/maintenance/temp/clear": {
       "post": {
-        "summary": "清理本程序未使用临时文件",
+        "summary": "Clean unused application temporary files",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -4132,7 +4132,7 @@
         ],
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -4158,7 +4158,7 @@
             }
           },
           "400": {
-            "description": "操作或输入无效",
+            "description": "Invalid operation or input",
             "content": {
               "application/json": {
                 "schema": {
@@ -4168,7 +4168,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -4178,7 +4178,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -4188,7 +4188,7 @@
             }
           },
           "503": {
-            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "description": "Maintenance in progress, insufficient disk space, or operation unsupported by the current service",
             "content": {
               "application/json": {
                 "schema": {
@@ -4198,7 +4198,7 @@
             }
           },
           "500": {
-            "description": "文件系统、数据库或其他内部故障",
+            "description": "Filesystem, database, or other internal failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -4212,9 +4212,9 @@
     },
     "/maintenance/logs/export": {
       "post": {
-        "summary": "导出应用日志和运行摘要",
+        "summary": "Export application logs and a runtime summary",
         "tags": [
-          "维护"
+          "Maintenance"
         ],
         "security": [
           {
@@ -4223,7 +4223,7 @@
         ],
         "responses": {
           "200": {
-            "description": "ZIP下载",
+            "description": "ZIP download",
             "content": {
               "application/zip": {
                 "schema": {
@@ -4234,7 +4234,7 @@
             }
           },
           "400": {
-            "description": "操作或输入无效",
+            "description": "Invalid operation or input",
             "content": {
               "application/json": {
                 "schema": {
@@ -4244,7 +4244,7 @@
             }
           },
           "401": {
-            "description": "未登录",
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
@@ -4254,7 +4254,7 @@
             }
           },
           "403": {
-            "description": "不接受API令牌",
+            "description": "API tokens are not accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -4264,7 +4264,7 @@
             }
           },
           "503": {
-            "description": "正在维护、磁盘空间不足或当前服务不支持此操作",
+            "description": "Maintenance in progress, insufficient disk space, or operation unsupported by the current service",
             "content": {
               "application/json": {
                 "schema": {
@@ -4274,7 +4274,7 @@
             }
           },
           "500": {
-            "description": "文件系统、数据库或其他内部故障",
+            "description": "Filesystem, database, or other internal failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -4288,10 +4288,10 @@
     },
     "/auth/me": {
       "get": {
-        "summary": "恢复登录会话身份与权限",
+        "summary": "Restore login-session identity and permissions",
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -4333,7 +4333,7 @@
             }
           },
           "401": {
-            "description": "登录凭据无效或过期",
+            "description": "Invalid or expired login credential",
             "content": {
               "application/json": {
                 "schema": {
@@ -4343,7 +4343,7 @@
             }
           },
           "403": {
-            "description": "需要登录会话，API令牌无权调用",
+            "description": "Login session required; API tokens cannot call this endpoint",
             "content": {
               "application/json": {
                 "schema": {
@@ -4357,7 +4357,7 @@
     },
     "/auth/captcha": {
       "post": {
-        "summary": "签发5分钟、单次登录验证码",
+        "summary": "Issue a single-use sign-in captcha valid for 5 minutes",
         "security": [
           {}
         ],
@@ -4379,7 +4379,7 @@
         },
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -4422,7 +4422,7 @@
             }
           },
           "429": {
-            "description": "验证码签发频率或容量限制",
+            "description": "Captcha issuance rate or capacity limit reached",
             "content": {
               "application/json": {
                 "schema": {
@@ -4436,7 +4436,7 @@
     },
     "/auth/tickets": {
       "post": {
-        "summary": "签发绑定当前会话的资源读取或一次性事件票据",
+        "summary": "Issue resource-read or one-use event tickets bound to the current session",
         "requestBody": {
           "required": true,
           "content": {
@@ -4468,7 +4468,7 @@
         },
         "responses": {
           "200": {
-            "description": "成功",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -4507,7 +4507,7 @@
             }
           },
           "401": {
-            "description": "登录凭据无效或过期",
+            "description": "Invalid or expired login credential",
             "content": {
               "application/json": {
                 "schema": {
@@ -4517,7 +4517,7 @@
             }
           },
           "403": {
-            "description": "需要登录会话，API令牌无权调用",
+            "description": "Login session required; API tokens cannot call this endpoint",
             "content": {
               "application/json": {
                 "schema": {
@@ -4531,7 +4531,7 @@
     },
     "/resources/{ticket}/{kind}/{path}": {
       "get": {
-        "summary": "受限原生资源；事件票据60秒一次性，其余跟随父会话到期，每次检查父会话",
+        "summary": "Restricted native resource. Event tickets are single-use and expire after 60 seconds; other tickets expire with the parent session. Check the parent session on every request.",
         "security": [
           {}
         ],
@@ -4563,10 +4563,10 @@
         ],
         "responses": {
           "200": {
-            "description": "对应资源原始内容"
+            "description": "Raw resource contents"
           },
           "101": {
-            "description": "WebSocket事件升级"
+            "description": "WebSocket event upgrade"
           }
         }
       }
@@ -4577,7 +4577,7 @@
       "bearer": {
         "type": "http",
         "scheme": "bearer",
-        "description": "API 令牌（rm_ 开头）"
+        "description": "API token (prefixed with rm_)"
       }
     },
     "schemas": {
@@ -4629,7 +4629,7 @@
           },
           "mtime": {
             "type": "integer",
-            "description": "修改时间（Unix 毫秒）"
+            "description": "Modification time (Unix milliseconds)"
           },
           "icon": {
             "$ref": "#/components/schemas/TreeIcon"
@@ -4644,18 +4644,18 @@
           },
           "path": {
             "type": "string",
-            "description": "原路径"
+            "description": "Original path"
           },
           "dir": {
             "type": "boolean"
           },
           "deletedAt": {
             "type": "integer",
-            "description": "Unix 毫秒"
+            "description": "Unix milliseconds"
           },
           "assets": {
             "type": "string",
-            "description": "随条目保存的旧图片目录，可省略"
+            "description": "Legacy image directory retained with the entry; optional"
           }
         },
         "required": [
@@ -4673,7 +4673,7 @@
           },
           "line": {
             "type": "integer",
-            "description": "第一处匹配所在行（从 1 开始）；只有路径匹配时为 0"
+            "description": "First matching line, starting at 1; 0 when only the path matches"
           },
           "snippet": {
             "type": "string"
@@ -4682,7 +4682,7 @@
       },
       "Event": {
         "type": "object",
-        "description": "tree：目录结构变化；changed：内容变化（rev 为新版本）；deleted：删除；moved：移动（from → path）；settings：设置变化",
+        "description": "tree: directory structure changed; changed: contents changed (rev is the new revision); deleted: deletion; moved: move (from -> path); settings: settings changed",
         "properties": {
           "type": {
             "type": "string",
@@ -4726,7 +4726,7 @@
           },
           "lastUsedAt": {
             "type": "integer",
-            "description": "Unix 毫秒，0 为从未使用"
+            "description": "Unix milliseconds; 0 means never used"
           }
         }
       },
@@ -4797,7 +4797,7 @@
           },
           "value": {
             "type": "string",
-            "description": "Emoji 字符或内置线性图标名称，最多64字节"
+            "description": "Emoji character or built-in outline icon name, up to 64 bytes"
           }
         }
       },
@@ -5097,20 +5097,20 @@
     }
   },
   "x-business-codes": {
-    "0": "成功",
-    "40000": "参数无效",
-    "40001": "验证码错误或已使用",
-    "40002": "验证码过期",
-    "40003": "当前密码错误",
-    "40100": "认证无效",
-    "40101": "登录密码错误",
-    "40300": "权限不足",
-    "40400": "资源不存在",
-    "40900": "资源冲突",
-    "41200": "文档版本冲突，data.rev为最新版本",
-    "41300": "超过大小上限",
-    "42900": "请求过于频繁",
-    "50000": "服务端错误",
-    "50300": "维护中"
+    "0": "Success",
+    "40000": "Invalid parameters",
+    "40001": "Incorrect or already-used captcha",
+    "40002": "Expired captcha",
+    "40003": "Incorrect current password",
+    "40100": "Invalid authentication",
+    "40101": "Incorrect sign-in password",
+    "40300": "Insufficient permissions",
+    "40400": "Resource not found",
+    "40900": "Resource conflict",
+    "41200": "Document revision conflict; data.rev is the latest revision",
+    "41300": "Size limit exceeded",
+    "42900": "Too many requests",
+    "50000": "Server error",
+    "50300": "Maintenance in progress"
   }
 }

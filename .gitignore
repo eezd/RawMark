@@ -2,9 +2,13 @@
 CONTEXT.md
 docs/*
 !docs/guide.md
+!docs/guide.zh-CN.md
 !docs/deployment.md
+!docs/deployment.zh-CN.md
 !docs/development.md
+!docs/development.zh-CN.md
 !docs/api.md
+!docs/api.zh-CN.md
 !docs/images/
 
 # 前端

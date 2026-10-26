@@ -54,7 +54,7 @@ These commands listen on localhost only. For a remote server, complete the initi
 
 ## Documentation
 
-Detailed guides are currently available in Simplified Chinese.
+All guides are available in English and Simplified Chinese. Use the language link at the top of each guide to switch.
 
 | What you want to do | Start here |
 | --- | --- |
@@ -67,7 +67,7 @@ Detailed guides are currently available in Simplified Chinese.
 
 Bug reports and suggestions are welcome in [Issues](https://github.com/eezd/RawMark/issues). Include your version, deployment method, browser, and steps to reproduce. Remove passwords, tokens, and private note content from logs and screenshots.
 
-Before contributing, read [AGENTS.md](AGENTS.md) and the [development guide](docs/development.md), both currently in Simplified Chinese. RawMark prioritizes simplicity and clarity; please discuss substantial features or architectural changes in an issue first.
+Before contributing, read [AGENTS.md](AGENTS.md) (in Simplified Chinese) and the [development guide](docs/development.md). RawMark prioritizes simplicity and clarity; please discuss substantial features or architectural changes in an issue first.
 
 ## Acknowledgments and license
 

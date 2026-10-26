@@ -6,8 +6,8 @@
   <p><a href="README.md">English</a> · <strong>简体中文</strong></p>
   <p>
     <a href="#快速开始">快速开始</a> ·
-    <a href="docs/guide.md">使用指南</a> ·
-    <a href="docs/deployment.md">部署文档</a> ·
+    <a href="docs/guide.zh-CN.md">使用指南</a> ·
+    <a href="docs/deployment.zh-CN.md">部署文档</a> ·
     <a href="https://github.com/eezd/RawMark/issues">反馈问题</a>
   </p>
 </div>
@@ -50,22 +50,22 @@ docker run -d --name rawmark --restart unless-stopped \
 
 打开 **http://localhost:21000**，首次访问设置登录密码，即可创建第一篇笔记。数据保存在 Docker 卷 `rawmark-data` 中，重建容器不会丢失。
 
-以上命令仅监听本机。部署到服务器时，请先完成初始化，再配置 HTTPS 访问；Docker Compose、已有笔记目录接入、备份与升级见[部署文档](docs/deployment.md)。
+以上命令仅监听本机。部署到服务器时，请先完成初始化，再配置 HTTPS 访问；Docker Compose、已有笔记目录接入、备份与升级见[部署文档](docs/deployment.zh-CN.md)。
 
 ## 文档
 
 | 想做什么 | 从这里开始 |
 | --- | --- |
-| 写作、整理笔记、管理图片与个性化设置 | [使用指南](docs/guide.md) |
-| 部署、配置存储、备份和升级 | [部署与维护](docs/deployment.md) |
-| 本地开发、了解目录职责和运行检查 | [开发指南](docs/development.md) |
-| 编写脚本、接入认证和调用接口 | [API 与认证](docs/api.md) |
+| 写作、整理笔记、管理图片与个性化设置 | [使用指南](docs/guide.zh-CN.md) |
+| 部署、配置存储、备份和升级 | [部署与维护](docs/deployment.zh-CN.md) |
+| 本地开发、了解目录职责和运行检查 | [开发指南](docs/development.zh-CN.md) |
+| 编写脚本、接入认证和调用接口 | [API 与认证](docs/api.zh-CN.md) |
 
 ## 参与项目
 
 欢迎通过 [Issues](https://github.com/eezd/RawMark/issues) 报告问题或提出建议。报告问题时，请附上版本、部署方式、浏览器和复现步骤；日志与截图中请移除密码、令牌及私人笔记内容。
 
-提交改动前请阅读 [AGENTS.md](AGENTS.md) 和[开发指南](docs/development.md)。RawMark 优先保持简单、清晰，较大的功能或架构调整建议先通过 Issue 讨论。
+提交改动前请阅读 [AGENTS.md](AGENTS.md) 和[开发指南](docs/development.zh-CN.md)。RawMark 优先保持简单、清晰，较大的功能或架构调整建议先通过 Issue 讨论。
 
 ## 致谢与许可
 

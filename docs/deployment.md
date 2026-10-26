@@ -1,12 +1,14 @@
-# 部署与维护
+# Deployment and maintenance
 
-[返回项目首页](../README.zh-CN.md) · [使用指南](guide.md) · [开发指南](development.md)
+**English** · [简体中文](deployment.zh-CN.md)
 
-RawMark 将前端嵌入 Go 服务，运行时使用 SQLite 与文件系统，不需要额外数据库服务。目前从源码构建 Docker 镜像；以下命令不依赖预先发布的镜像仓库。
+[Project home](../README.md) · [User guide](guide.md) · [Development guide](development.md)
 
-## Docker 快速启动
+RawMark embeds the frontend in its Go service and uses SQLite and the filesystem at runtime. No separate database service is needed. Docker images are currently built from source; the commands below do not depend on a prepublished image registry.
 
-安装 Git、Docker 后：
+## Docker quick start
+
+With Git and Docker installed:
 
 ```sh
 git clone https://github.com/eezd/RawMark.git
@@ -18,17 +20,17 @@ docker run -d --name rawmark --restart unless-stopped \
   rawmark
 ```
 
-访问 http://localhost:21000 完成首次密码设置。命名卷 `rawmark-data` 保存应用数据，重新创建容器时应继续挂载同一个卷，不要删除它。服务器上的本机端口可通过 SSH 隧道访问，再完成初始化：
+Open http://localhost:21000 to set the initial password. The named volume `rawmark-data` holds application data; reuse it when recreating the container and do not delete it. For a remote server, reach its local port through an SSH tunnel to complete setup:
 
 ```sh
 ssh -L 21000:127.0.0.1:21000 user@your-server
 ```
 
-容器默认以 UID/GID `65532:65532` 运行，Docker 新建命名卷会继承镜像数据目录的权限。
+The container defaults to UID/GID `65532:65532`. A new Docker named volume inherits permissions from the image's data directory.
 
 ## Docker Compose
 
-仓库提供 [deploy/docker-compose.yml](../deploy/docker-compose.yml)，使用宿主机的 `deploy/data/` 持久化。Linux 上首次部署可执行：
+The repository includes [deploy/docker-compose.yml](../deploy/docker-compose.yml), which persists data in the host's `deploy/data/`. For a first deployment on Linux:
 
 ```sh
 mkdir -p deploy/data
@@ -36,30 +38,30 @@ sudo chown 65532:65532 deploy/data
 docker compose -f deploy/docker-compose.yml up -d --build --wait
 ```
 
-该配置默认发布到所有网卡的 **21000** 端口。对公网开放前完成初始化并设置访问边界；使用反向代理时，可将 Compose 端口绑定改为 `127.0.0.1:${RAWMARK_PORT:-21000}:8080`。自定义端口可使用 `RAWMARK_PORT=21001 docker compose -f deploy/docker-compose.yml up -d --build --wait`。
+This configuration publishes port **21000** on all network interfaces by default. Complete initialization and configure access boundaries before exposing it publicly. With a reverse proxy, you can change the Compose port binding to `127.0.0.1:${RAWMARK_PORT:-21000}:8080`. For a custom port, use `RAWMARK_PORT=21001 docker compose -f deploy/docker-compose.yml up -d --build --wait`.
 
-不要把快速开始中的容器与 Compose 实例同时指向同一份数据库或笔记库；切换部署方式前先停止旧实例、备份并确认数据位置。
+Do not point the quick-start container and a Compose instance at the same database or vault concurrently. Stop the old instance, back up, and verify data locations before switching deployment methods.
 
-## 存储与配置
+## Storage and configuration
 
-| 环境变量 | 默认值 | 说明 |
+| Environment variable | Default | Description |
 | --- | --- | --- |
-| `RAWMARK_DATA` | `/data` | 应用数据库、索引、资源与默认笔记库所在目录 |
-| `RAWMARK_VAULT` | `$RAWMARK_DATA/vault` | Markdown 笔记库，可以单独挂载已有目录 |
-| `RAWMARK_ADDR` | `:8080` | 容器或二进制内部的监听地址 |
+| `RAWMARK_DATA` | `/data` | Application database, index, resources, and default vault directory |
+| `RAWMARK_VAULT` | `$RAWMARK_DATA/vault` | Markdown vault; can be a separately mounted existing directory |
+| `RAWMARK_ADDR` | `:8080` | Listen address inside the container or binary |
 
-主要数据：
+Main data locations:
 
-| 路径 | 内容 |
+| Path | Contents |
 | --- | --- |
-| `vault/` | Markdown 文件、附件与笔记库元数据；设定外置笔记库时位于对应目录 |
-| `rawmark.db` | 密码、会话、API 令牌、设置等应用状态 |
-| `index.db` | 可重建的搜索索引 |
-| `fonts/`、`themes/`、`plugins/` | 用户导入的字体、主题和插件 |
-| `backups/` | 导入或恢复操作前生成的回退备份 |
-| `logs/` | 运行日志 |
+| `vault/` | Markdown files, attachments, and vault metadata; stored at the configured location when using an external vault |
+| `rawmark.db` | Password, sessions, API tokens, settings, and other application state |
+| `index.db` | Rebuildable search index |
+| `fonts/`, `themes/`, `plugins/` | User-imported fonts, themes, and plugins |
+| `backups/` | Rollback backups created before imports or restores |
+| `logs/` | Runtime logs |
 
-要接入已有文件夹，可额外挂载它并设置 `RAWMARK_VAULT`：
+To use an existing folder, mount it separately and set `RAWMARK_VAULT`:
 
 ```sh
 docker run -d --name rawmark --restart unless-stopped \
@@ -71,49 +73,49 @@ docker run -d --name rawmark --restart unless-stopped \
   rawmark
 ```
 
-先创建 `$HOME/rawmark-data` 和 `$HOME/notes`，确保所选用户可写。此例以宿主机当前用户运行，适合管理自己的已有目录；不设置 `--user` 时须给容器默认用户写权限。RawMark 会修改笔记和链接，首次接入前请备份已有目录。
+Create `$HOME/rawmark-data` and `$HOME/notes` first and ensure the selected user can write to them. This example runs as the current host user, which suits an existing personal directory. Without `--user`, grant write access to the container's default user. RawMark modifies notes and links, so back up an existing directory before first use.
 
-## HTTPS 与反向代理
+## HTTPS and reverse proxy
 
-远程访问使用 HTTPS。代理到 RawMark 时需要转发 Host、协议与来源地址，并启用 WebSocket 升级和长连接；浏览器事件连接使用 `/api/v1/resources/<ticket>/events/`。代理上传限制也应满足实际导入需求。
+Use HTTPS for remote access. The proxy must forward Host, protocol, and client address information and support WebSocket upgrades and long-lived connections. Browser event connections use `/api/v1/resources/<ticket>/events/`. Proxy upload limits should accommodate your imports.
 
-[仓库 Nginx 配置](../deploy/nginx/raw.134333.xyz.conf)包含 WebSocket 和票据日志脱敏示例，但其中域名、证书 include、反爬 include、端口及日志路径属于原部署环境，**需要按自己的服务器调整，不能原样安装**。`$connection_upgrade` 的 map 也需要在 Nginx 的 `http` 上下文定义。
+The [repository's Nginx configuration](../deploy/nginx/raw.134333.xyz.conf) includes examples of WebSocket support and redacted ticket logging. Its domain, certificate includes, anti-bot includes, port, and log paths belong to the original deployment environment: **adapt them to your server rather than installing the file unchanged**. Define the `$connection_upgrade` map in Nginx's `http` context as well.
 
-资源票据是凭据：代理、CDN 和访问日志不得记录明文票据、查询参数或携带凭据的 Referer；应用的 `no-store` 不能代替代理日志脱敏。Nginx 错误日志也可能包含原始请求路径，仓库示例对票据资源路径关闭错误日志，保留脱敏访问日志及应用错误日志。
+Resource tickets are credentials. Proxies, CDNs, and access logs must not record plaintext tickets, query parameters, or credential-bearing Referer headers. The application's `no-store` policy does not replace proxy log redaction. Nginx error logs can also contain raw request paths; the repository example disables error logging for ticket resource paths while retaining redacted access logs and application error logs.
 
-若使用 CDN，需独立完成自定义域名与 TLS 证书配置，并确认 API、私有资源和 WebSocket 不被错误缓存；仅配置 DNS 不代表 HTTPS 接入已完成。
+When using a CDN, configure its custom domain and TLS certificate separately, and ensure APIs, private resources, and WebSocket connections are not cached incorrectly. DNS configuration alone does not complete HTTPS setup.
 
-## 备份与恢复
+## Backup and restore
 
-在「设置 → 存储空间」选择所需导出类型：
+Choose an export type under **Settings → Storage**:
 
-| 类型 | 适合用途 | 恢复行为 |
+| Type | Intended use | Restore behavior |
 | --- | --- | --- |
-| 普通 Markdown 笔记库 | 迁移到其他笔记工具 | 导入到新文件夹，不替换实例 |
-| 设置与资源 | 迁移偏好、插件数据、字体/主题/插件 | 合并资源，同 ID 替换，包外资源保留 |
-| 完整实例 | 迁移或恢复 RawMark | 替换业务数据，包含登录信息、回收站和资源，完成后重新登录 |
+| Plain Markdown vault | Move to another note-taking tool | Imports into a new folder without replacing the instance |
+| Settings and resources | Migrate preferences, plugin data, fonts, themes, and plugins | Merges resources, replaces matching IDs, and retains resources absent from the archive |
+| Full instance | Migrate or restore RawMark | Replaces application data, including login credentials, recycle bin, and resources; requires signing in again |
 
-设置导入与完整恢复只接受本程序的版本化 ZIP，应用前会在 `backups/` 保留回退包。上传顺序分块，每块 8 MiB，压缩包上限 2 GiB，展开上限 8 GiB、100000 项。不包含运维环境配置、派生索引或临时文件。
+Settings imports and full restores accept only RawMark's versioned ZIP format. A rollback archive is kept in `backups/` before applying changes. Uploads use sequential 8 MiB chunks. Limits are 2 GiB compressed, 8 GiB expanded, and 100,000 entries. Operational environment configuration, derived indexes, and temporary files are excluded.
 
-完整恢复前停止其他程序直接改写笔记库。维护时暂时暂停 API 操作，关闭数据库和后台任务后恢复，中断时回退操作前备份。导出的完整包包含账户和笔记等敏感数据，应妥善保管，不提交到仓库或附在公开 Issue 中。
+Stop other programs from directly modifying the vault before a full restore. API operations pause during maintenance; the restore closes databases and background tasks, and rolls back to the pre-operation backup if interrupted. Full exports contain sensitive account and note data. Store them securely; do not commit them or attach them to public issues.
 
-独立于应用备份，升级前建议停止服务后备份完整数据目录、外置笔记库、部署配置与旧镜像。SQLite 运行时可能有 WAL 文件，不要只复制正在写入的 `rawmark.db` 来冒充一致备份。
+In addition to application backups, stop the service before upgrades and back up the complete data directory, external vault, deployment configuration, and previous image. SQLite may have WAL files while running; copying only an actively written `rawmark.db` is not a consistent backup.
 
-## 升级与回退
+## Upgrade and rollback
 
-1. 确认目标版本的行为和数据兼容性，保留当前镜像及部署配置。
-2. 停止旧服务，备份应用数据与外置笔记库。
-3. 更新源码并重新构建，使用同一份挂载启动新实例；不要并行运行新旧服务。
-4. 核对容器健康、登录、笔记与附件。回退时使用配套的旧镜像与数据备份。
+1. Check the target version's behavior and data compatibility; retain the current image and deployment configuration.
+2. Stop the old service and back up application data and any external vault.
+3. Update the source, rebuild, and start the new instance with the same mounts. Do not run old and new services concurrently.
+4. Verify container health, sign-in, notes, and attachments. Roll back using the matching previous image and data backup.
 
-Bearer 认证升级需要前后端一起发布。旧 Cookie 页面不能继续使用，需重新登录；启动程序会沿现有 SQLite 初始化流程创建资源票据表和索引，笔记、密码、设置与已有 API 令牌保留。第三方客户端的 JSON 解包方式须遵循[当前协议](api.md)。
+The Bearer authentication upgrade requires the frontend and backend to be released together. Old Cookie-based pages require signing in again. Startup creates the resource-ticket table and indexes through the existing SQLite initialization flow; notes, passwords, settings, and existing API tokens are retained. Third-party clients must follow the [current JSON protocol](api.md).
 
-`scripts/remove-sharing.sql` 和 `scripts/reset-shortcuts.sql` 是历史版本的一次性迁移：前者移除旧分享数据，后者清空旧快捷键覆盖。**新部署无需运行，已执行过的实例不要重跑**；只有确认来自对应旧版本且需要该迁移时，才在停服并备份后单独执行。
+`scripts/remove-sharing.sql` and `scripts/reset-shortcuts.sql` are one-time historical migrations. The former removes old sharing data; the latter clears old shortcut overrides. **New deployments do not need them, and instances that have already run them must not rerun them.** Execute one separately only after confirming an applicable old version, stopping the service, and backing up.
 
-## 日常维护与排查
+## Routine maintenance and troubleshooting
 
-- 容器自带健康检查，也可访问 `GET /api/v1/health`；健康不代表所有业务流程已验证。
-- 设置内的优化/重建仅处理派生索引；清理临时文件不删除用户文件、活动上传或恢复备份。
-- 重置设置保留账户、资源、插件存储和本机标签页。
-- 日志位于 `logs/`，轮转保留三份，每份至多 10 MiB；可在设置中导出日志及版本摘要。该功能不补录历史日志。
-- 更新后界面异常先核对前后端是否来自同一构建，再查看浏览器网络请求和应用日志；插件与外观恢复入口见[使用指南](guide.md#插件与界面恢复)。
+- The container includes a health check. You can also call `GET /api/v1/health`; a healthy result does not verify every business workflow.
+- Index optimization/rebuilding affects only derived indexes. Temporary-file cleanup does not delete user files, active uploads, or restore backups.
+- Resetting settings retains the account, resources, plugin storage, and local tabs.
+- Logs live in `logs/`, with three rotated files retained, each up to 10 MiB. Settings can export logs and a version summary; this does not reconstruct historical logs.
+- If the interface breaks after an update, first check that the frontend and backend come from the same build, then inspect browser network requests and application logs. See the [user guide](guide.md#plugins-and-interface-recovery) for plugin and appearance recovery entry points.
