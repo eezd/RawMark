@@ -3,6 +3,7 @@ package backup
 
 import (
 	"archive/zip"
+	"compress/flate"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -21,6 +22,9 @@ import (
 const MaxArchiveBytes int64 = 2 << 30
 const MaxExpandedBytes int64 = 8 << 30
 const MaxEntries = 100000
+
+// ErrInvalidArchive 表示归档内容不满足备份契约，不包含磁盘或文件系统故障。
+var ErrInvalidArchive = errors.New("备份内容无效")
 
 type Entry struct {
 	Path     string `json:"path"`
@@ -182,44 +186,54 @@ func Create(ctx context.Context, dest, kind string, sources []Source, skip func(
 func Extract(ctx context.Context, archive, dest string) (Manifest, error) {
 	var manifest Manifest
 	z, err := zip.OpenReader(archive)
+	if errors.Is(err, zip.ErrInsecurePath) {
+		z.Close()
+		return manifest, fmt.Errorf("%w：%w", ErrInvalidArchive, err)
+	}
+	if errors.Is(err, zip.ErrFormat) {
+		return manifest, fmt.Errorf("%w：%w", ErrInvalidArchive, err)
+	}
 	if err != nil {
 		return manifest, err
 	}
 	defer z.Close()
 	if len(z.File) > MaxEntries+1 {
-		return manifest, fmt.Errorf("备份文件数超过上限")
+		return manifest, fmt.Errorf("%w：备份文件数超过上限", ErrInvalidArchive)
 	}
 	entries := map[string]*zip.File{}
 	for _, f := range z.File {
 		name := strings.TrimSuffix(f.Name, "/")
 		if !validPath(name) || entries[name] != nil {
-			return manifest, fmt.Errorf("归档路径无效或重复")
+			return manifest, fmt.Errorf("%w：归档路径无效或重复", ErrInvalidArchive)
 		}
 		if !f.Mode().IsRegular() && !f.Mode().IsDir() {
-			return manifest, fmt.Errorf("归档不允许符号链接或特殊文件")
+			return manifest, fmt.Errorf("%w：归档不允许符号链接或特殊文件", ErrInvalidArchive)
 		}
 		entries[name] = f
 	}
 	m := entries["manifest.json"]
 	if m == nil || m.UncompressedSize64 > 32<<20 {
-		return manifest, fmt.Errorf("缺少有效备份清单")
+		return manifest, fmt.Errorf("%w：缺少有效备份清单", ErrInvalidArchive)
 	}
 	r, err := m.Open()
 	if err != nil {
-		return manifest, err
+		return manifest, fmt.Errorf("%w：%w", ErrInvalidArchive, err)
 	}
 	err = json.NewDecoder(io.LimitReader(r, 32<<20)).Decode(&manifest)
+	if err != nil {
+		err = fmt.Errorf("%w：%w", ErrInvalidArchive, err)
+	}
 	err = errors.Join(err, r.Close())
 	if err != nil {
 		return manifest, err
 	}
 	if manifest.Format != 1 || (manifest.Kind != "full" && manifest.Kind != "settings") || len(manifest.Entries) != len(entries)-1 {
-		return manifest, fmt.Errorf("备份版本、类型或清单无效")
+		return manifest, fmt.Errorf("%w：备份版本、类型或清单无效", ErrInvalidArchive)
 	}
 	var expanded int64
 	for _, e := range manifest.Entries {
 		if e.Size < 0 || e.Size > MaxExpandedBytes-expanded {
-			return manifest, fmt.Errorf("备份展开大小超过 8 GiB")
+			return manifest, fmt.Errorf("%w：备份展开大小超过 8 GiB", ErrInvalidArchive)
 		}
 		expanded += e.Size
 	}
@@ -228,7 +242,7 @@ func Extract(ctx context.Context, archive, dest string) (Manifest, error) {
 		return manifest, err
 	}
 	if uint64(expanded)+(32<<20) > disk.Bavail*uint64(disk.Bsize) {
-		return manifest, fmt.Errorf("磁盘空间不足")
+		return manifest, fmt.Errorf("磁盘空间不足：%w", syscall.ENOSPC)
 	}
 	seen := map[string]bool{}
 	var total int64
@@ -238,17 +252,17 @@ func Extract(ctx context.Context, archive, dest string) (Manifest, error) {
 		}
 		f := entries[e.Path]
 		if !validEntry(manifest.Kind, e.Path) || seen[e.Path] || f == nil || e.Size < 0 || e.Dir != f.FileInfo().IsDir() || uint64(e.Size) != f.UncompressedSize64 {
-			return manifest, fmt.Errorf("备份清单与文件不符")
+			return manifest, fmt.Errorf("%w：备份清单与文件不符", ErrInvalidArchive)
 		}
 		seen[e.Path] = true
 		total += e.Size
 		if total > MaxExpandedBytes {
-			return manifest, fmt.Errorf("备份展开大小超过 8 GiB")
+			return manifest, fmt.Errorf("%w：备份展开大小超过 8 GiB", ErrInvalidArchive)
 		}
 		target := filepath.Join(dest, filepath.FromSlash(e.Path))
 		if e.Dir {
 			if e.Size != 0 {
-				return manifest, fmt.Errorf("目录大小无效")
+				return manifest, fmt.Errorf("%w：目录大小无效", ErrInvalidArchive)
 			}
 			if err := os.MkdirAll(target, 0700); err != nil {
 				return manifest, err
@@ -256,14 +270,14 @@ func Extract(ctx context.Context, archive, dest string) (Manifest, error) {
 			continue
 		}
 		if len(e.SHA256) != 64 {
-			return manifest, fmt.Errorf("文件校验值无效")
+			return manifest, fmt.Errorf("%w：文件校验值无效", ErrInvalidArchive)
 		}
 		if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
 			return manifest, err
 		}
 		in, err := f.Open()
 		if err != nil {
-			return manifest, err
+			return manifest, fmt.Errorf("%w：%w", ErrInvalidArchive, err)
 		}
 		out, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 		if err != nil {
@@ -272,23 +286,27 @@ func Extract(ctx context.Context, archive, dest string) (Manifest, error) {
 		}
 		sum := sha256.New()
 		n, copyErr := io.Copy(io.MultiWriter(out, sum), io.LimitReader(in, e.Size+1))
+		var corruptDeflate flate.CorruptInputError
+		if errors.Is(copyErr, zip.ErrChecksum) || errors.Is(copyErr, zip.ErrFormat) || errors.Is(copyErr, io.ErrUnexpectedEOF) || errors.As(copyErr, &corruptDeflate) {
+			copyErr = fmt.Errorf("%w：%w", ErrInvalidArchive, copyErr)
+		}
 		err = errors.Join(copyErr, in.Close(), out.Close())
 		if err != nil {
 			return manifest, err
 		}
 		if n != e.Size || hex.EncodeToString(sum.Sum(nil)) != e.SHA256 {
-			return manifest, fmt.Errorf("文件校验失败: %s", e.Path)
+			return manifest, fmt.Errorf("%w：文件校验失败: %s", ErrInvalidArchive, e.Path)
 		}
 		t := time.UnixMilli(e.Modified)
 		if err := os.Chtimes(target, t, t); err != nil {
 			return manifest, err
 		}
 	}
-	if manifest.Kind == "full" && (!seen["app/rawmark.db"] || !seen["vault"]) {
-		return manifest, fmt.Errorf("实例备份缺少数据库或笔记库")
+	if manifest.Kind == "full" && (!seen["app/rawmark.db"] || !seen["vault"] || entries["app/rawmark.db"].FileInfo().IsDir() || !entries["vault"].FileInfo().IsDir()) {
+		return manifest, fmt.Errorf("%w：实例备份缺少数据库或笔记库", ErrInvalidArchive)
 	}
-	if manifest.Kind == "settings" && !seen["settings.json"] {
-		return manifest, fmt.Errorf("设置备份缺少设置")
+	if manifest.Kind == "settings" && (!seen["settings.json"] || entries["settings.json"].FileInfo().IsDir()) {
+		return manifest, fmt.Errorf("%w：设置备份缺少设置", ErrInvalidArchive)
 	}
 	return manifest, nil
 }

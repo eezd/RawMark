@@ -116,7 +116,7 @@ func TestRecoveryCommitAndRollback(t *testing.T) {
 	}
 }
 func TestArchiveRejectsTraversalDuplicateLinksAndCorruption(t *testing.T) {
-	for _, mode := range []string{"traversal", "duplicate", "symlink", "checksum"} {
+	for _, mode := range []string{"traversal", "duplicate", "symlink", "checksum", "directory-settings"} {
 		t.Run(mode, func(t *testing.T) {
 			file := filepath.Join(t.TempDir(), "invalid.zip")
 			f, _ := os.Create(file)
@@ -138,13 +138,34 @@ func TestArchiveRejectsTraversalDuplicateLinksAndCorruption(t *testing.T) {
 				out.Write([]byte("{}"))
 				manifest, _ := z.Create("manifest.json")
 				io.WriteString(manifest, `{"format":1,"kind":"settings","entries":[{"path":"settings.json","size":2,"sha256":"`+strings.Repeat("0", 64)+`"}]}`)
+			case "directory-settings":
+				z.Create("settings.json/")
+				manifest, _ := z.Create("manifest.json")
+				io.WriteString(manifest, `{"format":1,"kind":"settings","entries":[{"path":"settings.json","dir":true,"size":0}]}`)
 			}
 			z.Close()
 			f.Close()
-			if _, err := Extract(context.Background(), file, t.TempDir()); err == nil {
-				t.Fatal("无效归档被接受")
+			if _, err := Extract(context.Background(), file, t.TempDir()); !errors.Is(err, ErrInvalidArchive) {
+				t.Fatalf("无效归档未归类为输入错误: %v", err)
 			}
 		})
+	}
+}
+
+func TestArchiveExtractionDistinguishesDiskFailure(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "settings.json")
+	writeTest(t, source, "{}")
+	archive := filepath.Join(dir, "settings.zip")
+	if err := Create(context.Background(), archive, "settings", []Source{{"settings.json", source}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	blocked := filepath.Join(dir, "not-a-directory")
+	writeTest(t, blocked, "block extraction")
+	_, err := Extract(context.Background(), archive, blocked)
+	var pathError *os.PathError
+	if !errors.As(err, &pathError) || errors.Is(err, ErrInvalidArchive) {
+		t.Fatalf("解压磁盘故障被误判为归档内容无效: %v", err)
 	}
 }
 func TestSettingsInterruptedImportRestoresPreferencesAndResources(t *testing.T) {

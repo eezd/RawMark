@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"rawmark/internal/backup"
@@ -53,9 +54,13 @@ func (s *Server) guardAPI(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+var errMaintenanceBusy = errors.New("其他维护操作正在执行")
+var errMaintenanceInput = errors.New("维护请求无效")
+
 func (s *Server) maintain(operation string, fn func() error) error {
 	if !s.maintenanceMu.TryLock() {
-		return fmt.Errorf("其他维护操作正在执行")
+		return errMaintenanceBusy
 	}
 	defer s.maintenanceMu.Unlock()
 	s.maintenanceBusy.Store(true)
@@ -82,8 +87,20 @@ func (s *Server) maintenanceInfo(w http.ResponseWriter, r *http.Request) {
 	defer s.maintenanceStatusMu.Unlock()
 	writeJSON(w, 200, s.maintenanceState)
 }
-func (s *Server) maintenanceError(w http.ResponseWriter, err error) {
-	writeError(w, 400, "操作失败："+err.Error())
+func (s *Server) maintenanceError(w http.ResponseWriter, r *http.Request, err error) {
+	var pathError *os.PathError
+	switch {
+	case errors.Is(err, errMaintenanceBusy):
+		writeError(w, 503, err.Error())
+	case errors.Is(err, syscall.ENOSPC):
+		writeError(w, 503, "磁盘空间不足")
+	case errors.As(err, &pathError) && !errors.Is(pathError, os.ErrNotExist) && !errors.Is(pathError, syscall.ENOTDIR) && !errors.Is(pathError, syscall.EISDIR):
+		internalError(w, r, err)
+	case errors.Is(err, errMaintenanceInput), errors.Is(err, backup.ErrInvalidArchive):
+		writeError(w, 400, "操作失败："+err.Error())
+	default:
+		internalError(w, r, err)
+	}
 }
 func (s *Server) tempDir() (string, error) {
 	dir := filepath.Join(s.DataDir, "temp")
@@ -207,7 +224,7 @@ func (s *Server) exportBackup(w http.ResponseWriter, r *http.Request) {
 		return sendDownload(w, r, name, "rawmark-"+kind+"-"+time.Now().Format("20060102-150405")+".zip")
 	})
 	if err != nil {
-		s.maintenanceError(w, err)
+		s.maintenanceError(w, r, err)
 	}
 }
 func (s *Server) exportNotes(w http.ResponseWriter, r *http.Request) {
@@ -229,46 +246,46 @@ func (s *Server) exportNotes(w http.ResponseWriter, r *http.Request) {
 		return sendDownload(w, r, file.Name(), "rawmark-notes-"+time.Now().Format("20060102-150405")+".zip")
 	})
 	if err != nil {
-		s.maintenanceError(w, err)
+		s.maintenanceError(w, r, err)
 	}
 }
 
 func validatePreferences(values map[string]json.RawMessage) error {
 	for key, raw := range values {
 		if len(raw) > maxJSONBytes {
-			return fmt.Errorf("单项设置超过 1 MiB")
+			return fmt.Errorf("%w：单项设置超过 1 MiB", errMaintenanceInput)
 		}
 		switch {
 		case key == settingsKey:
 			var settings map[string]json.RawMessage
 			if err := json.Unmarshal(raw, &settings); err != nil || settings == nil {
-				return fmt.Errorf("偏好设置必须为对象")
+				return fmt.Errorf("%w：偏好设置必须为对象", errMaintenanceInput)
 			}
 			if _, err := trashRetentionDays(settings); err != nil {
-				return err
+				return fmt.Errorf("%w：%w", errMaintenanceInput, err)
 			}
 			if value, ok := settings["shortcuts"]; ok {
 				var shortcuts map[string][]string
 				if err := json.Unmarshal(value, &shortcuts); err != nil {
-					return fmt.Errorf("快捷键格式无效")
+					return fmt.Errorf("%w：快捷键格式无效", errMaintenanceInput)
 				}
 			}
 		case key == pluginEnabledKey:
 			var ids map[string]bool
 			if err := json.Unmarshal(raw, &ids); err != nil {
-				return err
+				return fmt.Errorf("%w：%w", errMaintenanceInput, err)
 			}
 			for id := range ids {
 				if !validPluginID(id) {
-					return fmt.Errorf("插件 ID 无效")
+					return fmt.Errorf("%w：插件 ID 无效", errMaintenanceInput)
 				}
 			}
 		case strings.HasPrefix(key, "plugin.data."):
 			if !validPluginID(strings.TrimPrefix(key, "plugin.data.")) || !json.Valid(raw) {
-				return fmt.Errorf("插件数据无效")
+				return fmt.Errorf("%w：插件数据无效", errMaintenanceInput)
 			}
 		default:
-			return fmt.Errorf("设置包包含不允许的设置项")
+			return fmt.Errorf("%w：设置包包含不允许的设置项", errMaintenanceInput)
 		}
 	}
 	return nil
@@ -279,7 +296,7 @@ func readPreferences(stage string) (map[string]json.RawMessage, error) {
 		return nil, err
 	}
 	if info.Size() > 32<<20 {
-		return nil, fmt.Errorf("设置包设置内容超过 32 MiB")
+		return nil, fmt.Errorf("%w：设置包设置内容超过 32 MiB", errMaintenanceInput)
 	}
 	raw, err := os.ReadFile(filepath.Join(stage, "settings.json"))
 	if err != nil {
@@ -287,7 +304,7 @@ func readPreferences(stage string) (map[string]json.RawMessage, error) {
 	}
 	var values map[string]json.RawMessage
 	if err = json.Unmarshal(raw, &values); err != nil || values == nil {
-		return nil, fmt.Errorf("设置包格式无效")
+		return nil, fmt.Errorf("%w：设置包格式无效", errMaintenanceInput)
 	}
 	if err = validatePreferences(values); err != nil {
 		return nil, err
@@ -314,7 +331,7 @@ func (s *Server) applySettings(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		if !meta.Validated || meta.Kind != "settings" {
-			return fmt.Errorf("请先校验设置包")
+			return fmt.Errorf("%w：请先校验设置包", errMaintenanceInput)
 		}
 		stage := filepath.Join(dir, "stage")
 		values, err := readPreferences(stage)
@@ -407,7 +424,7 @@ func (s *Server) applySettings(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		s.maintenanceError(w, err)
+		s.maintenanceError(w, r, err)
 		return
 	}
 	s.hub.Broadcast(events.Event{Type: "settings"}, events.Event{Type: "plugins"})
@@ -432,7 +449,7 @@ func (s *Server) resetSettings(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		s.maintenanceError(w, err)
+		s.maintenanceError(w, r, err)
 		return
 	}
 	s.hub.Broadcast(events.Event{Type: "settings"}, events.Event{Type: "plugins"})
@@ -451,7 +468,7 @@ func (s *Server) maintainIndex(w http.ResponseWriter, r *http.Request) {
 		return s.index.Optimize(r.Context())
 	})
 	if err != nil {
-		s.maintenanceError(w, err)
+		s.maintenanceError(w, r, err)
 		return
 	}
 	s.hub.Broadcast(events.Event{Type: "indexed"})
@@ -518,6 +535,6 @@ func (s *Server) exportLogs(w http.ResponseWriter, r *http.Request) {
 		return sendDownload(w, r, file, "rawmark-system-logs.zip")
 	})
 	if err != nil {
-		s.maintenanceError(w, err)
+		s.maintenanceError(w, r, err)
 	}
 }

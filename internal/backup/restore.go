@@ -12,6 +12,9 @@ import (
 	"strings"
 
 	"rawmark/internal/store"
+
+	"modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // RestoreRecord 必须在关闭 HTTP、文件监听、索引和数据库之后执行。
@@ -74,12 +77,15 @@ func CheckDatabase(file string) error {
 	}
 	header := make([]byte, 16)
 	_, err = io.ReadFull(f, header)
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		err = fmt.Errorf("%w：%w", ErrInvalidArchive, err)
+	}
 	err = errors.Join(err, f.Close())
 	if err != nil {
 		return err
 	}
 	if string(header) != "SQLite format 3\x00" {
-		return fmt.Errorf("备份数据库格式无效")
+		return fmt.Errorf("%w：备份数据库格式无效", ErrInvalidArchive)
 	}
 	st, err := store.OpenExisting(file)
 	if err != nil {
@@ -87,7 +93,15 @@ func CheckDatabase(file string) error {
 	}
 	defer st.Close()
 	if err = st.CheckBackup(); err != nil {
-		return err
+		var databaseError *sqlite.Error
+		if errors.As(err, &databaseError) {
+			switch databaseError.Code() & 0xff {
+			case sqlite3.SQLITE_ERROR, sqlite3.SQLITE_CORRUPT, sqlite3.SQLITE_NOTADB:
+			default:
+				return err
+			}
+		}
+		return fmt.Errorf("%w：%w", ErrInvalidArchive, err)
 	}
 	password, ok, err := st.Setting("auth.password")
 	if err != nil {
@@ -95,15 +109,15 @@ func CheckDatabase(file string) error {
 	}
 	parts := strings.Split(password, "$")
 	if !ok || len(parts) != 6 || parts[1] != "argon2id" || parts[2] != "v=19" || parts[3] != "m=65536,t=3,p=4" {
-		return fmt.Errorf("备份密码格式不受支持")
+		return fmt.Errorf("%w：备份密码格式不受支持", ErrInvalidArchive)
 	}
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil || len(salt) != 16 {
-		return fmt.Errorf("备份密码盐无效")
+		return fmt.Errorf("%w：备份密码盐无效", ErrInvalidArchive)
 	}
 	key, err := base64.RawStdEncoding.DecodeString(parts[5])
 	if err != nil || len(key) != 32 {
-		return fmt.Errorf("备份密码校验值无效")
+		return fmt.Errorf("%w：备份密码校验值无效", ErrInvalidArchive)
 	}
 	return nil
 }

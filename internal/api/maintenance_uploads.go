@@ -18,6 +18,8 @@ import (
 
 	"rawmark/internal/backup"
 	"rawmark/internal/store"
+
+	"modernc.org/sqlite"
 )
 
 const maintenanceChunkBytes int64 = 8 << 20
@@ -37,10 +39,13 @@ func uploadOwner(r *http.Request) string {
 func (s *Server) readUpload(r *http.Request, id string) (maintenanceUpload, string, error) {
 	var meta maintenanceUpload
 	if !uploadIDPattern.MatchString(id) {
-		return meta, "", fmt.Errorf("上传 ID 无效")
+		return meta, "", fmt.Errorf("%w：上传 ID 无效", errMaintenanceInput)
 	}
 	dir := filepath.Join(s.DataDir, ".maintenance", "uploads", id)
 	data, err := os.ReadFile(filepath.Join(dir, "upload.json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return meta, "", fmt.Errorf("%w：上传不存在或已过期", errMaintenanceInput)
+	}
 	if err != nil {
 		return meta, "", err
 	}
@@ -48,7 +53,7 @@ func (s *Server) readUpload(r *http.Request, id string) (maintenanceUpload, stri
 		return meta, "", err
 	}
 	if meta.Owner != uploadOwner(r) {
-		return meta, "", fmt.Errorf("上传不属于当前会话")
+		return meta, "", fmt.Errorf("%w：上传不属于当前会话", errMaintenanceInput)
 	}
 	return meta, dir, nil
 }
@@ -65,7 +70,7 @@ func enoughSpace(dir string, size int64) error {
 		return err
 	}
 	if size < 0 || uint64(size)+(32<<20) > stat.Bavail*uint64(stat.Bsize) {
-		return fmt.Errorf("磁盘空间不足")
+		return fmt.Errorf("磁盘空间不足：%w", syscall.ENOSPC)
 	}
 	return nil
 }
@@ -107,7 +112,7 @@ func (s *Server) startMaintenanceUpload(w http.ResponseWriter, r *http.Request) 
 		return f.Close()
 	})
 	if err != nil {
-		s.maintenanceError(w, err)
+		s.maintenanceError(w, r, err)
 		return
 	}
 	writeJSON(w, 201, map[string]string{"id": id})
@@ -126,7 +131,7 @@ func (s *Server) appendMaintenanceUpload(w http.ResponseWriter, r *http.Request)
 			return err
 		}
 		if meta.Validated {
-			return fmt.Errorf("已校验的上传不可修改")
+			return fmt.Errorf("%w：已校验的上传不可修改", errMaintenanceInput)
 		}
 		f, err := os.OpenFile(filepath.Join(dir, "archive.zip"), os.O_WRONLY, 0600)
 		if err != nil {
@@ -138,18 +143,22 @@ func (s *Server) appendMaintenanceUpload(w http.ResponseWriter, r *http.Request)
 			return err
 		}
 		if info.Size() != offset {
-			return fmt.Errorf("上传偏移不匹配，请重新上传")
+			return fmt.Errorf("%w：上传偏移不匹配，请重新上传", errMaintenanceInput)
 		}
 		limit := min(maintenanceChunkBytes, meta.Size-offset)
 		if limit <= 0 {
-			return fmt.Errorf("上传大小超出清单")
+			return fmt.Errorf("%w：上传大小超出清单", errMaintenanceInput)
 		}
 		data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 		if err != nil {
+			var tooLarge *http.MaxBytesError
+			if errors.As(err, &tooLarge) {
+				return fmt.Errorf("%w：%w", errMaintenanceInput, err)
+			}
 			return err
 		}
 		if len(data) == 0 {
-			return fmt.Errorf("上传内容为空")
+			return fmt.Errorf("%w：上传内容为空", errMaintenanceInput)
 		}
 		if err = enoughSpace(dir, int64(len(data))); err != nil {
 			return err
@@ -165,11 +174,20 @@ func (s *Server) appendMaintenanceUpload(w http.ResponseWriter, r *http.Request)
 		return nil
 	})
 	if err != nil {
-		s.maintenanceError(w, err)
+		s.maintenanceError(w, r, err)
 		return
 	}
 	writeJSON(w, 200, map[string]int64{"offset": next})
 }
+func backupResourceError(err error) error {
+	var pathError *os.PathError
+	// 缺失文件或文件／目录类型错误来自归档内容；其他磁盘故障仍由服务端处理。
+	if errors.As(err, &pathError) && !errors.Is(pathError, os.ErrNotExist) && !errors.Is(pathError, syscall.ENOTDIR) && !errors.Is(pathError, syscall.EISDIR) {
+		return err
+	}
+	return fmt.Errorf("%w：%w", backup.ErrInvalidArchive, err)
+}
+
 func (s *Server) validateResources(stage string) error {
 	temp := &Server{FontsDir: filepath.Join(stage, "app", "fonts"), ThemesDir: filepath.Join(stage, "app", "themes"), PluginsDir: filepath.Join(stage, "app", "plugins")}
 	for _, kind := range []string{"fonts", "themes", "plugins"} {
@@ -178,27 +196,27 @@ func (s *Server) validateResources(stage string) error {
 			continue
 		}
 		if err != nil {
-			return err
+			return backupResourceError(err)
 		}
 		for _, entry := range entries {
 			if !entry.IsDir() {
-				return fmt.Errorf("资源目录内包含非目录条目")
+				return fmt.Errorf("%w：资源目录内包含非目录条目", errMaintenanceInput)
 			}
 			switch kind {
 			case "fonts":
 				dir, _, err := temp.openFont(entry.Name())
 				if err != nil {
-					return err
+					return backupResourceError(err)
 				}
 				dir.Close()
 			case "themes":
 				if _, _, err := temp.readTheme(entry.Name()); err != nil {
-					return err
+					return backupResourceError(err)
 				}
 			case "plugins":
 				dir, _, err := temp.openPlugin(entry.Name())
 				if err != nil {
-					return err
+					return backupResourceError(err)
 				}
 				dir.Close()
 			}
@@ -219,7 +237,7 @@ func (s *Server) validateMaintenanceUpload(w http.ResponseWriter, r *http.Reques
 			return err
 		}
 		if info.Size() != meta.Size {
-			return fmt.Errorf("上传尚未完成")
+			return fmt.Errorf("%w：上传尚未完成", errMaintenanceInput)
 		}
 		meta.Validated = false
 		if err = saveUpload(dir, meta); err != nil {
@@ -237,12 +255,12 @@ func (s *Server) validateMaintenanceUpload(w http.ResponseWriter, r *http.Reques
 			return err
 		}
 		if manifest.Kind != meta.Kind {
-			return fmt.Errorf("备份类型与所选操作不符")
+			return fmt.Errorf("%w：备份类型与所选操作不符", errMaintenanceInput)
 		}
 		for _, entry := range manifest.Entries {
 			bytes += entry.Size
 			if strings.HasPrefix(entry.Path, "vault/") && backup.VaultExcluded(s.DataDir, s.vault.Root(), strings.TrimPrefix(entry.Path, "vault/")) {
-				return fmt.Errorf("笔记库内容与应用目录冲突")
+				return fmt.Errorf("%w：笔记库内容与应用目录冲突", errMaintenanceInput)
 			}
 		}
 		if err = enoughSpace(dir, bytes*2); err != nil {
@@ -263,6 +281,11 @@ func (s *Server) validateMaintenanceUpload(w http.ResponseWriter, r *http.Reques
 					prefs, err = st.Preferences()
 					if err == nil {
 						err = validatePreferences(prefs)
+					} else {
+						var databaseError *sqlite.Error
+						if !errors.As(err, &databaseError) {
+							err = fmt.Errorf("%w：%w", backup.ErrInvalidArchive, err)
+						}
 					}
 					err = errors.Join(err, st.Close())
 				}
@@ -275,7 +298,7 @@ func (s *Server) validateMaintenanceUpload(w http.ResponseWriter, r *http.Reques
 		return saveUpload(dir, meta)
 	})
 	if err != nil {
-		s.maintenanceError(w, err)
+		s.maintenanceError(w, r, err)
 		return
 	}
 	writeJSON(w, 200, map[string]any{"kind": manifest.Kind, "createdAt": manifest.CreatedAt, "entries": len(manifest.Entries), "size": bytes})
@@ -289,7 +312,7 @@ func (s *Server) deleteMaintenanceUpload(w http.ResponseWriter, r *http.Request)
 		return os.RemoveAll(dir)
 	})
 	if err != nil {
-		s.maintenanceError(w, err)
+		s.maintenanceError(w, r, err)
 		return
 	}
 	writeJSON(w, 200, map[string]bool{"ok": true})
@@ -316,7 +339,7 @@ func (s *Server) restoreInstance(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		if !meta.Validated || meta.Kind != "full" {
-			return fmt.Errorf("请先校验完整服务备份")
+			return fmt.Errorf("%w：请先校验完整服务备份", errMaintenanceInput)
 		}
 		file, err := s.saveRollback(r.Context(), "full")
 		if err != nil {
@@ -329,7 +352,7 @@ func (s *Server) restoreInstance(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		s.maintenanceError(w, err)
+		s.maintenanceError(w, r, err)
 		return
 	}
 	writeJSON(w, 202, map[string]bool{"restarting": true})
@@ -421,7 +444,7 @@ func (s *Server) clearTemp(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		s.maintenanceError(w, err)
+		s.maintenanceError(w, r, err)
 		return
 	}
 	writeJSON(w, 200, result)

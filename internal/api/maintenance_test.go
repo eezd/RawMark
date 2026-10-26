@@ -4,13 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
 	"rawmark/internal/backup"
@@ -61,7 +64,7 @@ func exportedPackage(t *testing.T, f *fixture, kind string) []byte {
 	}
 	return data
 }
-func stagedPackage(t *testing.T, f *fixture, kind string, data []byte) string {
+func uploadedPackage(t *testing.T, f *fixture, kind string, data []byte) string {
 	t.Helper()
 	res := f.do(f.admin, "POST", "/api/v1/maintenance/uploads", `{"kind":"`+kind+`","size":`+strconv.Itoa(len(data))+`}`, nil)
 	if res.StatusCode != 201 {
@@ -82,7 +85,12 @@ func stagedPackage(t *testing.T, f *fixture, kind string, data []byte) string {
 		}
 		offset = next
 	}
-	res = f.do(f.admin, "POST", "/api/v1/maintenance/uploads/"+id+"/validate", "", nil)
+	return id
+}
+func stagedPackage(t *testing.T, f *fixture, kind string, data []byte) string {
+	t.Helper()
+	id := uploadedPackage(t, f, kind, data)
+	res := f.do(f.admin, "POST", "/api/v1/maintenance/uploads/"+id+"/validate", "", nil)
 	if res.StatusCode != 200 {
 		body, _ := io.ReadAll(res.Body)
 		t.Fatalf("校验失败: %d %s", res.StatusCode, body)
@@ -277,8 +285,8 @@ func TestSettingsPackageDatabaseFailureRollsBack(t *testing.T) {
 	}
 	id := stagedPackage(t, f, "settings", data)
 	res := f.do(f.admin, "POST", "/api/v1/maintenance/settings/import", `{"id":"`+id+`","confirmed":true}`, nil)
-	if res.StatusCode == 200 {
-		t.Fatal("错误提交返回成功")
+	if res.StatusCode != 500 {
+		t.Fatalf("数据库提交故障应返回 500，实际 %d", res.StatusCode)
 	}
 	value, _, err := f.store.Setting(settingsKey)
 	if err != nil || !strings.Contains(value, "18") {
@@ -287,4 +295,82 @@ func TestSettingsPackageDatabaseFailureRollsBack(t *testing.T) {
 	if pending, _ := backup.Pending(filepath.Dir(f.root)); pending {
 		t.Fatal("成功回退后仍有待执行记录")
 	}
+}
+
+func TestMaintenanceErrorsPreserveHTTPStatus(t *testing.T) {
+	t.Run("invalid archive", func(t *testing.T) {
+		f := newFixture(t)
+		id := uploadedPackage(t, f, "settings", []byte("not a zip"))
+		res := f.do(f.admin, "POST", "/api/v1/maintenance/uploads/"+id+"/validate", "", nil)
+		defer res.Body.Close()
+		var body response
+		if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if res.StatusCode != 400 || body.Code != 40000 || !strings.Contains(body.Message, "备份内容无效") {
+			t.Fatalf("无效备份响应错误: %d %+v", res.StatusCode, body)
+		}
+	})
+	t.Run("invalid resource structure", func(t *testing.T) {
+		f := newFixture(t)
+		dir := t.TempDir()
+		settings := filepath.Join(dir, "settings.json")
+		fonts := filepath.Join(dir, "fonts-file")
+		if err := os.WriteFile(settings, []byte("{}"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(fonts, []byte("not a directory"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		archive := filepath.Join(dir, "invalid-resources.zip")
+		if err := backup.Create(context.Background(), archive, "settings", []backup.Source{{Name: "settings.json", Path: settings}, {Name: "app/fonts", Path: fonts}}, nil); err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(archive)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id := uploadedPackage(t, f, "settings", data)
+		res := f.do(f.admin, "POST", "/api/v1/maintenance/uploads/"+id+"/validate", "", nil)
+		defer res.Body.Close()
+		if res.StatusCode != 400 {
+			t.Fatalf("归档资源结构错误应返回 400，实际 %d", res.StatusCode)
+		}
+	})
+	t.Run("filesystem failure", func(t *testing.T) {
+		f := newFixture(t)
+		if err := os.WriteFile(filepath.Join(f.server.DataDir, ".maintenance"), []byte("blocked"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		res := f.do(f.admin, "POST", "/api/v1/maintenance/uploads", `{"kind":"settings","size":10}`, nil)
+		defer res.Body.Close()
+		var body response
+		if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if res.StatusCode != 500 || body.Code != 50000 || body.Message != "服务器内部错误" {
+			t.Fatalf("磁盘故障被当作输入错误: %d %+v", res.StatusCode, body)
+		}
+	})
+	t.Run("maintenance contention", func(t *testing.T) {
+		f := newFixture(t)
+		f.server.maintenanceMu.Lock()
+		defer f.server.maintenanceMu.Unlock()
+		res := f.do(f.admin, "POST", "/api/v1/maintenance/uploads", `{"kind":"settings","size":10}`, nil)
+		defer res.Body.Close()
+		if res.StatusCode != 503 {
+			t.Fatalf("维护占用应返回 503，实际 %d", res.StatusCode)
+		}
+	})
+	t.Run("insufficient disk space", func(t *testing.T) {
+		err := enoughSpace(t.TempDir(), math.MaxInt64)
+		if !errors.Is(err, syscall.ENOSPC) {
+			t.Fatalf("磁盘容量检查未保留 ENOSPC: %v", err)
+		}
+		w := httptest.NewRecorder()
+		(&Server{}).maintenanceError(w, httptest.NewRequest("POST", "/api/v1/maintenance/uploads", nil), err)
+		if w.Code != 503 {
+			t.Fatalf("磁盘空间不足应返回 503，实际 %d", w.Code)
+		}
+	})
 }
