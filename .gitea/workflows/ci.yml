@@ -112,7 +112,7 @@ jobs:
     container:
       image: docker:29-cli
       volumes:
-        - /docker/main/rawmark-dev:/docker/main/rawmark-dev
+        - /docker/dev/rawmark:/docker/dev/rawmark
     env:
       GITEA_API_URL: ${{ gitea.server_url }}/api/v1
       GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
@@ -135,7 +135,7 @@ jobs:
           mkdir -p "$DOCKER_CONFIG"
           chmod 700 "$DOCKER_CONFIG"
           printf '%s' "$GITEA_RELEASE_TOKEN" | docker login git.134333.xyz --username eezd --password-stdin
-          python3 scripts/deploy.py development --directory /docker/main/rawmark-dev \
+          python3 scripts/deploy.py development --directory /docker/dev/rawmark \
             --image "$DEPLOY_IMAGE" --commit "$DEPLOY_COMMIT" --version "$DEPLOY_VERSION" \
             --client-container "$(hostname)"
       - name: Remove job credentials

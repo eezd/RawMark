@@ -116,7 +116,7 @@ Gitea is the primary repository and build executor (`origin`). GitHub (`github`)
 
 A main push runs `.gitea/workflows/ci.yml`: project checks, CI behavior tests, Linux amd64 packaging, and native lifecycle smoke tests. A dependent Docker job verifies that run's archive and checks the non-root image with synthetic data, including restart/replacement persistence and server-side logout. Only then does it publish `git.134333.xyz/eezd/rawmark:dev-<full-SHA>` and deploy its digest to the independent development instance. PRs only run checks and packaging; they receive no publication credentials and do not deploy. The host-Docker runner is for trusted code, not an untrusted-code sandbox; external PRs require maintainer review before execution.
 
-Development uses `raw-dev.134333.xyz`, loopback port 21001, and `/docker/main/rawmark-dev/data`. Production retains its own data and port 21000. Before updating development, the deployment lock rechecks main so an old run cannot overwrite a newer deployment.
+Development uses `raw-dev.134333.xyz`, loopback port 21001, and `/docker/dev/rawmark/data`. Production retains its own data under `/docker/main/rawmark` and port 21000. Before updating development, the deployment lock rechecks main so an old run cannot overwrite a newer deployment.
 
 `sh scripts/ci-check.sh development` and `sh scripts/ci-package.sh development` are the CI entry points. The `release` argument enables the Demo and five-platform packaging. Run `python3 -m unittest discover -s scripts/tests -v` for artifact and deployment behavior tests. Do not rebuild these artifacts on the deployment host.
 
