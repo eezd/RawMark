@@ -1,0 +1,49 @@
+name: Deploy production manually
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Completed formal release version (X.Y.Z)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rawmark-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: gitea.ref == 'refs/heads/main'
+    runs-on: docker
+    timeout-minutes: 20
+    container:
+      image: docker:29-cli
+      volumes:
+        - /docker/main/rawmark:/docker/main/rawmark
+    env:
+      GITEA_API_URL: ${{ gitea.server_url }}/api/v1
+      GITEA_READ_TOKEN: ${{ gitea.token }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      DOCKER_CONFIG: /tmp/rawmark-anonymous-docker
+    defaults:
+      run:
+        shell: sh
+    steps:
+      - name: Install deployment runtimes
+        run: apk add --no-cache nodejs python3 docker-cli-compose
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify completed release, back up and deploy only RawMark
+        run: |
+          set -eu
+          mkdir -m 700 "$DOCKER_CONFIG"
+          python3 scripts/deploy.py production --directory /docker/main/rawmark \
+            --version "$RELEASE_VERSION" --client-container "$(hostname)"
+      - name: Remove job configuration
+        if: always()
+        run: rm -rf "$DOCKER_CONFIG"

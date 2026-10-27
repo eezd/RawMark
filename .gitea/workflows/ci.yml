@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 55
     env:
-      CGO_ENABLED: '0'
+      CI_RUN_ID: ${{ gitea.run_id }}
     steps:
       - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -27,68 +26,12 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Install frontend dependencies
+      - name: Check CI behavior and project
         run: |
-          corepack enable
-          corepack prepare pnpm@12.11.2 --activate
-          pnpm -C web install --frozen-lockfile --registry=https://registry.npmjs.org
-      - name: Check and build frontend
-        run: |
-          pnpm -C web lint:check
-          pnpm -C web typecheck
-          pnpm -C web test
-          pnpm -C web build
-          pnpm -C web build:demo
-      - name: Check backend
-        run: |
-          go vet -tags dev ./...
-          go test ./internal/...
-          go test -tags dev ./web ./cmd/rawmark
-          go vet ./...
-          go test ./web ./cmd/rawmark
-      - name: Test filesystem permissions as an unprivileged user
-        run: |
-          for package in vault watch; do
-            go test -c -o "/tmp/rawmark-$package.test" "./internal/$package"
-            (cd "internal/$package" && runuser -u node -- "/tmp/rawmark-$package.test" -test.v)
-          done
-      - name: Build platform packages and smoke-test Linux amd64
-        run: |
-          mkdir -p package/licenses downloads
-          cp LICENSE package/
-          cp web/LICENSE package/licenses/vue3-starter-MIT.txt
-          cp web/src/common/appearance/fonts/*-OFL.txt package/licenses/
-          cp web/src/common/appearance/fonts/maple/LICENSE.txt package/licenses/Maple-Mono-OFL.txt
-          for target in linux/amd64 linux/arm64 windows/amd64 darwin/arm64 darwin/amd64; do
-            export GOOS="${target%/*}" GOARCH="${target#*/}"
-            extension=''
-            if [ "$GOOS" = windows ]; then extension='.exe'; fi
-            rm -f package/rawmark package/rawmark.exe
-            go vet ./...
-            go build -trimpath -ldflags="-s -w -X main.releaseVersion=$(cat VERSION)" -o "package/rawmark$extension" ./cmd/rawmark
-            if [ "$target" = linux/amd64 ]; then
-              python3 scripts/smoke-release.py package/rawmark
-            fi
-            python3 scripts/package-release.py "$GOOS" "$GOARCH"
-          done
-      - name: Check upload sizes and generate checksums
-        run: |
-          python3 - <<'PY'
-          import hashlib
-          from pathlib import Path
-
-          archives = sorted(Path('downloads').glob('rawmark_*'))
-          if len(archives) != 5:
-              raise SystemExit(f'Expected five platform packages, found {len(archives)}')
-          checksums = []
-          for archive in archives:
-              size = archive.stat().st_size
-              print(f'{archive.name}: {size:,} bytes')
-              if size >= 90_000_000:
-                  raise SystemExit(f'{archive.name} exceeds the 90 MB upload budget (Cloudflare limit: 100 MB)')
-              checksums.append(f'{hashlib.file_digest(archive.open("rb"), "sha256").hexdigest()}  {archive.name}\n')
-          Path('downloads/SHA256SUMS').write_text(''.join(checksums))
-          PY
+          python3 -m unittest discover -s scripts/tests -v
+          sh scripts/ci-check.sh development
+      - name: Package and smoke-test Linux amd64
+        run: sh scripts/ci-package.sh development
       - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-amd64
@@ -98,48 +41,32 @@ jobs:
           retention-days: 7
       - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: linux-arm64
-          path: downloads/*_linux_arm64.tar.gz
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 7
-      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-amd64
-          path: downloads/*_windows_amd64.zip
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 7
-      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: darwin-arm64
-          path: downloads/*_darwin_arm64.tar.gz
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 7
-      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: darwin-amd64
-          path: downloads/*_darwin_amd64.tar.gz
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 7
-      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
           name: checksums
-          path: downloads/SHA256SUMS
+          path: |
+            downloads/SHA256SUMS
+            downloads/build.json
           if-no-files-found: error
           retention-days: 7
 
-  docker-smoke:
+  image:
     needs: check-and-package
+    if: gitea.event_name == 'push' && gitea.ref == 'refs/heads/main'
     runs-on: docker
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      CI_RUN_ID: ${{ gitea.run_id }}
+      CI_RUN_ATTEMPT: ${{ gitea.run_attempt }}
+      CI_RESOURCE_LABEL: io.rawmark.ci.run=dev-${{ gitea.run_id }}-${{ gitea.run_attempt }}
+      TEMP_IMAGE: rawmark-ci:${{ gitea.sha }}-${{ gitea.run_id }}-${{ gitea.run_attempt }}
+      DOCKER_CONFIG: /tmp/rawmark-docker-auth
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+      version: ${{ steps.publish.outputs.version }}
     defaults:
       run:
         shell: sh
     steps:
-      - name: Install CI action and smoke-test runtimes
+      - name: Install CI runtimes
         run: apk add --no-cache nodejs python3
       - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -152,27 +79,63 @@ jobs:
         with:
           name: checksums
           path: downloads
-      - name: Verify the tested binary archive
-        run: |
-          python3 - <<'PY'
-          import hashlib
-          from pathlib import Path
-
-          expected = {line.split()[1]: line.split()[0] for line in Path('downloads/SHA256SUMS').read_text().splitlines()}
-          archive = Path(f'downloads/rawmark_{Path("VERSION").read_text().strip()}_linux_amd64.tar.gz')
-          with archive.open('rb') as source:
-              assert hashlib.file_digest(source, 'sha256').hexdigest() == expected[archive.name]
-          PY
-          mkdir -p image/linux/amd64 image/data
-          tar -xzf "downloads/rawmark_$(cat VERSION)_linux_amd64.tar.gz" -C image/linux/amd64
-      - name: Build and test the isolated container image
-        env:
-          COMMIT_SHA: ${{ gitea.sha }}
-          RUN_ID: ${{ gitea.run_id }}
-          RUN_ATTEMPT: ${{ gitea.run_attempt }}
+      - name: Verify, build and smoke-test the exact binary
         run: |
           set -eu
-          image="rawmark-ci:$COMMIT_SHA-$RUN_ID-$RUN_ATTEMPT"
-          docker build --build-arg TARGETARCH=amd64 --tag "$image" -f deploy/Dockerfile.release image
-          trap 'docker image rm "$image"' EXIT
-          python3 scripts/smoke-docker.py "$image" --client-container "$(hostname)"
+          python3 scripts/release.py prepare-image
+          docker build --provenance=false --build-arg TARGETARCH=amd64 --tag "$TEMP_IMAGE" \
+            --label "org.opencontainers.image.revision=${{ gitea.sha }}" \
+            --label "org.opencontainers.image.version=$(cat VERSION)" \
+            -f deploy/Dockerfile.release image
+          python3 scripts/smoke-docker.py "$TEMP_IMAGE" --client-container "$(hostname)" \
+            --resource-label "$CI_RESOURCE_LABEL"
+      - name: Publish immutable development image
+        id: publish
+        env:
+          GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
+        run: |
+          set -eu
+          mkdir -m 700 "$DOCKER_CONFIG"
+          python3 scripts/release.py promote-development "$TEMP_IMAGE"
+      - name: Clean only this attempt's resources and credentials
+        if: always()
+        run: |
+          python3 scripts/ci-cleanup.py "$CI_RESOURCE_LABEL" --client-container "$(hostname)" --image "$TEMP_IMAGE"
+          rm -rf "$DOCKER_CONFIG"
+
+  deploy-development:
+    needs: image
+    if: gitea.event_name == 'push' && gitea.ref == 'refs/heads/main'
+    runs-on: docker
+    timeout-minutes: 15
+    container:
+      image: docker:29-cli
+      volumes:
+        - /docker/main/rawmark-dev:/docker/main/rawmark-dev
+    env:
+      GITEA_API_URL: ${{ gitea.server_url }}/api/v1
+      GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
+      DOCKER_CONFIG: /tmp/rawmark-docker-auth
+      DEPLOY_IMAGE: ${{ needs.image.outputs.image }}
+      DEPLOY_VERSION: ${{ needs.image.outputs.version }}
+      DEPLOY_COMMIT: ${{ gitea.sha }}
+    defaults:
+      run:
+        shell: sh
+    steps:
+      - name: Install deployment runtimes
+        run: apk add --no-cache nodejs python3 docker-cli-compose
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Deploy only the independent development instance
+        run: |
+          set -eu
+          mkdir -m 700 "$DOCKER_CONFIG"
+          printf '%s' "$GITEA_RELEASE_TOKEN" | docker login git.134333.xyz --username eezd --password-stdin
+          python3 scripts/deploy.py development --directory /docker/main/rawmark-dev \
+            --image "$DEPLOY_IMAGE" --commit "$DEPLOY_COMMIT" --version "$DEPLOY_VERSION" \
+            --client-container "$(hostname)"
+      - name: Remove job credentials
+        if: always()
+        run: rm -rf "$DOCKER_CONFIG"

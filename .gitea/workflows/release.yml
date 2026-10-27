@@ -1,0 +1,151 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version matching VERSION (X.Y.Z)
+        required: true
+        type: string
+      commit:
+        description: Full main commit SHA with successful development CI
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rawmark-release
+  cancel-in-progress: false
+
+env:
+  GITEA_API_URL: ${{ gitea.server_url }}/api/v1
+  CI_RUN_ID: ${{ gitea.run_id }}
+
+jobs:
+  build:
+    if: gitea.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
+      GITHUB_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITHUB_TOKEN }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_COMMIT: ${{ inputs.commit }}
+    outputs:
+      completed: ${{ steps.preflight.outputs.completed }}
+    steps:
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate source, permissions and existing release checkpoint
+        id: preflight
+        run: python3 scripts/release.py preflight "$RELEASE_VERSION" "$RELEASE_COMMIT"
+      - uses: https://github.com/actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: steps.preflight.outputs.reuse == 'false'
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Check and build the five platform packages
+        if: steps.preflight.outputs.reuse == 'false'
+        run: |
+          python3 -m unittest discover -s scripts/tests -v
+          sh scripts/ci-check.sh release
+          sh scripts/ci-package.sh release
+      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.preflight.outputs.reuse == 'false'
+        with:
+          name: linux-amd64
+          path: downloads/*_linux_amd64.tar.gz
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
+      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.preflight.outputs.reuse == 'false'
+        with:
+          name: linux-arm64
+          path: downloads/*_linux_arm64.tar.gz
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
+      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.preflight.outputs.reuse == 'false'
+        with:
+          name: windows-amd64
+          path: downloads/*_windows_amd64.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
+      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.preflight.outputs.reuse == 'false'
+        with:
+          name: darwin-amd64
+          path: downloads/*_darwin_amd64.tar.gz
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
+      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.preflight.outputs.reuse == 'false'
+        with:
+          name: darwin-arm64
+          path: downloads/*_darwin_arm64.tar.gz
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
+      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.preflight.outputs.reuse == 'false'
+        with:
+          name: checksums
+          path: |
+            downloads/SHA256SUMS
+            downloads/build.json
+          if-no-files-found: error
+          retention-days: 30
+      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.preflight.outputs.reuse == 'false'
+        with:
+          name: demo
+          path: downloads/demo.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save immutable build checkpoint after artifact uploads
+        if: steps.preflight.outputs.reuse == 'false'
+        run: python3 scripts/release.py checkpoint
+
+  publish:
+    needs: build
+    if: needs.build.outputs.completed == 'false'
+    runs-on: docker
+    timeout-minutes: 55
+    container:
+      image: docker:29-cli
+    env:
+      GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
+      GITHUB_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITHUB_TOKEN }}
+      CI_RESOURCE_LABEL: io.rawmark.ci.run=release-${{ gitea.run_id }}-${{ gitea.run_attempt }}
+      DOCKER_CONFIG: /tmp/rawmark-docker-auth
+    defaults:
+      run:
+        shell: sh
+    steps:
+      - name: Install publication runtimes
+        run: apk add --no-cache nodejs python3 git skopeo
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Publish the original checked artifacts to both services
+        run: |
+          set -eu
+          mkdir -m 700 "$DOCKER_CONFIG"
+          python3 scripts/release.py publish
+      - name: Clean only this attempt's test resources and credentials
+        if: always()
+        run: |
+          python3 scripts/ci-cleanup.py "$CI_RESOURCE_LABEL" --client-container "$(hostname)"
+          rm -rf "$DOCKER_CONFIG"
