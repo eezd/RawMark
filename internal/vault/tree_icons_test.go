@@ -146,7 +146,6 @@ func TestTreeIconValidationAndCorruptMetadata(t *testing.T) {
 }
 
 func TestTreeIconWriteFailureRollsBack(t *testing.T) {
-
 	for _, operation := range []string{"set", "move", "delete", "restore"} {
 		t.Run(operation, func(t *testing.T) {
 			v := newVault(t)

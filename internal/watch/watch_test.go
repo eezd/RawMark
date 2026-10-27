@@ -15,7 +15,6 @@ import (
 )
 
 func TestUnreadableNotePreservesSnapshot(t *testing.T) {
-
 	v, err := vault.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

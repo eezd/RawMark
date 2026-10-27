@@ -14,7 +14,6 @@ import (
 )
 
 func TestTrashPurgeFailurePreservesMetadata(t *testing.T) {
-
 	for _, operation := range []string{"single", "all", "expired"} {
 		for _, blocked := range []string{"payload", "parent"} {
 			t.Run(operation+"/"+blocked, func(t *testing.T) {
