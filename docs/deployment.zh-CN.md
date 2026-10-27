@@ -4,7 +4,7 @@
 
 [返回项目首页](../README.zh-CN.md) · [使用指南](guide.zh-CN.md) · [开发指南](development.zh-CN.md)
 
-RawMark 将前端嵌入 Go 服务，运行时使用 SQLite 与文件系统，不需要额外数据库服务。目前从源码构建 Docker 镜像；以下命令不依赖预先发布的镜像仓库。
+RawMark 将前端嵌入 Go 服务，运行时使用 SQLite 与文件系统，不需要额外数据库服务。可以使用正式镜像或从源码构建，以下源码构建方式继续保留。
 
 ## Docker 快速启动
 
@@ -51,6 +51,21 @@ RAWMARK_DATA_DIR=/your/storage/rawmark/data \
 该配置默认发布到所有网卡的 **21000** 端口。对公网开放前完成初始化并设置访问边界；使用反向代理时，可将 Compose 端口绑定改为 `127.0.0.1:${RAWMARK_PORT:-21000}:8080`。自定义端口可使用 `RAWMARK_PORT=21001 docker compose -f deploy/docker-compose.yml up -d --build --wait`。
 
 不要把快速开始中的容器与 Compose 实例同时指向同一份数据库或笔记库；切换部署方式前先停止旧实例、备份并确认数据位置。
+
+## 预构建镜像与原生程序
+
+正式镜像为 `ghcr.io/eezd/rawmark:0.1.0`，支持 Linux amd64 和 arm64。将上述 Docker 命令中的 `rawmark` 镜像名替换为它即可跳过源码构建。`latest` 跟随最新稳定版本；需要可控升级时请固定版本标签。仓库 Compose 文件继续支持源码构建。
+
+[Releases 页面](https://github.com/eezd/RawMark/releases) 提供 Linux 原生压缩包及 `SHA256SUMS`。下载对应架构，先核对校验和再解压：
+
+```sh
+sha256sum --ignore-missing --check SHA256SUMS
+tar -xzf rawmark_0.1.0_linux_amd64.tar.gz
+./rawmark --version
+RAWMARK_DATA="$HOME/rawmark-data" RAWMARK_ADDR=127.0.0.1:21000 ./rawmark
+```
+
+ARM 系统请使用 arm64 压缩包。以普通用户运行，并确保所选数据目录可写。程序已内嵌前端和示例，无需 Node.js 或独立数据库服务。长期远程运行请配置服务管理器和 HTTPS 反向代理。
 
 ## 存储与配置
 

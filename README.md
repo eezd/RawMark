@@ -5,6 +5,7 @@
   <p>A self-hosted Markdown workspace for your personal notes. Your files, your server, ready in your browser.</p>
   <p><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
   <p>
+    <a href="https://eezd.github.io/RawMark/">Try the editor</a> ·
     <a href="#quick-start">Quick start</a> ·
     <a href="docs/guide.md">User guide</a> ·
     <a href="docs/deployment.md">Deployment</a> ·
@@ -36,19 +37,20 @@ RawMark is built for **single-user, self-hosted use**. It currently does not off
 
 ## Quick start
 
-With Git and Docker installed, build and run locally:
+With Docker installed:
 
 ```sh
-git clone https://github.com/eezd/RawMark.git
-cd RawMark
-docker build -t rawmark .
 docker run -d --name rawmark --restart unless-stopped \
   -p 127.0.0.1:21000:8080 \
   -v rawmark-data:/data \
-  rawmark
+  ghcr.io/eezd/rawmark:0.1.0
 ```
 
 Open **http://localhost:21000** and set your password on first use. A new, empty instance starts with seven English example notes; edit or delete them and begin writing. Data lives in the Docker volume `rawmark-data` and persists when you recreate the container with the same volume.
+
+Linux amd64 and arm64 are supported. Prefer a native program? Download it from [Releases](https://github.com/eezd/RawMark/releases), or build from source using the deployment guide.
+
+[Try the online editor](https://eezd.github.io/RawMark/) without installing anything. Demo edits are temporary and reset on refresh; the demo does not provide a server-backed workspace.
 
 These commands listen on localhost only. For a remote server, complete the initial setup before configuring HTTPS access. See the [deployment guide](docs/deployment.md) for Docker Compose, existing note folders, backups, and upgrades.
 

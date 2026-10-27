@@ -1,0 +1,206 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate release tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version="$(cat VERSION)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$RELEASE_TAG" = "v$version"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Install frontend dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@12.11.2 --activate
+          pnpm -C web install --frozen-lockfile --registry=https://registry.npmjs.org
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Check and build
+        run: |
+          pnpm -C web lint:check
+          pnpm -C web typecheck
+          pnpm -C web test
+          pnpm -C web build
+          pnpm -C web build:demo
+          go vet -tags dev ./...
+          go test ./internal/...
+          go test -tags dev ./web ./cmd/rawmark
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: frontend
+          path: web/dist
+          if-no-files-found: error
+          retention-days: 3
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: web/dist-demo
+
+  linux:
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: frontend
+          path: web/dist
+      - name: Build and smoke-test native binary
+        run: |
+          mkdir -p package/licenses
+          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.releaseVersion=$(cat VERSION)" -o package/rawmark ./cmd/rawmark
+          go test ./cmd/rawmark ./web
+          python3 scripts/smoke-release.py package/rawmark
+      - name: Package download
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          cp LICENSE package/
+          cp web/LICENSE package/licenses/vue3-starter-MIT.txt
+          cp web/src/common/appearance/fonts/*-OFL.txt package/licenses/
+          cp web/src/common/appearance/fonts/maple/LICENSE.txt package/licenses/Maple-Mono-OFL.txt
+          mkdir downloads
+          tar -C package -czf "downloads/rawmark_$(cat VERSION)_linux_$ARCH.tar.gz" rawmark LICENSE licenses
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-${{ matrix.arch }}
+          path: downloads/*.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+
+  image:
+    needs: linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: linux-*
+          path: downloads
+          merge-multiple: true
+      - name: Prepare tested binaries
+        run: |
+          mkdir -p image/linux/amd64 image/linux/arm64 image/data
+          for arch in amd64 arm64; do
+            tar -xzf "downloads/rawmark_$(cat VERSION)_linux_$arch.tar.gz" -C "image/linux/$arch"
+          done
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish version image
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: image
+          file: deploy/Dockerfile.release
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/eezd/rawmark:${{ github.ref_name }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/eezd/RawMark
+            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+      - name: Smoke-test packaged image
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          image="ghcr.io/eezd/rawmark:$RELEASE_TAG"
+          test "$(docker run --rm "$image" --version)" = "RawMark $(cat VERSION)"
+          trap 'docker rm -f rawmark-smoke; docker volume rm rawmark-smoke-data' EXIT
+          docker run -d --name rawmark-smoke -v rawmark-smoke-data:/data -p 127.0.0.1:21876:8080 "$image"
+          for attempt in {1..60}; do
+            status="$(docker inspect --format '{{.State.Health.Status}}' rawmark-smoke)"
+            if [ "$status" = healthy ]; then break; fi
+            if [ "$status" = unhealthy ]; then docker logs rawmark-smoke; exit 1; fi
+            sleep 1
+          done
+          test "$status" = healthy
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:21876/api/v1/tree)" = 401
+          docker exec rawmark-smoke /rawmark healthcheck
+
+  pages:
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        id: deployment
+
+  release:
+    needs: [image, pages]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: linux-*
+          path: downloads
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish release and stable image tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          IMAGE_DIGEST: ${{ needs.image.outputs.digest }}
+        run: |
+          (cd downloads && sha256sum *.tar.gz > SHA256SUMS)
+          gh release create "$RELEASE_TAG" downloads/* --verify-tag --title "RawMark $RELEASE_TAG" --notes-file .github/release-notes.md --latest
+          docker buildx imagetools create --tag "ghcr.io/eezd/rawmark:$(cat VERSION)" --tag ghcr.io/eezd/rawmark:latest "ghcr.io/eezd/rawmark@$IMAGE_DIGEST"

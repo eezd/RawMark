@@ -5,6 +5,7 @@
   <p>自托管的个人 Markdown 笔记工作台。文件属于你，打开浏览器就能继续写。</p>
   <p><a href="README.md">English</a> · <strong>简体中文</strong></p>
   <p>
+    <a href="https://eezd.github.io/RawMark/">在线体验</a> ·
     <a href="#快速开始">快速开始</a> ·
     <a href="docs/guide.zh-CN.md">使用指南</a> ·
     <a href="docs/deployment.zh-CN.md">部署文档</a> ·
@@ -36,19 +37,20 @@ RawMark 面向**单用户、自托管**场景。目前不提供多人协作或�
 
 ## 快速开始
 
-需要 Git 和 Docker。在本地构建镜像并启动：
+安装 Docker 后运行：
 
 ```sh
-git clone https://github.com/eezd/RawMark.git
-cd RawMark
-docker build -t rawmark .
 docker run -d --name rawmark --restart unless-stopped \
   -p 127.0.0.1:21000:8080 \
   -v rawmark-data:/data \
-  rawmark
+  ghcr.io/eezd/rawmark:0.1.0
 ```
 
 打开 **http://localhost:21000**，首次访问设置登录密码。全新空实例会提供 7 篇英文示例笔记，可以自由编辑或删除，然后开始记录自己的内容。数据保存在 Docker 卷 `rawmark-data` 中，重建容器不会丢失。
+
+支持 Linux amd64 和 arm64。也可以在 [Releases](https://github.com/eezd/RawMark/releases) 下载原生程序，或按照部署文档从源码构建。
+
+无需安装即可[在线体验编辑器](https://eezd.github.io/RawMark/)。Demo 修改仅在当前页面保留，刷新恢复示例，不提供服务端工作区。
 
 以上命令仅监听本机。部署到服务器时，请先完成初始化，再配置 HTTPS 访问；Docker Compose、已有笔记目录接入、备份与升级见[部署文档](docs/deployment.zh-CN.md)。
 

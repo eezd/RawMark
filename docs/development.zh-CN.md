@@ -107,3 +107,13 @@ python3 scripts/prepare-maple-font.py /path/to/MapleMonoNormalNL-NF-CN.zip
 账户语言沿用 settings store 的串行写入、服务器设置与事件同步；登录页仅更新本机启动缓存，认证后读取服务器值。CodeMirror 使用 locale Compartment 更新控件，不替换文档、选区或撤销历史。用户正文、现有路径和插件提供的文字保持原样。
 
 后端 `internal/i18n/` 保存消息 ID 与参数，错误在 HTTP 边界根据 `Accept-Language` 渲染，并保留 `errors.Is/As` 及原始诊断；日志遵循原有语言。既有索引警告只在需要时重新分析源笔记生成译文，同时更新该条目的完整元数据和版本，不改索引格式；已删除或移动的过期条目跳过，其他读取错误明确返回。新增文案同时补充中英字典与参数，运行字典完整性、设置同步、编辑器和 API 的相应测试。
+
+## 版本发布与公开 Demo
+
+`VERSION` 是发布版本的唯一来源。Docker 构建和发布二进制将其写入 `--version`，Vite 用于设置页面展示；既有 PWA 内容哈希保持独立。
+
+发布时更新 `VERSION`、`.github/release-notes.md` 和双语安装示例，完成检查、review 和提交后 push `main`，再推送对应的 `vX.Y.Z` 标签。`.github/workflows/release.yml` 是唯一发布工作流：普通分支推送不触发，创建 Release 也不启动第二个工作流。同一次运行完成检查、Linux amd64/arm64 原生程序测试、以相同程序封装双架构镜像、Demo 部署及 Release 和稳定镜像标签发布。失败时在原 run 中重跑失败 job，不移动已发布标签或覆盖发布附件。
+
+GitHub Pages 必须选择 GitHub Actions 作为发布来源，`github-pages` 环境需要允许版本标签部署。首次 GHCR 镜像需在包设置中将可见性改为 Public，公告前验证匿名拉取。生产实例部署与版本发布是不同操作。
+
+执行 `pnpm -C web build:demo` 构建静态编辑器预览，输出至 `web/dist-demo/`，基础路径为 `/RawMark/`。复用现有编辑器，修改仅在当前页面保留；不使用私有 API、认证、持久化工作区或 Service Worker。工作流在同一次发布运行中部署至 https://eezd.github.io/RawMark/。

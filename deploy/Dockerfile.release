@@ -1,0 +1,12 @@
+# Package the exact native binaries already tested by the release workflow.
+FROM gcr.io/distroless/static:nonroot
+ARG TARGETARCH
+COPY linux/${TARGETARCH}/rawmark /rawmark
+COPY linux/${TARGETARCH}/LICENSE /LICENSE
+COPY linux/${TARGETARCH}/licenses /licenses
+COPY --chown=65532:65532 data/ /data/
+ENV RAWMARK_DATA=/data
+EXPOSE 8080
+VOLUME /data
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s CMD ["/rawmark", "healthcheck"]
+ENTRYPOINT ["/rawmark"]

@@ -4,7 +4,7 @@
 
 [Project home](../README.md) · [User guide](guide.md) · [Development guide](development.md)
 
-RawMark embeds the frontend in its Go service and uses SQLite and the filesystem at runtime. No separate database service is needed. Docker images are currently built from source; the commands below do not depend on a prepublished image registry.
+RawMark embeds the frontend in its Go service and uses SQLite and the filesystem at runtime. No separate database service is needed. You can use a release image or build from source; the source-build commands below remain available.
 
 ## Docker quick start
 
@@ -51,6 +51,21 @@ Keep the same `RAWMARK_DATA_DIR` value for every subsequent Compose command, for
 This configuration publishes port **21000** on all network interfaces by default. Complete initialization and configure access boundaries before exposing it publicly. With a reverse proxy, you can change the Compose port binding to `127.0.0.1:${RAWMARK_PORT:-21000}:8080`. For a custom port, use `RAWMARK_PORT=21001 docker compose -f deploy/docker-compose.yml up -d --build --wait`.
 
 Do not point the quick-start container and a Compose instance at the same database or vault concurrently. Stop the old instance, back up, and verify data locations before switching deployment methods.
+
+## Prebuilt images and native programs
+
+Release images are available as `ghcr.io/eezd/rawmark:0.1.0` for Linux amd64 and arm64. Replace `rawmark` in the Docker commands above with that image name to skip source builds. `latest` follows the latest stable release; use a version tag for controlled upgrades. The repository Compose file continues to support source builds.
+
+Native Linux archives and `SHA256SUMS` are available on the [Releases page](https://github.com/eezd/RawMark/releases). Download the archive matching your architecture and verify its checksum before extracting it:
+
+```sh
+sha256sum --ignore-missing --check SHA256SUMS
+tar -xzf rawmark_0.1.0_linux_amd64.tar.gz
+./rawmark --version
+RAWMARK_DATA="$HOME/rawmark-data" RAWMARK_ADDR=127.0.0.1:21000 ./rawmark
+```
+
+Use the arm64 archive on ARM systems. Run as an unprivileged user with write access to the chosen data directory. The executable embeds the frontend and examples; no Node.js or separate database service is needed. Configure your service manager and HTTPS proxy for long-running remote use.
 
 ## Storage and configuration
 

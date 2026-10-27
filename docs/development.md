@@ -107,3 +107,13 @@ Vue I18n Composition API supports `en` and `zh-CN`, defaulting to English. Share
 Account language reuses the settings store's serial writes, server settings, and event synchronization. The sign-in page updates only the local startup cache; authentication loads the server value. CodeMirror updates controls through a locale Compartment without replacing the document, selection, or undo history. User content, existing paths, and plugin-supplied text remain unchanged.
 
 Backend `internal/i18n/` preserves message IDs and parameters. Errors render at the HTTP boundary according to `Accept-Language`, retaining `errors.Is/As` and original diagnostics; logs keep their existing language. Existing index warnings are reanalyzed from source notes only when needed for translation, refreshing the entry's complete metadata and revision without changing the index format. Stale entries for deleted or moved notes are skipped; other read errors fail explicitly. Add both languages and interpolation parameters for new messages and run the corresponding dictionary-completeness, settings-sync, editor, and API tests.
+
+## Version releases and the public demo
+
+`VERSION` is the release-version source. Docker builds and release binaries inject it into `--version`; Vite uses it for the settings display. The existing content-derived PWA build hash remains independent.
+
+For a release, update `VERSION`, `.github/release-notes.md`, and the paired installation examples; run the required checks, review and commit the changes, push `main`, then push the matching `vX.Y.Z` tag. `.github/workflows/release.yml` is the only release workflow: ordinary branch pushes do not run it, and publishing its Release does not start another workflow. Jobs check the project, test native Linux amd64/arm64 binaries, package those same binaries into a multi-platform image, deploy the demo, and publish the Release and stable image tags. Rerun failed jobs in the existing run when necessary; do not move published tags or overwrite release assets.
+
+GitHub Pages must use the GitHub Actions publishing source, with the `github-pages` environment allowing release tags. The first GHCR package must be made public once in its package settings; verify anonymous pulls before announcing the release. Runtime production deployment is separate from publishing a version.
+
+Build the static editor preview with `pnpm -C web build:demo`. Output is `web/dist-demo/`, with `/RawMark/` as its base path. It uses the existing editor with temporary page-only edits; no private API, authentication, persistent workspace, or Service Worker is used. The workflow deploys it to https://eezd.github.io/RawMark/ in the same release run.
