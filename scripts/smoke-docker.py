@@ -16,9 +16,11 @@ import urllib.request
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('image')
 parser.add_argument('--client-container', help='CI job container to connect to the test network')
+parser.add_argument('--resource-label', help='Label temporary resources for cancellation cleanup')
 args = parser.parse_args()
 version = Path('VERSION').read_text().strip()
 name = 'rawmark-ci-' + secrets.token_hex(8)
+labels = ('--label', args.resource_label) if args.resource_label else ()
 
 
 def docker(*command):
@@ -28,17 +30,17 @@ def docker(*command):
 config = json.loads(docker('image', 'inspect', args.image))[0]['Config']
 assert config['User'].split(':')[0] not in ('', '0', 'root'), 'Image must run as non-root'
 assert config['Healthcheck']['Test'] == ['CMD', '/rawmark', 'healthcheck']
-assert docker('run', '--rm', '--network', 'none', args.image, '--version') == f'RawMark {version}'
+assert docker('run', '--rm', '--network', 'none', *labels, args.image, '--version') == f'RawMark {version}'
 
 with contextlib.ExitStack() as cleanup:
-    docker('network', 'create', '--internal', name)
+    docker('network', 'create', '--internal', *labels, name)
     cleanup.callback(docker, 'network', 'rm', name)
-    docker('volume', 'create', name)
+    docker('volume', 'create', *labels, name)
     cleanup.callback(docker, 'volume', 'rm', name)
     if args.client_container:
         docker('network', 'connect', name, args.client_container)
         cleanup.callback(docker, 'network', 'disconnect', name, args.client_container)
-    create = ('create', '--name', name, '--network', name,
+    create = ('create', '--name', name, '--network', name, *labels,
               '--mount', f'type=volume,source={name},target=/data',
               '--cpus', '1', '--memory', '512m', '--health-interval', '1s',
               '--health-start-period', '1s', args.image)

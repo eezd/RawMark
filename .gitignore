@@ -16,6 +16,9 @@ node_modules/
 web/dist/
 web/dist-demo/
 
+# Python CI helpers
+__pycache__/
+
 # Local development data
 .dev-data/
 
