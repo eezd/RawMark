@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise a release binary using disposable data only, on either Linux architecture."""
+"""Exercise a release binary using disposable data only, on every supported native platform."""
 
 import contextlib
 import hashlib
@@ -23,7 +23,7 @@ assert subprocess.check_output([binary, '--version'], text=True).strip() == f'Ra
 
 
 with tempfile.TemporaryDirectory(prefix='rawmark-release-') as directory:
-    data = Path(directory) / 'data'
+    data = Path(directory) / '数据 data'
     with socket.socket() as listener:
         listener.bind(('127.0.0.1', 0))
         port = listener.getsockname()[1]
@@ -31,11 +31,11 @@ with tempfile.TemporaryDirectory(prefix='rawmark-release-') as directory:
     environment = {**os.environ, 'RAWMARK_DATA': str(data),
                    'RAWMARK_VAULT': str(data / 'vault'), 'RAWMARK_ADDR': f'127.0.0.1:{port}'}
 
-    def request(path, *, method='GET', body=None, token=None, status=200):
-        headers = {'Accept-Language': 'en'}
+    def request(path, *, method='GET', body=None, token=None, status=200, raw=False, headers=None):
+        headers = {'Accept-Language': 'en', **(headers or {})}
         if token:
             headers['Authorization'] = 'Bearer ' + token
-        if body is not None:
+        if body is not None and not isinstance(body, bytes):
             headers['Content-Type'] = 'application/json'
             body = json.dumps(body).encode()
         req = urllib.request.Request(origin + '/api/v1/' + path, data=body, headers=headers, method=method)
@@ -45,13 +45,15 @@ with tempfile.TemporaryDirectory(prefix='rawmark-release-') as directory:
             response = error
         with response:
             assert response.status == status, (path, response.status, response.read())
+            if raw:
+                return response.read()
             result = json.load(response)
             assert (result['code'] == 0) == (status < 400), result
             return result['data']
 
     @contextlib.contextmanager
     def running():
-        with (Path(directory) / 'server.log').open('w+') as log:
+        with (Path(directory) / 'server.log').open('w+', encoding='utf-8') as log:
             process = subprocess.Popen([binary], env=environment, stdout=log, stderr=log)
             try:
                 for _ in range(100):
@@ -86,10 +88,18 @@ with tempfile.TemporaryDirectory(prefix='rawmark-release-') as directory:
             assert (data / 'vault' / note.relative_to('deploy/data/vault')).read_bytes() == note.read_bytes()
         path = urllib.parse.quote('Getting Started/Welcome to RawMark.md')
         original = (data / 'vault/Getting Started/Welcome to RawMark.md').read_bytes()
-        req = urllib.request.Request(origin + '/api/v1/files/' + path, data=original + b'\nRelease smoke test.\n',
-                                     headers={'Authorization': 'Bearer ' + token}, method='PUT')
-        with urllib.request.urlopen(req, timeout=5) as response:
-            assert json.load(response)['code'] == 0
+        request('files/' + path, method='PUT', body=original + b'\nRelease smoke test.\n', token=token)
+        note = '中文 folder/笔记 note.md'
+        moved = '移动 folder/新笔记 note.md'
+        content = '# Portable note\n\n中文 content.\n'.encode()
+        request('files/' + urllib.parse.quote(note), method='PUT', body=content, token=token)
+        request('files/' + urllib.parse.quote(note), method='PUT', body=content + b'Updated.\n', token=token)
+        request('move', method='POST', body={'from': note, 'to': moved}, token=token)
+        assert not (data / 'vault' / note).exists()
+        item = request('files/' + urllib.parse.quote(moved), method='DELETE', token=token)
+        assert item['id'] in [entry['id'] for entry in request('trash', token=token)['items']]
+        request('trash/' + item['id'] + '/restore', method='POST', token=token)
+        assert (data / 'vault' / moved).read_bytes() == content + b'Updated.\n'
 
     before = {str(p.relative_to(data / 'vault')): hashlib.sha256(p.read_bytes()).hexdigest()
               for p in (data / 'vault').rglob('*') if p.is_file()}
@@ -99,4 +109,30 @@ with tempfile.TemporaryDirectory(prefix='rawmark-release-') as directory:
         after = {str(p.relative_to(data / 'vault')): hashlib.sha256(p.read_bytes()).hexdigest()
                  for p in (data / 'vault').rglob('*') if p.is_file()}
         assert before == after, 'Restart modified existing notes'
-    print(f'RawMark {version}: initialization, authentication, examples, editing and restart passed')
+        archive = request('maintenance/export/full', method='POST', token=token, raw=True)
+        restored_content = (data / 'vault' / moved).read_bytes()
+        request('files/' + urllib.parse.quote(moved), method='PUT', body=b'Changed after backup', token=token)
+        upload = request('maintenance/uploads', method='POST', body={'kind': 'full', 'size': len(archive)},
+                         token=token, status=201)['id']
+        for offset in range(0, len(archive), 8 << 20):
+            chunk = archive[offset:offset + (8 << 20)]
+            result = request('maintenance/uploads/' + upload, method='PUT', body=chunk, token=token,
+                             headers={'Upload-Offset': str(offset)})
+            assert result['offset'] == offset + len(chunk)
+        request('maintenance/uploads/' + upload + '/validate', method='POST', token=token)
+        request('maintenance/restore', method='POST', body={'id': upload, 'confirmed': True}, token=token, status=202)
+        for _ in range(200):
+            if ((data / 'vault' / moved).is_file()
+                    and (data / 'vault' / moved).read_bytes() == restored_content
+                    and not (data / '.maintenance/restore.json').exists()):
+                try:
+                    request('health')
+                    break
+                except urllib.error.URLError:
+                    pass
+            time.sleep(0.1)
+        else:
+            raise TimeoutError('Full restore did not complete')
+        request('auth/me', token=token, status=401)
+    print(f'RawMark {version}: initialization, authentication, examples, overwrite, Unicode paths, '
+          'move, recycle bin, restart and full backup/restore passed')
