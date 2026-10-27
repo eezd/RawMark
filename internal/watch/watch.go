@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"rawmark/internal/i18n"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -135,8 +136,18 @@ func (w *Watcher) scan() (map[string]fileState, error) {
 	next := make(map[string]fileState, len(entries))
 	dirs := map[string]bool{w.v.Root(): true}
 	for _, e := range entries {
-		st := fileState{dir: e.Dir, size: e.Size, mtime: e.Info.ModTime().UnixNano(), info: e.Info}
 		abs := filepath.Join(w.v.Root(), filepath.FromSlash(e.Path))
+		info := e.Info
+		if runtime.GOOS == "windows" {
+			info, err = snapshotInfo(abs)
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+		}
+		st := fileState{dir: e.Dir, size: info.Size(), mtime: info.ModTime().UnixNano(), info: info}
 		if e.Dir {
 			dirs[abs] = true
 		} else if vault.IsNote(e.Path) {

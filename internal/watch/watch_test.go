@@ -42,6 +42,9 @@ func TestUnreadableNotePreservesSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	allowRead := testutil.DenyRead(t, p)
+	if _, err := os.ReadFile(p); err == nil {
+		t.Fatal("filesystem failure fixture did not block reading")
+	}
 	w.rescan()
 	if w.snap["note.md"].rev != old || scans != 0 {
 		t.Fatal("读取失败不能提交不完整快照或更新索引")
@@ -69,7 +72,7 @@ func TestDiff(t *testing.T) {
 		}
 	}
 	state := func(p, rev string) fileState {
-		info, err := os.Stat(filepath.Join(root, p))
+		info, err := snapshotInfo(filepath.Join(root, p))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -125,7 +128,7 @@ func TestDirectoryMovesCoverChildrenAndEmptyDirectories(t *testing.T) {
 	snapshot := func(dir string) map[string]fileState {
 		out := map[string]fileState{}
 		for _, rel := range []string{dir, dir + "/empty", dir + "/a.md"} {
-			info, err := os.Stat(filepath.Join(root, rel))
+			info, err := snapshotInfo(filepath.Join(root, rel))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -170,7 +173,7 @@ func TestImageReplacementRefreshesTree(t *testing.T) {
 	if err := os.WriteFile(p, []byte("image"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	info, err := os.Stat(p)
+	info, err := snapshotInfo(p)
 	if err != nil {
 		t.Fatal(err)
 	}
