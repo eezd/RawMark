@@ -3,6 +3,7 @@ package watch
 import (
 	"os"
 	"path/filepath"
+	"rawmark/internal/testutil"
 	"sort"
 	"strings"
 	"testing"
@@ -14,9 +15,7 @@ import (
 )
 
 func TestUnreadableNotePreservesSnapshot(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("权限回归需要以非 root 用户运行")
-	}
+
 	v, err := vault.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -43,10 +42,7 @@ func TestUnreadableNotePreservesSnapshot(t *testing.T) {
 	if err := os.WriteFile(p, []byte("修改后的较长正文"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(p, 0); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chmod(p, 0o644)
+	allowRead := testutil.DenyRead(t, p)
 	w.rescan()
 	if w.snap["note.md"].rev != old || scans != 0 {
 		t.Fatal("读取失败不能提交不完整快照或更新索引")
@@ -56,9 +52,7 @@ func TestUnreadableNotePreservesSnapshot(t *testing.T) {
 		t.Fatalf("读取失败不能广播删除事件: %s", msg)
 	default:
 	}
-	if err := os.Chmod(p, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	allowRead()
 	w.rescan()
 	if w.snap["note.md"].rev == old || scans != 1 {
 		t.Fatal("恢复读取权限后应同步新版本")

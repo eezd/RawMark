@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -130,7 +131,11 @@ func TestRestoreRollsBackWhenAssetsAreMissing(t *testing.T) {
 
 func TestAssetLinksWithReservedNotePath(t *testing.T) {
 	v := newVault(t)
-	link, err := v.SaveAsset("目录 #?%20/n.md", "x.png", strings.NewReader("image"), 100)
+	folder := "目录 #?%20"
+	if runtime.GOOS == "windows" {
+		folder = "目录 #%20"
+	}
+	link, err := v.SaveAsset(folder+"/n.md", "x.png", strings.NewReader("image"), 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +143,7 @@ func TestAssetLinksWithReservedNotePath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file, _, err := v.OpenRaw(filepath.ToSlash(filepath.Join("目录 #?%20", decoded)))
+	file, _, err := v.OpenRaw(filepath.ToSlash(filepath.Join(folder, decoded)))
 	if err != nil {
 		t.Fatalf("资源链接未指向实际文件: %s %v", link, err)
 	}

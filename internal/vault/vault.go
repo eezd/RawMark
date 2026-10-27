@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"rawmark/internal/fileutil"
 	"rawmark/internal/i18n"
 	"regexp"
 	"sort"
@@ -97,7 +98,7 @@ func Rev(content []byte) string {
 // CleanPath validates client-relative paths: reject absolute paths, empty segments, "."/"..", and hidden segments starting with ".".
 // Hidden segments include .rawmark metadata and .git; none are exposed through the API.
 func CleanPath(p string) (string, error) {
-	if p == "" || strings.HasPrefix(p, "/") || strings.ContainsAny(p, "\\\x00") {
+	if !fileutil.IsLocalPath(p) || strings.ContainsAny(p, "\\\x00") {
 		return "", ErrInvalidPath
 	}
 	for _, seg := range strings.Split(p, "/") {

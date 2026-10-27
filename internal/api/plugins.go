@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"rawmark/internal/fileutil"
 	"rawmark/internal/i18n"
 	"regexp"
 	"strings"
@@ -42,7 +43,7 @@ type pluginInfo struct {
 }
 
 func validPluginID(id string) bool {
-	return pluginIDPattern.MatchString(id) && !strings.HasPrefix(id, "rawmark-")
+	return pluginIDPattern.MatchString(id) && fileutil.IsLocalPath(id) && !strings.HasPrefix(id, "rawmark-")
 }
 
 func parsePluginManifest(data []byte) (pluginManifest, error) {
@@ -181,7 +182,7 @@ func unpackPlugin(data []byte, destination string) (pluginInfo, error) {
 	var total int64
 	for _, file := range archive.File {
 		name := strings.TrimSuffix(file.Name, "/")
-		if !fs.ValidPath(name) || strings.ContainsAny(name, "\\:\x00") || strings.HasPrefix(name, ".") || name != path.Clean(name) || seen[name] || (!file.FileInfo().IsDir() && !file.Mode().IsRegular()) {
+		if !fs.ValidPath(name) || !fileutil.IsLocalPath(name) || strings.ContainsAny(name, "\\:\x00") || strings.HasPrefix(name, ".") || name != path.Clean(name) || seen[name] || (!file.FileInfo().IsDir() && !file.Mode().IsRegular()) {
 			return info, i18n.New("plugin_contains_invalid_paths_duplicate_6a1e05")
 		}
 		seen[name] = true

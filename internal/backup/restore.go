@@ -51,15 +51,7 @@ func WriteRecord(data string, record RestoreRecord) error {
 	if err != nil {
 		return err
 	}
-	if err = os.Rename(f.Name(), dest); err != nil {
-		return err
-	}
-	dir, err := os.Open(filepath.Dir(dest))
-	if err != nil {
-		return err
-	}
-	defer dir.Close()
-	return dir.Sync()
+	return publishRecord(f.Name(), dest)
 }
 func Pending(data string) (bool, error) {
 	_, err := os.Stat(recordPath(data))

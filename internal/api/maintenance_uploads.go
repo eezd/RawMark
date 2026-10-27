@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"rawmark/internal/fileutil"
 	"rawmark/internal/i18n"
 	"regexp"
 	"strconv"
@@ -65,11 +66,11 @@ func saveUpload(dir string, meta maintenanceUpload) error {
 	return os.WriteFile(filepath.Join(dir, "upload.json"), data, 0600)
 }
 func enoughSpace(dir string, size int64) error {
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(dir, &stat); err != nil {
+	available, err := fileutil.AvailableBytes(dir)
+	if err != nil {
 		return err
 	}
-	if size < 0 || uint64(size)+(32<<20) > stat.Bavail*uint64(stat.Bsize) {
+	if size < 0 || uint64(size)+(32<<20) > available {
 		return i18n.New("not_enough_disk_space_w_a39b20", syscall.ENOSPC)
 	}
 	return nil

@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"rawmark/internal/fileutil"
 	"rawmark/internal/i18n"
 	"strings"
 	"syscall"
@@ -42,7 +43,7 @@ type Manifest struct {
 type Source struct{ Name, Path string }
 
 func validPath(name string) bool {
-	return name != "" && path.Clean(name) == name && name != "." && !strings.HasPrefix(name, "/") && name != ".." && !strings.HasPrefix(name, "../") && !strings.ContainsAny(name, "\\\x00")
+	return fileutil.IsLocalPath(name) && path.Clean(name) == name && name != "." && !strings.ContainsAny(name, "\\\x00")
 }
 func validEntry(kind, name string) bool {
 	if !validPath(name) {
@@ -237,11 +238,11 @@ func Extract(ctx context.Context, archive, dest string) (Manifest, error) {
 		}
 		expanded += e.Size
 	}
-	var disk syscall.Statfs_t
-	if err := syscall.Statfs(dest, &disk); err != nil {
+	available, err := fileutil.AvailableBytes(dest)
+	if err != nil {
 		return manifest, err
 	}
-	if uint64(expanded)+(32<<20) > disk.Bavail*uint64(disk.Bsize) {
+	if uint64(expanded)+(32<<20) > available {
 		return manifest, i18n.New("not_enough_disk_space_w_a39b20", syscall.ENOSPC)
 	}
 	seen := map[string]bool{}

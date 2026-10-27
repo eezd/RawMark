@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -77,8 +78,14 @@ func run(addr string) error {
 	if err = os.MkdirAll(tempDir, 0700); err != nil {
 		return err
 	}
-	if err = os.Setenv("TMPDIR", tempDir); err != nil {
-		return err
+	tempKeys := []string{"TMPDIR"}
+	if runtime.GOOS == "windows" {
+		tempKeys = []string{"TMP", "TEMP"}
+	}
+	for _, key := range tempKeys {
+		if err = os.Setenv(key, tempDir); err != nil {
+			return err
+		}
 	}
 	logs, err := backup.OpenLog(filepath.Join(dataDir, "logs"))
 	if err != nil {
@@ -221,6 +228,9 @@ func serve(parent context.Context, addr, dataDir, vaultDir, version string, font
 // permissionHint adds guidance for permission errors: Docker bind mounts are often not writable by non-root container users.
 func permissionHint(err error) error {
 	if errors.Is(err, fs.ErrPermission) {
+		if runtime.GOOS == "windows" {
+			return fmt.Errorf("%w (grant this user write access to RAWMARK_DATA and RAWMARK_VAULT)", err)
+		}
 		return fmt.Errorf("%w（当前 UID %d 对数据目录没有写权限：请用 --user 指定宿主机目录所有者的 UID:GID，或执行 chown 修改目录所有者）", err, os.Getuid())
 	}
 	return err

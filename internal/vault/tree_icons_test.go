@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"rawmark/internal/testutil"
 	"reflect"
 	"strings"
 	"testing"
@@ -145,9 +146,7 @@ func TestTreeIconValidationAndCorruptMetadata(t *testing.T) {
 }
 
 func TestTreeIconWriteFailureRollsBack(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("目录写权限测试需以普通用户运行；root 可绕过文件权限")
-	}
+
 	for _, operation := range []string{"set", "move", "delete", "restore"} {
 		t.Run(operation, func(t *testing.T) {
 			v := newVault(t)
@@ -169,10 +168,7 @@ func TestTreeIconWriteFailureRollsBack(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := os.Chmod(filepath.Join(v.root, metaDir), 0555); err != nil {
-				t.Fatal(err)
-			}
-			defer os.Chmod(filepath.Join(v.root, metaDir), 0755)
+			testutil.DenyReplace(t, filepath.Join(v.root, metaDir, "tree-icons.json"))
 			switch operation {
 			case "set":
 				err = v.SetTreeIcon("a.md", &TreeIcon{"builtin", "folder"})

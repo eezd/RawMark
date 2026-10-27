@@ -78,6 +78,8 @@ func TestPortableNotesExcludeApplicationData(t *testing.T) {
 			}
 			// As in the real process, export temporary files live inside the application data directory.
 			t.Setenv("TMPDIR", filepath.Join(data, "temp"))
+			t.Setenv("TMP", filepath.Join(data, "temp"))
+			t.Setenv("TEMP", filepath.Join(data, "temp"))
 			res = f.do(f.admin, "POST", "/api/v1/maintenance/notes/export", "", nil)
 			defer res.Body.Close()
 			assertOK(t, res)

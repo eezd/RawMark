@@ -6,15 +6,15 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"rawmark/internal/testutil"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
 )
 
 func TestTrashPurgeFailurePreservesMetadata(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("目录写权限测试需以普通用户运行；root 可绕过文件权限")
-	}
+
 	for _, operation := range []string{"single", "all", "expired"} {
 		for _, blocked := range []string{"payload", "parent"} {
 			t.Run(operation+"/"+blocked, func(t *testing.T) {
@@ -47,11 +47,11 @@ func TestTrashPurgeFailurePreservesMetadata(t *testing.T) {
 				locked := filepath.Join(v.trash, item.ID, "folder", "locked")
 				if blocked == "parent" {
 					locked = v.trash
+					if runtime.GOOS == "windows" {
+						locked = filepath.Join(v.trash, item.ID)
+					}
 				}
-				if err := os.Chmod(locked, 0500); err != nil {
-					t.Fatal(err)
-				}
-				t.Cleanup(func() { os.Chmod(locked, 0755) })
+				allowRemove := testutil.DenyRemove(t, locked)
 				purge := func() error {
 					if operation == "single" {
 						return v.Purge(item.ID)
@@ -80,9 +80,7 @@ func TestTrashPurgeFailurePreservesMetadata(t *testing.T) {
 				if err != nil || len(items) != 1 || items[0].ID != item.ID {
 					t.Fatalf("删除失败的条目必须仍可列出: %+v %v", items, err)
 				}
-				if err := os.Chmod(locked, 0755); err != nil {
-					t.Fatal(err)
-				}
+				allowRemove()
 				if err := purge(); err != nil {
 					t.Fatalf("修复权限后应可继续清理: %v", err)
 				}

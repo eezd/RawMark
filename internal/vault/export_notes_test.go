@@ -62,6 +62,8 @@ func TestExportNotesKeepsMarkdownAndReportsMissingAssets(t *testing.T) {
 func TestExportNotesExcludesItsOwnOutputInsideVault(t *testing.T) {
 	v := newVault(t)
 	t.Setenv("TMPDIR", v.Root())
+	t.Setenv("TMP", v.Root())
+	t.Setenv("TEMP", v.Root())
 	if _, err := v.Write("note.md", []byte("source"), Precondition{}); err != nil {
 		t.Fatal(err)
 	}
