@@ -15,7 +15,7 @@ export default antfu(
       semi: false,
     },
     // Ignored files.
-    ignores: ['dist/**', 'types/auto/**', 'public/**', 'src/common/appearance/fonts/**', 'src/common/appearance/maple-font.css', 'LICENSE'],
+    ignores: ['dist/**', 'dist-demo/**', 'types/auto/**', 'public/**', 'src/common/appearance/fonts/**', 'src/common/appearance/maple-font.css', 'LICENSE'],
   },
   {
     // Rules applied to all files.
