@@ -122,3 +122,9 @@ pnpm -C web build
 
 按实际风险补充 Go race、Docker 构建和隔离浏览器验证。只用合成数据测试初始化、导入、恢复与删除，不对生产数据执行迁移或维护；生产部署、重启、数据库迁移执行及 commit/push 均需另行明确授权。
 本文件为规范唯一来源，`CLAUDE.md`、`.cursor/rules/`、`.trae/rules/` 仅指回本文件；`.agents/skills/v3-*` 仅提供对应任务的操作入口，不复制第二套规则。
+
+## CI/CD
+
+Gitea 为主仓库和构建执行方；日常 main push 仅构建 Linux amd64，通过隔离验收后发布开发镜像并更新独立开发实例。正式发布只从 Gitea 手动入口选择已通过开发 CI 的提交，构建五平台包及 Linux 双架构镜像，同步同一版本至 GitHub/GHCR；GitHub 不执行项目构建，仅允许 Pages 平台部署预构建 Demo。生产仅手动选择完整发布版本并固定 GHCR 摘要，不能随开发推送更新。
+
+runner 保持容量一，最多两个任务同时运行；当前宿主 Docker 执行器只接收受信代码。临时资源按任务标识清理，不全局 prune，不删除部署容器。CI 行为测试为 `python3 -m unittest discover -s scripts/tests -v`；项目检查与打包入口为 `sh scripts/ci-check.sh development|release`、`sh scripts/ci-package.sh development|release`，仅在 CI 工具链容器执行。正式版本、凭据、上传限制、部署目录与回退步骤见双语开发和部署文档。

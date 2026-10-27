@@ -54,7 +54,7 @@ RAWMARK_DATA_DIR=/your/storage/rawmark/data \
 
 ## 预构建镜像与原生程序
 
-正式镜像为 `ghcr.io/eezd/rawmark:0.1.1`，支持 Linux amd64 和 arm64。将上述 Docker 命令中的 `rawmark` 镜像名替换为它即可跳过源码构建。`latest` 跟随最新稳定版本；需要可控升级时请固定版本标签。仓库 Compose 文件继续支持源码构建。
+正式发布后提供 `ghcr.io/eezd/rawmark:<版本>`，支持 Linux amd64 和 arm64。此前版本已撤回，`VERSION` 不代表版本已可下载；使用下方示例版本前先核对 Releases 和软件包公开状态。将上述 Docker 命令中的 `rawmark` 镜像名替换为它即可跳过源码构建。`latest` 跟随最新稳定版本；需要可控升级时请固定版本标签。仓库 Compose 文件继续支持源码构建。
 
 [Releases 页面](https://github.com/eezd/RawMark/releases) 提供 Linux amd64/arm64、Windows amd64 和 macOS Intel/Apple Silicon 原生压缩包及 `SHA256SUMS`。下载对应系统和架构，先核对校验和再解压：
 
@@ -146,7 +146,7 @@ docker run -d --name rawmark --restart unless-stopped \
 
 1. 确认目标版本的行为和数据兼容性，保留当前镜像及部署配置。
 2. 停止旧服务，备份应用数据与外置笔记库。
-3. 更新源码并重新构建，使用同一份挂载启动新实例；不要并行运行新旧服务。
+3. 拉取选定的预构建镜像摘要，使用同一份挂载启动新实例；源码构建仅供贡献者选择，不用于托管生产更新。不要并行运行新旧服务。
 4. 核对容器健康、登录、笔记与附件。回退时使用配套的旧镜像与数据备份。
 
 Bearer 认证升级需要前后端一起发布。旧 Cookie 页面不能继续使用，需重新登录；启动程序会沿现有 SQLite 初始化流程创建资源票据表和索引，笔记、密码、设置与已有 API 令牌保留。第三方客户端的 JSON 解包方式须遵循[当前协议](api.zh-CN.md)。
@@ -160,3 +160,26 @@ Bearer 认证升级需要前后端一起发布。旧 Cookie 页面不能继续�
 - 重置设置保留账户、资源、插件存储和本机标签页。
 - 日志位于 `logs/`，轮转保留三份，每份至多 10 MiB；可在设置中导出日志及版本摘要。该功能不补录历史日志。
 - 更新后界面异常先核对前后端是否来自同一构建，再查看浏览器网络请求和应用日志；插件与外观恢复入口见[使用指南](guide.zh-CN.md#插件与界面恢复)。
+
+## 开发与生产托管
+
+仓库 `deploy/compose.image.yml` 是仅拉镜像的模板，复制至实例目录并命名为 `compose.yml`，旁边放权限 600 的私有 `.env`。实例不依赖源码工作目录，必须明确填写：
+
+```dotenv
+RAWMARK_CHANNEL=development
+RAWMARK_PROJECT=rawmark-dev
+RAWMARK_BIND=127.0.0.1
+RAWMARK_PORT=21001
+RAWMARK_DATA_DIR=/docker/main/rawmark-dev/data
+RAWMARK_IMAGE=git.134333.xyz/eezd/rawmark@sha256:<已验证摘要>
+```
+
+生产使用 channel `production`、project `rawmark`、端口 21000、`/docker/main/rawmark/data` 和 `ghcr.io/eezd/rawmark@sha256:<已验证摘要>`；迁移时保留当前监听地址。仅为新的开发目录设置 `65532:65532` 所有者，不递归修改现有生产权限，不将仓库示例模板作为运行数据挂载。
+
+main push CI 自动更新开发。Gitea **Deploy production manually** 工作流只接受两端均正式发布、构建/发布回执相同且标签一致的版本。它固定 GHCR 摘要，检查原挂载与并发写入实例，仅停止本项目旧服务，备份完整数据目录和配置后替换。备份为私有文件并包含 SQLite WAL；旧镜像和备份继续保留。
+
+替换前记录 `deployment.pending.json`，健康和前端检查通过后记录 `deployment.json`。候选版本访问数据后失败则停止候选，保留备份和 pending 记录，不自动恢复私人数据，也不直接用旧程序打开可能迁移后的数据；恢复须明确授权并核对兼容性。备份在替换前失败时，旧数据未被新程序访问，可安全重新启动旧容器。不做全局 Docker 清理。
+
+准备生产文件不等于重启当前服务或执行数据迁移。首次从旧源码构建 Compose 切换须明确授权生产更新，不同时运行两套 Compose。先用合成数据演练更新和恢复。
+
+新开发域名须完成 DNS、CDN 自定义主机名及证书激活，并配置源站和国内入口。必须验证公网访问，不能仅凭回环端口健康或 DNS 有记录认定成功。所有代理都要对资源票据路径脱敏。

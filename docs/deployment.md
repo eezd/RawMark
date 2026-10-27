@@ -54,7 +54,7 @@ Do not point the quick-start container and a Compose instance at the same databa
 
 ## Prebuilt images and native programs
 
-Release images are available as `ghcr.io/eezd/rawmark:0.1.1` for Linux amd64 and arm64. Replace `rawmark` in the Docker commands above with that image name to skip source builds. `latest` follows the latest stable release; use a version tag for controlled upgrades. The repository Compose file continues to support source builds.
+Formal releases publish `ghcr.io/eezd/rawmark:<version>` for Linux amd64 and arm64. The earlier releases were withdrawn; `VERSION` alone does not mean a version is available. Check the Releases page and package visibility before using the example version below. Replace `rawmark` in the Docker commands above with that image name to skip source builds. `latest` follows the latest stable release; use a version tag for controlled upgrades. The repository Compose file continues to support source builds.
 
 Native archives for Linux amd64/arm64, Windows amd64 and macOS Intel/Apple Silicon, plus `SHA256SUMS`, are available on the [Releases page](https://github.com/eezd/RawMark/releases). Download the archive matching your operating system and architecture and verify its checksum before extracting it:
 
@@ -146,7 +146,7 @@ In addition to application backups, stop the service before upgrades and back up
 
 1. Check the target version's behavior and data compatibility; retain the current image and deployment configuration.
 2. Stop the old service and back up application data and any external vault.
-3. Update the source, rebuild, and start the new instance with the same mounts. Do not run old and new services concurrently.
+3. Pull the selected prebuilt image digest and start with the same mounts. Source builds are optional contributor workflows, not managed production updates. Do not run old and new services concurrently.
 4. Verify container health, sign-in, notes, and attachments. Roll back using the matching previous image and data backup.
 
 The Bearer authentication upgrade requires the frontend and backend to be released together. Old Cookie-based pages require signing in again. Startup creates the resource-ticket table and indexes through the existing SQLite initialization flow; notes, passwords, settings, and existing API tokens are retained. Third-party clients must follow the [current JSON protocol](api.md).
@@ -160,3 +160,26 @@ The Bearer authentication upgrade requires the frontend and backend to be releas
 - Resetting settings retains the account, resources, plugin storage, and local tabs.
 - Logs live in `logs/`, with three rotated files retained, each up to 10 MiB. Settings can export logs and a version summary; this does not reconstruct historical logs.
 - If the interface breaks after an update, first check that the frontend and backend come from the same build, then inspect browser network requests and application logs. See the [user guide](guide.md#plugins-and-interface-recovery) for plugin and appearance recovery entry points.
+
+## Managed development and production
+
+The checked-in `deploy/compose.image.yml` is an image-only template. Copy it to the instance directory as `compose.yml`, with a private mode-600 `.env` beside it. These instances do not depend on a source checkout. Set all required values explicitly:
+
+```dotenv
+RAWMARK_CHANNEL=development
+RAWMARK_PROJECT=rawmark-dev
+RAWMARK_BIND=127.0.0.1
+RAWMARK_PORT=21001
+RAWMARK_DATA_DIR=/docker/main/rawmark-dev/data
+RAWMARK_IMAGE=git.134333.xyz/eezd/rawmark@sha256:<verified-digest>
+```
+
+For production, use channel `production`, project `rawmark`, port 21000, `/docker/main/rawmark/data`, and `ghcr.io/eezd/rawmark@sha256:<verified-digest>`. Preserve the current binding during migration. Create only a new development data directory with owner `65532:65532`; never recursively change existing production ownership or mount the repository example template as live storage.
+
+Main-push CI automatically updates development. The **Deploy production manually** Gitea workflow only accepts a version whose Gitea and GitHub releases are formal and contain identical build/release receipts and matching tags. It fixes the GHCR digest, checks current mounts and competing writers, stops only this project's old service, and backs up the whole data directory plus configuration before replacement. Backups are private and include SQLite WAL files; old images and backups are retained.
+
+The job records `deployment.pending.json` before replacement and `deployment.json` after health/frontend checks. If the candidate fails after accessing data, it stops the candidate and retains the backup and pending record for diagnosis; it does not automatically restore private data or run an older program against possibly migrated storage. Recovery requires explicit authorization and compatibility review. If backup fails before replacement, the untouched old service can be restarted safely. No global Docker cleanup is performed.
+
+Preparing the production files does not restart the current service or execute a data migration. Its first transition from the old source-build Compose is an explicitly authorized production update. Do not run both Compose configurations simultaneously. Test upgrades and recovery with synthetic data before that transition.
+
+A new development domain needs DNS, CDN custom-hostname activation and TLS, plus both the origin and regional ingress proxy configuration. Verify public access; a healthy loopback port or DNS record alone is insufficient. Keep resource-ticket paths redacted on every proxy.

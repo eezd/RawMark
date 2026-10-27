@@ -39,6 +39,8 @@ RawMark is built for **single-user, self-hosted use**. It currently does not off
 
 With Docker installed:
 
+Choose an available version from [Releases](https://github.com/eezd/RawMark/releases) first. Previous releases were withdrawn; the command below is an installation example, not an availability guarantee.
+
 ```sh
 docker run -d --name rawmark --restart unless-stopped \
   -p 127.0.0.1:21000:8080 \

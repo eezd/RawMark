@@ -108,22 +108,47 @@ python3 scripts/prepare-maple-font.py /path/to/MapleMonoNormalNL-NF-CN.zip
 
 后端 `internal/i18n/` 保存消息 ID 与参数，错误在 HTTP 边界根据 `Accept-Language` 渲染，并保留 `errors.Is/As` 及原始诊断；日志遵循原有语言。既有索引警告只在需要时重新分析源笔记生成译文，同时更新该条目的完整元数据和版本，不改索引格式；已删除或移动的过期条目跳过，其他读取错误明确返回。新增文案同时补充中英字典与参数，运行字典完整性、设置同步、编辑器和 API 的相应测试。
 
-## 开发 CI 与发布晋级
+## Gitea CI/CD
 
-Gitea 为开发远端（`origin`），GitHub 为发布远端（`github`）。日常 `git push origin main` 触发 `.gitea/workflows/ci.yml`；不配置 GitHub 自动镜像，开发 CI 不发布版本或部署服务。私有 runner 每次执行一个 job，保持容量为一（本项目最多不能超过两个）。
+Gitea 是主仓库和构建执行方（`origin`）；GitHub（`github`）只接收明确发布的版本，不持续镜像。项目检查和编译全部在 CI 工具链容器执行，不向部署宿主安装 Node 或 Go。runner 容量保持一；加上允许的 Pages 平台部署，同时执行的任务不超过两个。
 
-Linux runner 执行 lint、类型检查、前端测试、正式与 Demo 构建、Go vet 和测试、普通用户文件权限测试，以及使用临时数据的 Linux amd64 程序生命周期测试；交叉编译并 vet Linux amd64/arm64、Windows amd64、macOS arm64/amd64。交叉编译**不代表**已验证 Windows、macOS 或 Linux arm64 的原生行为，GitHub 发布流程仍保留原生测试。 检查通过后，后续 Docker job 核对同一次运行的 Linux amd64 安装包校验和，使用 `deploy/Dockerfile.release` 构建镜像；验证非 root 运行、内嵌前端、健康检查、认证、示例笔记、中文路径、编辑、移动、回收站、重启与重建容器后的持久化和服务端注销。测试使用全新内部网络与命名卷，不发布宿主机端口，结束后移除临时容器、卷、网络及镜像，不推送镜像仓库。
+### 开发流程
 
-每个平台独立上传压缩包，附校验和，保留七天。上传前拒绝大于等于 90,000,000 字节的包，为 Cloudflare 的 100 MB 请求限制预留余量；不将五平台合成一个产物，不将构建输出提交到 Git。Git HTTP 限制同样针对整个 push 请求，而非只针对单个文件：保持小批量推送，不将大二进制文件写入历史。自托管 runner 通过已配置的 Docker 私有网络连接 Gitea。
+main push 触发 `.gitea/workflows/ci.yml`，执行项目检查、CI 行为测试、Linux amd64 打包和原生生命周期冒烟。后续 Docker job 校验同一运行的包，使用合成数据验证非 root 镜像、重启及重建容器持久化、服务端注销；通过后才发布 `git.134333.xyz/eezd/rawmark:dev-<完整SHA>` 并按摘要更新独立开发实例。PR 仅检查和打包，不注入发布凭据、不部署。宿主 Docker runner 只运行受信代码，并非不可信代码沙箱；外部 PR 运行前须由维护者审查。
 
-发布时选择已 review 且通过 Gitea CI 的 commit。先完成版本与发布说明调整，再在 Gitea 验证最终提交。获得明确发布授权后，将该提交同步至 GitHub，并为该提交推送版本标签，不能直接发布后来移动且未验证的分支顶端。此前版本撤销后，GitHub Release Actions 仍处于手动禁用状态；仅在获准发布时恢复。生产部署另行授权。
+开发使用 `raw-dev.134333.xyz`、回环端口 21001 和 `/docker/main/rawmark-dev/data`；生产保留独立数据和 21000 端口。部署锁内再次核对 main，旧运行不能覆盖新部署。
 
-## 版本发布与公开 Demo
+CI 入口是 `sh scripts/ci-check.sh development` 和 `sh scripts/ci-package.sh development`；参数换为 `release` 才构建 Demo 和五平台程序。`python3 -m unittest discover -s scripts/tests -v` 验证产物与部署行为。部署宿主不重新编译这些产物。
 
-`VERSION` 是发布版本的唯一来源。Docker 构建和发布二进制将其写入 `--version`，Vite 用于设置页面展示；既有 PWA 内容哈希保持独立。
+### 正式发布
 
-发布时更新 `VERSION`、`.github/release-notes.md` 和双语安装示例，完成检查、review、提交并通过 Gitea CI。明确获准发布后，将选定的 `main` 提交推送至 `github` 远端，再将该提交对应的 `vX.Y.Z` 标签推送至 `github`。`.github/workflows/release.yml` 是唯一发布工作流：普通分支推送不触发，创建 Release 也不启动第二个工作流。发布运行全局串行，原生平台矩阵最多同时执行两个 job。同一次运行完成检查、Linux amd64/arm64、Windows amd64 与 macOS amd64/arm64 原生程序测试、以相同程序封装双架构镜像、Demo 部署及 Release 和稳定镜像标签发布。失败时在原 run 中重跑失败 job，不移动已发布标签或覆盖发布附件。
+先更新 `VERSION` 和 `.github/release-notes.md`，review 提交并通过 main push 开发 CI。进入 Gitea 的 **Release** 工作流，选择 main，输入完整提交 SHA 和对应的 `X.Y.Z` 版本。手动操作才发布，推标签不会自动启动发布。
 
-GitHub Pages 必须选择 GitHub Actions 作为发布来源，`github-pages` 环境需要允许版本标签部署。首次 GHCR 镜像需在包设置中将可见性改为 Public，公告前验证匿名拉取。生产实例部署与版本发布是不同操作。
+同一工作流完成检查并打包 Linux amd64/arm64、Windows amd64、Darwin amd64/arm64。现有 runner 只对 Linux amd64 执行原生运行验收；交叉构建和 vet 不代替 Windows、macOS、ARM64 原生验收，先前 Windows 原生测试失败尚未复验。程序包附许可证和 `SHA256SUMS`。双架构镜像复用这些包中的 Linux 二进制，原样同步到 Gitea Registry 和 GHCR。
 
-执行 `pnpm -C web build:demo` 构建静态编辑器预览，输出至 `web/dist-demo/`，基础路径为 `/RawMark/`。复用现有编辑器，修改仅在当前页面保留；不使用私有 API、认证、持久化工作区或 Service Worker。工作流在同一次发布运行中部署至 https://eezd.github.io/RawMark/。
+完成产物上传后，工作流准备 Gitea 草稿和不可变的 `build.json`；`image.json` 记录已验证候选镜像，`release.json` 关联构建、镜像摘要和 Demo 提交。两端最终发布文件一致。中断后重跑失败 job 或重新选择相同版本和提交，复用已有回执与原始产物；原产物过期则明确失败，不重新构建另一份内容。标签或附件冲突报错，已发布版本不覆盖。GitHub main 只正常快进。
+
+GitHub 发布和 Pages 验证完成后，Gitea 才成为正式 Release。跨服务发布不具原子性：失败时可能已有 GitHub Release 或候选镜像，但 Gitea 仍为草稿，该版本不能进入生产。稳定镜像标签只在产物和公开镜像验证后更新。
+
+每个安装包及 Demo 产物小于 90,000,000 字节，按平台分别上传。同时核对源码 Git pack 和镜像 blob：Cloudflare 100 MB 限制针对请求，而非只针对单个入库文件。合并 OCI 文件只留在 CI 临时空间，不作为发布附件上传。
+
+### 凭据与 runner
+
+在 Gitea 仓库 Actions Secrets 中配置：
+
+| Secret | 所需权限 |
+| --- | --- |
+| `RAWMARK_GITEA_TOKEN` | Gitea 仓库 Release 与 Packages 写入 |
+| `RAWMARK_GITHUB_TOKEN` | GitHub classic PAT，仓库权限、修改工作流文件所需的 `workflow`、`write:packages` |
+
+Gitea 禁止 Secret 名以 `GITEA_` 或 `GITHUB_` 开头。令牌不进入 Git 或日志；job 的 Docker 凭据使用私有临时目录。手动生产 job 使用只读 Gitea job token 和匿名 GitHub/GHCR 读取，不获取发布 PAT。
+
+首次创建的 GHCR 包默认私有，需要在包设置中设为公开后重跑失败的发布 job；匿名拉取通过后才能完成发布。不假定仓库凭据天然有 Packages 权限。
+
+现有 runner 设置 `container.sweep: false`，避免任务结束后清除已部署服务。冒烟资源带 run/attempt 标签，由 always 清理步骤仅回收本次资源；部署挂载仅允许两个实例目录。不执行全局 Docker prune，不删除历史软件包；成功、失败和取消后均核对清理结果。
+
+### 静态 Demo
+
+`pnpm -C web build:demo` 生成 `web/dist-demo/`，基础路径为 `/RawMark/`。示例编辑仅在当前页面有效，不使用私有 API、身份、持久化工作区或 Service Worker。Gitea 将预构建产物和 `.nojekyll` 同步至 GitHub `gh-pages`，Pages 从此分支发布。GitHub 仍会执行平台 Pages 部署，这是唯一允许的 GitHub job，不编译 RawMark；旧 GitHub 项目发布工作流已移除。
+
+生产更新为独立手动操作，见[部署文档](deployment.zh-CN.md#开发与生产托管)。

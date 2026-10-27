@@ -39,6 +39,8 @@ RawMark 面向**单用户、自托管**场景。目前不提供多人协作或�
 
 安装 Docker 后运行：
 
+请先从 [Releases](https://github.com/eezd/RawMark/releases) 选择已发布版本。此前版本已撤回，下方命令仅为安装示例，不代表该版本已可拉取。
+
 ```sh
 docker run -d --name rawmark --restart unless-stopped \
   -p 127.0.0.1:21000:8080 \
