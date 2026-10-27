@@ -112,7 +112,7 @@ python3 scripts/prepare-maple-font.py /path/to/MapleMonoNormalNL-NF-CN.zip
 
 Gitea 为开发远端（`origin`），GitHub 为发布远端（`github`）。日常 `git push origin main` 触发 `.gitea/workflows/ci.yml`；不配置 GitHub 自动镜像，开发 CI 不发布版本或部署服务。私有 runner 每次执行一个 job，保持容量为一（本项目最多不能超过两个）。
 
-Linux runner 执行 lint、类型检查、前端测试、正式与 Demo 构建、Go vet 和测试、普通用户文件权限测试，以及使用临时数据的 Linux amd64 程序生命周期测试；交叉编译并 vet Linux amd64/arm64、Windows amd64、macOS arm64/amd64。交叉编译**不代表**已验证 Windows、macOS 或 Linux arm64 的原生行为，GitHub 发布流程仍保留原生测试。
+Linux runner 执行 lint、类型检查、前端测试、正式与 Demo 构建、Go vet 和测试、普通用户文件权限测试，以及使用临时数据的 Linux amd64 程序生命周期测试；交叉编译并 vet Linux amd64/arm64、Windows amd64、macOS arm64/amd64。交叉编译**不代表**已验证 Windows、macOS 或 Linux arm64 的原生行为，GitHub 发布流程仍保留原生测试。 检查通过后，后续 Docker job 核对同一次运行的 Linux amd64 安装包校验和，使用 `deploy/Dockerfile.release` 构建镜像；验证非 root 运行、内嵌前端、健康检查、认证、示例笔记、中文路径、编辑、移动、回收站、重启与重建容器后的持久化和服务端注销。测试使用全新内部网络与命名卷，不发布宿主机端口，结束后移除临时容器、卷、网络及镜像，不推送镜像仓库。
 
 每个平台独立上传压缩包，附校验和，保留七天。上传前拒绝大于等于 90,000,000 字节的包，为 Cloudflare 的 100 MB 请求限制预留余量；不将五平台合成一个产物，不将构建输出提交到 Git。Git HTTP 限制同样针对整个 push 请求，而非只针对单个文件：保持小批量推送，不将大二进制文件写入历史。自托管 runner 通过已配置的 Docker 私有网络连接 Gitea。
 

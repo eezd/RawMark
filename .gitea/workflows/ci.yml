@@ -130,3 +130,49 @@ jobs:
           path: downloads/SHA256SUMS
           if-no-files-found: error
           retention-days: 7
+
+  docker-smoke:
+    needs: check-and-package
+    runs-on: docker
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: sh
+    steps:
+      - name: Install CI action and smoke-test runtimes
+        run: apk add --no-cache nodejs python3
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: https://github.com/actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-amd64
+          path: downloads
+      - uses: https://github.com/actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: checksums
+          path: downloads
+      - name: Verify the tested binary archive
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          expected = {line.split()[1]: line.split()[0] for line in Path('downloads/SHA256SUMS').read_text().splitlines()}
+          archive = Path(f'downloads/rawmark_{Path("VERSION").read_text().strip()}_linux_amd64.tar.gz')
+          with archive.open('rb') as source:
+              assert hashlib.file_digest(source, 'sha256').hexdigest() == expected[archive.name]
+          PY
+          mkdir -p image/linux/amd64 image/data
+          tar -xzf "downloads/rawmark_$(cat VERSION)_linux_amd64.tar.gz" -C image/linux/amd64
+      - name: Build and test the isolated container image
+        env:
+          COMMIT_SHA: ${{ gitea.sha }}
+          RUN_ID: ${{ gitea.run_id }}
+          RUN_ATTEMPT: ${{ gitea.run_attempt }}
+        run: |
+          set -eu
+          image="rawmark-ci:$COMMIT_SHA-$RUN_ID-$RUN_ATTEMPT"
+          docker build --build-arg TARGETARCH=amd64 --tag "$image" -f deploy/Dockerfile.release image
+          trap 'docker image rm "$image"' EXIT
+          python3 scripts/smoke-docker.py "$image" --client-container "$(hostname)"
