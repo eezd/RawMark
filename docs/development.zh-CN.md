@@ -108,11 +108,21 @@ python3 scripts/prepare-maple-font.py /path/to/MapleMonoNormalNL-NF-CN.zip
 
 后端 `internal/i18n/` 保存消息 ID 与参数，错误在 HTTP 边界根据 `Accept-Language` 渲染，并保留 `errors.Is/As` 及原始诊断；日志遵循原有语言。既有索引警告只在需要时重新分析源笔记生成译文，同时更新该条目的完整元数据和版本，不改索引格式；已删除或移动的过期条目跳过，其他读取错误明确返回。新增文案同时补充中英字典与参数，运行字典完整性、设置同步、编辑器和 API 的相应测试。
 
+## 开发 CI 与发布晋级
+
+Gitea 为开发远端（`origin`），GitHub 为发布远端（`github`）。日常 `git push origin main` 触发 `.gitea/workflows/ci.yml`；不配置 GitHub 自动镜像，开发 CI 不发布版本或部署服务。私有 runner 每次执行一个 job，保持容量为一（本项目最多不能超过两个）。
+
+Linux runner 执行 lint、类型检查、前端测试、正式与 Demo 构建、Go vet 和测试、普通用户文件权限测试，以及使用临时数据的 Linux amd64 程序生命周期测试；交叉编译并 vet Linux amd64/arm64、Windows amd64、macOS arm64/amd64。交叉编译**不代表**已验证 Windows、macOS 或 Linux arm64 的原生行为，GitHub 发布流程仍保留原生测试。
+
+每个平台独立上传压缩包，附校验和，保留七天。上传前拒绝大于等于 90,000,000 字节的包，为 Cloudflare 的 100 MB 请求限制预留余量；不将五平台合成一个产物，不将构建输出提交到 Git。Git HTTP 限制同样针对整个 push 请求，而非只针对单个文件：保持小批量推送，不将大二进制文件写入历史。自托管 runner 通过已配置的 Docker 私有网络连接 Gitea。
+
+发布时选择已 review 且通过 Gitea CI 的 commit。先完成版本与发布说明调整，再在 Gitea 验证最终提交。获得明确发布授权后，将该提交同步至 GitHub，并为该提交推送版本标签，不能直接发布后来移动且未验证的分支顶端。此前版本撤销后，GitHub Release Actions 仍处于手动禁用状态；仅在获准发布时恢复。生产部署另行授权。
+
 ## 版本发布与公开 Demo
 
 `VERSION` 是发布版本的唯一来源。Docker 构建和发布二进制将其写入 `--version`，Vite 用于设置页面展示；既有 PWA 内容哈希保持独立。
 
-发布时更新 `VERSION`、`.github/release-notes.md` 和双语安装示例，完成检查、review 和提交后 push `main`，再推送对应的 `vX.Y.Z` 标签。`.github/workflows/release.yml` 是唯一发布工作流：普通分支推送不触发，创建 Release 也不启动第二个工作流。发布运行全局串行，原生平台矩阵最多同时执行两个 job。同一次运行完成检查、Linux amd64/arm64、Windows amd64 与 macOS amd64/arm64 原生程序测试、以相同程序封装双架构镜像、Demo 部署及 Release 和稳定镜像标签发布。失败时在原 run 中重跑失败 job，不移动已发布标签或覆盖发布附件。
+发布时更新 `VERSION`、`.github/release-notes.md` 和双语安装示例，完成检查、review、提交并通过 Gitea CI。明确获准发布后，将选定的 `main` 提交推送至 `github` 远端，再将该提交对应的 `vX.Y.Z` 标签推送至 `github`。`.github/workflows/release.yml` 是唯一发布工作流：普通分支推送不触发，创建 Release 也不启动第二个工作流。发布运行全局串行，原生平台矩阵最多同时执行两个 job。同一次运行完成检查、Linux amd64/arm64、Windows amd64 与 macOS amd64/arm64 原生程序测试、以相同程序封装双架构镜像、Demo 部署及 Release 和稳定镜像标签发布。失败时在原 run 中重跑失败 job，不移动已发布标签或覆盖发布附件。
 
 GitHub Pages 必须选择 GitHub Actions 作为发布来源，`github-pages` 环境需要允许版本标签部署。首次 GHCR 镜像需在包设置中将可见性改为 Public，公告前验证匿名拉取。生产实例部署与版本发布是不同操作。
 
