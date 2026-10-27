@@ -7,12 +7,14 @@ RUN corepack enable && corepack prepare pnpm@12.11.2 --activate
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml web/.npmrc ./
 RUN pnpm install --frozen-lockfile
 COPY web/ ./
+COPY VERSION /src/VERSION
 RUN pnpm build
 
 # ---- Backend (frontend assets embedded in the binary) ----
 FROM golang:1-alpine AS server
 WORKDIR /src
 COPY go.mod go.sum ./
+COPY VERSION ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
@@ -20,10 +22,14 @@ COPY deploy/embed.go ./deploy/
 COPY deploy/data/vault ./deploy/data/vault
 COPY web/embed.go web/font_storage.go ./web/
 COPY --from=web /src/web/dist ./web/dist
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/rawmark ./cmd/rawmark && mkdir -p /out/data
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.releaseVersion=$(cat VERSION)" -o /out/rawmark ./cmd/rawmark && mkdir -p /out/data
 
 # ---- Runtime ----
 FROM gcr.io/distroless/static:nonroot
+COPY LICENSE /LICENSE
+COPY web/LICENSE /licenses/vue3-starter-MIT.txt
+COPY web/src/common/appearance/fonts/*-OFL.txt /licenses/
+COPY web/src/common/appearance/fonts/maple/LICENSE.txt /licenses/Maple-Mono-OFL.txt
 COPY --from=server /out/rawmark /rawmark
 COPY --from=server --chown=nonroot:nonroot /out/data /data
 ENV RAWMARK_DATA=/data

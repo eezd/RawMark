@@ -32,6 +32,9 @@ import (
 	"rawmark/web"
 )
 
+// releaseVersion is set from VERSION by release and Docker builds.
+var releaseVersion = "dev"
+
 func env(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -40,6 +43,10 @@ func env(key, def string) string {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--version" {
+		fmt.Println("RawMark " + releaseVersion)
+		return
+	}
 	addr := env("RAWMARK_ADDR", ":8080")
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		os.Exit(healthcheck(addr))

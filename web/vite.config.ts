@@ -8,7 +8,10 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import Components from 'unplugin-vue-components/vite'
 import { defineConfig } from 'vitest/config'
 
+const releaseVersion = readFileSync(new URL('../VERSION', import.meta.url), 'utf8').trim()
+
 export default defineConfig({
+  define: { __RAWMARK_RELEASE__: JSON.stringify(releaseVersion) },
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)), '@@': fileURLToPath(new URL('./src/common', import.meta.url)) } },
   plugins: [
     vue(),

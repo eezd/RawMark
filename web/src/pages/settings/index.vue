@@ -21,6 +21,7 @@ import { searchSettings, SETTINGS_SECTIONS } from './settings-catalog'
 const props = defineProps<{ prepareMaintenance: () => Promise<void>, restoreNote: (id: string) => Promise<void> }>()
 const emit = defineEmits<{ importNotes: [] }>()
 const { settingsSave } = useSettingsStore()
+const releaseVersion = __RAWMARK_RELEASE__
 const buildVersion = import.meta.env.DEV ? translate('settings.development_0d1c11') : document.querySelector<HTMLMetaElement>('meta[name="rawmark-version"]')?.content
 if (!buildVersion) throw new Error(translate('settings.application_build_information_is_missing_6b04f9'))
 const model = defineModel<SettingsSection | 'index' | null>({ required: true })
@@ -80,7 +81,7 @@ function close() {
           </button>
         </div>
         <div class="rm-settings-nav-foot">
-          <span>RawMark</span><small>{{ buildVersion }}</small>
+          <span>RawMark</span><small>{{ releaseVersion }}</small>
         </div>
       </nav>
       <section class="rm-settings-body">
@@ -120,7 +121,7 @@ function close() {
                 {{ translate('settings.rawmark_a_markdown_note_editor_66b52a') }}
               </p>
               <SettingRow id="version">
-                <code>{{ buildVersion }}</code>
+                <code>{{ releaseVersion }} · {{ buildVersion }}</code>
               </SettingRow>
               <SettingRow id="install">
                 <el-button v-if="installPrompt" class="rm-btn" @click="installApp">
