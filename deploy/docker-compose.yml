@@ -9,5 +9,8 @@ services:
     ports:
       - "0.0.0.0:${RAWMARK_PORT:-21000}:8080"
     volumes:
-      - ./data:/data
+      - ${RAWMARK_DATA_DIR:-rawmark-data}:/data
     stop_grace_period: 15s
+
+volumes:
+  rawmark-data:
