@@ -112,7 +112,7 @@ python3 scripts/prepare-maple-font.py /path/to/MapleMonoNormalNL-NF-CN.zip
 
 `VERSION` 是发布版本的唯一来源。Docker 构建和发布二进制将其写入 `--version`，Vite 用于设置页面展示；既有 PWA 内容哈希保持独立。
 
-发布时更新 `VERSION`、`.github/release-notes.md` 和双语安装示例，完成检查、review 和提交后 push `main`，再推送对应的 `vX.Y.Z` 标签。`.github/workflows/release.yml` 是唯一发布工作流：普通分支推送不触发，创建 Release 也不启动第二个工作流。同一次运行完成检查、Linux amd64/arm64、Windows amd64 与 macOS amd64/arm64 原生程序测试、以相同程序封装双架构镜像、Demo 部署及 Release 和稳定镜像标签发布。失败时在原 run 中重跑失败 job，不移动已发布标签或覆盖发布附件。
+发布时更新 `VERSION`、`.github/release-notes.md` 和双语安装示例，完成检查、review 和提交后 push `main`，再推送对应的 `vX.Y.Z` 标签。`.github/workflows/release.yml` 是唯一发布工作流：普通分支推送不触发，创建 Release 也不启动第二个工作流。发布运行全局串行，原生平台矩阵最多同时执行两个 job。同一次运行完成检查、Linux amd64/arm64、Windows amd64 与 macOS amd64/arm64 原生程序测试、以相同程序封装双架构镜像、Demo 部署及 Release 和稳定镜像标签发布。失败时在原 run 中重跑失败 job，不移动已发布标签或覆盖发布附件。
 
 GitHub Pages 必须选择 GitHub Actions 作为发布来源，`github-pages` 环境需要允许版本标签部署。首次 GHCR 镜像需在包设置中将可见性改为 Public，公告前验证匿名拉取。生产实例部署与版本发布是不同操作。
 
