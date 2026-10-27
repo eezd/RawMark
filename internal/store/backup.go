@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/url"
+	"path/filepath"
 	"rawmark/internal/i18n"
 	"strings"
 )
@@ -83,7 +84,15 @@ func (s *Store) CheckBackup() error {
 
 // OpenExisting opens only existing databases; import validation must not create tables or change journal modes.
 func OpenExisting(path string) (*Store, error) {
-	db, err := sql.Open("sqlite", (&url.URL{Scheme: "file", Path: path, RawQuery: "mode=rw&_pragma=busy_timeout(5000)"}).String())
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	uriPath := filepath.ToSlash(absolute)
+	if filepath.VolumeName(absolute) != "" && !strings.HasPrefix(uriPath, "/") {
+		uriPath = "/" + uriPath
+	}
+	db, err := sql.Open("sqlite", (&url.URL{Scheme: "file", Path: uriPath, RawQuery: "mode=rw&_pragma=busy_timeout(5000)"}).String())
 	if err != nil {
 		return nil, err
 	}

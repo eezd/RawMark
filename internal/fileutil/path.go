@@ -21,7 +21,9 @@ func IsLocalPath(name string) bool {
 			}
 		}
 		for _, part := range strings.Split(name, "/") {
-			if strings.HasSuffix(part, " ") || strings.HasSuffix(part, ".") {
+			// Reject device basenames on every supported Windows version, including extensions.
+			base, _, _ := strings.Cut(part, ".")
+			if (base != "" && !filepath.IsLocal(strings.TrimRight(base, " "))) || strings.HasSuffix(part, " ") || strings.HasSuffix(part, ".") {
 				return false
 			}
 		}

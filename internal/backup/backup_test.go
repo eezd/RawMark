@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -228,7 +229,7 @@ func TestLogRotationIsBounded(t *testing.T) {
 	}
 	for _, entry := range entries {
 		info, _ := entry.Info()
-		if info.Size() > 10<<20 || info.Mode().Perm() != 0600 {
+		if info.Size() > 10<<20 || (runtime.GOOS != "windows" && info.Mode().Perm() != 0600) {
 			t.Fatalf("日志未限量或权限不符: %+v", info)
 		}
 	}

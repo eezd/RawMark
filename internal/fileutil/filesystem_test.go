@@ -18,7 +18,7 @@ func TestAvailableBytes(t *testing.T) {
 }
 
 func TestLocalPath(t *testing.T) {
-	for _, name := range []string{"notes/中文 note.md", "vault/.rawmark/tree-icons.json"} {
+	for _, name := range []string{"notes/中文 note.md", "vault/.rawmark/tree-icons.json", "vault/.rawmark/trash/id/meta.json"} {
 		if !IsLocalPath(name) {
 			t.Fatalf("valid path rejected: %s", name)
 		}

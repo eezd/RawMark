@@ -112,3 +112,34 @@ func TestStorageIncludesOptionalAndImportedFontBytes(t *testing.T) {
 		t.Fatal("分类与总量不一致")
 	}
 }
+
+func TestStorageResolvesBothRootAliases(t *testing.T) {
+	root := t.TempDir()
+	data := filepath.Join(root, "data")
+	vault := filepath.Join(data, "vault")
+	if err := os.MkdirAll(vault, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(vault, "note.md"), []byte("content"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(data, "other.bin"), []byte("misc"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(root, alias); err != nil {
+		t.Fatal(err)
+	}
+	for _, roots := range [][2]string{
+		{data, filepath.Join(alias, "data", "vault")},
+		{filepath.Join(alias, "data"), vault},
+	} {
+		usage, err := scanStorage(context.Background(), roots[0], roots[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if usage.TotalSize != 11 || usage.Categories[0].Size != 7 || usage.Categories[5].Size != 4 {
+			t.Fatalf("root aliases counted more than once: %+v", usage)
+		}
+	}
+}

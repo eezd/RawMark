@@ -1,6 +1,10 @@
 package fileutil
 
-import "golang.org/x/sys/windows"
+import (
+	"os"
+
+	"golang.org/x/sys/windows"
+)
 
 // AvailableBytes returns disk space available to the current user.
 func AvailableBytes(dir string) (uint64, error) {
@@ -10,5 +14,8 @@ func AvailableBytes(dir string) (uint64, error) {
 	}
 	var available uint64
 	err = windows.GetDiskFreeSpaceEx(name, &available, nil, nil)
-	return available, err
+	if err != nil {
+		return 0, &os.PathError{Op: "GetDiskFreeSpaceEx", Path: dir, Err: err}
+	}
+	return available, nil
 }

@@ -54,7 +54,11 @@ func scanStorage(ctx context.Context, dataDir, vaultDir string) (storageUsage, e
 	if err != nil {
 		return usage, err
 	}
-	vaultRoot, err := filepath.Abs(vaultDir)
+	vaultRoot, err := filepath.EvalSymlinks(vaultDir)
+	if err != nil {
+		return usage, err
+	}
+	vaultRoot, err = filepath.Abs(vaultRoot)
 	if err != nil {
 		return usage, err
 	}

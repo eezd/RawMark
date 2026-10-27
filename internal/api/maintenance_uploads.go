@@ -192,10 +192,18 @@ func backupResourceError(err error) error {
 func (s *Server) validateResources(stage string) error {
 	temp := &Server{FontsDir: filepath.Join(stage, "app", "fonts"), ThemesDir: filepath.Join(stage, "app", "themes"), PluginsDir: filepath.Join(stage, "app", "plugins")}
 	for _, kind := range []string{"fonts", "themes", "plugins"} {
-		entries, err := os.ReadDir(filepath.Join(stage, "app", kind))
+		resourceDir := filepath.Join(stage, "app", kind)
+		info, err := os.Stat(resourceDir)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
+		if err != nil {
+			return backupResourceError(err)
+		}
+		if !info.IsDir() {
+			return i18n.New("w_the_resource_directory_contains_3898a5", errMaintenanceInput)
+		}
+		entries, err := os.ReadDir(resourceDir)
 		if err != nil {
 			return backupResourceError(err)
 		}
