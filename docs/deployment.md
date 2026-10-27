@@ -54,18 +54,34 @@ Do not point the quick-start container and a Compose instance at the same databa
 
 ## Prebuilt images and native programs
 
-Release images are available as `ghcr.io/eezd/rawmark:0.1.0` for Linux amd64 and arm64. Replace `rawmark` in the Docker commands above with that image name to skip source builds. `latest` follows the latest stable release; use a version tag for controlled upgrades. The repository Compose file continues to support source builds.
+Release images are available as `ghcr.io/eezd/rawmark:0.1.1` for Linux amd64 and arm64. Replace `rawmark` in the Docker commands above with that image name to skip source builds. `latest` follows the latest stable release; use a version tag for controlled upgrades. The repository Compose file continues to support source builds.
 
-Native Linux archives and `SHA256SUMS` are available on the [Releases page](https://github.com/eezd/RawMark/releases). Download the archive matching your architecture and verify its checksum before extracting it:
+Native archives for Linux amd64/arm64, Windows amd64 and macOS Intel/Apple Silicon, plus `SHA256SUMS`, are available on the [Releases page](https://github.com/eezd/RawMark/releases). Download the archive matching your operating system and architecture and verify its checksum before extracting it:
 
 ```sh
 sha256sum --ignore-missing --check SHA256SUMS
-tar -xzf rawmark_0.1.0_linux_amd64.tar.gz
+tar -xzf rawmark_0.1.1_linux_amd64.tar.gz
 ./rawmark --version
 RAWMARK_DATA="$HOME/rawmark-data" RAWMARK_ADDR=127.0.0.1:21000 ./rawmark
 ```
 
-Use the arm64 archive on ARM systems. Run as an unprivileged user with write access to the chosen data directory. The executable embeds the frontend and examples; no Node.js or separate database service is needed. Configure your service manager and HTTPS proxy for long-running remote use.
+For macOS, use `darwin_arm64` on Apple Silicon or `darwin_amd64` on Intel. Compare `shasum -a 256 rawmark_0.1.1_darwin_arm64.tar.gz` with its entry in `SHA256SUMS`, extract it with `tar -xzf`, then use the same environment variables as above. The program is unsigned; review and approve it through macOS security settings if prompted.
+
+On Windows, compare the output of `Get-FileHash` with the archive's entry in `SHA256SUMS`, then run in PowerShell:
+
+```powershell
+Get-FileHash .\rawmark_0.1.1_windows_amd64.zip -Algorithm SHA256
+Expand-Archive .\rawmark_0.1.1_windows_amd64.zip -DestinationPath .\rawmark
+Set-Location .\rawmark
+.\rawmark.exe --version
+$env:RAWMARK_DATA = Join-Path $env:LOCALAPPDATA 'RawMark'
+$env:RAWMARK_ADDR = '127.0.0.1:21000'
+.\rawmark.exe
+```
+
+Open `http://127.0.0.1:21000` and set your password. These downloads run a web server in the terminal, not a desktop window, and include no installer or code signing. Stop with Ctrl+C. Keep the data directory when replacing the executable. Moving an existing vault between operating systems requires filenames supported by the destination filesystem; Windows rejects device names, alternate data streams and trailing dots/spaces rather than silently renaming them.
+
+Use the Linux arm64 archive on Linux ARM systems. Run as an unprivileged user with write access to the chosen data directory. The executable embeds the frontend and examples; no Node.js or separate database service is needed. Configure your service manager and HTTPS proxy for long-running remote use.
 
 ## Storage and configuration
 

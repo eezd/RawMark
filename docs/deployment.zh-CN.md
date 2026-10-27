@@ -54,18 +54,34 @@ RAWMARK_DATA_DIR=/your/storage/rawmark/data \
 
 ## 预构建镜像与原生程序
 
-正式镜像为 `ghcr.io/eezd/rawmark:0.1.0`，支持 Linux amd64 和 arm64。将上述 Docker 命令中的 `rawmark` 镜像名替换为它即可跳过源码构建。`latest` 跟随最新稳定版本；需要可控升级时请固定版本标签。仓库 Compose 文件继续支持源码构建。
+正式镜像为 `ghcr.io/eezd/rawmark:0.1.1`，支持 Linux amd64 和 arm64。将上述 Docker 命令中的 `rawmark` 镜像名替换为它即可跳过源码构建。`latest` 跟随最新稳定版本；需要可控升级时请固定版本标签。仓库 Compose 文件继续支持源码构建。
 
-[Releases 页面](https://github.com/eezd/RawMark/releases) 提供 Linux 原生压缩包及 `SHA256SUMS`。下载对应架构，先核对校验和再解压：
+[Releases 页面](https://github.com/eezd/RawMark/releases) 提供 Linux amd64/arm64、Windows amd64 和 macOS Intel/Apple Silicon 原生压缩包及 `SHA256SUMS`。下载对应系统和架构，先核对校验和再解压：
 
 ```sh
 sha256sum --ignore-missing --check SHA256SUMS
-tar -xzf rawmark_0.1.0_linux_amd64.tar.gz
+tar -xzf rawmark_0.1.1_linux_amd64.tar.gz
 ./rawmark --version
 RAWMARK_DATA="$HOME/rawmark-data" RAWMARK_ADDR=127.0.0.1:21000 ./rawmark
 ```
 
-ARM 系统请使用 arm64 压缩包。以普通用户运行，并确保所选数据目录可写。程序已内嵌前端和示例，无需 Node.js 或独立数据库服务。长期远程运行请配置服务管理器和 HTTPS 反向代理。
+macOS 的 Apple Silicon 使用 `darwin_arm64`，Intel 使用 `darwin_amd64`。先将 `shasum -a 256 rawmark_0.1.1_darwin_arm64.tar.gz` 的结果与 `SHA256SUMS` 中对应记录比较，再用 `tar -xzf` 解压并沿用上述环境变量启动。程序未签名，若系统提示拦截，请核对来源后通过 macOS 安全设置手动允许。
+
+Windows 先将 `Get-FileHash` 的结果与 `SHA256SUMS` 中对应记录比较，再在 PowerShell 中启动：
+
+```powershell
+Get-FileHash .\rawmark_0.1.1_windows_amd64.zip -Algorithm SHA256
+Expand-Archive .\rawmark_0.1.1_windows_amd64.zip -DestinationPath .\rawmark
+Set-Location .\rawmark
+.\rawmark.exe --version
+$env:RAWMARK_DATA = Join-Path $env:LOCALAPPDATA 'RawMark'
+$env:RAWMARK_ADDR = '127.0.0.1:21000'
+.\rawmark.exe
+```
+
+打开 `http://127.0.0.1:21000` 设置密码。原生程序是在终端运行的网页服务端，不含桌面窗口、安装器或代码签名；按 Ctrl+C 停止。替换程序时保留数据目录。跨系统迁移已有笔记库时，文件名须符合目标文件系统要求；Windows 会拒绝设备名、备用数据流和末尾点/空格，不会静默改名。
+
+Linux ARM 系统请使用 Linux arm64 压缩包。以普通用户运行，并确保所选数据目录可写。程序已内嵌前端和示例，无需 Node.js 或独立数据库服务。长期远程运行请配置服务管理器和 HTTPS 反向代理。
 
 ## 存储与配置
 
