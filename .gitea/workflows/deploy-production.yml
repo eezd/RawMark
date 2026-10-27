@@ -41,7 +41,8 @@ jobs:
       - name: Verify completed release, back up and deploy only RawMark
         run: |
           set -eu
-          mkdir -m 700 "$DOCKER_CONFIG"
+          mkdir -p "$DOCKER_CONFIG"
+          chmod 700 "$DOCKER_CONFIG"
           python3 scripts/deploy.py production --directory /docker/main/rawmark \
             --version "$RELEASE_VERSION" --client-container "$(hostname)"
       - name: Remove job configuration

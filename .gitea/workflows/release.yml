@@ -142,7 +142,8 @@ jobs:
       - name: Publish the original checked artifacts to both services
         run: |
           set -eu
-          mkdir -m 700 "$DOCKER_CONFIG"
+          mkdir -p "$DOCKER_CONFIG"
+          chmod 700 "$DOCKER_CONFIG"
           python3 scripts/release.py publish
       - name: Clean only this attempt's test resources and credentials
         if: always()
