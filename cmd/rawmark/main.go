@@ -129,6 +129,9 @@ func serve(parent context.Context, addr, dataDir, vaultDir, version string, font
 		return false, err
 	}
 	defer st.Close()
+	if err := initializeExamples(v, st); err != nil {
+		return false, err
+	}
 	idx, err := search.Open(filepath.Join(dataDir, "index.db"), v)
 	if err != nil {
 		return false, err

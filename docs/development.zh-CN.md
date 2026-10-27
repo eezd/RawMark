@@ -53,7 +53,7 @@ web/
     router/                 路由与守卫
     pinia/                  实例及共享认证、权限、设置状态
   types/auto/               自动生成的导入声明
-deploy/                    容器与代理配置
+deploy/                    容器、代理配置及嵌入的公开示例笔记库
 scripts/                   开发、资源生成及历史迁移脚本
 ```
 

@@ -28,15 +28,25 @@ ssh -L 21000:127.0.0.1:21000 user@your-server
 
 The container defaults to UID/GID `65532:65532`. A new Docker named volume inherits permissions from the image's data directory.
 
+A fresh instance with an empty vault receives seven English example notes from the public template in `deploy/data/vault/`. They are embedded in the binary, so Docker and native deployments behave the same way. You still set your own password; no account credentials or personal settings are shipped. Existing accounts and nonempty vaults are left untouched. Examples are ordinary user files: deleting them, restarting, or resetting preferences does not recreate them. Initialization state is retained in the application database, outside user preferences.
+
 ## Docker Compose
 
-The repository includes [deploy/docker-compose.yml](../deploy/docker-compose.yml), which persists data in the host's `deploy/data/`. For a first deployment on Linux:
+The repository includes [deploy/docker-compose.yml](../deploy/docker-compose.yml), which stores runtime data in an independent Docker named volume:
 
 ```sh
-mkdir -p deploy/data
-sudo chown 65532:65532 deploy/data
 docker compose -f deploy/docker-compose.yml up -d --build --wait
 ```
+
+The tracked `deploy/data/` directory is a public example template, not a runtime data directory. Do not mount it as writable application storage. To use a host directory instead, create it with UID/GID `65532:65532` and set an absolute path:
+
+```sh
+sudo install -d -o 65532 -g 65532 /your/storage/rawmark/data
+RAWMARK_DATA_DIR=/your/storage/rawmark/data \
+  docker compose -f deploy/docker-compose.yml up -d --build --wait
+```
+
+Keep the same `RAWMARK_DATA_DIR` value for every subsequent Compose command, for example in a private file passed with `--env-file`. This Compose variable selects the host mount; it is separate from the application's `RAWMARK_DATA` variable inside the container. Existing deployments that used `deploy/data/` must explicitly select that directory until it has been migrated; omitting the override starts a separate instance in a named volume.
 
 This configuration publishes port **21000** on all network interfaces by default. Complete initialization and configure access boundaries before exposing it publicly. With a reverse proxy, you can change the Compose port binding to `127.0.0.1:${RAWMARK_PORT:-21000}:8080`. For a custom port, use `RAWMARK_PORT=21001 docker compose -f deploy/docker-compose.yml up -d --build --wait`.
 

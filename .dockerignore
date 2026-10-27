@@ -4,4 +4,8 @@ web/dist
 CONTEXT.md
 docs
 .dev-data
-deploy/data
+deploy/data/*
+!deploy/data/vault
+deploy/data/vault/**/.rawmark
+deploy/data/**/*.db*
+deploy/data/**/*.log

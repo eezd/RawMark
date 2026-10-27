@@ -8,7 +8,7 @@ RawMark is a single-user workspace with notes stored on your server. Multiple br
 
 ## Start writing
 
-Set a password on first use. Subsequent sign-ins require your password and an image captcha. Right-click the **Files** heading or empty space in the sidebar to search, create notes or folders, import documents, open the tag index, or manage images. You can also click the heading to open the menu on a touchscreen.
+Set a password on first use. A new, empty instance includes seven English example notes that you can edit or delete; they do not return after deletion or restart. Existing vaults are not populated with examples. Subsequent sign-ins require your password and an image captcha. Right-click the **Files** heading or empty space in the sidebar to search, create notes or folders, import documents, open the tag index, or manage images. You can also click the heading to open the menu on a touchscreen.
 
 The editor opens in live preview mode. Use the icons at the top right to switch to source mode, open the outline, or enter focus mode. Supported syntax includes standard Markdown, tables, task lists, code blocks, math, Mermaid, footnotes, and YAML metadata.
 

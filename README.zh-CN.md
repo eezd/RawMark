@@ -48,7 +48,7 @@ docker run -d --name rawmark --restart unless-stopped \
   rawmark
 ```
 
-打开 **http://localhost:21000**，首次访问设置登录密码，即可创建第一篇笔记。数据保存在 Docker 卷 `rawmark-data` 中，重建容器不会丢失。
+打开 **http://localhost:21000**，首次访问设置登录密码。全新空实例会提供 7 篇英文示例笔记，可以自由编辑或删除，然后开始记录自己的内容。数据保存在 Docker 卷 `rawmark-data` 中，重建容器不会丢失。
 
 以上命令仅监听本机。部署到服务器时，请先完成初始化，再配置 HTTPS 访问；Docker Compose、已有笔记目录接入、备份与升级见[部署文档](docs/deployment.zh-CN.md)。
 

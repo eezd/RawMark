@@ -53,7 +53,7 @@ web/
     router/                 Routes and guards
     pinia/                  Pinia instance and shared auth, permission, settings state
   types/auto/               Generated import declarations
-deploy/                     Container and proxy configuration
+deploy/                     Container/proxy configuration and embedded public example vault
 scripts/                    Development, resource generation, historical migrations
 ```
 

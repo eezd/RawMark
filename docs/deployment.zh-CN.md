@@ -28,15 +28,25 @@ ssh -L 21000:127.0.0.1:21000 user@your-server
 
 容器默认以 UID/GID `65532:65532` 运行，Docker 新建命名卷会继承镜像数据目录的权限。
 
+全新实例的空笔记库会自动生成 `deploy/data/vault/` 公开模板中的 7 篇英文示例笔记。示例嵌入二进制，Docker 与原生部署行为一致。仍需自行设置密码，不附带账号凭据或私人设置；已有账号和非空笔记库不会被添加示例。示例是普通文件，删除、重启或重置偏好设置后都不会重新生成；一次性初始化状态保存在应用数据库中，不属于用户偏好设置。
+
 ## Docker Compose
 
-仓库提供 [deploy/docker-compose.yml](../deploy/docker-compose.yml)，使用宿主机的 `deploy/data/` 持久化。Linux 上首次部署可执行：
+仓库提供 [deploy/docker-compose.yml](../deploy/docker-compose.yml)，默认使用独立的 Docker 命名卷保存运行数据：
 
 ```sh
-mkdir -p deploy/data
-sudo chown 65532:65532 deploy/data
 docker compose -f deploy/docker-compose.yml up -d --build --wait
 ```
+
+纳入版本控制的 `deploy/data/` 是公开示例模板，不是运行数据目录，不要将其作为可写数据目录挂载。若使用宿主机目录，先创建目录并设置 UID/GID `65532:65532`，再指定绝对路径：
+
+```sh
+sudo install -d -o 65532 -g 65532 /your/storage/rawmark/data
+RAWMARK_DATA_DIR=/your/storage/rawmark/data \
+  docker compose -f deploy/docker-compose.yml up -d --build --wait
+```
+
+后续每次执行 Compose 命令都必须使用相同的 `RAWMARK_DATA_DIR`，例如保存在通过 `--env-file` 指定的私有文件中。该 Compose 变量选择宿主机挂载位置，与容器内应用使用的 `RAWMARK_DATA` 不同。原先使用 `deploy/data/` 的实例，在迁出前必须显式指定原目录；省略此覆盖值会在命名卷中启动另一个独立实例。
 
 该配置默认发布到所有网卡的 **21000** 端口。对公网开放前完成初始化并设置访问边界；使用反向代理时，可将 Compose 端口绑定改为 `127.0.0.1:${RAWMARK_PORT:-21000}:8080`。自定义端口可使用 `RAWMARK_PORT=21001 docker compose -f deploy/docker-compose.yml up -d --build --wait`。
 

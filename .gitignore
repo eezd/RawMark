@@ -17,7 +17,15 @@ web/dist/
 
 # Local development data
 .dev-data/
-deploy/data/
+
+# Public examples are tracked; instance state must remain outside the template.
+deploy/data/*
+!deploy/data/vault/
+deploy/data/vault/**/.rawmark/
+deploy/data/**/*.db
+deploy/data/**/*.db-wal
+deploy/data/**/*.db-shm
+deploy/data/**/*.log
 
 # Repository-maintained tool rules (other local skills stay untracked)
 .agents/skills/*

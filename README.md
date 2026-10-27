@@ -48,7 +48,7 @@ docker run -d --name rawmark --restart unless-stopped \
   rawmark
 ```
 
-Open **http://localhost:21000**, set your password on first use, and create your first note. Data lives in the Docker volume `rawmark-data` and persists when you recreate the container with the same volume.
+Open **http://localhost:21000** and set your password on first use. A new, empty instance starts with seven English example notes; edit or delete them and begin writing. Data lives in the Docker volume `rawmark-data` and persists when you recreate the container with the same volume.
 
 These commands listen on localhost only. For a remote server, complete the initial setup before configuring HTTPS access. See the [deployment guide](docs/deployment.md) for Docker Compose, existing note folders, backups, and upgrades.
 
