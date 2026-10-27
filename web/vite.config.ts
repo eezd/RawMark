@@ -10,7 +10,7 @@ import { defineConfig } from 'vitest/config'
 
 const releaseVersion = readFileSync(new URL('../VERSION', import.meta.url), 'utf8').trim()
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   define: { __RAWMARK_RELEASE__: JSON.stringify(releaseVersion) },
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)), '@@': fileURLToPath(new URL('./src/common', import.meta.url)) } },
   plugins: [
@@ -19,8 +19,15 @@ export default defineConfig({
     AutoImport({ imports: ['vue', 'vue-router', 'pinia'], dts: 'types/auto/auto-imports.d.ts' }),
     Components({ dts: 'types/auto/components.d.ts', resolvers: [ElementPlusResolver({ importStyle: false })] }),
     {
+      name: 'rawmark-demo-entry',
+      apply: (_config, env) => env.command === 'build' && env.mode === 'demo',
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'index.html', source: '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=./demo.html"><title>RawMark Demo</title></head><body><a href="./demo.html">Open RawMark Demo</a></body></html>' })
+      },
+    },
+    {
       name: 'rawmark-pwa',
-      apply: 'build',
+      apply: (_config, env) => env.command === 'build' && env.mode !== 'demo',
       enforce: 'post',
       generateBundle(_options, bundle) {
         // Count only optional application fonts; fonts.css excludes Maple and KaTeX.
@@ -58,7 +65,7 @@ export default defineConfig({
   build: {
     rolldownOptions: {
       // demo.html is an unauthenticated editor demo for automated performance/interaction tests.
-      input: { index: 'index.html', demo: 'demo.html' },
+      input: mode === 'demo' ? 'demo.html' : { index: 'index.html', demo: 'demo.html' },
     },
   },
   worker: { format: 'es' },
@@ -67,4 +74,4 @@ export default defineConfig({
     proxy: { '/api': { target: `http://127.0.0.1:${process.env.API_PORT ?? 8080}`, ws: true } },
   },
   test: { environment: 'node', setupFiles: ['./src/i18n.ts'] },
-})
+}))

@@ -52,7 +52,7 @@ func main() {
 
 ## Images
 
-![Sample image](https://vuejs.org/images/logo.png)
+![RawMark icon](./icon.svg)
 
 ## Tables
 

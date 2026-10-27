@@ -14,6 +14,7 @@ docs/*
 # Frontend
 node_modules/
 web/dist/
+web/dist-demo/
 
 # Local development data
 .dev-data/
