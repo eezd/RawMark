@@ -163,14 +163,14 @@ Bearer 认证升级需要前后端一起发布。旧 Cookie 页面不能继续�
 
 ## 开发与生产托管
 
-仓库 `deploy/compose.image.yml` 是仅拉镜像的模板。开发实例放在 `/docker/dev/rawmark`，生产实例放在 `/docker/main/rawmark`；将模板复制至对应实例目录并命名为 `compose.yml`，旁边放权限 600 的私有 `.env`。实例不依赖源码工作目录，必须明确填写：
+仓库 `deploy/compose.image.yml` 是仅拉镜像的模板。开发实例放在 `/docker/gitea/dev/rawmark`，生产实例放在 `/docker/main/rawmark`；将模板复制至对应实例目录并命名为 `compose.yml`，旁边放权限 600 的私有 `.env`。容器名跟随 `RAWMARK_PROJECT`，开发容器为 `rawmark-dev`。实例不依赖源码工作目录，必须明确填写：
 
 ```dotenv
 RAWMARK_CHANNEL=development
 RAWMARK_PROJECT=rawmark-dev
 RAWMARK_BIND=127.0.0.1
 RAWMARK_PORT=21001
-RAWMARK_DATA_DIR=/docker/dev/rawmark/data
+RAWMARK_DATA_DIR=/docker/gitea/dev/rawmark/data
 RAWMARK_IMAGE=git.134333.xyz/eezd/rawmark@sha256:<已验证摘要>
 ```
 

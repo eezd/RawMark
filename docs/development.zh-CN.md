@@ -116,7 +116,7 @@ Gitea 是主仓库和构建执行方（`origin`）；GitHub（`github`）只接�
 
 main push 触发 `.gitea/workflows/ci.yml`，执行项目检查、CI 行为测试、Linux amd64 打包和原生生命周期冒烟。后续 Docker job 校验同一运行的包，使用合成数据验证非 root 镜像、重启及重建容器持久化、服务端注销；通过后才发布 `git.134333.xyz/eezd/rawmark:dev-<完整SHA>` 并按摘要更新独立开发实例。PR 仅检查和打包，不注入发布凭据、不部署。宿主 Docker runner 只运行受信代码，并非不可信代码沙箱；外部 PR 运行前须由维护者审查。
 
-开发使用 `raw-dev.134333.xyz`、回环端口 21001 和 `/docker/dev/rawmark/data`；生产保留 `/docker/main/rawmark` 下的独立数据和 21000 端口。部署锁内再次核对 main，旧运行不能覆盖新部署。
+开发使用 `raw-dev.134333.xyz`、回环端口 21001 和 `/docker/gitea/dev/rawmark/data`；生产保留 `/docker/main/rawmark` 下的独立数据和 21000 端口。部署锁内再次核对 main，旧运行不能覆盖新部署。
 
 CI 入口是 `sh scripts/ci-check.sh development` 和 `sh scripts/ci-package.sh development`；参数换为 `release` 才构建 Demo 和五平台程序。`python3 -m unittest discover -s scripts/tests -v` 验证产物与部署行为。部署宿主不重新编译这些产物。
 
