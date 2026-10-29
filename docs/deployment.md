@@ -163,20 +163,21 @@ The Bearer authentication upgrade requires the frontend and backend to be releas
 
 ## Managed development and production
 
-The checked-in `deploy/compose.image.yml` is an image-only template. Development lives in `/docker/gitea/dev/RawMark`; production lives in `/docker/main/rawmark`. Copy the template to the instance directory as `compose.yml`, with a private mode-600 `.env` beside it. The container name follows `RAWMARK_PROJECT`, so the development container is `rawmark-dev`. These instances do not depend on a source checkout. Set all required values explicitly:
+The checked-in `deploy/compose.image.yml` is an image-only template. Development lives in `/docker/gitea/dev/RawMark`; production lives in `/docker/main/rawmark`. Copy the template to the instance directory as `compose.yml`, with a private mode-600 `.env` beside it. Set the project and container names independently. These instances do not depend on a source checkout. Set all required values explicitly:
 
 ```dotenv
 RAWMARK_CHANNEL=development
 RAWMARK_PROJECT=rawmark-dev
+RAWMARK_CONTAINER_NAME=RawMark-dev
 RAWMARK_BIND=127.0.0.1
 RAWMARK_PORT=21001
 RAWMARK_DATA_DIR=/docker/gitea/dev/RawMark/data
-RAWMARK_IMAGE=git.134333.xyz/eezd/rawmark@sha256:<verified-digest>
+RAWMARK_IMAGE=git.134333.xyz/eezd/dev/rawmark@sha256:<verified-digest>
 ```
 
-For production, use channel `production`, project `rawmark`, port 21000, `/docker/main/rawmark/data`, and `ghcr.io/eezd/rawmark@sha256:<verified-digest>`. Preserve the current binding during migration. Create only a new development data directory with owner `65532:65532`; never recursively change existing production ownership or mount the repository example template as live storage.
+For production, use channel `production`, project `rawmark`, the existing container name, port 21000, `/docker/main/rawmark/data`, and `ghcr.io/eezd/rawmark@sha256:<verified-digest>`. Preserve the current binding during migration. Create only a new development data directory with owner `65532:65532`; never recursively change existing production ownership or mount the repository example template as live storage.
 
-Main-push CI automatically updates development. The **Deploy production manually** Gitea workflow only accepts a version whose Gitea and GitHub releases are formal and contain identical build/release receipts and matching tags. It fixes the GHCR digest, checks current mounts and competing writers, stops only this project's old service, and backs up the whole data directory plus configuration before replacement. Backups are private and include SQLite WAL files; old images and backups are retained.
+Dev-push CI automatically updates development after checks and isolated smoke tests pass. Main pushes and PRs only validate. Formal release and **Deploy production manually** Gitea workflows remain disabled during this CI migration; enabling or executing them requires a separate release plan and authorization. The prepared production workflow requires matching formal Gitea/GitHub releases and receipts, pins the GHCR digest, and backs up data and configuration before replacement. Backups are private and include SQLite WAL files; old images and backups are retained.
 
 The job records `deployment.pending.json` before replacement and `deployment.json` after health/frontend checks. If the candidate fails after accessing data, it stops the candidate and retains the backup and pending record for diagnosis; it does not automatically restore private data or run an older program against possibly migrated storage. Recovery requires explicit authorization and compatibility review. If backup fails before replacement, the untouched old service can be restarted safely. No global Docker cleanup is performed.
 

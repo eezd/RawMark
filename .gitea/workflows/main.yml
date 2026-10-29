@@ -63,9 +63,6 @@ jobs:
       CI_RESOURCE_LABEL: io.rawmark.ci.run=dev-${{ gitea.run_id }}-${{ gitea.run_attempt }}
       TEMP_IMAGE: rawmark-ci:${{ gitea.sha }}-${{ gitea.run_id }}-${{ gitea.run_attempt }}
       DOCKER_CONFIG: /tmp/rawmark-docker-auth
-    outputs:
-      image: ${{ steps.publish.outputs.image }}
-      version: ${{ steps.publish.outputs.version }}
     defaults:
       run:
         shell: sh
