@@ -160,6 +160,7 @@ The Bearer authentication upgrade requires the frontend and backend to be releas
 - Resetting settings retains the account, resources, plugin storage, and local tabs.
 - Logs live in `logs/`, with three rotated files retained, each up to 10 MiB. Settings can export logs and a version summary; this does not reconstruct historical logs.
 - If the interface breaks after an update, first check that the frontend and backend come from the same build, then inspect browser network requests and application logs. See the [user guide](guide.md#plugins-and-interface-recovery) for plugin and appearance recovery entry points.
+- Note reads send `Cache-Control: no-store, no-transform` so proxies preserve the strong revision ETag used by conditional saves. A proxy rewriting it to a weak ETag can cause otherwise valid edits to return HTTP 412; preserve this response policy through the public ingress.
 
 ## Managed development and production
 

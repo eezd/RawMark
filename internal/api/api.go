@@ -327,7 +327,8 @@ func (s *Server) readFile(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
 	w.Header().Set("ETag", `"`+rev+`"`)
-	w.Header().Set("Cache-Control", "no-store")
+	// Preserve the strong revision ETag through compression proxies for If-Match writes.
+	w.Header().Set("Cache-Control", "no-store, no-transform")
 	w.Write(data)
 }
 
