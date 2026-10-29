@@ -7,6 +7,8 @@ case "$mode" in
   release) targets='linux/amd64 linux/arm64 windows/amd64 darwin/amd64 darwin/arm64' ;;
   *) exit 2 ;;
 esac
+if [ "$mode" = development ]; then export RAWMARK_BUILD_CHANNEL=development; fi
+export RAWMARK_BUILD_VERSION="$(python3 scripts/release.py version)"
 export CGO_ENABLED=0
 mkdir -p package/licenses downloads
 cp LICENSE package/
@@ -19,7 +21,7 @@ for target in $targets; do
   if [ "$GOOS" = windows ]; then extension='.exe'; fi
   rm -f package/rawmark package/rawmark.exe
   go vet ./...
-  go build -trimpath -ldflags="-s -w -X main.releaseVersion=$(cat VERSION)" \
+  go build -trimpath -ldflags="-s -w -X main.releaseVersion=$(python3 scripts/release.py version)" \
     -o "package/rawmark$extension" ./cmd/rawmark
   if [ "$target" = linux/amd64 ]; then python3 scripts/smoke-release.py package/rawmark; fi
   python3 scripts/package-release.py "$GOOS" "$GOARCH"

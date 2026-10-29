@@ -110,45 +110,12 @@ Backend `internal/i18n/` preserves message IDs and parameters. Errors render at 
 
 ## Gitea CI/CD
 
-Gitea is the primary repository and build executor (`origin`). GitHub (`github`) receives explicitly published versions; there is no continuous mirror. All project compilation and checks run in CI toolchain containers, without installing Node or Go on the deployment host. The runner has capacity one. Together with the allowed Pages platform deployment, no more than two jobs run at once.
+Gitea is the public source repository; GitHub is a strict one-way Git mirror. Both use main as the default branch and dev for daily development.
 
-### Development
-
-A main push runs `.gitea/workflows/ci.yml`: project checks, CI behavior tests, Linux amd64 packaging, and native lifecycle smoke tests. A dependent Docker job verifies that run's archive and checks the non-root image with synthetic data, including restart/replacement persistence and server-side logout. Only then does it publish `git.134333.xyz/eezd/rawmark:dev-<full-SHA>` and deploy its digest to the independent development instance. PRs only run checks and packaging; they receive no publication credentials and do not deploy. The host-Docker runner is for trusted code, not an untrusted-code sandbox; external PRs require maintainer review before execution.
-
-Development uses `raw-dev.134333.xyz`, loopback port 21001, and `/docker/gitea/dev/rawmark/data`. Production retains its own data under `/docker/main/rawmark` and port 21000. Before updating development, the deployment lock rechecks main so an old run cannot overwrite a newer deployment.
-
-`sh scripts/ci-check.sh development` and `sh scripts/ci-package.sh development` are the CI entry points. The `release` argument enables the Demo and five-platform packaging. Run `python3 -m unittest discover -s scripts/tests -v` for artifact and deployment behavior tests. Do not rebuild these artifacts on the deployment host.
-
-### Formal releases
-
-Update `VERSION` and `.github/release-notes.md`, review the commit and pass main-push development CI. In Gitea's **Release** workflow, select main and enter the exact full commit SHA and matching `X.Y.Z` version. Publishing is an explicit action, not a tag-push side effect.
-
-The same workflow performs checks and packages Linux amd64/arm64, Windows amd64, and Darwin amd64/arm64. Only Linux amd64 is runtime-tested on the available runner. Cross-builds and vet do not replace native Windows, macOS or ARM64 acceptance; the earlier Windows native test failure has not been reverified. Archives include licenses and `SHA256SUMS`. Linux binaries from these exact archives are packaged into one dual-architecture image and copied unchanged to Gitea Registry and GHCR.
-
-The workflow stages a Gitea draft and immutable `build.json` after artifact uploads. `image.json` records the tested candidate; `release.json` connects the build, image digest and Demo commit. Both final releases contain matching files. On interruption, rerun failed jobs or dispatch the same version/commit: existing receipts and original artifacts are reused. If an original artifact has expired, recovery fails explicitly rather than rebuilding different content. Conflicting tags or attachments fail; published versions are not overwritten. GitHub main advances by normal fast-forward only.
-
-GitHub publication and Pages validation complete before the Gitea release becomes formal. Cross-service publication is not atomic: a failed run can leave a GitHub release or candidate images visible while Gitea remains a draft. Such a version is not production-eligible. Stable image tags advance only after artifact and public-image checks.
-
-Each installation archive and Demo artifact must be smaller than 90,000,000 bytes. Upload platforms separately. Check the source Git pack and image blobs too: the Cloudflare 100 MB limit applies to requests, not only individual tracked files. The combined OCI file is local CI scratch space, never a release upload.
-
-### Credentials and runner
-
-Configure these repository Actions Secrets in Gitea:
-
-| Secret | Required access |
-| --- | --- |
-| `RAWMARK_GITEA_TOKEN` | Gitea repository releases and Packages write access |
-| `RAWMARK_GITHUB_TOKEN` | GitHub classic PAT with repository access, `workflow` for workflow-file changes, and `write:packages` |
-
-Gitea rejects Secret names beginning with `GITEA_` or `GITHUB_`. Tokens do not belong in Git or job output. Job Docker credentials use temporary private directories. The manual production job uses a read-only Gitea job token and anonymous public GitHub/GHCR reads, not the publication PAT.
-
-The first GHCR package is private by default. Make it public in its package settings and rerun the failed publication job; anonymous pulling is required before completion. The workflow does not claim a repository token automatically includes Packages access.
-
-The existing runner uses `container.sweep: false` so deployed services survive job completion. Smoke resources carry a run/attempt label and the always-cleanup step removes only those resources. Deployment mounts are allowlisted to the two instance directories. Do not use global Docker prune or delete historical packages. Check cancellation cleanup as well as successful runs.
-
-### Static Demo
-
-`pnpm -C web build:demo` generates `web/dist-demo/` with base `/RawMark/`. It contains page-local example edits, no private API, authentication, persistent workspace or Service Worker. Gitea copies this prebuilt output to GitHub's `gh-pages` branch with `.nojekyll`; Pages uses that branch as its publishing source. GitHub still runs its platform Pages deployment, the only allowed GitHub job. It does not compile RawMark. The old GitHub project release workflow is removed.
-
-Runtime production updates are a separate manual action; see [deployment](deployment.md#managed-development-and-production).
+- A dev push checks, packages and smoke-tests Linux amd64 in CI containers, publishes only `git.134333.xyz/eezd/dev/rawmark:YYYYMMDD-<8-char-SHA>`, then deploys its verified digest. The date comes from the commit timestamp in UTC. Receipts retain the full SHA; conflicting versions fail and verified images are reused on retry.
+- A main push independently checks and smoke-tests the actual merged commit without publishing images or deploying. Trusted same-repository PRs only check; external fork PRs do not automatically enter the shared Docker runner or receive publication credentials.
+- DEV lives at `/docker/gitea/dev/RawMark`, container `RawMark-dev`, explicit Compose project `rawmark-dev`, loopback port 21001 and domain `raw-dev.134333.xyz`. All deployment entrypoints share the instance `.deploy.lock`; stale dev commits are skipped and unresolved pending deployments block updates. Existing data is backed up even when no old container exists.
+- Git mirroring runs independently on push/create/delete, hourly reconciliation and manual retry, sharing `/docker/gitea/mirrors/RawMark/.mirror.lock`. Only business branches, tags and complete history are mirrored, including deletions. Control code comes from main. Enable `RAWMARK_MIRROR_ENABLED=true` after the main cutover and configure `RAWMARK_GITHUB_MIRROR_TOKEN` with repository/workflow write access. DEV images never go to GHCR.
+- `RAWMARK_GITEA_TOKEN` requires repository and Packages write access. Keep runner capacity one and sweep disabled; only trusted code runs on this Docker-socket runner. Install toolchains inside CI containers and clean only resources labeled for the current attempt.
+- `RAWMARK_BUILD_CHANNEL=development` derives a consistent frontend/binary version without editing the formal VERSION file. Development archives use `RawMark_<version>_linux_amd64.tar.gz`; historical release artifacts retain their names. Keep the existing 90,000,000-byte transfer budget.
+- Formal release and production workflows are temporarily disabled pending gitea-release adaptation; future publication must share Git mirror serialization. Production data and paths remain unchanged. Keep the old GitHub Release workflow disabled and preserve the current Pages Demo.

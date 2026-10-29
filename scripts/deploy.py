@@ -14,7 +14,7 @@ import tempfile
 import time
 import urllib.request
 
-from release import API, GITEA_IMAGE, GITHUB_IMAGE, release_receipt, require, run
+from release import API, GITEA_DEV_IMAGE, GITHUB_IMAGE, release_receipt, require, run
 
 
 def settings(directory, channel):
@@ -49,7 +49,7 @@ def save(path, data):
 def deployment(directory, channel, image, commit, version, client_container=None):
     directory = Path(directory).resolve(strict=True)
     cfg = settings(directory, channel)
-    registry = GITEA_IMAGE if channel == 'development' else GITHUB_IMAGE
+    registry = GITEA_DEV_IMAGE if channel == 'development' else GITHUB_IMAGE
     require(re.fullmatch(re.escape(registry) + r'@sha256:[0-9a-f]{64}', image), 'Expected an immutable registry digest')
     require(re.fullmatch(r'[0-9a-f]{40}', commit), 'Expected a full commit SHA')
     # Serializes actual deployments, including manually started jobs and CLI use.
@@ -67,8 +67,8 @@ def deployment(directory, channel, image, commit, version, client_container=None
                 'Executable version mismatch')
         if channel == 'development':
             api = API(os.environ['GITEA_API_URL'], os.environ['GITEA_RELEASE_TOKEN'])
-            if api.repo('/branches/main')['commit']['id'] != commit:
-                print('Skipped development deployment: main has advanced')
+            if api.repo('/branches/dev')['commit']['id'] != commit:
+                print('Skipped development deployment: dev has advanced')
                 return
         identifiers = run('docker', 'ps', '-aq', '--filter', 'label=com.docker.compose.project=' + cfg['RAWMARK_PROJECT'],
                           '--filter', 'label=com.docker.compose.service=rawmark').split()
@@ -87,6 +87,7 @@ def deployment(directory, channel, image, commit, version, client_container=None
         backup = None
         if previous:
             run('docker', 'stop', '--time', '15', previous['Id'])
+        if any((directory / 'data').iterdir()):
             try:
                 backups = directory / 'backups'
                 backups.mkdir(mode=0o700, exist_ok=True)
@@ -101,7 +102,7 @@ def deployment(directory, channel, image, commit, version, client_container=None
                                 archive.add(directory / name, arcname=name)
             except BaseException:
                 # No new executable has touched the data; restarting the old container is safe here.
-                if previous['State']['Running']:
+                if previous and previous['State']['Running']:
                     run('docker', 'start', previous['Id'])
                 raise
         pending = {'image': image, 'commit': commit, 'version': version, 'channel': channel,

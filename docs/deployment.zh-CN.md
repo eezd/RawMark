@@ -160,23 +160,25 @@ Bearer 认证升级需要前后端一起发布。旧 Cookie 页面不能继续�
 - 重置设置保留账户、资源、插件存储和本机标签页。
 - 日志位于 `logs/`，轮转保留三份，每份至多 10 MiB；可在设置中导出日志及版本摘要。该功能不补录历史日志。
 - 更新后界面异常先核对前后端是否来自同一构建，再查看浏览器网络请求和应用日志；插件与外观恢复入口见[使用指南](guide.zh-CN.md#插件与界面恢复)。
+- 笔记读取返回 `Cache-Control: no-store, no-transform`，防止代理改写条件保存使用的强版本 ETag。代理将其改为弱 ETag 可能导致正常编辑返回 HTTP 412；公网入口须保留该响应策略。
 
 ## 开发与生产托管
 
-仓库 `deploy/compose.image.yml` 是仅拉镜像的模板。开发实例放在 `/docker/gitea/dev/rawmark`，生产实例放在 `/docker/main/rawmark`；将模板复制至对应实例目录并命名为 `compose.yml`，旁边放权限 600 的私有 `.env`。容器名跟随 `RAWMARK_PROJECT`，开发容器为 `rawmark-dev`。实例不依赖源码工作目录，必须明确填写：
+仓库 `deploy/compose.image.yml` 是仅拉镜像的模板。开发实例放在 `/docker/gitea/dev/RawMark`，生产实例放在 `/docker/main/rawmark`；将模板复制至对应实例目录并命名为 `compose.yml`，旁边放权限 600 的私有 `.env`。项目名与容器名分别指定。实例不依赖源码工作目录，必须明确填写：
 
 ```dotenv
 RAWMARK_CHANNEL=development
 RAWMARK_PROJECT=rawmark-dev
+RAWMARK_CONTAINER_NAME=RawMark-dev
 RAWMARK_BIND=127.0.0.1
 RAWMARK_PORT=21001
-RAWMARK_DATA_DIR=/docker/gitea/dev/rawmark/data
-RAWMARK_IMAGE=git.134333.xyz/eezd/rawmark@sha256:<已验证摘要>
+RAWMARK_DATA_DIR=/docker/gitea/dev/RawMark/data
+RAWMARK_IMAGE=git.134333.xyz/eezd/dev/rawmark@sha256:<已验证摘要>
 ```
 
-生产使用 channel `production`、project `rawmark`、端口 21000、`/docker/main/rawmark/data` 和 `ghcr.io/eezd/rawmark@sha256:<已验证摘要>`；迁移时保留当前监听地址。仅为新的开发目录设置 `65532:65532` 所有者，不递归修改现有生产权限，不将仓库示例模板作为运行数据挂载。
+生产使用 channel `production`、project `rawmark`、现有容器名、端口 21000、`/docker/main/rawmark/data` 和 `ghcr.io/eezd/rawmark@sha256:<已验证摘要>`；迁移时保留当前监听地址。仅为新的开发目录设置 `65532:65532` 所有者，不递归修改现有生产权限，不将仓库示例模板作为运行数据挂载。
 
-main push CI 自动更新开发。Gitea **Deploy production manually** 工作流只接受两端均正式发布、构建/发布回执相同且标签一致的版本。它固定 GHCR 摘要，检查原挂载与并发写入实例，仅停止本项目旧服务，备份完整数据目录和配置后替换。备份为私有文件并包含 SQLite WAL；旧镜像和备份继续保留。
+dev push CI 通过检查和隔离冒烟后自动更新开发；main push 与 PR 仅验证。本次 CI 迁移期间，正式发布及 Gitea **Deploy production manually** 工作流保持禁用，启用或执行须另行规划并授权。已准备的生产工作流要求两端正式发布及回执一致，固定 GHCR 摘要，并在替换前备份数据和配置。备份为私有文件并包含 SQLite WAL；旧镜像和备份继续保留。
 
 替换前记录 `deployment.pending.json`，健康和前端检查通过后记录 `deployment.json`。候选版本访问数据后失败则停止候选，保留备份和 pending 记录，不自动恢复私人数据，也不直接用旧程序打开可能迁移后的数据；恢复须明确授权并核对兼容性。备份在替换前失败时，旧数据未被新程序访问，可安全重新启动旧容器。不做全局 Docker 清理。
 

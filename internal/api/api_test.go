@@ -37,6 +37,23 @@ type fixture struct {
 	admin *http.Client
 }
 
+func TestNoteRevisionSurvivesProxyBoundary(t *testing.T) {
+	f := newFixture(t)
+	f.write("proxy.md", "original")
+	res := f.do(f.admin, "GET", "/api/v1/files/proxy.md", "", nil)
+	defer res.Body.Close()
+	etag := res.Header.Get("ETag")
+	if res.StatusCode != http.StatusOK || res.Header.Get("Cache-Control") != "no-store, no-transform" || !strings.HasPrefix(etag, `"`) {
+		t.Fatalf("笔记响应必须保留强版本标识并禁止代理转换: %d %v", res.StatusCode, res.Header)
+	}
+	if code := f.status(f.admin, "PUT", "/api/v1/files/proxy.md", "updated", map[string]string{"If-Match": etag}); code != http.StatusOK {
+		t.Fatalf("读取的版本标识应允许条件保存: %d", code)
+	}
+	if code := f.status(f.admin, "PUT", "/api/v1/files/proxy.md", "stale", map[string]string{"If-Match": etag}); code != http.StatusPreconditionFailed {
+		t.Fatalf("过期版本必须仍拒绝保存: %d", code)
+	}
+}
+
 func TestMoveBroadcastsWhenAssetRewriteReplacesFileIdentity(t *testing.T) {
 	f := newFixture(t)
 	f.write("from.md", "![](from.assets/x.png)")
@@ -274,7 +291,11 @@ func TestAPIResponsesAreNotCached(t *testing.T) {
 	// Firefox once cached identity and tree responses offline, incorrectly opening an unloadable workspace.
 	for _, path := range []string{"/api/v1/auth/state", "/api/v1/tree", "/api/v1/files/笔记.md", "/api/v1/raw/笔记.md"} {
 		res := f.do(f.admin, "GET", path, "", nil)
-		if res.StatusCode != http.StatusOK || res.Header.Get("Cache-Control") != "no-store" {
+		want := "no-store"
+		if strings.HasPrefix(path, "/api/v1/files/") {
+			want = "no-store, no-transform"
+		}
+		if res.StatusCode != http.StatusOK || res.Header.Get("Cache-Control") != want {
 			t.Errorf("%s：状态 %d，缓存策略 %q", path, res.StatusCode, res.Header.Get("Cache-Control"))
 		}
 	}

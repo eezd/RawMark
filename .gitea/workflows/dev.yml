@@ -1,0 +1,145 @@
+name: Development CI
+
+on:
+  push:
+    branches: [dev]
+
+env:
+  RAWMARK_BUILD_CHANNEL: development
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rawmark-development
+  cancel-in-progress: false
+
+jobs:
+  check-and-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      CI_RUN_ID: ${{ gitea.run_id }}
+    steps:
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: https://github.com/actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Check CI behavior and project
+        run: |
+          env -u RAWMARK_BUILD_CHANNEL python3 -m unittest discover -s scripts/tests -v
+          sh scripts/ci-check.sh development
+      - name: Package and smoke-test Linux amd64
+        run: sh scripts/ci-package.sh development
+      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-amd64
+          path: downloads/*_linux_amd64.tar.gz
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
+      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: checksums
+          path: |
+            downloads/SHA256SUMS
+            downloads/build.json
+          if-no-files-found: error
+          retention-days: 7
+
+  image:
+    needs: check-and-package
+    if: gitea.event_name == 'push' && gitea.ref == 'refs/heads/dev'
+    runs-on: docker
+    timeout-minutes: 20
+    env:
+      CI_RUN_ID: ${{ gitea.run_id }}
+      CI_RUN_ATTEMPT: ${{ gitea.run_attempt }}
+      CI_RESOURCE_LABEL: io.rawmark.ci.run=dev-${{ gitea.run_id }}-${{ gitea.run_attempt }}
+      TEMP_IMAGE: rawmark-ci:${{ gitea.sha }}-${{ gitea.run_id }}-${{ gitea.run_attempt }}
+      DOCKER_CONFIG: /tmp/rawmark-docker-auth
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+      version: ${{ steps.publish.outputs.version }}
+    defaults:
+      run:
+        shell: sh
+    steps:
+      - name: Install CI runtimes
+        run: apk add --no-cache nodejs python3
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: https://github.com/actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-amd64
+          path: downloads
+      - uses: https://github.com/actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: checksums
+          path: downloads
+      - name: Verify, build and smoke-test the exact binary
+        run: |
+          set -eu
+          python3 scripts/release.py prepare-image
+          docker build --provenance=false --build-arg TARGETARCH=amd64 --tag "$TEMP_IMAGE" \
+            --label "org.opencontainers.image.revision=${{ gitea.sha }}" \
+            --label "org.opencontainers.image.version=$(python3 scripts/release.py version)" \
+            -f deploy/Dockerfile.release image
+          python3 scripts/smoke-docker.py "$TEMP_IMAGE" --client-container "$(hostname)" \
+            --resource-label "$CI_RESOURCE_LABEL"
+      - name: Publish immutable development image
+        id: publish
+        env:
+          GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
+        run: |
+          set -eu
+          mkdir -p "$DOCKER_CONFIG"
+          chmod 700 "$DOCKER_CONFIG"
+          python3 scripts/release.py promote-development "$TEMP_IMAGE"
+      - name: Clean only this attempt's resources and credentials
+        if: always()
+        run: |
+          python3 scripts/ci-cleanup.py "$CI_RESOURCE_LABEL" --client-container "$(hostname)" --image "$TEMP_IMAGE"
+          rm -rf "$DOCKER_CONFIG"
+
+  deploy-development:
+    needs: image
+    if: gitea.event_name == 'push' && gitea.ref == 'refs/heads/dev'
+    runs-on: docker
+    timeout-minutes: 15
+    container:
+      image: docker:29-cli
+      volumes:
+        - /docker/gitea/dev/RawMark:/docker/gitea/dev/RawMark
+    env:
+      GITEA_API_URL: ${{ gitea.server_url }}/api/v1
+      GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
+      DOCKER_CONFIG: /tmp/rawmark-docker-auth
+      DEPLOY_IMAGE: ${{ needs.image.outputs.image }}
+      DEPLOY_VERSION: ${{ needs.image.outputs.version }}
+      DEPLOY_COMMIT: ${{ gitea.sha }}
+    defaults:
+      run:
+        shell: sh
+    steps:
+      - name: Install deployment runtimes
+        run: apk add --no-cache nodejs python3 docker-cli-compose
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Deploy only the independent development instance
+        run: |
+          set -eu
+          mkdir -p "$DOCKER_CONFIG"
+          chmod 700 "$DOCKER_CONFIG"
+          printf '%s' "$GITEA_RELEASE_TOKEN" | docker login git.134333.xyz --username eezd --password-stdin
+          python3 scripts/deploy.py development --directory /docker/gitea/dev/RawMark \
+            --image "$DEPLOY_IMAGE" --commit "$DEPLOY_COMMIT" --version "$DEPLOY_VERSION" \
+            --client-container "$(hostname)"
+      - name: Remove job credentials
+        if: always()
+        run: rm -rf "$DOCKER_CONFIG"

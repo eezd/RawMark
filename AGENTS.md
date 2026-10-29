@@ -67,10 +67,14 @@
 
 ## 文档与交接
 
-- 文档按任务、行为变化或项目约定维护；注释解释意图与约束，项目指引只记录已确认的事实，不额外生成无关文档或备份。
-- 仅在已授权执行且交接信息无法从代码、Git 历史或已有文档恢复时，创建或更新 `CONTEXT.md`；简单修改无需记录。
-- 交接内容原位更新，保留有效目标、决策及理由、未完成事项和风险，标注未验证信息，删除过时状态；当前状态不超过 100 行，全文不超过 500 行。
-- 保留 `CONTEXT.md` 原有跟踪策略：本地专用文件继续忽略，不擅自停止跟踪已纳入版本控制的文件。
+- 文档按任务、行为变化或项目约定按需维护；注释解释意图与约束，项目指引只记录已确认的事实，不额外生成无关文档或备份。
+- `CONTEXT.md` 是跨会话交接快照，而非变更日志；仅在已授权执行且关键信息无法从代码、Git 历史或已有文档恢复时创建或更新，简单修改无需记录。
+- 新会话接续任务时，按需读取 `CONTEXT.md` 及其引用的关键文件，并结合代码和 Git 状态核实，不将历史记录直接视为当前事实。
+- 交接内容保留当前目标与进度、关键决策及理由、已否决方案及原因、用户约束、环境注意事项、未解决风险和下一步；已完成里程碑仅保留必要摘要，不重复记录实现细节和变更历史。
+- 内容应准确、自包含；必要的路径、命令、报错和配置值保留原文，无法核实的信息标注 `[未核实]`，不得记录密码、密钥或 Token。
+- 目标、进度、决策或风险发生重要变化时，按需原位更新；及时清理过时状态、已完成事项和已解决风险，避免内容重复或相互矛盾。
+- 当前状态不超过 100 行，全文不超过 500 行；超限时优先压缩历史记录，长期有效的项目规则归入 `AGENTS.md`，详细设计归入现有文档。
+- 保留 `CONTEXT.md` 原有 Git 跟踪策略：本地专用文件继续忽略，不擅自停止跟踪已纳入版本控制的文件。
 
 ## 项目定位与工具链
 
@@ -125,6 +129,12 @@ pnpm -C web build
 
 ## CI/CD
 
-Gitea 为主仓库和构建执行方；日常 main push 仅构建 Linux amd64，通过隔离验收后发布开发镜像并更新独立开发实例。开发实例目录为 `/docker/gitea/dev/rawmark`，开发应用容器名为 `rawmark-dev`，生产实例目录为 `/docker/main/rawmark`。正式发布只从 Gitea 手动入口选择已通过开发 CI 的提交，构建五平台包及 Linux 双架构镜像，同步同一版本至 GitHub/GHCR；GitHub 不执行项目构建，仅允许 Pages 平台部署预构建 Demo。生产仅手动选择完整发布版本并固定 GHCR 摘要，不能随开发推送更新。
+Gitea 为公开主仓库，GitHub 为单向公开镜像；默认分支均为 main，日常开发使用 dev。
 
-runner 保持容量一，最多两个任务同时运行；当前宿主 Docker 执行器只接收受信代码。临时资源按任务标识清理，不全局 prune，不删除部署容器。CI 行为测试为 `python3 -m unittest discover -s scripts/tests -v`；项目检查与打包入口为 `sh scripts/ci-check.sh development|release`、`sh scripts/ci-package.sh development|release`，仅在 CI 工具链容器执行。正式版本、凭据、上传限制、部署目录与回退步骤见双语开发和部署文档。
+- dev push：容器内检查、Linux amd64 打包与隔离冒烟，通过后发布 `git.134333.xyz/eezd/dev/rawmark:YYYYMMDD-<8位SHA>`，按摘要部署 DEV。日期取提交时间 UTC，完整 SHA 保留在回执；同名异提交拒绝，已验证镜像重试复用。
+- main push：独立检查实际合并提交、Linux amd64 构建及容器冒烟，不发布镜像、不部署。仓库内受信 PR 只检查；外部 fork PR 不自动进入共享 Docker runner，不注入发布凭据。
+- DEV 为 `/docker/gitea/dev/RawMark`，容器 `RawMark-dev`，Compose 项目 `rawmark-dev`，监听 `127.0.0.1:21001`，域名 `raw-dev.134333.xyz`。数据独立；所有部署共用宿主实例 `.deploy.lock`，锁内核对 dev 最新 SHA，pending 未处理时拒绝覆盖。已有数据即使无旧容器也必须备份。
+- Git 镜像独立于 CI 成败：push/create/delete、每小时对账和手动重试，共用 `/docker/gitea/mirrors/RawMark/.mirror.lock`，仅同步业务分支和 TAG 及完整历史，跟随源端删除。同步代码从 main 读取；`RAWMARK_MIRROR_ENABLED=true` 后启用，凭据为 `RAWMARK_GITHUB_MIRROR_TOKEN`。DEV 镜像不上传 GHCR。main 切换前保持该变量关闭。
+- CI 凭据 `RAWMARK_GITEA_TOKEN` 需要仓库和 Packages 写权限。runner 保持容量一、`sweep: false`，只运行受信代码；工具链安装在任务容器。资源按任务标签清理，禁止全局 prune。
+- 开发构建通过 `RAWMARK_BUILD_CHANNEL=development` 派生版本，前端与二进制一致；正式 `VERSION` 不因开发构建改变。开发包为 `RawMark_<版本>_linux_amd64.tar.gz`；历史正式产物不改名。安装包及单次传输保持既有 90,000,000 字节预算。
+- 正式发布与生产入口暂时禁用，后续由 gitea-release 适配，不能绕过 Git 镜像锁直接写 GitHub 分支。生产保留现有目录和数据，不随开发推送更新；GitHub 旧 Release workflow 保持禁用，Pages Demo 不切换。

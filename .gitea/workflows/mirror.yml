@@ -1,0 +1,35 @@
+name: GitHub Git mirror
+on:
+  push:
+    branches: ['**']
+    tags: ['**']
+  create:
+  delete:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: rawmark-github-mirror
+  cancel-in-progress: false
+jobs:
+  mirror:
+    if: vars.RAWMARK_MIRROR_ENABLED == 'true'
+    runs-on: docker
+    timeout-minutes: 15
+    container:
+      image: docker:29-cli
+      volumes:
+        - /docker/gitea/mirrors/RawMark:/docker/gitea/mirrors/RawMark
+    steps:
+      - name: Install mirror runtimes
+        run: apk add --no-cache nodejs python3 git git-lfs
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Reconcile current source references
+        env:
+          GITHUB_MIRROR_TOKEN: ${{ secrets.RAWMARK_GITHUB_MIRROR_TOKEN }}
+        run: python3 scripts/mirror.py --directory /docker/gitea/mirrors/RawMark

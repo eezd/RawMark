@@ -7,8 +7,12 @@ import tarfile
 import zipfile
 
 system, arch = sys.argv[1:]
-version = Path('VERSION').read_text().strip()
-name = f'rawmark_{version}_{system}_{arch}'
+from release import build_version
+
+version = build_version()
+from release import archive_name
+
+name = archive_name(version, system + '/' + arch).removesuffix('.zip').removesuffix('.tar.gz')
 package = Path('package')
 files = sorted(p for p in package.rglob('*') if p.is_file())
 if system == 'windows':
