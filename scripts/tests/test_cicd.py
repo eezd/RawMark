@@ -204,7 +204,7 @@ class DeploymentTests(unittest.TestCase):
         (self.directory / '.env').write_text(
             f'RAWMARK_CHANNEL=development\nRAWMARK_PROJECT=rawmark-ci-deploy\n'
             f'RAWMARK_BIND=127.0.0.1\nRAWMARK_PORT=21899\nRAWMARK_DATA_DIR={self.directory}/data\n')
-        self.image = release.GITEA_IMAGE + '@' + DIGEST
+        self.image = release.GITEA_DEV_IMAGE + '@' + DIGEST
         self.previous = {'Id': 'old-id', 'Image': 'old-image', 'State': {'Running': True},
                          'Mounts': [{'Destination': '/data', 'Type': 'bind', 'Source': str(self.directory / 'data')}]}
         self.image_info = {'Id': 'new-image', 'Config': {'User': '65532:65532', 'Labels': {
@@ -249,7 +249,7 @@ class DeploymentTests(unittest.TestCase):
                 deploy.deployment(self.directory, 'development', self.image, SHA, '0.1.1')
             docker.assert_not_called()
 
-    def test_stale_main_skips_without_stopping_existing_service(self):
+    def test_stale_dev_skips_without_stopping_existing_service(self):
         with patch.object(deploy, 'API') as api, patch.object(deploy, 'run', side_effect=self.command):
             api.return_value.repo.return_value = {'commit': {'id': 'c' * 40}}
             deploy.deployment(self.directory, 'development', self.image, SHA, '0.1.1')
@@ -278,6 +278,21 @@ class DeploymentTests(unittest.TestCase):
         self.assertLess(stop, start)
         self.assertIn('RAWMARK_IMAGE=' + self.image, (self.directory / '.env').read_text())
 
+    def test_existing_data_is_backed_up_without_a_container(self):
+        def without_container(*args, **kwargs):
+            if args[:2] == ('docker', 'ps'):
+                return ''
+            return self.command(*args, **kwargs)
+        opener = Mock()
+        opener.open.side_effect = [contextlib.nullcontext(io.BytesIO(b'<html>RawMark</html>')),
+                                   contextlib.nullcontext(io.BytesIO(b'{"code":0}'))]
+        with patch.object(deploy, 'run', side_effect=without_container), patch.object(
+                deploy.urllib.request, 'build_opener', return_value=opener):
+            deploy.deployment(self.directory, 'development', self.image, SHA, '0.1.1')
+        receipt = json.loads((self.directory / 'deployment.json').read_text())
+        self.assertTrue(Path(receipt['backup']).exists())
+        self.assertIsNone(receipt['previous_image'])
+
     def test_failed_replacement_keeps_backup_and_does_not_downgrade_data(self):
         def failure(*args, **kwargs):
             if args[:2] == ('docker', 'compose') and 'up' in args:
@@ -291,6 +306,15 @@ class DeploymentTests(unittest.TestCase):
         self.assertTrue(Path(pending['backup']).exists())
         self.assertFalse(any(c[:2] == ('docker', 'start') for c in self.commands))
         self.assertNotIn('RAWMARK_IMAGE=', (self.directory / '.env').read_text())
+
+
+class DevelopmentVersionTests(unittest.TestCase):
+    def test_version_uses_utc_commit_date_and_exact_eight_character_hash(self):
+        with patch.dict(os.environ, {'RAWMARK_BUILD_CHANNEL': 'development'}), patch.object(
+                release, 'run', side_effect=[SHA, '0']):
+            self.assertEqual(release.build_version(), '19700101-aaaaaaaa')
+        self.assertEqual(release.archive_name('19700101-aaaaaaaa', 'linux/amd64'),
+                         'RawMark_19700101-aaaaaaaa_linux_amd64.tar.gz')
 
 
 class CleanupTests(unittest.TestCase):

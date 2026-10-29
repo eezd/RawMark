@@ -18,7 +18,9 @@ parser.add_argument('image')
 parser.add_argument('--client-container', help='CI job container to connect to the test network')
 parser.add_argument('--resource-label', help='Label temporary resources for cancellation cleanup')
 args = parser.parse_args()
-version = Path('VERSION').read_text().strip()
+from release import build_version
+
+version = build_version()
 name = 'rawmark-ci-' + secrets.token_hex(8)
 labels = ('--label', args.resource_label) if args.resource_label else ()
 

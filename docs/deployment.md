@@ -163,14 +163,14 @@ The Bearer authentication upgrade requires the frontend and backend to be releas
 
 ## Managed development and production
 
-The checked-in `deploy/compose.image.yml` is an image-only template. Development lives in `/docker/gitea/dev/rawmark`; production lives in `/docker/main/rawmark`. Copy the template to the instance directory as `compose.yml`, with a private mode-600 `.env` beside it. The container name follows `RAWMARK_PROJECT`, so the development container is `rawmark-dev`. These instances do not depend on a source checkout. Set all required values explicitly:
+The checked-in `deploy/compose.image.yml` is an image-only template. Development lives in `/docker/gitea/dev/RawMark`; production lives in `/docker/main/rawmark`. Copy the template to the instance directory as `compose.yml`, with a private mode-600 `.env` beside it. The container name follows `RAWMARK_PROJECT`, so the development container is `rawmark-dev`. These instances do not depend on a source checkout. Set all required values explicitly:
 
 ```dotenv
 RAWMARK_CHANNEL=development
 RAWMARK_PROJECT=rawmark-dev
 RAWMARK_BIND=127.0.0.1
 RAWMARK_PORT=21001
-RAWMARK_DATA_DIR=/docker/gitea/dev/rawmark/data
+RAWMARK_DATA_DIR=/docker/gitea/dev/RawMark/data
 RAWMARK_IMAGE=git.134333.xyz/eezd/rawmark@sha256:<verified-digest>
 ```
 

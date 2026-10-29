@@ -3,6 +3,7 @@
 
 import argparse
 import base64
+import datetime
 import hashlib
 import io
 import json
@@ -22,6 +23,7 @@ import zipfile
 
 REPOSITORY = 'eezd/RawMark'
 GITEA_IMAGE = 'git.134333.xyz/eezd/rawmark'
+GITEA_DEV_IMAGE = 'git.134333.xyz/eezd/dev/rawmark'
 GITHUB_IMAGE = 'ghcr.io/eezd/rawmark'
 PLATFORMS = ('linux/amd64', 'linux/arm64', 'windows/amd64', 'darwin/amd64', 'darwin/arm64')
 UPLOAD_LIMIT = 90_000_000
@@ -52,13 +54,23 @@ def output(name, value):
             target.write(f'{name}={value}\n')
 
 
+def build_version():
+    if os.environ.get('RAWMARK_BUILD_CHANNEL') != 'development':
+        return Path('VERSION').read_text().strip()
+    commit = run('git', 'rev-parse', 'HEAD')
+    timestamp = int(run('git', 'show', '-s', '--format=%ct', commit))
+    date = datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).strftime('%Y%m%d')
+    return date + '-' + commit[:8]
+
+
 def archive_name(version, platform):
     extension = '.zip' if platform.startswith('windows/') else '.tar.gz'
-    return f'rawmark_{version}_{platform.replace("/", "_")}{extension}'
+    prefix = 'RawMark' if re.fullmatch(r'[0-9]{8}-[0-9a-f]{8}', version) else 'rawmark'
+    return f'{prefix}_{version}_{platform.replace("/", "_")}{extension}'
 
 
 def bundle(mode):
-    version = Path('VERSION').read_text().strip()
+    version = build_version()
     commit = run('git', 'rev-parse', 'HEAD')
     platforms = PLATFORMS if mode == 'release' else PLATFORMS[:1]
     files = {}
@@ -91,7 +103,7 @@ def bundle(mode):
 
 def validate_build(build):
     require(build['schema'] == 1, 'Unsupported build receipt')
-    require(build['version'] == Path('VERSION').read_text().strip(), 'Build version mismatch')
+    require(build['version'] == build_version(), 'Build version mismatch')
     require(build['commit'] == run('git', 'rev-parse', 'HEAD'), 'Build commit mismatch')
     require(build['mode'] in ('development', 'release'), 'Unknown build mode')
     expected = PLATFORMS if build['mode'] == 'release' else PLATFORMS[:1]
@@ -423,7 +435,19 @@ def promote_development(local_image):
     token = os.environ['GITEA_RELEASE_TOKEN']
     subprocess.run(['docker', 'login', 'git.134333.xyz', '--username', 'eezd', '--password-stdin'],
                    input=token, text=True, check=True)
-    candidate = GITEA_IMAGE + ':build-' + build['commit'] + '-' + os.environ['CI_RUN_ID'] + '-' + os.environ['CI_RUN_ATTEMPT']
+    existing = registry_digest(GITEA_DEV_IMAGE, build['version'])
+    if existing:
+        reference = GITEA_DEV_IMAGE + '@' + existing
+        run('docker', 'pull', reference)
+        info = json.loads(run('docker', 'image', 'inspect', reference))[0]
+        labels = info['Config'].get('Labels') or {}
+        require(labels.get('org.opencontainers.image.revision') == build['commit']
+                and labels.get('org.opencontainers.image.version') == build['version'],
+                'Existing development version belongs to another commit')
+        output('image', reference)
+        output('version', build['version'])
+        return
+    candidate = GITEA_DEV_IMAGE + ':build-' + build['commit'] + '-' + os.environ['CI_RUN_ID'] + '-' + os.environ['CI_RUN_ATTEMPT']
     # Uncompressed layer sizes provide a conservative bound before any CDN upload.
     with tempfile.TemporaryFile() as target:
         subprocess.run(['docker', 'image', 'save', local_image], stdout=target, check=True)
@@ -434,15 +458,15 @@ def promote_development(local_image):
     run('docker', 'tag', local_image, candidate)
     try:
         run('docker', 'push', candidate)
-        value = registry_digest(GITEA_IMAGE, candidate.rsplit(':', 1)[1])
-        tag = 'dev-' + build['commit']
-        existing = registry_digest(GITEA_IMAGE, tag)
+        value = registry_digest(GITEA_DEV_IMAGE, candidate.rsplit(':', 1)[1])
+        tag = build['version']
+        existing = registry_digest(GITEA_DEV_IMAGE, tag)
         require(existing in (None, value), 'Immutable development tag already has different content')
         if not existing:
             run('docker', 'buildx', 'imagetools', 'create', '--prefer-index=false', '--tag',
-                GITEA_IMAGE + ':' + tag, GITEA_IMAGE + '@' + value)
-        require(registry_digest(GITEA_IMAGE, tag) == value, 'Development tag digest changed')
-        output('image', GITEA_IMAGE + '@' + value)
+                GITEA_DEV_IMAGE + ':' + tag, GITEA_DEV_IMAGE + '@' + value)
+        require(registry_digest(GITEA_DEV_IMAGE, tag) == value, 'Development tag digest changed')
+        output('image', GITEA_DEV_IMAGE + '@' + value)
         output('version', build['version'])
     finally:
         run('docker', 'image', 'rm', candidate)
@@ -610,6 +634,7 @@ def main():
     sub = parser.add_subparsers(dest='command', required=True)
     sub.add_parser('bundle').add_argument('mode', choices=('development', 'release'))
     sub.add_parser('prepare-image')
+    sub.add_parser('version')
     pre = sub.add_parser('preflight')
     pre.add_argument('version')
     pre.add_argument('commit')
@@ -617,7 +642,9 @@ def main():
     sub.add_parser('publish')
     sub.add_parser('promote-development').add_argument('image')
     args = parser.parse_args()
-    if args.command == 'bundle':
+    if args.command == 'version':
+        print(build_version())
+    elif args.command == 'bundle':
         bundle(args.mode)
     elif args.command == 'prepare-image':
         prepare_image()

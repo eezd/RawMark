@@ -2,7 +2,7 @@
 name: ${RAWMARK_PROJECT:?Set RAWMARK_PROJECT}
 services:
   rawmark:
-    container_name: ${RAWMARK_PROJECT:?Set RAWMARK_PROJECT}
+    container_name: ${RAWMARK_CONTAINER_NAME:?Set RAWMARK_CONTAINER_NAME}
     image: ${RAWMARK_IMAGE:?Set a verified registry image digest}
     ports:
       - "${RAWMARK_BIND:-127.0.0.1}:${RAWMARK_PORT:?Set RAWMARK_PORT}:8080"

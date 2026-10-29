@@ -18,7 +18,9 @@ import urllib.request
 
 
 binary = str(Path(sys.argv[1]).resolve())
-version = Path('VERSION').read_text().strip()
+from release import build_version
+
+version = build_version()
 assert subprocess.check_output([binary, '--version'], text=True).strip() == f'RawMark {version}'
 
 

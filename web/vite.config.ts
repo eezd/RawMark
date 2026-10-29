@@ -8,7 +8,7 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import Components from 'unplugin-vue-components/vite'
 import { defineConfig } from 'vitest/config'
 
-const releaseVersion = readFileSync(new URL('../VERSION', import.meta.url), 'utf8').trim()
+const releaseVersion = process.env.RAWMARK_BUILD_VERSION ?? readFileSync(new URL('../VERSION', import.meta.url), 'utf8').trim()
 
 export default defineConfig(({ mode }) => ({
   define: { __RAWMARK_RELEASE__: JSON.stringify(releaseVersion) },
