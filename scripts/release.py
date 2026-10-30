@@ -299,6 +299,19 @@ def release_receipt(gitea, github, version):
     return build, receipt
 
 
+def successful_main_ci(gitea, commit):
+    page = 1
+    passed = False
+    while not passed:
+        runs = gitea.repo(f'/actions/runs?limit=100&page={page}')['workflow_runs']
+        if not runs:
+            break
+        passed = any(r['head_sha'] == commit and r['event'] == 'push' and r.get('conclusion') == 'success'
+                     and r['path'] == 'main.yml@refs/heads/main' for r in runs)
+        page += 1
+    return passed
+
+
 def preflight(version, commit):
     state = selected_state()
     gitea, _ = clients()
@@ -326,16 +339,7 @@ def preflight(version, commit):
         return
     main = fetch_main(gitea)
     run('git', 'merge-base', '--is-ancestor', commit, main)
-    page = 1
-    passed = False
-    while not passed:
-        runs = gitea.repo(f'/actions/runs?limit=100&page={page}')['workflow_runs']
-        if not runs:
-            break
-        passed = any(r['head_sha'] == commit and r['event'] == 'push' and r['conclusion'] == 'success'
-                     and r['path'] == 'main.yml@refs/heads/main' for r in runs)
-        page += 1
-    require(passed, 'The selected commit has no successful main-push CI')
+    require(successful_main_ci(gitea, commit), 'The selected commit has no successful main-push CI')
     remote = fetch_main(github)
     run('git', 'merge-base', '--is-ancestor', remote, commit)
     tag = version

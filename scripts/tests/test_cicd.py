@@ -361,3 +361,22 @@ class ReleaseReservationTests(unittest.TestCase):
     def test_release_version_uses_utc_commit_date_and_fixed_sha(self):
         with patch.object(release, 'run', return_value='0'):
             self.assertEqual(release.version_for(SHA), '19700101-aaaaaaaa')
+
+
+class MainAdmissionTests(unittest.TestCase):
+    def test_pending_rows_do_not_hide_later_success(self):
+        api = Mock()
+        api.repo.side_effect = [
+            {'workflow_runs': [{'head_sha': SHA, 'event': 'push', 'path': 'mirror.yml@refs/heads/main'}]},
+            {'workflow_runs': [{'head_sha': SHA, 'event': 'push', 'path': 'main.yml@refs/heads/main', 'conclusion': 'success'}]},
+        ]
+        self.assertTrue(release.successful_main_ci(api, SHA))
+
+    def test_other_sha_pr_or_dev_success_cannot_admit_main(self):
+        api = Mock()
+        api.repo.side_effect = [{'workflow_runs': [
+            {'head_sha': 'b' * 40, 'event': 'push', 'path': 'main.yml@refs/heads/main', 'conclusion': 'success'},
+            {'head_sha': SHA, 'event': 'pull_request', 'path': 'main.yml@refs/pull/3/head', 'conclusion': 'success'},
+            {'head_sha': SHA, 'event': 'push', 'path': 'dev.yml@refs/heads/dev', 'conclusion': 'success'},
+        ]}, {'workflow_runs': []}]
+        self.assertFalse(release.successful_main_ci(api, SHA))
