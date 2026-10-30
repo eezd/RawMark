@@ -332,8 +332,7 @@ def preflight(version, commit):
             'GitHub classic PAT needs repository access, workflow and write:packages')
     current = gitea.release(version)
     if current and not current['draft']:
-        build, _ = release_receipt(gitea, github, version)
-        require(build['commit'] == commit, 'Published version belongs to another commit')
+        complete_publication(gitea, github, version, commit)
         output('completed', 'true')
         output('reuse', 'true')
         return
@@ -384,6 +383,16 @@ def save_state(state):
     temporary = path.with_suffix('.tmp')
     write_json(temporary, state)
     temporary.replace(path)
+
+
+def complete_publication(gitea, github, version, commit):
+    """Finish the matching reservation only after both published receipts validate."""
+    state = selected_state()
+    require(state['version'] == version and state['commit'] == commit, 'Publication candidate mismatch')
+    build, _ = release_receipt(gitea, github, version)
+    require(build['commit'] == commit, 'Published version belongs to another commit')
+    state['status'] = 'complete'
+    save_state(state)
 
 
 def reserve(dev):
@@ -651,7 +660,7 @@ def publish():
             run('docker', 'buildx', 'imagetools', 'create', '--tag', image + ':' + stable_tag, image + '@' + value)
             require(registry_digest(image, stable_tag) == value, 'Promoted image digest differs')
     gitea.repo(f'/releases/{release["id"]}', method='PATCH', data={'draft': False})
-    release_receipt(gitea, github, tag)
+    complete_publication(gitea, github, tag, build['commit'])
     print(f'Published RawMark {tag}: {build["commit"]}, {value}')
 
 

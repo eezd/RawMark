@@ -182,35 +182,3 @@ jobs:
         run: |
           python3 scripts/ci-cleanup.py "$CI_RESOURCE_LABEL" --client-container "$(hostname)"
           rm -rf "$DOCKER_CONFIG"
-
-  deploy:
-    needs: [build, publish]
-    if: always() && needs.build.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped')
-    runs-on: docker
-    timeout-minutes: 20
-    container:
-      image: docker:29-cli
-      volumes:
-        - /docker/gitea/mirrors/RawMark:/docker/gitea/mirrors/RawMark
-        - /docker/gitea/main/RawMark:/docker/gitea/main/RawMark
-    env:
-      GITEA_READ_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
-      DOCKER_CONFIG: /tmp/rawmark-anonymous-docker
-    steps:
-      - name: Install deployment runtimes
-        run: apk add --no-cache nodejs python3 git docker-cli-compose
-      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ gitea.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Deploy the completed release and finish its reservation
-        run: |
-          set -eu
-          mkdir -p "$DOCKER_CONFIG"
-          python3 scripts/deploy.py production --directory /docker/gitea/main/RawMark \
-            --version "$(python3 -c 'import sys;sys.path.insert(0,"scripts");import release;print(release.selected_state()["version"])')" \
-            --client-container "$(hostname)"
-      - name: Remove temporary Docker configuration
-        if: always()
-        run: rm -rf "$DOCKER_CONFIG"

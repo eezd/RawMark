@@ -14,7 +14,7 @@ import tempfile
 import time
 import urllib.request
 
-from release import API, GITEA_DEV_IMAGE, GITHUB_IMAGE, release_receipt, require, run, release_state, save_state
+from release import API, GITEA_DEV_IMAGE, require, run
 
 
 def settings(directory, channel):
@@ -48,16 +48,14 @@ def save(path, data):
 
 def deployment(directory, channel, image, commit, version, client_container=None):
     directory = Path(directory).resolve(strict=True)
+    require(channel == 'development', 'Only the persistent DEV instance supports deployment')
     cfg = settings(directory, channel)
-    registry = GITEA_DEV_IMAGE if channel == 'development' else GITHUB_IMAGE
+    registry = GITEA_DEV_IMAGE
     require(re.fullmatch(re.escape(registry) + r'@sha256:[0-9a-f]{64}', image), 'Expected an immutable registry digest')
     require(re.fullmatch(r'[0-9a-f]{40}', commit), 'Expected a full commit SHA')
     # Serializes actual deployments, including manually started jobs and CLI use.
     with (directory / '.deploy.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        if channel == 'production' and (directory / 'deployment.json').exists():
-            deployed = json.loads((directory / 'deployment.json').read_text())
-            run('git', 'merge-base', '--is-ancestor', deployed['commit'], commit)
         require(not (directory / 'deployment.pending.json').exists(),
                 'Resolve the previous pending deployment before attempting another update')
         run('docker', 'pull', image)
@@ -143,33 +141,15 @@ def deployment(directory, channel, image, commit, version, client_container=None
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('channel', choices=('development', 'production'))
+    parser.add_argument('channel', choices=('development',))
     parser.add_argument('--directory', required=True)
     parser.add_argument('--image')
     parser.add_argument('--commit')
     parser.add_argument('--version', required=True)
     parser.add_argument('--client-container')
     args = parser.parse_args()
-    if args.channel == 'production':
-        require(not args.image and not args.commit, 'Production accepts a completed version, not an arbitrary image')
-        gitea = API(os.environ['GITEA_API_URL'], os.environ['GITEA_READ_TOKEN'])
-        github = API('https://api.github.com', '', github=True)
-        build, receipt = release_receipt(gitea, github, args.version)
-        image, commit = GITHUB_IMAGE + '@' + receipt['image_digest'], build['commit']
-    else:
-        image, commit = args.image, args.commit
-        require(image and commit, 'Development requires an image digest and commit')
-    if args.channel == 'production':
-        with release_state() as state:
-            if state and state.get('status') != 'complete':
-                require(state.get('commit') == commit and state.get('version') == args.version,
-                        'Another release is pending')
-            deployment(args.directory, args.channel, image, commit, args.version, args.client_container)
-            if state and state.get('commit') == commit:
-                state['status'] = 'complete'
-                save_state(state)
-    else:
-        deployment(args.directory, args.channel, image, commit, args.version, args.client_container)
+    require(args.image and args.commit, 'Development requires an image digest and commit')
+    deployment(args.directory, args.channel, args.image, args.commit, args.version, args.client_container)
 
 
 if __name__ == '__main__':

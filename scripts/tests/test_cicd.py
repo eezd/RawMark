@@ -239,7 +239,7 @@ class DeploymentTests(unittest.TestCase):
     def test_channel_mismatch_cannot_touch_docker(self):
         with patch.object(deploy, 'run') as docker:
             with self.assertRaisesRegex(ValueError, 'channel'):
-                deploy.deployment(self.directory, 'production', self.image, SHA, '0.1.1')
+                deploy.settings(self.directory, 'production')
             docker.assert_not_called()
 
     def test_unresolved_pending_deployment_cannot_be_overwritten(self):
@@ -380,3 +380,52 @@ class MainAdmissionTests(unittest.TestCase):
             {'head_sha': SHA, 'event': 'push', 'path': 'dev.yml@refs/heads/dev', 'conclusion': 'success'},
         ]}, {'workflow_runs': []}]
         self.assertFalse(release.successful_main_ci(api, SHA))
+
+
+class PublicationCompletionTests(unittest.TestCase):
+    def test_success_finishes_reservation_without_deployment(self):
+        state = {'version': 'version', 'commit': SHA, 'status': 'selected'}
+        with patch.object(release, 'selected_state', return_value=state), \
+                patch.object(release, 'release_receipt', return_value=({'commit': SHA}, {})), \
+                patch.object(release, 'save_state') as save:
+            release.complete_publication(None, None, 'version', SHA)
+        self.assertEqual(state['status'], 'complete')
+        save.assert_called_once_with(state)
+
+    def test_partial_publication_remains_pending(self):
+        state = {'version': 'version', 'commit': SHA, 'status': 'selected'}
+        with patch.object(release, 'selected_state', return_value=state), \
+                patch.object(release, 'release_receipt', side_effect=ValueError('Incomplete mirror')), \
+                patch.object(release, 'save_state') as save:
+            with self.assertRaisesRegex(ValueError, 'Incomplete mirror'):
+                release.complete_publication(None, None, 'version', SHA)
+        self.assertEqual(state['status'], 'selected')
+        save.assert_not_called()
+
+    def test_published_retry_repairs_pending_reservation(self):
+        state = {'version': 'version', 'commit': SHA, 'status': 'selected'}
+        gitea, github = Mock(), Mock()
+        gitea.request.return_value = github.request.return_value = {'login': 'eezd'}
+        github.repo.return_value = {'permissions': {'push': True}}
+        github.headers = {'X-OAuth-Scopes': 'repo, workflow, write:packages'}
+        gitea.release.return_value = {'draft': False}
+        with patch.dict(os.environ, {'CI_RUN_ID': '42'}), \
+                patch.object(release, 'selected_state', return_value=state), \
+                patch.object(release, 'clients', return_value=(gitea, github)), \
+                patch.object(release, 'validate_identity'), \
+                patch.object(release, 'release_receipt', return_value=({'commit': SHA}, {})), \
+                patch.object(release, 'save_state'), patch.object(release, 'run') as run, \
+                patch.object(release, 'output') as output:
+            release.preflight('version', SHA)
+        self.assertEqual(state['status'], 'complete')
+        output.assert_any_call('completed', 'true')
+        run.assert_not_called()
+
+    def test_wrong_candidate_cannot_finish_reservation(self):
+        state = {'version': 'version', 'commit': SHA, 'status': 'selected'}
+        with patch.object(release, 'selected_state', return_value=state), \
+                patch.object(release, 'release_receipt', return_value=({'commit': 'c' * 40}, {})), \
+                patch.object(release, 'save_state') as save:
+            with self.assertRaisesRegex(ValueError, 'another commit'):
+                release.complete_publication(None, None, 'version', SHA)
+        save.assert_not_called()
