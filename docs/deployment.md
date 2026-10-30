@@ -162,9 +162,11 @@ The Bearer authentication upgrade requires the frontend and backend to be releas
 - If the interface breaks after an update, first check that the frontend and backend come from the same build, then inspect browser network requests and application logs. See the [user guide](guide.md#plugins-and-interface-recovery) for plugin and appearance recovery entry points.
 - Note reads send `Cache-Control: no-store, no-transform` so proxies preserve the strong revision ETag used by conditional saves. A proxy rewriting it to a weak ETag can cause otherwise valid edits to return HTTP 412; preserve this response policy through the public ingress.
 
-## Managed development and production
+## Managed DEV and formal artifacts
 
-The checked-in `deploy/compose.image.yml` is an image-only template. Development lives in `/docker/gitea/dev/RawMark`; production lives in `/docker/main/rawmark`. Copy the template to the instance directory as `compose.yml`, with a private mode-600 `.env` beside it. Set the project and container names independently. These instances do not depend on a source checkout. Set all required values explicitly:
+Personal use keeps only `/docker/gitea/dev/RawMark` running: container `RawMark-dev`, Compose project `rawmark-dev`, loopback port 21001 and public entry `https://raw.134333.xyz`. The raw-dev site is retired. DEV holds real private data; CI and isolated smoke tests use synthetic data.
+
+Copy `deploy/compose.image.yml` to the instance as `compose.yml`, with a private mode-600 `.env` beside it. Preserve existing ownership and never mount repository examples as live data.
 
 ```dotenv
 RAWMARK_CHANNEL=development
@@ -176,12 +178,8 @@ RAWMARK_DATA_DIR=/docker/gitea/dev/RawMark/data
 RAWMARK_IMAGE=git.134333.xyz/eezd/dev/rawmark@sha256:<verified-digest>
 ```
 
-For production, use channel `production`, project `rawmark`, the existing container name, port 21000, `/docker/main/rawmark/data`, and `ghcr.io/eezd/rawmark@sha256:<verified-digest>`. Preserve the current binding during migration. Create only a new development data directory with owner `65532:65532`; never recursively change existing production ownership or mount the repository example template as live storage.
+Dev pushes deploy verified Gitea development digests after checks and isolated smoke tests. Main pushes and PRs only validate. Manual formal releases publish packages and Gitea/GHCR images with GitHub mirrors; they do not create MAIN or update DEV. `/docker/gitea/dev/manage.sh start|stop` manages first-level projects using instance `.deploy.lock` files and rejects starts with unresolved pending deployments.
 
-Dev-push CI automatically updates development after checks and isolated smoke tests pass. Main pushes and PRs only validate. Formal release and **Deploy production manually** Gitea workflows remain disabled during this CI migration; enabling or executing them requires a separate release plan and authorization. The prepared production workflow requires matching formal Gitea/GitHub releases and receipts, pins the GHCR digest, and backs up data and configuration before replacement. Backups are private and include SQLite WAL files; old images and backups are retained.
+Deployment stops the service and backs up complete data, including SQLite WAL, configuration and previous-image details before writing `deployment.pending.json`. Successful health checks write `deployment.json` and clear pending. A failed candidate is stopped while its backup and pending record remain; no automatic data restore or program downgrade occurs. Recovery and private-data migration require explicit authorization and compatibility review. Never run two instances sharing writable data.
 
-The job records `deployment.pending.json` before replacement and `deployment.json` after health/frontend checks. If the candidate fails after accessing data, it stops the candidate and retains the backup and pending record for diagnosis; it does not automatically restore private data or run an older program against possibly migrated storage. Recovery requires explicit authorization and compatibility review. If backup fails before replacement, the untouched old service can be restarted safely. No global Docker cleanup is performed.
-
-Preparing the production files does not restart the current service or execute a data migration. Its first transition from the old source-build Compose is an explicitly authorized production update. Do not run both Compose configurations simultaneously. Test upgrades and recovery with synthetic data before that transition.
-
-A new development domain needs DNS, CDN custom-hostname activation and TLS, plus both the origin and regional ingress proxy configuration. Verify public access; a healthy loopback port or DNS record alone is insufficient. Keep resource-ticket paths redacted on every proxy.
+Domain changes require public, CDN and TLS validation while preserving resource-ticket log redaction. DNS remains user-managed.
