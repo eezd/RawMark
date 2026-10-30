@@ -1,7 +1,7 @@
 {
   "demo_notice": "仅供编辑器预览。修改不会保存，刷新后恢复示例。",
   "retry_b8784c": "重试",
-  "fonts_could_not_be_loaded_42a574": "字体加载失败，请检查网络后刷新页面。",
+  "fonts_could_not_be_loaded_42a574": "部分字体加载失败，正在使用备用字体，可刷新页面重试。",
   "refresh_page_9366e1": "刷新页面",
   "invalid_font_catalog_b577df": "字体列表格式无效",
   "manrope_sans_serif_a8923c": "Manrope · 清晰无衬线",

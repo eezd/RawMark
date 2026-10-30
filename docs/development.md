@@ -90,7 +90,7 @@ Default font resources are checked in; ordinary builds require no download or co
 python3 scripts/prepare-maple-font.py /path/to/MapleMonoNormalNL-NF-CN.zip
 ```
 
-The script generates WOFF2 files and `maple-font.css` while retaining the upstream license. Code blocks use highlight.js with fixed Atom One Dark; theme changes must not reintroduce previous highlighters or color schemes.
+The script generates WOFF2 files and `maple-font.css` while retaining the upstream license; `--css-only` regenerates declarations without rebuilding font binaries. Fonts use swap rendering, so downloads never hide the page. After first paint, regular Maple chunks (about 6.72 MB) load in batches of two; other weights load on demand. PWA installation skips font files and caches public build fonts after use. Code blocks use highlight.js with fixed Atom One Dark; theme changes must not reintroduce previous highlighters or color schemes.
 
 Plugin SDK types are in [common/plugin-api/index.d.ts](../web/src/common/plugin-api/index.d.ts); loading and lifecycle code lives in `common/plugins/`. Plugins run only on the frontend, and installers must trust their code. Namespaces, disabling, and resource versioning do not constitute a permission sandbox. Editor-extension failures preserve document contents and disable the relevant extensions on the current page.
 

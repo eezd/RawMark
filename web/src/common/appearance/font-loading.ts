@@ -1,13 +1,16 @@
 import { t as translate } from '@@/i18n/runtime'
-// Use the font set requested by actual browser layout, covering initial render, note switches, and later glyphs.
-export function watchFontLoading() {
-  const root = document.documentElement
-  const fonts = document.fonts
-  root.dataset.rmFonts = 'loading'
 
+const started = new WeakSet<FontFaceSet>()
+
+// Fonts may finish after interaction starts; never hide or disable the application.
+export function watchFontLoading() {
+  const fonts = document.fonts
+  if (started.has(fonts)) return
+  started.add(fonts)
+  let reported = false
   function failed() {
-    if (root.dataset.rmFonts === 'error') return
-    root.dataset.rmFonts = 'error'
+    if (reported) return
+    reported = true
     const panel = document.createElement('div')
     panel.className = 'rm-font-error'
     panel.setAttribute('role', 'alert')
@@ -19,24 +22,20 @@ export function watchFontLoading() {
     panel.append(message, retry)
     document.body.append(panel)
   }
-
-  function ready() {
-    if (root.dataset.rmFonts === 'error') return
-    // fonts.ready also resolves after download failure; failure must not count as fonts being ready.
-    if ([...fonts].some(font => font.status === 'error')) failed()
-    else if (fonts.status === 'loaded') root.dataset.rmFonts = 'ready'
-  }
-
-  fonts.addEventListener('loading', () => {
-    if (root.dataset.rmFonts === 'error') return
-    root.dataset.rmFonts = 'loading'
-    void fonts.ready.then(ready)
-  })
   fonts.addEventListener('loadingerror', failed)
 
-  // Trigger layout after mounting so the wait covers fonts used by the current text.
+  async function preload() {
+    const regular = [...fonts].filter(face => face.family.replace(/['"]/g, '') === 'Maple Mono Normal NL NF CN' && face.style === 'normal' && face.weight === '400')
+    for (let i = 0; i < regular.length; i += 2) {
+      const results = await Promise.allSettled(regular.slice(i, i + 2).map(face => face.load()))
+      if (results.some(result => result.status === 'rejected')) failed()
+    }
+  }
+  // Yield a paint before scheduling background downloads, including in the standalone demo.
   requestAnimationFrame(() => {
-    document.body.getBoundingClientRect()
-    void fonts.ready.then(ready)
+    setTimeout(() => {
+      if ([...fonts].some(face => face.status === 'error')) failed()
+      void preload()
+    }, 0)
   })
 }

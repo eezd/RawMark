@@ -13,7 +13,6 @@ import '@@/assets/styles/app.css'
 import '@@/assets/styles/element-plus.scss'
 import 'virtual:uno.css'
 
-watchFontLoading()
 const app = createApp(App)
 app.use(i18n).use(pinia).use(router)
 const user = useUserStore(pinia)
@@ -28,5 +27,5 @@ watch(() => user.sessionVersion, () => {
 })
 // Mount a retryable error interface even if identity restoration temporarily fails.
 void router.isReady().catch(() => {}).finally(() => {
-  app.mount('#app'); void registerPwa()
+  app.mount('#app'); watchFontLoading(); void registerPwa()
 })

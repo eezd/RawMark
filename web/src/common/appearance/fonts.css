@@ -3,7 +3,7 @@
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400 600;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/6b5e37b52d26eeac.woff2) format('woff2');
   unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
 }
@@ -12,7 +12,7 @@
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400 600;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/eb83d8d40af4411f.woff2) format('woff2');
   unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
 }
@@ -21,7 +21,7 @@
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400 600;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/99e400330f36ae77.woff2) format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
 }
@@ -30,7 +30,7 @@
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400 600;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/c4064400db3750ce.woff2) format('woff2');
   unicode-range:
     U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309,
@@ -41,7 +41,7 @@
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400 600;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/b19c2080652a3c2b.woff2) format('woff2');
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
@@ -52,7 +52,7 @@
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400 600;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/cc27b30471250057.woff2) format('woff2');
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
@@ -63,7 +63,7 @@
   font-family: 'Manrope';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/842459da81f909f2.woff2) format('woff2');
   unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
 }
@@ -72,7 +72,7 @@
   font-family: 'Manrope';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/9b2d027172a3481c.woff2) format('woff2');
   unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
 }
@@ -81,7 +81,7 @@
   font-family: 'Manrope';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/ed7393f42d27db3d.woff2) format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
 }
@@ -90,7 +90,7 @@
   font-family: 'Manrope';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/1f3ea86e40d947e2.woff2) format('woff2');
   unicode-range:
     U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309,
@@ -101,7 +101,7 @@
   font-family: 'Manrope';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/ee75508933e6fd45.woff2) format('woff2');
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
@@ -112,7 +112,7 @@
   font-family: 'Manrope';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/4872f2a6dc9a8250.woff2) format('woff2');
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
@@ -122,7 +122,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/7b3ddaeea40a0fe5.woff2) format('woff2');
   unicode-range:
     U+1f1e9-1f1f5, U+1f1f7-1f1ff, U+1f21a, U+1f232, U+1f234-1f237, U+1f250-1f251, U+1f300, U+1f302-1f308, U+1f30a-1f311,
@@ -132,7 +132,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/9af011928c669ba6.woff2) format('woff2');
   unicode-range:
     U+fee3, U+fef3, U+ff03-ff04, U+ff07, U+ff0a, U+ff17-ff19, U+ff1c-ff1d, U+ff20-ff3a, U+ff3c, U+ff3e-ff5b, U+ff5d,
@@ -144,7 +144,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/5f6c87a981ef2def.woff2) format('woff2');
   unicode-range:
     U+f0a7, U+f0b2, U+f0b7, U+f0c9, U+f0d8, U+f0da, U+f0dc-f0dd, U+f0e0, U+f0e6, U+f0eb, U+f0fc, U+f101, U+f104-f105,
@@ -159,7 +159,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/8953b4246f39fce9.woff2) format('woff2');
   unicode-range:
     U+9f83, U+9f85-9f8d, U+9f90-9f91, U+9f94-9f96, U+9f98, U+9f9b-9f9c, U+9f9e, U+9fa0, U+9fa2, U+9ff0-9fff, U+a001,
@@ -175,7 +175,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/e55b19a3912a75d1.woff2) format('woff2');
   unicode-range:
     U+9e30-9e33, U+9e35-9e3b, U+9e3e, U+9e40-9e44, U+9e46-9e4e, U+9e51, U+9e53, U+9e55-9e58, U+9e5a-9e5c, U+9e5e-9e63,
@@ -190,7 +190,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/935e2cf08e92673e.woff2) format('woff2');
   unicode-range:
     U+9c82-9c83, U+9c85-9c8c, U+9c8e-9c92, U+9c94-9c9b, U+9c9e-9ca3, U+9ca5-9ca7, U+9ca9, U+9cab, U+9cad-9cae,
@@ -204,7 +204,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/b5ae0757f6ecaa47.woff2) format('woff2');
   unicode-range:
     U+9a80, U+9a83, U+9a85, U+9a88-9a8a, U+9a8d-9a8e, U+9a90, U+9a92-9a93, U+9a95-9a96, U+9a98-9a99, U+9a9b-9aa2,
@@ -220,7 +220,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/4e47f619496a388f.woff2) format('woff2');
   unicode-range:
     U+98dd, U+98e1-98e2, U+98e7-98ea, U+98ec, U+98ee-98ef, U+98f2, U+98f4, U+98fc-98fe, U+9903, U+9905, U+9908, U+990a,
@@ -236,7 +236,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/3bc0783456e12fcc.woff2) format('woff2');
   unicode-range:
     U+975b-975c, U+9763, U+9765-9766, U+976c-976d, U+9773, U+9776, U+977a, U+977c, U+9784-9785, U+978e-978f,
@@ -252,7 +252,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/4168a698bef8858e.woff2) format('woff2');
   unicode-range:
     U+95c4-95ca, U+95cc-95cd, U+95d4-95d6, U+95d8, U+95e1-95e2, U+95e9, U+95f0-95f1, U+95f3, U+95f6, U+95fc,
@@ -268,7 +268,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/7a0b612893faf498.woff2) format('woff2');
   unicode-range:
     U+94f5, U+94f7, U+94f9, U+94fb-94fd, U+94ff, U+9503-9504, U+9506-9507, U+9509-950a, U+950d-950f, U+9511-9518,
@@ -280,7 +280,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/95d37f56ac503320.woff2) format('woff2');
   unicode-range:
     U+941c-942b, U+942d-942e, U+9432-9433, U+9435, U+9438, U+943a, U+943e, U+9444, U+944a, U+9451-9452, U+945a,
@@ -291,7 +291,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/7e74d2ffc02d78d0.woff2) format('woff2');
   unicode-range:
     U+92ec-92ed, U+92f0, U+92f3, U+92f8, U+92fc, U+9304, U+9306, U+9310, U+9312, U+9315, U+9318, U+931a, U+931e,
@@ -304,7 +304,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/70a0301ffa863394.woff2) format('woff2');
   unicode-range:
     U+9163-9164, U+9169, U+9170, U+9172, U+9174, U+9179-917a, U+917d-917e, U+9182-9183, U+9185, U+918c-918d,
@@ -320,7 +320,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/f65e41fe796f55cb.woff2) format('woff2');
   unicode-range:
     U+9004, U+900b, U+9011, U+9015-9016, U+901e, U+9021, U+9026, U+902d, U+902f, U+9031, U+9035-9036, U+9039-903a,
@@ -336,7 +336,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/1a993e7ab856f9c8.woff2) format('woff2');
   unicode-range:
     U+8e41-8e42, U+8e47, U+8e49-8e4b, U+8e50-8e53, U+8e59-8e5a, U+8e5f-8e60, U+8e64, U+8e69, U+8e6c, U+8e70, U+8e74,
@@ -352,7 +352,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/50a18da9b4927dbb.woff2) format('woff2');
   unicode-range:
     U+8cbd, U+8cbf-8cc4, U+8cc7-8cc8, U+8cca, U+8ccd, U+8cd1, U+8cd3, U+8cdb-8cdc, U+8cde, U+8ce0, U+8ce2-8ce4,
@@ -368,7 +368,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/a806fd74a8216e5f.woff2) format('woff2');
   unicode-range:
     U+8b80, U+8b83, U+8b8a, U+8b8c, U+8b90, U+8b93, U+8b99-8b9a, U+8ba0, U+8ba3, U+8ba5-8ba7, U+8baa-8bac, U+8bb4-8bb5,
@@ -383,7 +383,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/78bd32786a1b31ff.woff2) format('woff2');
   unicode-range:
     U+8a15-8a18, U+8a1a-8a1b, U+8a1d, U+8a1f, U+8a22-8a23, U+8a25, U+8a2b, U+8a2d, U+8a31, U+8a33-8a34, U+8a36-8a38,
@@ -399,7 +399,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/f44e78d8ce83767d.woff2) format('woff2');
   unicode-range:
     U+8882, U+8884-8886, U+8888, U+888f, U+8892-8893, U+889b, U+88a2, U+88a4, U+88a6, U+88a8, U+88aa, U+88ae, U+88b1,
@@ -415,7 +415,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/63e1e25c88076e71.woff2) format('woff2');
   unicode-range:
     U+86f4, U+86f8-86f9, U+86fb, U+86fe, U+8703, U+8706-870a, U+870d, U+8711-8713, U+871a, U+871e, U+8722-8723, U+8725,
@@ -431,7 +431,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/badb08d4ed31aab3.woff2) format('woff2');
   unicode-range:
     U+8548, U+854e, U+8553, U+8556-8557, U+8559, U+855e, U+8561, U+8564-8565, U+8568-856a, U+856d, U+856f-8570, U+8572,
@@ -447,7 +447,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/9d0550296822bc88.woff2) format('woff2');
   unicode-range:
     U+83c5, U+83c8-83c9, U+83cb, U+83d1, U+83d3-83d6, U+83d8, U+83db, U+83dd, U+83df, U+83e1, U+83e5, U+83ea-83eb,
@@ -464,7 +464,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/ea65d613de6262b7.woff2) format('woff2');
   unicode-range:
     U+82bc, U+82be, U+82c0-82c2, U+82c4-82c8, U+82ca-82cc, U+82ce, U+82d0, U+82d2-82d3, U+82d5-82d6, U+82d8-82d9,
@@ -479,7 +479,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/f624e6edcc42557f.woff2) format('woff2');
   unicode-range:
     U+8166-8169, U+816b, U+816d, U+8171, U+8173-8174, U+8178, U+817c-817d, U+8182, U+8188, U+8191, U+8198-819b, U+81a0,
@@ -495,7 +495,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/af97bfb909af51ae.woff2) format('woff2');
   unicode-range:
     U+8016, U+8018-8019, U+801c, U+801e, U+8026-802a, U+8031, U+8034-8035, U+8037, U+8043, U+804b, U+804d, U+8052,
@@ -510,7 +510,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/84a684f5b97032b6.woff2) format('woff2');
   unicode-range:
     U+7ef0-7ef2, U+7ef6, U+7efa-7efb, U+7efe, U+7f01-7f04, U+7f08, U+7f0a-7f12, U+7f17, U+7f19, U+7f1b-7f1c, U+7f1f,
@@ -525,7 +525,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/4af13061394e55b3.woff2) format('woff2');
   unicode-range:
     U+7dd2, U+7dd4, U+7dd6-7dd8, U+7dda-7de0, U+7de2-7de6, U+7de8-7ded, U+7def, U+7df1-7df5, U+7df7, U+7df9,
@@ -540,7 +540,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/a3739966a326e377.woff2) format('woff2');
   unicode-range:
     U+7ce8, U+7cec, U+7cf0, U+7cf5-7cf9, U+7cfc, U+7cfe, U+7d00, U+7d04-7d0b, U+7d0d, U+7d10-7d14, U+7d17-7d19,
@@ -554,7 +554,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/6c7df51c2d3405f8.woff2) format('woff2');
   unicode-range:
     U+7bd3-7bd4, U+7bd9-7bda, U+7bdd, U+7be0-7be1, U+7be4-7be6, U+7be9-7bea, U+7bef, U+7bf4, U+7bf6, U+7bfc, U+7bfe,
@@ -568,7 +568,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/a8901603a8f60b5c.woff2) format('woff2');
   unicode-range:
     U+7ae6, U+7af4-7af7, U+7afa-7afb, U+7afd-7b0a, U+7b0c, U+7b0e-7b0f, U+7b13, U+7b15-7b16, U+7b18-7b19, U+7b1e-7b20,
@@ -581,7 +581,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/62d567322492159f.woff2) format('woff2');
   unicode-range:
     U+798b-798e, U+7992, U+7994-7995, U+7997-7998, U+799a-799c, U+799f, U+79a3-79a6, U+79a8-79ac, U+79ae-79b1,
@@ -597,7 +597,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/4ca36ec0898d9f4b.woff2) format('woff2');
   unicode-range:
     U+784c, U+784e-7854, U+7856-7857, U+7859-785a, U+7865, U+7869-786a, U+786d, U+786f, U+7876-7877, U+787c,
@@ -613,7 +613,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/dc00089f866f9369.woff2) format('woff2');
   unicode-range:
     U+7722, U+7726, U+7728, U+772b-7730, U+7732-7736, U+7739-773a, U+773d-773f, U+7743, U+7746-7747, U+774c-774f,
@@ -628,7 +628,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/b14a1ed0396f00cf.woff2) format('woff2');
   unicode-range:
     U+7613-7619, U+761b-761d, U+761f-7622, U+7625, U+7627-762a, U+762e-7630, U+7632-7635, U+7638-763a, U+763c-763d,
@@ -643,7 +643,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/beed123d60cc6155.woff2) format('woff2');
   unicode-range:
     U+750d, U+750f, U+7511, U+7513, U+7515, U+7517, U+7519, U+7521-7527, U+752a, U+752c-752d, U+752f, U+7534, U+7536,
@@ -658,7 +658,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/9fcc77355f5a0d52.woff2) format('woff2');
   unicode-range:
     U+73f0, U+73f2, U+73f4-73f5, U+73f7, U+73f9-73fa, U+73fc-73fd, U+73ff-7402, U+7404, U+7407-7408, U+740a-740f,
@@ -673,7 +673,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/500793f7237d7337.woff2) format('woff2');
   unicode-range:
     U+72e6, U+72e8, U+72ef-72f0, U+72f2-72f4, U+72f6-72f7, U+72f9-72fb, U+72fd, U+7300-7304, U+7307, U+730a-730c,
@@ -688,7 +688,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/c4c44fadfc63ac54.woff2) format('woff2');
   unicode-range:
     U+71a8, U+71af, U+71b1-71bc, U+71be, U+71c1-71c2, U+71c4, U+71c8-71cb, U+71ce-71d0, U+71d2, U+71d4, U+71d9-71da,
@@ -703,7 +703,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/cf9cd646bc0d0f19.woff2) format('woff2');
   unicode-range:
     U+700b, U+700d, U+7015, U+7018, U+701b, U+701d-701f, U+7023, U+7026-7028, U+702c, U+702e-7030, U+7035, U+7037,
@@ -720,7 +720,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/620f5f28321be052.woff2) format('woff2');
   unicode-range:
     U+6ed9, U+6edb, U+6edd, U+6edf-6ee0, U+6ee2, U+6ee6, U+6eea, U+6eec, U+6eee-6eef, U+6ef2-6ef3, U+6ef7-6efa, U+6efe,
@@ -735,7 +735,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/658210c7f683a557.woff2) format('woff2');
   unicode-range:
     U+6dc3, U+6dc5-6dc6, U+6dc9, U+6dcc, U+6dcf, U+6dd2-6dd3, U+6dd6, U+6dd9-6dde, U+6de0, U+6de4, U+6de6, U+6de8-6dea,
@@ -750,7 +750,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/795b87224e8dcbc4.woff2) format('woff2');
   unicode-range:
     U+6cb1-6cb2, U+6cb4-6cb5, U+6cb7, U+6cba, U+6cbc-6cbd, U+6cc1-6cc3, U+6cc5-6cc7, U+6cd0-6cd4, U+6cd6-6cd7,
@@ -765,7 +765,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/e9d83a6fe76066e1.woff2) format('woff2');
   unicode-range:
     U+6b83-6b86, U+6b89, U+6b8d, U+6b91-6b93, U+6b95, U+6b97-6b98, U+6b9a-6b9b, U+6b9e, U+6ba1-6ba4, U+6ba9-6baa,
@@ -780,7 +780,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/df78bcc0618fdcb2.woff2) format('woff2');
   unicode-range:
     U+69fe-6a01, U+6a06, U+6a09, U+6a0b, U+6a11, U+6a13, U+6a17-6a19, U+6a1b, U+6a1e, U+6a23, U+6a28-6a29, U+6a2b,
@@ -796,7 +796,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/cf0b566ed87b1702.woff2) format('woff2');
   unicode-range:
     U+68d3, U+68d7, U+68dd, U+68df, U+68e1, U+68e3-68e4, U+68e6-68ed, U+68ef-68f0, U+68f2, U+68f4, U+68f6-68f7, U+68f9,
@@ -811,7 +811,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/b4bf867aff4a6bde.woff2) format('woff2');
   unicode-range:
     U+678b-678d, U+678f, U+6792-6793, U+6796, U+6798, U+679e-67a1, U+67a5, U+67a7-67a9, U+67ac-67ad, U+67b0-67b1,
@@ -827,7 +827,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/23f09a3fd29c803a.woff2) format('woff2');
   unicode-range:
     U+6631, U+6633-6634, U+6636, U+663a-663b, U+663d, U+6641, U+6644-6645, U+6649, U+664c, U+664f, U+6654, U+6659,
@@ -843,7 +843,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/e110453047bfe034.woff2) format('woff2');
   unicode-range:
     U+64f1-64f2, U+64f4, U+64f7-64f8, U+64fa, U+64fc, U+64fe-64ff, U+6503, U+6509, U+650f, U+6514, U+6518, U+651c-651e,
@@ -859,7 +859,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/b7668e18fe9cce6c.woff2) format('woff2');
   unicode-range:
     U+63b8-63bc, U+63be, U+63c0, U+63c3-63c4, U+63c6, U+63c8, U+63cd-63ce, U+63d1, U+63d6, U+63da-63db, U+63de, U+63e0,
@@ -874,7 +874,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/2306716a58a58a05.woff2) format('woff2');
   unicode-range:
     U+622c, U+622e-6230, U+6232, U+6238, U+623b, U+623d-623e, U+6243, U+6246, U+6248-6249, U+624c, U+6255, U+6259,
@@ -890,7 +890,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/b37a954f47c08e8e.woff2) format('woff2');
   unicode-range:
     U+60ed-60ee, U+60f0-60f1, U+60f4, U+60f6, U+60fa, U+6100, U+6106, U+610d-610e, U+6112, U+6114-6115, U+6119, U+611c,
@@ -905,7 +905,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/41d1d19f7bebcf26.woff2) format('woff2');
   unicode-range:
     U+5fc4, U+5fc9, U+5fcb, U+5fce-5fd6, U+5fda-5fde, U+5fe1-5fe2, U+5fe4-5fe5, U+5fea, U+5fed-5fee, U+5ff1-5ff3,
@@ -920,7 +920,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/3c66c61b08f9dc28.woff2) format('woff2');
   unicode-range:
     U+5e98, U+5e9b, U+5e9d, U+5ea0-5ea5, U+5ea8, U+5eab, U+5eaf, U+5eb3, U+5eb5-5eb6, U+5eb9, U+5ebe, U+5ec1-5ec3,
@@ -935,7 +935,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/8a51ce32a2d6a2b0.woff2) format('woff2');
   unicode-range:
     U+5d26-5d27, U+5d2e-5d34, U+5d3c-5d3e, U+5d41-5d44, U+5d46-5d48, U+5d4a-5d4b, U+5d4e, U+5d50, U+5d52, U+5d55-5d58,
@@ -950,7 +950,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/ffa6ae4b9eb5ffdc.woff2) format('woff2');
   unicode-range:
     U+5bec, U+5bee-5bf0, U+5bf2-5bf3, U+5bf5-5bf6, U+5bfe, U+5c02-5c03, U+5c05, U+5c07-5c09, U+5c0b-5c0c, U+5c0e,
@@ -965,7 +965,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/96088f438d29f54b.woff2) format('woff2');
   unicode-range:
     U+5aa0, U+5aa3-5aa4, U+5aaa, U+5aae-5aaf, U+5ab1-5ab2, U+5ab4-5ab5, U+5ab7-5aba, U+5abd-5abf, U+5ac3-5ac4,
@@ -980,7 +980,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/e0d8fdb665a16cd2.woff2) format('woff2');
   unicode-range:
     U+596a, U+596c-596e, U+5977, U+597b-597c, U+5981, U+598f, U+5997-5998, U+599a, U+599c-599d, U+59a0-59a1,
@@ -995,7 +995,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/20f6ba8c0c269b1a.woff2) format('woff2');
   unicode-range:
     U+5820, U+5822-5823, U+5825-5826, U+582c, U+582f, U+5831, U+583a, U+583d, U+583f-5842, U+5844-5846, U+5848, U+584a,
@@ -1011,7 +1011,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/847818b9c19663fd.woff2) format('woff2');
   unicode-range:
     U+56f9, U+56fc, U+56ff-5700, U+5703-5704, U+5709-570a, U+570c-570d, U+570f, U+5712-5713, U+5718-5719, U+571c,
@@ -1026,7 +1026,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/a7c81fbdd8cc5eb5.woff2) format('woff2');
   unicode-range:
     U+55f5-55f7, U+55fb, U+55fe, U+5600-5601, U+5605-5606, U+5608, U+560c-560d, U+560f, U+5614, U+5616-5617, U+561a,
@@ -1040,7 +1040,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/23acd90334da40b5.woff2) format('woff2');
   unicode-range:
     U+550f, U+5511-5514, U+5516-5517, U+5519, U+551b, U+551d-551e, U+5520, U+5522-5523, U+5526-5527, U+552a-552c,
@@ -1054,7 +1054,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/aebf42c37a635878.woff2) format('woff2');
   unicode-range:
     U+53e7-53e9, U+53f1, U+53f4-53f5, U+53fa-5400, U+5402, U+5405-5407, U+540b, U+540f, U+5412, U+5414, U+5416,
@@ -1069,7 +1069,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/c08b4b4d95cfb2ea.woff2) format('woff2');
   unicode-range:
     U+5289, U+528b, U+528d, U+528f, U+5291-5293, U+529a, U+52a2, U+52a6-52a7, U+52ac-52ad, U+52af, U+52b4-52b5, U+52b9,
@@ -1085,7 +1085,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/5b4fc0b27a8a1464.woff2) format('woff2');
   unicode-range:
     U+5104, U+5106-5107, U+5109-510b, U+510d, U+510f-5110, U+5113, U+5115, U+5117-5118, U+511a-511c, U+511e-511f,
@@ -1101,7 +1101,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/14213d7fbd6ab158.woff2) format('woff2');
   unicode-range:
     U+4fd1, U+4fd3, U+4fda-4fdc, U+4fdf-4fe0, U+4fe2-4fe4, U+4fe6, U+4fe8, U+4feb-4fed, U+4ff3, U+4ff5-4ff6, U+4ff8,
@@ -1116,7 +1116,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/3ff1abbbffc86b31.woff2) format('woff2');
   unicode-range:
     U+4ea3, U+4ea5, U+4eb0-4eb1, U+4eb3-4eb6, U+4eb8-4eb9, U+4ebb-4ebe, U+4ec2-4ec4, U+4ec8-4ec9, U+4ecc, U+4ecf-4ed0,
@@ -1131,7 +1131,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/5e6011e3010d50bd.woff2) format('woff2');
   unicode-range:
     U+3129, U+3131, U+3134, U+3137, U+3139, U+3141-3142, U+3145, U+3147-3148, U+314b, U+314d-314e, U+315c, U+3160-3161,
@@ -1147,7 +1147,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/65a11622c84af2c7.woff2) format('woff2');
   unicode-range:
     U+279f-27a2, U+27a4-27a5, U+27a8, U+27b0, U+27b2-27b3, U+27b9, U+27e8-27e9, U+27f6, U+2800, U+28ec, U+2913,
@@ -1162,7 +1162,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/6d4e9520e29f6d02.woff2) format('woff2');
   unicode-range:
     U+2651-2655, U+2658, U+265a-265b, U+265d-265e, U+2660-266d, U+266f, U+267b, U+2688, U+2693-2696, U+2698-2699,
@@ -1175,7 +1175,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/497141c2daba02b0.woff2) format('woff2');
   unicode-range:
     U+2550-2551, U+2554, U+2557, U+255a-255b, U+255d, U+255f-2560, U+2562-2563, U+2565-2567, U+2569-256a, U+256c-2572,
@@ -1187,7 +1187,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/eb4969d421026bd0.woff2) format('woff2');
   unicode-range:
     U+23f0, U+23f3, U+2445, U+2449, U+2465-2471, U+2474-249b, U+24b8, U+24c2, U+24c7, U+24c9, U+24d0, U+24d2, U+24d4,
@@ -1198,7 +1198,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/48c235f25cd265a1.woff2) format('woff2');
   unicode-range:
     U+207c-2083, U+208c-208e, U+2092, U+20a6, U+20a8-20ad, U+20af, U+20b1, U+20b4-20b5, U+20b8-20ba, U+20bd, U+20db,
@@ -1213,7 +1213,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/0a8cf734a0b6b153.woff2) format('woff2');
   unicode-range:
     U+1d34-1d35, U+1d38-1d3a, U+1d3c, U+1d3f-1d40, U+1d49, U+1d4e-1d4f, U+1d52, U+1d55, U+1d5b, U+1d5e, U+1d9c, U+1da0,
@@ -1227,7 +1227,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/b42723fe53599b90.woff2) format('woff2');
   unicode-range:
     U+2ae-2b3, U+2b5-2bf, U+2c2-2c3, U+2c6-2d1, U+2d8-2da, U+2dc, U+2e1-2e3, U+2e5, U+2eb, U+2ee-2f0, U+2f2-2f7,
@@ -1239,7 +1239,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/05a7d600a249b837.woff2) format('woff2');
   unicode-range:
     U+176-17f, U+192, U+194, U+19a-19b, U+19d, U+1a0-1a1, U+1a3-1a4, U+1aa, U+1ac-1ad, U+1af-1bf, U+1d2, U+1d4, U+1d6,
@@ -1252,7 +1252,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/b73283458ef26d55.woff2) format('woff2');
   unicode-range:
     U+a1-a4, U+a6-a8, U+aa, U+ac, U+af, U+b1, U+b3-b6, U+b8-ba, U+bc-d6, U+d8-de, U+e6, U+eb, U+ee-f0, U+f5, U+f7-f8,
@@ -1264,7 +1264,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/2944f60aea487c2a.woff2) format('woff2');
   unicode-range:
     U+221a, U+2264, U+2464, U+25a0, U+3008, U+4e10, U+512a, U+5152, U+5201, U+5241, U+5340, U+5352, U+549a, U+54b2,
@@ -1286,7 +1286,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/b140f9d60ba877f5.woff2) format('woff2');
   unicode-range:
     U+161, U+926, U+928, U+939, U+93f-940, U+94d, U+e17, U+e22, U+e44, U+25c7, U+25ce, U+2764, U+3009, U+3016-3017,
@@ -1307,7 +1307,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/3bf9956fe5c594f4.woff2) format('woff2');
   unicode-range:
     U+10c, U+627-629, U+639, U+644, U+64a, U+203b, U+2265, U+2463, U+2573, U+25b2, U+3448-3449, U+4e1e, U+4e5e, U+4f3a,
@@ -1329,7 +1329,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/47d3dc9f8403f684.woff2) format('woff2');
   unicode-range:
     U+60, U+631, U+2606, U+3014-3015, U+309c, U+33a1, U+4e52, U+4ec6, U+4f86, U+4f8d, U+4fde, U+4fef, U+500b, U+502a,
@@ -1351,7 +1351,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/4a7ea73dc15f2b63.woff2) format('woff2');
   unicode-range:
     U+2003, U+2193, U+2462, U+4e19, U+4e2b, U+4e36, U+4ea8, U+4ed1, U+4ed7, U+4f51, U+4f63, U+4f83, U+50e7, U+5112,
@@ -1373,7 +1373,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/f0721a3949f84d42.woff2) format('woff2');
   unicode-range:
     U+5e, U+2190, U+250a, U+25bc, U+25cf, U+4e56, U+4ea9, U+4f3d, U+4f6c, U+4f88, U+4fa8, U+4fcf, U+5029, U+5188,
@@ -1395,7 +1395,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/71139ee70c1b1fce.woff2) format('woff2');
   unicode-range:
     U+b0, U+2191, U+2460-2461, U+25c6, U+300e-300f, U+4e1b, U+4e7e, U+4ed5, U+4ef2, U+4f10, U+4f1e, U+4f50, U+4fa6,
@@ -1417,7 +1417,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/75c0090760a68ac5.woff2) format('woff2');
   unicode-range:
     U+200b, U+2103, U+4e18, U+4e27-4e28, U+4e38, U+4e59, U+4e8f, U+4ead, U+4ec7, U+4fe9, U+503a, U+5085, U+5146, U+51af,
@@ -1439,7 +1439,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/8eae1f2d9b73ca52.woff2) format('woff2');
   unicode-range:
     U+24, U+4e08, U+4e43, U+4e4f, U+4ef0, U+4f2a, U+507f, U+50ac, U+50bb, U+5151, U+51bb, U+51f6, U+51fd, U+5272,
@@ -1461,7 +1461,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/a263283eb6ff7679.woff2) format('woff2');
   unicode-range:
     U+a5, U+2192, U+2605, U+4e11, U+4e22, U+4e32, U+4f0d, U+4f0f, U+4f69, U+4ff1, U+50b2, U+5154, U+51dd, U+51f0,
@@ -1483,7 +1483,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/09c325c9da420816.woff2) format('woff2');
   unicode-range:
     U+300c-300d, U+4e54, U+4e58, U+4e95, U+4ec1, U+4f2f, U+4f38, U+4fa3, U+4fca, U+503e, U+5141, U+5144, U+517c, U+51cc,
@@ -1505,7 +1505,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/053609e6b57c594f.woff2) format('woff2');
   unicode-range:
     U+4e4c, U+4e88, U+4ea1, U+4ea6, U+4ed3-4ed4, U+4eff, U+4f30, U+4fa7, U+4fc4, U+4fd7, U+500d, U+504f, U+5076-5077,
@@ -1527,7 +1527,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/5c92b2016607caeb.woff2) format('woff2');
   unicode-range:
     U+23, U+3d, U+4e01, U+4e39, U+4e73, U+4ecd, U+4ed9, U+4eea, U+4f0a, U+4f1f, U+4f5b, U+4fa0, U+4fc3, U+501f, U+50a8,
@@ -1548,7 +1548,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/f192aec3fa1f17f4.woff2) format('woff2');
   unicode-range:
     U+26, U+3c, U+d7, U+4e4e, U+4e61, U+4e71, U+4ebf, U+4f26, U+5012, U+51ac, U+51b0, U+51b2, U+51b7, U+5218, U+521a,
@@ -1569,7 +1569,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/f6255320a8ecc997.woff2) format('woff2');
   unicode-range:
     U+7e, U+2026, U+4e03, U+4e25, U+4e30, U+4e34, U+4e45, U+4e5d, U+4e89, U+4eae, U+4ed8, U+4f11, U+4f19, U+4f24,
@@ -1591,7 +1591,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/5849283072442ca2.woff2) format('woff2');
   unicode-range:
     U+25, U+4e14, U+4e1d, U+4e3d, U+4e49, U+4e60, U+4e9a, U+4eb2, U+4ec5, U+4efd, U+4f3c, U+4f4f, U+4f8b, U+4fbf,
@@ -1613,7 +1613,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/04eaf1a999368419.woff2) format('woff2');
   unicode-range:
     U+2b, U+40, U+3000, U+300a-300b, U+4e16, U+4e66, U+4e70, U+4e91-4e92, U+4e94, U+4e9b, U+4ec0, U+4eca, U+4f01,
@@ -1635,7 +1635,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/2ef4d8c6c25aaa84.woff2) format('woff2');
   unicode-range:
     U+4e, U+201c-201d, U+3010-3011, U+4e07, U+4e1c, U+4e24, U+4e3e, U+4e48, U+4e50, U+4e5f, U+4e8b-4e8c, U+4ea4,
@@ -1657,7 +1657,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/f63d970a7b2b5321.woff2) format('woff2');
   unicode-range:
     U+d, U+3e, U+5f, U+7c, U+a0, U+a9, U+4e09-4e0b, U+4e0d-4e0e, U+4e13, U+4e1a, U+4e2a, U+4e3a-4e3b, U+4e4b, U+4e86,
@@ -1678,7 +1678,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/ca6307f70603bdbf.woff2) format('woff2');
   unicode-range:
     U+20-22, U+27-2a, U+2c-3b, U+3f, U+41-4d, U+4f-5d, U+61-7b, U+7d, U+ab, U+ae, U+b2, U+b7, U+bb, U+df-e5, U+e7-ea,
@@ -1694,7 +1694,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/89c8b72714b2fb05.woff2) format('woff2');
   unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
 }
@@ -1703,7 +1703,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/38475678e2d17cfd.woff2) format('woff2');
   unicode-range:
     U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309,
@@ -1714,7 +1714,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/59aba4ce37e0d3de.woff2) format('woff2');
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
@@ -1725,7 +1725,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400 700;
-  font-display: block;
+  font-display: swap;
   src: url(./fonts/d8c61f0c834f348a.woff2) format('woff2');
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,

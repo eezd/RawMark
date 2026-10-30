@@ -74,6 +74,9 @@ watch(() => [ws.active, tab.value?.status, ws.view, ws.images], () => {
     <div v-if="!tab" class="rm-empty">
       <p>{{ translate('workspace.select_or_create_a_note_669f82') }}</p>
     </div>
+    <div v-else-if="tab.status === 'loading'" class="rm-empty" role="status">
+      <p>{{ translate('workspace.loading_4927a5') }}</p>
+    </div>
     <div v-else-if="tab.status === 'error'" class="rm-empty">
       <p>{{ translate('workspace.could_not_open_this_note_634236') }}</p>
     </div>
