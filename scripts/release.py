@@ -310,6 +310,8 @@ def preflight(version, commit):
     require(state['version'] == version, 'Reserved version mismatch')
     validate_identity(version, commit)
     gitea, github = clients()
+    require(gitea.request('/user')['login'] == 'eezd', 'Unexpected Gitea release identity')
+    require(github.request('/user')['login'] == 'eezd', 'Unexpected GitHub release identity')
     repository = github.repo()
     require(repository['permissions']['push'], 'GitHub credential cannot publish this repository')
     scopes = {s.strip() for s in github.headers.get('X-OAuth-Scopes', '').split(',')}

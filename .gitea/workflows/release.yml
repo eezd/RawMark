@@ -31,7 +31,6 @@ jobs:
     if: gitea.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 55
-    env:
     container:
       image: node:24-bookworm
       volumes:
