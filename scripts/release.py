@@ -4,6 +4,8 @@
 import argparse
 import base64
 import datetime
+import contextlib
+import fcntl
 import hashlib
 import io
 import json
@@ -25,7 +27,7 @@ REPOSITORY = 'eezd/RawMark'
 GITEA_IMAGE = 'git.134333.xyz/eezd/rawmark'
 GITEA_DEV_IMAGE = 'git.134333.xyz/eezd/dev/rawmark'
 GITHUB_IMAGE = 'ghcr.io/eezd/rawmark'
-PLATFORMS = ('linux/amd64', 'linux/arm64', 'windows/amd64', 'darwin/amd64', 'darwin/arm64')
+PLATFORMS = ('linux/amd64', 'linux/arm64', 'windows/amd64', 'windows/arm64', 'darwin/amd64', 'darwin/arm64')
 UPLOAD_LIMIT = 90_000_000
 DOWNLOADS = Path('downloads')
 
@@ -55,7 +57,7 @@ def output(name, value):
 
 
 def build_version():
-    if os.environ.get('RAWMARK_BUILD_CHANNEL') != 'development':
+    if os.environ.get('RAWMARK_BUILD_CHANNEL') not in ('development', 'release'):
         return Path('VERSION').read_text().strip()
     commit = run('git', 'rev-parse', 'HEAD')
     timestamp = int(run('git', 'show', '-s', '--format=%ct', commit))
@@ -188,7 +190,7 @@ class API:
         return self.request('/repos/' + REPOSITORY + path, **kwargs)
 
     def release(self, version):
-        return self.repo('/releases/tags/v' + version, missing=True)
+        return self.repo('/releases/tags/' + version, missing=True)
 
     def assets(self, release):
         return self.repo(f'/releases/{release["id"]}/assets')
@@ -248,10 +250,10 @@ def clients():
 
 
 def validate_identity(version, commit):
-    require(re.fullmatch(r'\d+\.\d+\.\d+', version), 'Version must use X.Y.Z')
+    require(re.fullmatch(r'[0-9]{8}-[0-9a-f]{8}', version), 'Expected a date and eight-character commit hash')
     require(re.fullmatch(r'[0-9a-f]{40}', commit), 'Commit must be a full SHA')
-    require(version == Path('VERSION').read_text().strip(), 'VERSION does not match the requested version')
-    require(commit == run('git', 'rev-parse', 'HEAD'), 'Checkout does not match the requested commit')
+    require(version == version_for(commit), 'Version does not match the selected commit')
+    run('git', 'merge-base', '--is-ancestor', commit, 'HEAD')
 
 
 def git_env(api):
@@ -270,10 +272,11 @@ def fetch_main(api):
 
 
 def release_receipt(gitea, github, version):
-    require(re.fullmatch(r'\d+\.\d+\.\d+', version), 'Version must use X.Y.Z')
+    require(re.fullmatch(r'[0-9]{8}-[0-9a-f]{8}', version), 'Expected a date and eight-character commit hash')
     left, right = gitea.release(version), github.release(version)
     require(left and right and not any(r['draft'] or r['prerelease'] for r in (left, right)),
             'Version is not completely published on both services')
+    require(left['name'] == right['name'] and left['body'] == right['body'], 'Published release metadata differs')
     a, b = gitea.asset_bytes(left, 'release.json'), github.asset_bytes(right, 'release.json')
     require(a == b, 'Published release receipts differ')
     receipt = json.loads(a)
@@ -288,7 +291,7 @@ def release_receipt(gitea, github, version):
         require(re.fullmatch(r'[0-9a-f]{64}', info['sha256']) and 0 < info['size'] < UPLOAD_LIMIT,
                 'Invalid published asset metadata')
     for api in (gitea, github):
-        require(api.repo('/commits/v' + version)['sha'] == build['commit'], 'Published tag points to another commit')
+        require(api.repo('/commits/' + version)['sha'] == build['commit'], 'Published tag points to another commit')
         assets = {asset['name']: asset for asset in api.assets(left if api is gitea else right)}
         for name, info in build['files'].items():
             require(name in assets and assets[name]['size'] == info['size'], 'Published asset is missing or has a different size')
@@ -297,6 +300,14 @@ def release_receipt(gitea, github, version):
 
 
 def preflight(version, commit):
+    state = selected_state()
+    gitea, _ = clients()
+    active = state.get('active_run_id')
+    if active and str(active) != os.environ['CI_RUN_ID']:
+        require(gitea.repo('/actions/runs/' + str(active))['status'] == 'completed', 'Another release run is active')
+    state['active_run_id'] = int(os.environ['CI_RUN_ID'])
+    save_state(state)
+    require(state['version'] == version, 'Reserved version mismatch')
     validate_identity(version, commit)
     gitea, github = clients()
     repository = github.repo()
@@ -320,40 +331,108 @@ def preflight(version, commit):
         if not runs:
             break
         passed = any(r['head_sha'] == commit and r['event'] == 'push' and r['conclusion'] == 'success'
-                     and r['path'] == 'ci.yml@refs/heads/main' for r in runs)
+                     and r['path'] == 'main.yml@refs/heads/main' for r in runs)
         page += 1
-    require(passed, 'The selected commit has no successful main-push development CI')
+    require(passed, 'The selected commit has no successful main-push CI')
     remote = fetch_main(github)
     run('git', 'merge-base', '--is-ancestor', remote, commit)
+    tag = version
+    existing = gitea.repo('/commits/' + tag, missing=True)
+    if existing:
+        require(existing['sha'] == commit, 'Existing tag belongs to another commit')
+    else:
+        run('git', '-c', 'user.name=eezd', '-c', 'user.email=eezd@outlook.com',
+            'tag', '-a', tag, commit, '-m', 'RawMark ' + version)
+        require(run('git', 'for-each-ref', '--format=%(taggername)', 'refs/tags/' + tag) == 'eezd', 'Unexpected tagger')
+        run('git', 'push', gitea.root.removesuffix('/api/v1') + '/' + REPOSITORY + '.git',
+            'refs/tags/' + tag, env=git_env(gitea))
+    from mirror import synchronize
+    synchronize(STATE_DIRECTORY, gitea.root.removesuffix('/api/v1') + '/' + REPOSITORY + '.git',
+                'https://github.com/' + REPOSITORY + '.git', git_env(github))
+    require(github.repo('/commits/' + tag)['sha'] == commit, 'GitHub tag has not mirrored')
     if current:
         restore(gitea, current)
     output('completed', 'false')
     output('reuse', 'true' if current else 'false')
 
 
+def version_for(commit):
+    timestamp = int(run('git', 'show', '-s', '--format=%ct', commit))
+    return datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).strftime('%Y%m%d') + '-' + commit[:8]
+
+
+STATE_DIRECTORY = Path('/docker/gitea/mirrors/RawMark')
+
+
+@contextlib.contextmanager
+def release_state():
+    with (STATE_DIRECTORY / '.release.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        path = STATE_DIRECTORY / 'release.pending.json'
+        state = json.loads(path.read_text()) if path.exists() else None
+        yield state
+
+
+def save_state(state):
+    path = STATE_DIRECTORY / 'release.pending.json'
+    temporary = path.with_suffix('.tmp')
+    write_json(temporary, state)
+    temporary.replace(path)
+
+
+def reserve(dev):
+    require(re.fullmatch(r'[0-9a-f]{40}', dev), 'Expected the accepted dev SHA')
+    with release_state() as current:
+        if current and current.get('status') != 'complete':
+            require(current['dev'] == dev, 'Another release is pending; resolve it before starting another')
+            print(current['id'])
+            return
+        state = {'id': dev, 'dev': dev, 'status': 'preparing'}
+        save_state(state)
+        print(state['id'])
+
+
+def select_release(commit, notes_file):
+    with release_state() as state:
+        require(state and state['status'] == 'preparing', 'Expected a release preparation reservation')
+        require(re.fullmatch(r'[0-9a-f]{40}', commit), 'Expected a full main SHA')
+        content = Path(notes_file).read_text()
+        require(content.strip(), 'Release notes are required')
+        state.update(commit=commit, version=version_for(commit), notes=content,
+                     notes_sha256=hashlib.sha256(content.encode()).hexdigest(), status='selected')
+        save_state(state)
+        print(state['version'])
+
+
+def selected_state():
+    state = json.loads((STATE_DIRECTORY / 'release.pending.json').read_text())
+    require(state['id'] == os.environ['RELEASE_ID'] and state['commit'] == os.environ['RELEASE_COMMIT'],
+            'Release inputs differ from the reserved candidate')
+    require(hashlib.sha256(state['notes'].encode()).hexdigest() == state['notes_sha256'], 'Release notes changed')
+    return state
+
+
 def notes(build):
-    return (Path('.github/release-notes.md').read_text().rstrip() + '\n\n'
+    state = selected_state()
+    require(state['commit'] == build['commit'] and state['version'] == build['version'], 'Release notes candidate mismatch')
+    return (state['notes'].rstrip() + '\n\n'
             f'Source commit: `{build["commit"]}`. Build run: `{build["run_id"]}`.\n\n'
-            'Validation: Linux amd64 runtime tests; all five targets cross-built and vetted on Gitea. '
-            'Windows, macOS and Linux arm64 have not passed native runtime acceptance for this release.\n')
+            'Validation: Linux amd64 native lifecycle and container tests; six targets cross-built and vetted. '
+            'Other targets have not passed native runtime acceptance. Downloads are unsigned.\n\n'
+            '验证：Linux amd64 已完成原生生命周期与容器测试；六平台交叉构建及 vet。其他平台未完成原生运行验收，程序未签名。\n')
 
 
 def ensure_draft(api, build):
-    tag = 'v' + build['version']
+    tag = build['version']
     existing = api.repo('/commits/' + tag, missing=True)
-    if existing:
-        require(existing['sha'] == build['commit'], 'Existing tag conflicts')
-    elif api.github:
-        api.repo('/git/refs', method='POST', data={'ref': 'refs/tags/' + tag, 'sha': build['commit']})
-    else:
-        api.repo('/tags', method='POST', data={'tag_name': tag, 'target': build['commit']})
+    require(existing and existing['sha'] == build['commit'], 'Expected the verified mirrored annotated tag')
     release = api.release(build['version'])
     if not release:
         release = api.repo('/releases', method='POST', data={
-            'tag_name': 'v' + build['version'], 'target_commitish': build['commit'],
+            'tag_name': build['version'], 'target_commitish': build['commit'],
             'name': 'RawMark ' + build['version'], 'body': notes(build), 'draft': True,
         })
-    require(api.repo('/commits/v' + build['version'])['sha'] == build['commit'], 'Existing tag conflicts')
+    require(api.repo('/commits/' + build['version'])['sha'] == build['commit'], 'Existing tag conflicts')
     require(release['body'] == notes(build), 'Existing release notes conflict')
     return release
 
@@ -362,7 +441,8 @@ def checkpoint():
     build = verify_bundle()
     gitea, _ = clients()
     release = ensure_draft(gitea, build)
-    gitea.upload(release, DOWNLOADS / 'build.json')
+    for name in [*build['files'], 'SHA256SUMS', 'build.json']:
+        gitea.upload(release, DOWNLOADS / name)
 
 
 def restore(gitea, release):
@@ -491,69 +571,9 @@ def verify_anonymous(image):
         run('docker', 'pull', image, env=env)
 
 
-def sync_source(github, build):
-    remote = fetch_main(github)
-    run('git', 'merge-base', '--is-ancestor', remote, build['commit'])
-    tag = 'v' + build['version']
-    existing = github.repo('/commits/' + tag, missing=True)
-    if existing:
-        require(existing['sha'] == build['commit'], 'GitHub tag already points to another commit')
-    # Bound the actual pack rather than checking individual tracked file sizes.
-    revision_input = f'{build["commit"]}\n^{remote}\n'
-    pack = subprocess.run(['git', 'pack-objects', '--revs', '--stdout'], input=revision_input.encode(),
-                          stdout=subprocess.PIPE, check=True).stdout
-    require(len(pack) < UPLOAD_LIMIT, 'GitHub source push exceeds CDN budget')
-    run('git', 'push', 'https://github.com/' + REPOSITORY + '.git',
-        build['commit'] + ':refs/heads/main', env=git_env(github))
-
-
-def sync_pages(github, build):
-    env = git_env(github)
-    with tempfile.TemporaryDirectory(prefix='rawmark-pages-') as directory:
-        target = Path(directory)
-        url = 'https://github.com/' + REPOSITORY + '.git'
-        run('git', 'init', '--initial-branch=gh-pages', directory)
-        existing = github.repo('/branches/gh-pages', missing=True)
-        if existing:
-            run('git', '-C', directory, 'fetch', '--depth=1', url, 'gh-pages', env=env)
-            run('git', '-C', directory, 'reset', '--hard', 'FETCH_HEAD')
-            run('git', '-C', directory, 'rm', '-r', '--ignore-unmatch', '.')
-        with zipfile.ZipFile(DOWNLOADS / 'demo.zip') as archive:
-            for info in archive.infolist():
-                path = Path(info.filename)
-                require(not path.is_absolute() and '..' not in path.parts and '.git' not in path.parts,
-                        'Unsafe demo archive entry')
-                archive.extract(info, target)
-        run('git', '-C', directory, 'add', '.')
-        changed = run('git', '-C', directory, 'status', '--porcelain')
-        if changed:
-            run('git', '-C', directory, '-c', 'user.name=RawMark CI',
-                '-c', 'user.email=rawmark-ci@users.noreply.github.com', 'commit',
-                '-m', 'docs(demo): publish RawMark ' + build['version'])
-            run('git', '-C', directory, 'push', url, 'HEAD:refs/heads/gh-pages', env=env)
-        pages_commit = run('git', '-C', directory, 'rev-parse', 'HEAD')
-    pages = github.repo('/pages')
-    if pages.get('build_type') != 'legacy' or pages.get('source') != {'branch': 'gh-pages', 'path': '/'}:
-        github.repo('/pages', method='PUT', data={'build_type': 'legacy', 'source': {'branch': 'gh-pages', 'path': '/'}})
-    deadline = time.monotonic() + 900
-    while time.monotonic() < deadline:
-        url = 'https://eezd.github.io/RawMark/rawmark-release.json?commit=' + build['commit']
-        try:
-            with urllib.request.urlopen(url, timeout=15) as response:
-                published = json.load(response)
-        except urllib.error.HTTPError as error:
-            if error.code not in (404, 503):
-                raise
-        else:
-            if published == {'version': build['version'], 'commit': build['commit']}:
-                return pages_commit
-        time.sleep(5)
-    raise TimeoutError('GitHub Pages did not serve the selected release; Gitea release remains a draft')
-
-
 def publish():
     gitea, github = clients()
-    release = gitea.release(Path('VERSION').read_text().strip())
+    release = gitea.release(selected_state()['version'])
     require(release and release['draft'], 'Expected the build checkpoint draft')
     restore(gitea, release)
     build = verify_bundle()
@@ -602,15 +622,15 @@ def publish():
             str(Path(os.environ['DOCKER_CONFIG']) / 'config.json'),
             'docker://' + GITEA_IMAGE + '@' + value, 'docker://' + target)
     require(image_digest(target) == value, 'GHCR image differs from the tested candidate')
+    package = github.request('/user/packages/container/rawmark')
+    require(package['visibility'] == 'public', 'GHCR package is private. Set Public at https://github.com/users/eezd/packages/container/rawmark/settings then retry this release ID; original artifacts are saved.')
     verify_anonymous(GITHUB_IMAGE + '@' + value)
-    sync_source(github, build)
     public_release = ensure_draft(github, build)
     for name in [*(archive_name(tag, p) for p in PLATFORMS), 'SHA256SUMS', 'build.json', 'demo.zip']:
         for api, destination in ((gitea, release), (github, public_release)):
             api.upload(destination, DOWNLOADS / name)
-    pages_commit = sync_pages(github, build)
     write_json(DOWNLOADS / 'release.json', {'schema': 1, 'build_sha256': digest(DOWNLOADS / 'build.json'),
-                                          'image_digest': value, 'pages_commit': pages_commit})
+                                          'image_digest': value})
     for api, destination in ((gitea, release), (github, public_release)):
         api.upload(destination, DOWNLOADS / 'release.json')
     # Match the internal checkpoint on GitHub too; both releases expose the same files.
@@ -632,6 +652,10 @@ def publish():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
+    sub.add_parser('reserve').add_argument('dev')
+    selection = sub.add_parser('select')
+    selection.add_argument('commit')
+    selection.add_argument('notes_file')
     sub.add_parser('bundle').add_argument('mode', choices=('development', 'release'))
     sub.add_parser('prepare-image')
     sub.add_parser('version')
@@ -642,20 +666,30 @@ def main():
     sub.add_parser('publish')
     sub.add_parser('promote-development').add_argument('image')
     args = parser.parse_args()
-    if args.command == 'version':
+    if args.command == 'reserve':
+        reserve(args.dev)
+    elif args.command == 'select':
+        select_release(args.commit, args.notes_file)
+    elif args.command == 'version':
         print(build_version())
     elif args.command == 'bundle':
         bundle(args.mode)
     elif args.command == 'prepare-image':
         prepare_image()
     elif args.command == 'preflight':
-        preflight(args.version, args.commit)
+        with release_state() as state:
+            selected_state()
+            preflight(args.version, args.commit)
     elif args.command == 'checkpoint':
-        checkpoint()
+        with release_state() as state:
+            selected_state()
+            checkpoint()
     elif args.command == 'promote-development':
         promote_development(args.image)
     else:
-        publish()
+        with release_state() as state:
+            selected_state()
+            publish()
 
 
 if __name__ == '__main__':

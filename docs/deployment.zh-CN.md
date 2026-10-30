@@ -60,18 +60,18 @@ RAWMARK_DATA_DIR=/your/storage/rawmark/data \
 
 ```sh
 sha256sum --ignore-missing --check SHA256SUMS
-tar -xzf rawmark_0.1.1_linux_amd64.tar.gz
+tar -xzf RawMark_YYYYMMDD-xxxxxxxx_linux_amd64.tar.gz
 ./rawmark --version
 RAWMARK_DATA="$HOME/rawmark-data" RAWMARK_ADDR=127.0.0.1:21000 ./rawmark
 ```
 
-macOS 的 Apple Silicon 使用 `darwin_arm64`，Intel 使用 `darwin_amd64`。先将 `shasum -a 256 rawmark_0.1.1_darwin_arm64.tar.gz` 的结果与 `SHA256SUMS` 中对应记录比较，再用 `tar -xzf` 解压并沿用上述环境变量启动。程序未签名，若系统提示拦截，请核对来源后通过 macOS 安全设置手动允许。
+macOS 的 Apple Silicon 使用 `darwin_arm64`，Intel 使用 `darwin_amd64`。先将 `shasum -a 256 RawMark_YYYYMMDD-xxxxxxxx_darwin_arm64.tar.gz` 的结果与 `SHA256SUMS` 中对应记录比较，再用 `tar -xzf` 解压并沿用上述环境变量启动。程序未签名，若系统提示拦截，请核对来源后通过 macOS 安全设置手动允许。
 
 Windows 先将 `Get-FileHash` 的结果与 `SHA256SUMS` 中对应记录比较，再在 PowerShell 中启动：
 
 ```powershell
-Get-FileHash .\rawmark_0.1.1_windows_amd64.zip -Algorithm SHA256
-Expand-Archive .\rawmark_0.1.1_windows_amd64.zip -DestinationPath .\rawmark
+Get-FileHash .\RawMark_YYYYMMDD-xxxxxxxx_windows_amd64.zip -Algorithm SHA256
+Expand-Archive .\RawMark_YYYYMMDD-xxxxxxxx_windows_amd64.zip -DestinationPath .\rawmark
 Set-Location .\rawmark
 .\rawmark.exe --version
 $env:RAWMARK_DATA = Join-Path $env:LOCALAPPDATA 'RawMark'

@@ -3,12 +3,12 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: Version matching VERSION (X.Y.Z)
+      release_id:
+        description: Reserved release ID
         required: true
         type: string
       commit:
-        description: Full main commit SHA with successful development CI
+        description: Full candidate SHA with successful main-push CI
         required: true
         type: string
 
@@ -21,6 +21,9 @@ concurrency:
 
 env:
   GITEA_API_URL: ${{ gitea.server_url }}/api/v1
+  RAWMARK_BUILD_CHANNEL: release
+  RELEASE_ID: ${{ inputs.release_id }}
+  RELEASE_COMMIT: ${{ inputs.commit }}
   CI_RUN_ID: ${{ gitea.run_id }}
 
 jobs:
@@ -29,37 +32,46 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 55
     env:
-      GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
-      GITHUB_RELEASE_TOKEN: ${{ secrets.ALL_GITHUB_TOKEN }}
-      RELEASE_VERSION: ${{ inputs.version }}
-      RELEASE_COMMIT: ${{ inputs.commit }}
+    container:
+      image: node:24-bookworm
+      volumes:
+        - /docker/gitea/mirrors/RawMark:/docker/gitea/mirrors/RawMark
     outputs:
       completed: ${{ steps.preflight.outputs.completed }}
     steps:
       - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ inputs.commit }}
+          ref: ${{ gitea.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Validate source, permissions and existing release checkpoint
         id: preflight
-        run: python3 scripts/release.py preflight "$RELEASE_VERSION" "$RELEASE_COMMIT"
+        env:
+          GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
+          GITHUB_RELEASE_TOKEN: ${{ secrets.ALL_GITHUB_TOKEN }}
+        run: python3 scripts/release.py preflight "$(python3 -c 'import sys; sys.path.insert(0,"scripts"); import release; import os; print(release.version_for(os.environ["RELEASE_COMMIT"]))')" "$RELEASE_COMMIT"
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.commit }}
+          path: source
+          persist-credentials: false
       - uses: https://github.com/actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: steps.preflight.outputs.reuse == 'false'
         with:
-          go-version-file: go.mod
+          go-version-file: source/go.mod
           cache: false
-      - name: Check and build the five platform packages
+      - name: Check and build the six platform packages
         if: steps.preflight.outputs.reuse == 'false'
+        working-directory: source
         run: |
-          python3 -m unittest discover -s scripts/tests -v
+          env -u RAWMARK_BUILD_CHANNEL python3 -m unittest discover -s scripts/tests -v
           sh scripts/ci-check.sh release
           sh scripts/ci-package.sh release
       - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: steps.preflight.outputs.reuse == 'false'
         with:
           name: linux-amd64
-          path: downloads/*_linux_amd64.tar.gz
+          path: source/downloads/*_linux_amd64.tar.gz
           compression-level: 0
           if-no-files-found: error
           retention-days: 30
@@ -67,7 +79,7 @@ jobs:
         if: steps.preflight.outputs.reuse == 'false'
         with:
           name: linux-arm64
-          path: downloads/*_linux_arm64.tar.gz
+          path: source/downloads/*_linux_arm64.tar.gz
           compression-level: 0
           if-no-files-found: error
           retention-days: 30
@@ -75,7 +87,15 @@ jobs:
         if: steps.preflight.outputs.reuse == 'false'
         with:
           name: windows-amd64
-          path: downloads/*_windows_amd64.zip
+          path: source/downloads/*_windows_amd64.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
+      - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: steps.preflight.outputs.reuse == 'false'
+        with:
+          name: windows-arm64
+          path: source/downloads/*_windows_arm64.zip
           compression-level: 0
           if-no-files-found: error
           retention-days: 30
@@ -83,7 +103,7 @@ jobs:
         if: steps.preflight.outputs.reuse == 'false'
         with:
           name: darwin-amd64
-          path: downloads/*_darwin_amd64.tar.gz
+          path: source/downloads/*_darwin_amd64.tar.gz
           compression-level: 0
           if-no-files-found: error
           retention-days: 30
@@ -91,7 +111,7 @@ jobs:
         if: steps.preflight.outputs.reuse == 'false'
         with:
           name: darwin-arm64
-          path: downloads/*_darwin_arm64.tar.gz
+          path: source/downloads/*_darwin_arm64.tar.gz
           compression-level: 0
           if-no-files-found: error
           retention-days: 30
@@ -100,21 +120,25 @@ jobs:
         with:
           name: checksums
           path: |
-            downloads/SHA256SUMS
-            downloads/build.json
+            source/downloads/SHA256SUMS
+            source/downloads/build.json
           if-no-files-found: error
           retention-days: 30
       - uses: https://github.com/actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: steps.preflight.outputs.reuse == 'false'
         with:
           name: demo
-          path: downloads/demo.zip
+          path: source/downloads/demo.zip
           compression-level: 0
           if-no-files-found: error
           retention-days: 30
       - name: Save immutable build checkpoint after artifact uploads
         if: steps.preflight.outputs.reuse == 'false'
-        run: python3 scripts/release.py checkpoint
+        working-directory: source
+        env:
+          GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
+          GITHUB_RELEASE_TOKEN: ${{ secrets.ALL_GITHUB_TOKEN }}
+        run: python3 ../scripts/release.py checkpoint
 
   publish:
     needs: build
@@ -123,9 +147,9 @@ jobs:
     timeout-minutes: 55
     container:
       image: docker:29-cli
+      volumes:
+        - /docker/gitea/mirrors/RawMark:/docker/gitea/mirrors/RawMark
     env:
-      GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
-      GITHUB_RELEASE_TOKEN: ${{ secrets.ALL_GITHUB_TOKEN }}
       CI_RESOURCE_LABEL: io.rawmark.ci.run=release-${{ gitea.run_id }}-${{ gitea.run_attempt }}
       DOCKER_CONFIG: /tmp/rawmark-docker-auth
     defaults:
@@ -136,17 +160,58 @@ jobs:
         run: apk add --no-cache nodejs python3 git skopeo
       - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ inputs.commit }}
+          ref: ${{ gitea.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.commit }}
+          path: source
+          persist-credentials: false
       - name: Publish the original checked artifacts to both services
+        working-directory: source
+        env:
+          GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
+          GITHUB_RELEASE_TOKEN: ${{ secrets.ALL_GITHUB_TOKEN }}
         run: |
           set -eu
           mkdir -p "$DOCKER_CONFIG"
           chmod 700 "$DOCKER_CONFIG"
-          python3 scripts/release.py publish
+          python3 ../scripts/release.py publish
       - name: Clean only this attempt's test resources and credentials
         if: always()
         run: |
           python3 scripts/ci-cleanup.py "$CI_RESOURCE_LABEL" --client-container "$(hostname)"
           rm -rf "$DOCKER_CONFIG"
+
+  deploy:
+    needs: [build, publish]
+    if: always() && needs.build.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped')
+    runs-on: docker
+    timeout-minutes: 20
+    container:
+      image: docker:29-cli
+      volumes:
+        - /docker/gitea/mirrors/RawMark:/docker/gitea/mirrors/RawMark
+        - /docker/gitea/main/RawMark:/docker/gitea/main/RawMark
+    env:
+      GITEA_READ_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
+      DOCKER_CONFIG: /tmp/rawmark-anonymous-docker
+    steps:
+      - name: Install deployment runtimes
+        run: apk add --no-cache nodejs python3 git docker-cli-compose
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ gitea.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Deploy the completed release and finish its reservation
+        run: |
+          set -eu
+          mkdir -p "$DOCKER_CONFIG"
+          python3 scripts/deploy.py production --directory /docker/gitea/main/RawMark \
+            --version "$(python3 -c 'import sys;sys.path.insert(0,"scripts");import release;print(release.selected_state()["version"])')" \
+            --client-container "$(hostname)"
+      - name: Remove temporary Docker configuration
+        if: always()
+        run: rm -rf "$DOCKER_CONFIG"

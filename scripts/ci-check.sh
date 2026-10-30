@@ -4,7 +4,7 @@ set -eu
 
 mode="${1:?Expected development or release}"
 case "$mode" in development|release) ;; *) exit 2 ;; esac
-if [ "$mode" = development ]; then export RAWMARK_BUILD_CHANNEL=development; fi
+export RAWMARK_BUILD_CHANNEL="$mode"
 export RAWMARK_BUILD_VERSION="$(python3 scripts/release.py version)"
 export CGO_ENABLED=0
 corepack enable
