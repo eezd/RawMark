@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 55
     env:
       GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
-      GITHUB_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITHUB_TOKEN }}
+      GITHUB_RELEASE_TOKEN: ${{ secrets.ALL_GITHUB_TOKEN }}
       RELEASE_VERSION: ${{ inputs.version }}
       RELEASE_COMMIT: ${{ inputs.commit }}
     outputs:
@@ -125,7 +125,7 @@ jobs:
       image: docker:29-cli
     env:
       GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
-      GITHUB_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITHUB_TOKEN }}
+      GITHUB_RELEASE_TOKEN: ${{ secrets.ALL_GITHUB_TOKEN }}
       CI_RESOURCE_LABEL: io.rawmark.ci.run=release-${{ gitea.run_id }}-${{ gitea.run_attempt }}
       DOCKER_CONFIG: /tmp/rawmark-docker-auth
     defaults:
