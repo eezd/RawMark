@@ -56,22 +56,22 @@ Do not point the quick-start container and a Compose instance at the same databa
 
 Formal releases publish `ghcr.io/eezd/rawmark:<version>` for Linux amd64 and arm64. The earlier releases were withdrawn; `VERSION` alone does not mean a version is available. Check the Releases page and package visibility before using the example version below. Replace `rawmark` in the Docker commands above with that image name to skip source builds. `latest` follows the latest stable release; use a version tag for controlled upgrades. The repository Compose file continues to support source builds.
 
-Native archives for Linux amd64/arm64, Windows amd64 and macOS Intel/Apple Silicon, plus `SHA256SUMS`, are available on the [Releases page](https://github.com/eezd/RawMark/releases). Download the archive matching your operating system and architecture and verify its checksum before extracting it:
+Native archives for Linux amd64/arm64, Windows amd64/arm64 and macOS Intel/Apple Silicon, plus `SHA256SUMS`, are available on the [Releases page](https://github.com/eezd/RawMark/releases). Download the archive matching your operating system and architecture and verify its checksum before extracting it:
 
 ```sh
 sha256sum --ignore-missing --check SHA256SUMS
-tar -xzf rawmark_0.1.1_linux_amd64.tar.gz
+tar -xzf RawMark_YYYYMMDD-xxxxxxxx_linux_amd64.tar.gz
 ./rawmark --version
 RAWMARK_DATA="$HOME/rawmark-data" RAWMARK_ADDR=127.0.0.1:21000 ./rawmark
 ```
 
-For macOS, use `darwin_arm64` on Apple Silicon or `darwin_amd64` on Intel. Compare `shasum -a 256 rawmark_0.1.1_darwin_arm64.tar.gz` with its entry in `SHA256SUMS`, extract it with `tar -xzf`, then use the same environment variables as above. The program is unsigned; review and approve it through macOS security settings if prompted.
+For macOS, use `darwin_arm64` on Apple Silicon or `darwin_amd64` on Intel. Compare `shasum -a 256 RawMark_YYYYMMDD-xxxxxxxx_darwin_arm64.tar.gz` with its entry in `SHA256SUMS`, extract it with `tar -xzf`, then use the same environment variables as above. The program is unsigned; review and approve it through macOS security settings if prompted.
 
 On Windows, compare the output of `Get-FileHash` with the archive's entry in `SHA256SUMS`, then run in PowerShell:
 
 ```powershell
-Get-FileHash .\rawmark_0.1.1_windows_amd64.zip -Algorithm SHA256
-Expand-Archive .\rawmark_0.1.1_windows_amd64.zip -DestinationPath .\rawmark
+Get-FileHash .\RawMark_YYYYMMDD-xxxxxxxx_windows_amd64.zip -Algorithm SHA256
+Expand-Archive .\RawMark_YYYYMMDD-xxxxxxxx_windows_amd64.zip -DestinationPath .\rawmark
 Set-Location .\rawmark
 .\rawmark.exe --version
 $env:RAWMARK_DATA = Join-Path $env:LOCALAPPDATA 'RawMark'

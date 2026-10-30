@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Completed formal release version (X.Y.Z)
+        description: Completed date-hash release version
         required: true
         type: string
 
@@ -23,7 +23,8 @@ jobs:
     container:
       image: docker:29-cli
       volumes:
-        - /docker/main/rawmark:/docker/main/rawmark
+        - /docker/gitea/main/RawMark:/docker/gitea/main/RawMark
+        - /docker/gitea/mirrors/RawMark:/docker/gitea/mirrors/RawMark
     env:
       GITEA_API_URL: ${{ gitea.server_url }}/api/v1
       GITEA_READ_TOKEN: ${{ gitea.token }}
@@ -34,16 +35,18 @@ jobs:
         shell: sh
     steps:
       - name: Install deployment runtimes
-        run: apk add --no-cache nodejs python3 docker-cli-compose
+        run: apk add --no-cache nodejs python3 git docker-cli-compose
       - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: main
+          fetch-depth: 0
           persist-credentials: false
       - name: Verify completed release, back up and deploy only RawMark
         run: |
           set -eu
           mkdir -p "$DOCKER_CONFIG"
           chmod 700 "$DOCKER_CONFIG"
-          python3 scripts/deploy.py production --directory /docker/main/rawmark \
+          python3 scripts/deploy.py production --directory /docker/gitea/main/RawMark \
             --version "$RELEASE_VERSION" --client-container "$(hostname)"
       - name: Remove job configuration
         if: always()

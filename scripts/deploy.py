@@ -14,7 +14,7 @@ import tempfile
 import time
 import urllib.request
 
-from release import API, GITEA_DEV_IMAGE, GITHUB_IMAGE, release_receipt, require, run
+from release import API, GITEA_DEV_IMAGE, GITHUB_IMAGE, release_receipt, require, run, release_state, save_state
 
 
 def settings(directory, channel):
@@ -55,6 +55,9 @@ def deployment(directory, channel, image, commit, version, client_container=None
     # Serializes actual deployments, including manually started jobs and CLI use.
     with (directory / '.deploy.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
+        if channel == 'production' and (directory / 'deployment.json').exists():
+            deployed = json.loads((directory / 'deployment.json').read_text())
+            run('git', 'merge-base', '--is-ancestor', deployed['commit'], commit)
         require(not (directory / 'deployment.pending.json').exists(),
                 'Resolve the previous pending deployment before attempting another update')
         run('docker', 'pull', image)
@@ -156,7 +159,17 @@ def main():
     else:
         image, commit = args.image, args.commit
         require(image and commit, 'Development requires an image digest and commit')
-    deployment(args.directory, args.channel, image, commit, args.version, args.client_container)
+    if args.channel == 'production':
+        with release_state() as state:
+            if state and state.get('status') != 'complete':
+                require(state.get('commit') == commit and state.get('version') == args.version,
+                        'Another release is pending')
+            deployment(args.directory, args.channel, image, commit, args.version, args.client_container)
+            if state and state.get('commit') == commit:
+                state['status'] = 'complete'
+                save_state(state)
+    else:
+        deployment(args.directory, args.channel, image, commit, args.version, args.client_container)
 
 
 if __name__ == '__main__':

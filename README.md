@@ -45,12 +45,12 @@ Choose an available version from [Releases](https://github.com/eezd/RawMark/rele
 docker run -d --name rawmark --restart unless-stopped \
   -p 127.0.0.1:21000:8080 \
   -v rawmark-data:/data \
-  ghcr.io/eezd/rawmark:0.1.1
+  ghcr.io/eezd/rawmark:latest
 ```
 
 Open **http://localhost:21000** and set your password on first use. A new, empty instance starts with seven English example notes; edit or delete them and begin writing. Data lives in the Docker volume `rawmark-data` and persists when you recreate the container with the same volume.
 
-Docker supports Linux amd64 and arm64. Native programs are available for Linux amd64/arm64, Windows amd64, and macOS Intel/Apple Silicon. Download them from [Releases](https://github.com/eezd/RawMark/releases), or build from source using the deployment guide.
+Docker supports Linux amd64 and arm64. Native programs are available for Linux amd64/arm64, Windows amd64/arm64, and macOS Intel/Apple Silicon. Download them from [Releases](https://github.com/eezd/RawMark/releases), or build from source using the deployment guide.
 
 [Try the online editor](https://eezd.github.io/RawMark/) without installing anything. Demo edits are temporary and reset on refresh; the demo does not provide a server-backed workspace.
 

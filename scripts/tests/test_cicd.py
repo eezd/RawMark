@@ -117,7 +117,7 @@ class PublicationTests(unittest.TestCase):
         gitea.release.return_value = {'draft': True, 'prerelease': False}
         github.release.return_value = {'draft': False, 'prerelease': False}
         with self.assertRaisesRegex(ValueError, 'not completely published'):
-            release.release_receipt(gitea, github, '0.1.1')
+            release.release_receipt(gitea, github, '20261030-aaaaaaaa')
 
     def test_registry_permission_error_is_not_treated_as_missing_image(self):
         result = Mock(returncode=1, stderr='403 Forbidden', stdout='')
@@ -327,3 +327,56 @@ class CleanupTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ReleaseReservationTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.patch = patch.object(release, 'STATE_DIRECTORY', Path(self.directory.name))
+        self.patch.start()
+        self.addCleanup(self.patch.stop)
+
+    def test_other_candidate_cannot_replace_pending_release(self):
+        release.reserve(SHA)
+        with self.assertRaisesRegex(ValueError, 'Another release'):
+            release.reserve('c' * 40)
+
+    def test_fixed_notes_and_candidate_are_required_on_retry(self):
+        release.reserve(SHA)
+        notes = Path(self.directory.name) / 'notes.md'
+        notes.write_text('English\n\n中文')
+        with patch.object(release, 'version_for', return_value='20261030-aaaaaaaa'):
+            release.select_release(SHA, notes)
+        with patch.dict(os.environ, {'RELEASE_ID': SHA, 'RELEASE_COMMIT': SHA}):
+            self.assertEqual(release.selected_state()['notes'], notes.read_text())
+            with patch.dict(os.environ, {'RELEASE_COMMIT': 'b' * 40}):
+                with self.assertRaisesRegex(ValueError, 'reserved candidate'):
+                    release.selected_state()
+
+    def test_release_matrix_includes_windows_arm64(self):
+        self.assertEqual(set(release.PLATFORMS), {'linux/amd64', 'linux/arm64',
+                         'darwin/amd64', 'darwin/arm64', 'windows/amd64', 'windows/arm64'})
+
+    def test_release_version_uses_utc_commit_date_and_fixed_sha(self):
+        with patch.object(release, 'run', return_value='0'):
+            self.assertEqual(release.version_for(SHA), '19700101-aaaaaaaa')
+
+
+class MainAdmissionTests(unittest.TestCase):
+    def test_pending_rows_do_not_hide_later_success(self):
+        api = Mock()
+        api.repo.side_effect = [
+            {'workflow_runs': [{'head_sha': SHA, 'event': 'push', 'path': 'mirror.yml@refs/heads/main'}]},
+            {'workflow_runs': [{'head_sha': SHA, 'event': 'push', 'path': 'main.yml@refs/heads/main', 'conclusion': 'success'}]},
+        ]
+        self.assertTrue(release.successful_main_ci(api, SHA))
+
+    def test_other_sha_pr_or_dev_success_cannot_admit_main(self):
+        api = Mock()
+        api.repo.side_effect = [{'workflow_runs': [
+            {'head_sha': 'b' * 40, 'event': 'push', 'path': 'main.yml@refs/heads/main', 'conclusion': 'success'},
+            {'head_sha': SHA, 'event': 'pull_request', 'path': 'main.yml@refs/pull/3/head', 'conclusion': 'success'},
+            {'head_sha': SHA, 'event': 'push', 'path': 'dev.yml@refs/heads/dev', 'conclusion': 'success'},
+        ]}, {'workflow_runs': []}]
+        self.assertFalse(release.successful_main_ci(api, SHA))

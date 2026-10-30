@@ -4,10 +4,10 @@ set -eu
 mode="${1:?Expected development or release}"
 case "$mode" in
   development) targets='linux/amd64' ;;
-  release) targets='linux/amd64 linux/arm64 windows/amd64 darwin/amd64 darwin/arm64' ;;
+  release) targets='linux/amd64 linux/arm64 windows/amd64 windows/arm64 darwin/amd64 darwin/arm64' ;;
   *) exit 2 ;;
 esac
-if [ "$mode" = development ]; then export RAWMARK_BUILD_CHANNEL=development; fi
+export RAWMARK_BUILD_CHANNEL="$mode"
 export RAWMARK_BUILD_VERSION="$(python3 scripts/release.py version)"
 export CGO_ENABLED=0
 mkdir -p package/licenses downloads

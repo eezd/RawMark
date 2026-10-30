@@ -45,7 +45,7 @@ RawMark 面向**单用户、自托管**场景。目前不提供多人协作或�
 docker run -d --name rawmark --restart unless-stopped \
   -p 127.0.0.1:21000:8080 \
   -v rawmark-data:/data \
-  ghcr.io/eezd/rawmark:0.1.1
+  ghcr.io/eezd/rawmark:latest
 ```
 
 打开 **http://localhost:21000**，首次访问设置登录密码。全新空实例会提供 7 篇英文示例笔记，可以自由编辑或删除，然后开始记录自己的内容。数据保存在 Docker 卷 `rawmark-data` 中，重建容器不会丢失。
