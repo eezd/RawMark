@@ -162,9 +162,11 @@ Bearer 认证升级需要前后端一起发布。旧 Cookie 页面不能继续�
 - 更新后界面异常先核对前后端是否来自同一构建，再查看浏览器网络请求和应用日志；插件与外观恢复入口见[使用指南](guide.zh-CN.md#插件与界面恢复)。
 - 笔记读取返回 `Cache-Control: no-store, no-transform`，防止代理改写条件保存使用的强版本 ETag。代理将其改为弱 ETag 可能导致正常编辑返回 HTTP 412；公网入口须保留该响应策略。
 
-## 开发与生产托管
+## DEV 托管与正式产物
 
-仓库 `deploy/compose.image.yml` 是仅拉镜像的模板。开发实例放在 `/docker/gitea/dev/RawMark`，生产实例放在 `/docker/main/rawmark`；将模板复制至对应实例目录并命名为 `compose.yml`，旁边放权限 600 的私有 `.env`。项目名与容器名分别指定。实例不依赖源码工作目录，必须明确填写：
+个人使用只保留 `/docker/gitea/dev/RawMark` 常驻实例，容器 `RawMark-dev`、Compose 项目 `rawmark-dev`、端口 `127.0.0.1:21001`，入口 `https://raw.134333.xyz`。raw-dev 站点停用。实例持有真实用户数据，CI 和隔离冒烟只使用合成数据。
+
+将 `deploy/compose.image.yml` 复制为实例 `compose.yml`，旁边放权限 600 的私有 `.env`。不要覆盖已有数据所有权或挂载仓库示例作为真实数据。
 
 ```dotenv
 RAWMARK_CHANNEL=development
@@ -176,12 +178,8 @@ RAWMARK_DATA_DIR=/docker/gitea/dev/RawMark/data
 RAWMARK_IMAGE=git.134333.xyz/eezd/dev/rawmark@sha256:<已验证摘要>
 ```
 
-生产使用 channel `production`、project `rawmark`、现有容器名、端口 21000、`/docker/main/rawmark/data` 和 `ghcr.io/eezd/rawmark@sha256:<已验证摘要>`；迁移时保留当前监听地址。仅为新的开发目录设置 `65532:65532` 所有者，不递归修改现有生产权限，不将仓库示例模板作为运行数据挂载。
+DEV push 检查及隔离验收通过后自动部署 Gitea 开发镜像；main push 与 PR 只检查。正式 Release 手动发布程序包、Gitea/GHCR 镜像及 GitHub 镜像，不创建 MAIN 或更新 DEV。`/docker/gitea/dev/manage.sh start|stop` 批量管理一级项目，共用实例 `.deploy.lock`，pending 未处理时拒绝启动。
 
-dev push CI 通过检查和隔离冒烟后自动更新开发；main push 与 PR 仅验证。本次 CI 迁移期间，正式发布及 Gitea **Deploy production manually** 工作流保持禁用，启用或执行须另行规划并授权。已准备的生产工作流要求两端正式发布及回执一致，固定 GHCR 摘要，并在替换前备份数据和配置。备份为私有文件并包含 SQLite WAL；旧镜像和备份继续保留。
+部署停止服务后备份完整数据（含 SQLite WAL）、配置和旧镜像信息，再写入 `deployment.pending.json`；健康检查通过才写入 `deployment.json` 并清除 pending。候选失败时停止候选、保留备份，不自动降级程序或恢复数据库。恢复和私人数据迁移需明确授权及兼容性核查；不得同时运行共享可写数据的新旧实例。
 
-替换前记录 `deployment.pending.json`，健康和前端检查通过后记录 `deployment.json`。候选版本访问数据后失败则停止候选，保留备份和 pending 记录，不自动恢复私人数据，也不直接用旧程序打开可能迁移后的数据；恢复须明确授权并核对兼容性。备份在替换前失败时，旧数据未被新程序访问，可安全重新启动旧容器。不做全局 Docker 清理。
-
-准备生产文件不等于重启当前服务或执行数据迁移。首次从旧源码构建 Compose 切换须明确授权生产更新，不同时运行两套 Compose。先用合成数据演练更新和恢复。
-
-新开发域名须完成 DNS、CDN 自定义主机名及证书激活，并配置源站和国内入口。必须验证公网访问，不能仅凭回环端口健康或 DNS 有记录认定成功。所有代理都要对资源票据路径脱敏。
+域名切换须验证公网、CDN 与 TLS，并保留资源票据日志脱敏。DNS 由用户管理。

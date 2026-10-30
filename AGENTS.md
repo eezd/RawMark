@@ -133,8 +133,8 @@ Gitea 为公开主仓库，GitHub 为单向公开镜像；默认分支均为 mai
 
 - dev push：容器内检查、Linux amd64 打包与隔离冒烟，通过后发布 `git.134333.xyz/eezd/dev/rawmark:YYYYMMDD-<8位SHA>`，按摘要部署 DEV。日期取提交时间 UTC，完整 SHA 保留在回执；同名异提交拒绝，已验证镜像重试复用。
 - main push：独立检查实际合并提交、Linux amd64 构建及容器冒烟，不发布镜像、不部署。仓库内受信 PR 只检查；外部 fork PR 不自动进入共享 Docker runner，不注入发布凭据。
-- DEV 为 `/docker/gitea/dev/RawMark`，容器 `RawMark-dev`，Compose 项目 `rawmark-dev`，监听 `127.0.0.1:21001`，域名 `raw-dev.134333.xyz`。数据独立；所有部署共用宿主实例 `.deploy.lock`，锁内核对 dev 最新 SHA，pending 未处理时拒绝覆盖。已有数据即使无旧容器也必须备份。
+- DEV 为 `/docker/gitea/dev/RawMark`，容器 `RawMark-dev`，Compose 项目 `rawmark-dev`，监听 `127.0.0.1:21001`，域名 `raw.134333.xyz`，raw-dev 域名停用。DEV 是唯一常驻实例，保存个人真实数据；CI 与冒烟使用隔离合成数据。数据独立；所有部署共用宿主实例 `.deploy.lock`，锁内核对 dev 最新 SHA，pending 未处理时拒绝覆盖。已有数据即使无旧容器也必须备份。
 - Git 镜像独立于 CI 成败：push/create/delete、每小时对账和手动重试，共用 `/docker/gitea/mirrors/RawMark/.mirror.lock`，仅同步业务分支和 TAG 及完整历史，跟随源端删除。同步代码从 main 读取；`RAWMARK_MIRROR_ENABLED=true` 后启用，凭据统一使用 Gitea 账号级 Secret `ALL_GITHUB_TOKEN`（头像 → 设置 → Actions → 密钥），接入前配置并验证实际权限，仓库级同名项会覆盖账号级值。DEV 镜像不上传 GHCR。main 切换前保持该变量关闭。
 - CI 凭据 `RAWMARK_GITEA_TOKEN` 需要仓库和 Packages 写权限。runner 保持容量一、`sweep: false`，只运行受信代码；工具链安装在任务容器。资源按任务标签清理，禁止全局 prune。
 - 开发构建通过 `RAWMARK_BUILD_CHANNEL=development` 派生版本，前端与二进制一致；正式 `VERSION` 不因开发构建改变。开发包为 `RawMark_<版本>_linux_amd64.tar.gz`；历史正式产物不改名。安装包及单次传输保持既有 90,000,000 字节预算。
-- 正式发布从受信 main 手动触发，使用日期哈希注解 TAG、六平台程序包与 Linux 双架构镜像；发布 ID 和候选 SHA 固定，发布记录与 .release.lock 位于持久镜像目录。GitHub 引用同步复用镜像锁，Pages Demo 不切换。双端发布和 GHCR 公开拉取验收后自动部署 MAIN：/docker/gitea/main/RawMark、RawMark-main、rawmark-main，127.0.0.1:21000，raw.134333.xyz。自动/手动/批量启停共用实例 .deploy.lock，旧版本不得覆盖新版；生产数据保留并先备份，不随开发推送更新。
+- 正式发布从受信 main 手动触发，使用日期哈希注解 TAG、六平台程序包与 Linux 双架构镜像；发布 ID 和候选 SHA 固定，发布记录与 .release.lock 位于持久镜像目录。GitHub 引用同步复用镜像锁，Pages Demo 不切换。双端发布和 GHCR 公开拉取验收后结束发布并标记预约完成，不部署 MAIN、不更新 DEV。DEV 批量管理入口为 `/docker/gitea/dev/manage.sh start|stop`，与 CD 共用实例锁，pending 阻止启动。
