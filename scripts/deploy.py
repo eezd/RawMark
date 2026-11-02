@@ -4,6 +4,7 @@
 import argparse
 import contextlib
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -46,12 +47,35 @@ def save(path, data):
         temporary.unlink(missing_ok=True)
 
 
+def install_controls(directory):
+    # Recognize the original templates; subsequent updates verify the installed receipt.
+    legacy = {'start.sh': 'b4709f36a66b428671a09f373f640a99259845924779dcb122f5cd9c17e85ab6',
+              'stop.sh': '83348a7781b7d738a715bde51387951041a5cfcd31796805422ef83139a21571'}
+    receipt = directory / '.control-scripts.json'
+    previous = json.loads(receipt.read_text()) if receipt.exists() else {}
+    sources = Path(__file__).resolve().parents[1] / 'deploy'
+    scripts = {name: (sources / name).read_bytes() for name in legacy}
+    hashes = {name: hashlib.sha256(data).hexdigest() for name, data in scripts.items()}
+    # Check both entries before replacing either; preserve custom or locally edited scripts.
+    for name in scripts:
+        target = directory / name
+        require(not target.is_symlink(), f'Refusing to replace symlink: {target}')
+        if target.exists():
+            current = hashlib.sha256(target.read_bytes()).hexdigest()
+            require(current in (legacy[name], hashes[name], previous.get(name)),
+                    f'Locally modified control script requires review: {target}')
+    for name, data in scripts.items():
+        save(directory / name, data)
+        (directory / name).chmod(0o755)
+    save(receipt, (json.dumps(hashes, indent=2) + '\n').encode())
+
+
 def deployment(directory, channel, image, commit, version, client_container=None):
     directory = Path(directory).resolve(strict=True)
     require(channel == 'development', 'Only the persistent DEV instance supports deployment')
     cfg = settings(directory, channel)
     registry = GITEA_DEV_IMAGE
-    require(re.fullmatch(re.escape(registry) + r'@sha256:[0-9a-f]{64}', image), 'Expected an immutable registry digest')
+    require(image == registry + ':' + version, 'Expected the selected development version tag')
     require(re.fullmatch(r'[0-9a-f]{40}', commit), 'Expected a full commit SHA')
     # Serializes actual deployments, including manually started jobs and CLI use.
     with (directory / '.deploy.lock').open('a') as lock:
@@ -85,6 +109,7 @@ def deployment(directory, channel, image, commit, version, client_container=None
         compose = ['docker', 'compose', '--project-name', cfg['RAWMARK_PROJECT'], '--env-file', str(directory / '.env'),
                    '-f', str(directory / 'compose.yml')]
         run(*compose, 'config', '--quiet', env=env)
+        install_controls(directory)
         backup = None
         if previous:
             run('docker', 'stop', '--time', '15', previous['Id'])
@@ -148,7 +173,7 @@ def main():
     parser.add_argument('--version', required=True)
     parser.add_argument('--client-container')
     args = parser.parse_args()
-    require(args.image and args.commit, 'Development requires an image digest and commit')
+    require(args.image and args.commit, 'Development requires an image version tag and commit')
     deployment(args.directory, args.channel, args.image, args.commit, args.version, args.client_container)
 
 

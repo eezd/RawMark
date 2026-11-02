@@ -204,7 +204,7 @@ class DeploymentTests(unittest.TestCase):
         (self.directory / '.env').write_text(
             f'RAWMARK_CHANNEL=development\nRAWMARK_PROJECT=rawmark-ci-deploy\n'
             f'RAWMARK_BIND=127.0.0.1\nRAWMARK_PORT=21899\nRAWMARK_DATA_DIR={self.directory}/data\n')
-        self.image = release.GITEA_DEV_IMAGE + '@' + DIGEST
+        self.image = release.GITEA_DEV_IMAGE + ':0.1.1'
         self.previous = {'Id': 'old-id', 'Image': 'old-image', 'State': {'Running': True},
                          'Mounts': [{'Destination': '/data', 'Type': 'bind', 'Source': str(self.directory / 'data')}]}
         self.image_info = {'Id': 'new-image', 'Config': {'User': '65532:65532', 'Labels': {
@@ -235,6 +235,24 @@ class DeploymentTests(unittest.TestCase):
             return json.dumps([{'Image': 'new-image', 'NetworkSettings': {'Networks': {
                 'test': {'NetworkID': 'network', 'IPAddress': '127.0.0.1'}}}}])
         return ''
+
+    def test_existing_verified_build_outputs_a_tag(self):
+        build={'commit':SHA,'version':'0.1.1'}
+        info=json.dumps([{'Config':{'Labels':{'org.opencontainers.image.revision':SHA,
+                                            'org.opencontainers.image.version':'0.1.1'}}}])
+        with patch.object(release,'verify_bundle',return_value=build), \
+                patch.object(release.subprocess,'run'), patch.object(release,'registry_digest',return_value=DIGEST), \
+                patch.object(release,'run',return_value=info) as run, patch.object(release,'output') as output:
+            release.promote_development('synthetic')
+            output.assert_any_call('image',release.GITEA_DEV_IMAGE+':0.1.1')
+            self.assertEqual(run.call_args_list[0].args,('docker','pull',release.GITEA_DEV_IMAGE+':0.1.1'))
+
+    def test_digest_and_other_version_tags_cannot_deploy(self):
+        for image in (release.GITEA_DEV_IMAGE + '@' + DIGEST, release.GITEA_DEV_IMAGE + ':other'):
+            with self.subTest(image=image), patch.object(deploy, 'run') as docker:
+                with self.assertRaisesRegex(ValueError, 'version tag'):
+                    deploy.deployment(self.directory, 'development', image, SHA, '0.1.1')
+                docker.assert_not_called()
 
     def test_channel_mismatch_cannot_touch_docker(self):
         with patch.object(deploy, 'run') as docker:
@@ -277,6 +295,16 @@ class DeploymentTests(unittest.TestCase):
         start = next(i for i,c in enumerate(self.commands) if c[:2] == ('docker', 'compose') and 'up' in c)
         self.assertLess(stop, start)
         self.assertIn('RAWMARK_IMAGE=' + self.image, (self.directory / '.env').read_text())
+        self.assertTrue((self.directory / 'start.sh').stat().st_mode & 0o111)
+        self.assertTrue((self.directory / 'stop.sh').stat().st_mode & 0o111)
+
+    def test_custom_control_script_is_preserved_before_stopping(self):
+        (self.directory / 'stop.sh').write_text('custom behavior\n')
+        with patch.object(deploy, 'run', side_effect=self.command):
+            with self.assertRaisesRegex(ValueError, 'Locally modified'):
+                deploy.deployment(self.directory, 'development', self.image, SHA, '0.1.1')
+        self.assertFalse(any(c[:2] == ('docker', 'stop') for c in self.commands))
+        self.assertEqual((self.directory / 'stop.sh').read_text(), 'custom behavior\n')
 
     def test_existing_data_is_backed_up_without_a_container(self):
         def without_container(*args, **kwargs):

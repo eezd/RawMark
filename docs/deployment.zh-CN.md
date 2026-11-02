@@ -146,7 +146,7 @@ docker run -d --name rawmark --restart unless-stopped \
 
 1. 确认目标版本的行为和数据兼容性，保留当前镜像及部署配置。
 2. 停止旧服务，备份应用数据与外置笔记库。
-3. 拉取选定的预构建镜像摘要，使用同一份挂载启动新实例；源码构建仅供贡献者选择，不用于托管生产更新。不要并行运行新旧服务。
+3. 拉取选定的预构建镜像版本标签，使用同一份挂载启动新实例；源码构建仅供贡献者选择，不用于托管生产更新。不要并行运行新旧服务。
 4. 核对容器健康、登录、笔记与附件。回退时使用配套的旧镜像与数据备份。
 
 Bearer 认证升级需要前后端一起发布。旧 Cookie 页面不能继续使用，需重新登录；启动程序会沿现有 SQLite 初始化流程创建资源票据表和索引，笔记、密码、设置与已有 API 令牌保留。第三方客户端的 JSON 解包方式须遵循[当前协议](api.zh-CN.md)。
@@ -175,10 +175,19 @@ RAWMARK_CONTAINER_NAME=RawMark-dev
 RAWMARK_BIND=127.0.0.1
 RAWMARK_PORT=21001
 RAWMARK_DATA_DIR=/docker/gitea/dev/RawMark/data
-RAWMARK_IMAGE=git.134333.xyz/eezd/dev/rawmark@sha256:<已验证摘要>
+RAWMARK_IMAGE=git.134333.xyz/eezd/dev/rawmark:<已验证版本>
 ```
 
-DEV push 检查及隔离验收通过后自动部署 Gitea 开发镜像；main push 与 PR 只检查。正式 Release 手动发布程序包、Gitea/GHCR 镜像及 GitHub 镜像，不创建 MAIN 或更新 DEV。`/docker/gitea/dev/manage.sh start|stop` 批量管理一级项目，共用实例 `.deploy.lock`，pending 未处理时拒绝启动。
+DEV push 检查及隔离验收通过后自动部署 Gitea 开发镜像；main push 与 PR 只检查。正式 Release 手动发布程序包、Gitea/GHCR 镜像及 GitHub 镜像，不创建 MAIN 或更新 DEV。实例启停脚本与 CD 共用 `.deploy.lock`。pending 未处理时拒绝启动，停止仍可在取得锁后执行。
+
+```bash
+bash /docker/gitea/dev/RawMark/start.sh
+bash /docker/gitea/dev/RawMark/stop.sh
+```
+
+CD 在首次及后续部署停服前，将 `deploy/start.sh`、`deploy/stop.sh` 安装到实例并设置权限 755。`.control-scripts.json` 记录已安装脚本的哈希；遇到本地修改或无法识别的已有脚本会要求先审查，不会静默覆盖。首次手动配置也可在检查已有入口后复制这两个文件。
+
+脚本显式依次加载 `.env` 和存在的 `images.env`，调用者的应用及 Compose 环境变量不能覆盖实例配置；只保留 PATH、HOME 及脚本列明的 Docker 客户端连接与配置变量。RawMark CD 将已验证镜像写入 `.env`，无需另建 `images.env`。启动通过 `--no-build --pull never` 复用本地镜像，停止保留容器、网络、卷和数据。启动命令成功表示 Compose 已接受启动，服务就绪仍需核对容器健康。
 
 部署停止服务后备份完整数据（含 SQLite WAL）、配置和旧镜像信息，再写入 `deployment.pending.json`；健康检查通过才写入 `deployment.json` 并清除 pending。候选失败时停止候选、保留备份，不自动降级程序或恢复数据库。恢复和私人数据迁移需明确授权及兼容性核查；不得同时运行共享可写数据的新旧实例。
 

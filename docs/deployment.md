@@ -146,7 +146,7 @@ In addition to application backups, stop the service before upgrades and back up
 
 1. Check the target version's behavior and data compatibility; retain the current image and deployment configuration.
 2. Stop the old service and back up application data and any external vault.
-3. Pull the selected prebuilt image digest and start with the same mounts. Source builds are optional contributor workflows, not managed production updates. Do not run old and new services concurrently.
+3. Pull the selected prebuilt image version tag and start with the same mounts. Source builds are optional contributor workflows, not managed production updates. Do not run old and new services concurrently.
 4. Verify container health, sign-in, notes, and attachments. Roll back using the matching previous image and data backup.
 
 The Bearer authentication upgrade requires the frontend and backend to be released together. Old Cookie-based pages require signing in again. Startup creates the resource-ticket table and indexes through the existing SQLite initialization flow; notes, passwords, settings, and existing API tokens are retained. Third-party clients must follow the [current JSON protocol](api.md).
@@ -175,10 +175,19 @@ RAWMARK_CONTAINER_NAME=RawMark-dev
 RAWMARK_BIND=127.0.0.1
 RAWMARK_PORT=21001
 RAWMARK_DATA_DIR=/docker/gitea/dev/RawMark/data
-RAWMARK_IMAGE=git.134333.xyz/eezd/dev/rawmark@sha256:<verified-digest>
+RAWMARK_IMAGE=git.134333.xyz/eezd/dev/rawmark:<verified-version>
 ```
 
-Dev pushes deploy verified Gitea development digests after checks and isolated smoke tests. Main pushes and PRs only validate. Manual formal releases publish packages and Gitea/GHCR images with GitHub mirrors; they do not create MAIN or update DEV. `/docker/gitea/dev/manage.sh start|stop` manages first-level projects using instance `.deploy.lock` files and rejects starts with unresolved pending deployments.
+Dev pushes deploy verified Gitea development version tags after checks and isolated smoke tests. Main pushes and PRs only validate. Manual formal releases publish packages and Gitea/GHCR images with GitHub mirrors; they do not create MAIN or update DEV. The instance-local controls share `.deploy.lock` with CD. Startup rejects unresolved pending deployments; stopping remains available after acquiring the lock.
+
+```bash
+bash /docker/gitea/dev/RawMark/start.sh
+bash /docker/gitea/dev/RawMark/stop.sh
+```
+
+CD installs `deploy/start.sh` and `deploy/stop.sh` into the instance with mode 755 before stopping the service, on both first deployment and updates. The `.control-scripts.json` receipt tracks installed hashes; local edits or unrecognized existing scripts require review before deployment and are never silently overwritten. Initial manual setup can copy these two files after checking any existing entries.
+
+Controls explicitly load `.env`, followed by `images.env` when present. Application and Compose variables from the caller cannot override those files; only PATH, HOME and the listed Docker client connection/configuration variables are retained. RawMark CD stores its verified image in `.env`; no separate `images.env` is needed. Startup reuses local images with `--no-build --pull never`; stopping preserves containers, networks, volumes and data. A successful start command means Compose accepted startup; use container health to confirm readiness.
 
 Deployment stops the service and backs up complete data, including SQLite WAL, configuration and previous-image details before writing `deployment.pending.json`. Successful health checks write `deployment.json` and clear pending. A failed candidate is stopped while its backup and pending record remain; no automatic data restore or program downgrade occurs. Recovery and private-data migration require explicit authorization and compatibility review. Never run two instances sharing writable data.
 

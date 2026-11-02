@@ -532,7 +532,7 @@ def promote_development(local_image):
                    input=token, text=True, check=True)
     existing = registry_digest(GITEA_DEV_IMAGE, build['version'])
     if existing:
-        reference = GITEA_DEV_IMAGE + '@' + existing
+        reference = GITEA_DEV_IMAGE + ':' + build['version']
         run('docker', 'pull', reference)
         info = json.loads(run('docker', 'image', 'inspect', reference))[0]
         labels = info['Config'].get('Labels') or {}
@@ -561,7 +561,7 @@ def promote_development(local_image):
             run('docker', 'buildx', 'imagetools', 'create', '--prefer-index=false', '--tag',
                 GITEA_DEV_IMAGE + ':' + tag, GITEA_DEV_IMAGE + '@' + value)
         require(registry_digest(GITEA_DEV_IMAGE, tag) == value, 'Development tag digest changed')
-        output('image', GITEA_DEV_IMAGE + '@' + value)
+        output('image', GITEA_DEV_IMAGE + ':' + build['version'])
         output('version', build['version'])
     finally:
         run('docker', 'image', 'rm', candidate)
