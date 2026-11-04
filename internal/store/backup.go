@@ -56,8 +56,19 @@ func (s *Store) ReplacePreferences(values map[string]json.RawMessage) error {
 	return tx.Commit()
 }
 func (s *Store) ResetPreferences() error {
-	_, err := s.db.Exec(`DELETE FROM settings WHERE key IN ('app.settings','plugins.enabled')`)
-	return err
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec(`DELETE FROM settings WHERE key IN ('app.settings','plugins.enabled')`); err != nil {
+		return err
+	}
+	// An explicit empty list prevents older devices from migrating their local pins after a reset.
+	if _, err = tx.Exec(`INSERT INTO settings(key,value) VALUES ('app.settings',?)`, `{"pinnedTabs":[]}`); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 func (s *Store) ClearSessions() error { _, err := s.db.Exec(`DELETE FROM sessions`); return err }
 

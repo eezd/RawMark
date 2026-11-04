@@ -18,12 +18,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/http/axios'
 
 import { pinia } from '@/pinia'
+import { useSettingsStore } from '@/pinia/stores/settings'
 import { useUserStore } from '@/pinia/stores/user'
 import { apiSuccess } from '../../../tests/api-response'
 import { pluginEvents } from '../../common/plugins/registry'
 import { drafts } from './drafts'
 import { insertImageFiles } from './editor/paste'
-import { attachView, closeTab, createNoteAt, editorStateOf, flush, importNotes, keepLocalVersion, move, openNote, readyToReload, refreshTree, remove, replaceImage, restore, startWorkspace, stopWorkspace, storeViewState, ws } from './workspace'
+import { attachView, closeTab, createNoteAt, editorStateOf, flush, importNotes, keepLocalVersion, move, openNote, readyToReload, refreshTree, remove, replaceImage, restore, startWorkspace, stopWorkspace, storeViewState, toggleTabPin, ws } from './workspace'
 
 vi.mock('@@/apis/events', () => ({ connectEventsApi: vi.fn(() => () => {}) }))
 
@@ -113,6 +114,249 @@ describe('事件同步', () => {
       pluginEvents.removeEventListener('resync', resync)
       await closeTab('sync.md')
     }
+  })
+})
+
+describe('固定标签跨设备同步', () => {
+  const { settings, flushSettings } = useSettingsStore(pinia)
+  let serverPins: string[] | undefined
+
+  beforeEach(() => {
+    serverPins = undefined
+    settings.pinnedTabs = undefined
+    localStorage.removeItem('rawmark.tabs')
+    vi.spyOn(treeApi, 'getTreeApi').mockResolvedValue(apiSuccess({ entries: ['a.md', 'b.md', 'from/note.md'].map(path => ({ path, dir: false, size: 0, mtime: 0 })) }))
+    vi.spyOn(settingsApi, 'getSettingsApi').mockImplementation(async () => apiSuccess(serverPins === undefined ? {} : { pinnedTabs: [...serverPins] }))
+    vi.spyOn(settingsApi, 'patchSettingsApi').mockImplementation(async (patch) => {
+      serverPins = patch.pinnedTabs as string[]
+      return apiSuccess({ pinnedTabs: serverPins })
+    })
+    vi.spyOn(fontsApi, 'getFontsApi').mockResolvedValue(apiSuccess({ fonts: [] }))
+    vi.spyOn(pluginsApi, 'getPluginsApi').mockResolvedValue(apiSuccess({ plugins: [] }))
+    vi.spyOn(noteFiles, 'readNoteFile').mockResolvedValue({ content: '服务器正文', rev: 'r1' })
+    vi.spyOn(drafts, 'all').mockResolvedValue([])
+    vi.spyOn(drafts, 'delete').mockResolvedValue(undefined)
+  })
+
+  afterEach(async () => {
+    stopWorkspace()
+    await flushSettings().catch(() => {})
+    await flushPromises()
+    settings.pinnedTabs = undefined
+    localStorage.removeItem('rawmark.tabs')
+  })
+
+  it('固定后保存服务器，另一设备没有本地标签也能恢复', async () => {
+    await startWorkspace()
+    await openNote('a.md')
+    await toggleTabPin('a.md')
+    expect(serverPins).toEqual(['a.md'])
+    expect(ws.tabs[0].pinned).toBe(true)
+    stopWorkspace()
+    await flushPromises()
+    localStorage.removeItem('rawmark.tabs')
+    settings.pinnedTabs = undefined
+    await startWorkspace()
+    expect(ws.tabs.map(tab => [tab.path, tab.pinned])).toEqual([['a.md', true]])
+    expect(editorStateOf('a.md')?.doc.toString()).toBe('服务器正文')
+    expect(ws.active).toBe('a.md')
+  })
+
+  it('只在服务器尚无固定列表时迁移本地固定标签', async () => {
+    localStorage.setItem('rawmark.tabs', JSON.stringify({ paths: ['a.md'], active: 'a.md', pinned: ['a.md'] }))
+    await startWorkspace()
+    expect(serverPins).toEqual(['a.md'])
+    expect(settingsApi.patchSettingsApi).toHaveBeenCalledTimes(1)
+    await flushPromises()
+    expect(JSON.parse(localStorage.getItem('rawmark.tabs')!)).not.toHaveProperty('pinned')
+  })
+
+  it('服务器已取消所有固定时，旧设备缓存不能重新固定', async () => {
+    serverPins = []
+    localStorage.setItem('rawmark.tabs', JSON.stringify({ paths: ['a.md'], active: 'a.md', pinned: ['a.md'] }))
+    await startWorkspace()
+    expect(ws.tabs[0].pinned).toBe(false)
+    expect(settingsApi.patchSettingsApi).not.toHaveBeenCalled()
+  })
+
+  it('加载服务器失败时保留本地固定状态，不上传未确认的列表', async () => {
+    vi.mocked(settingsApi.getSettingsApi).mockRejectedValueOnce(new ApiError(503, '设置暂不可用'))
+    localStorage.setItem('rawmark.tabs', JSON.stringify({ paths: ['a.md'], active: 'a.md', pinned: ['a.md'] }))
+    await startWorkspace()
+    expect(ws.tabs[0].pinned).toBe(true)
+    expect(settingsApi.patchSettingsApi).not.toHaveBeenCalled()
+    expect(JSON.parse(localStorage.getItem('rawmark.tabs')!).pinned).toEqual(['a.md'])
+  })
+
+  it('其他设备固定和取消固定，不切换视图或关闭本机未保存标签', async () => {
+    serverPins = ['a.md']
+    await startWorkspace()
+    const tab = ws.tabs[0]
+    tab.dirty = true
+    const state = editorStateOf('a.md')
+    ws.view = 'graph'
+    ws.images = ''
+    ws.sidebarOpen = true
+    serverPins = ['b.md']
+    vi.mocked(connectEventsApi).mock.lastCall![0].onEvents([{ type: 'settings' }])
+    await vi.waitFor(() => expect(ws.tabs.find(t => t.path === 'b.md')?.status).toBe('ready'))
+    expect(ws.active).toBe('a.md')
+    expect(ws.view).toBe('graph')
+    expect(ws.images).toBe('')
+    expect(ws.sidebarOpen).toBe(true)
+    expect(tab.pinned).toBe(false)
+    expect(tab.dirty).toBe(true)
+    expect(editorStateOf('a.md')).toBe(state)
+    expect(settingsApi.patchSettingsApi).not.toHaveBeenCalled()
+    tab.dirty = false
+  })
+
+  it('断线重连补回错过的固定设置', async () => {
+    serverPins = []
+    await startWorkspace()
+    serverPins = ['b.md']
+    vi.mocked(connectEventsApi).mock.lastCall![0].onResync()
+    await vi.waitFor(() => expect(ws.tabs.find(tab => tab.path === 'b.md')?.pinned).toBe(true))
+    expect(settingsApi.patchSettingsApi).not.toHaveBeenCalled()
+  })
+
+  it('保存失败时提示并恢复服务器状态', async () => {
+    serverPins = []
+    await startWorkspace()
+    await openNote('a.md')
+    vi.mocked(settingsApi.patchSettingsApi).mockRejectedValueOnce(new ApiError(503, '固定保存失败'))
+    await toggleTabPin('a.md')
+    expect(ws.tabs[0].pinned).toBe(false)
+    expect(settings.pinnedTabs).toEqual([])
+    expect(toasts.some(toast => toast.text.includes('固定保存失败'))).toBe(true)
+  })
+
+  it('快速固定和取消固定按操作顺序保存', async () => {
+    serverPins = []
+    await startWorkspace()
+    await openNote('a.md')
+    await Promise.all([toggleTabPin('a.md'), toggleTabPin('a.md'), toggleTabPin('a.md')])
+    expect(vi.mocked(settingsApi.patchSettingsApi).mock.calls.map(([patch]) => patch.pinnedTabs)).toEqual([['a.md'], [], ['a.md']])
+    expect(serverPins).toEqual(['a.md'])
+    expect(ws.tabs[0].pinned).toBe(true)
+  })
+
+  it('主动关闭固定标签也从服务器固定列表中移除', async () => {
+    serverPins = ['a.md', 'b.md']
+    await startWorkspace()
+    expect(await closeTab('a.md')).toBe(true)
+    expect(serverPins).toEqual(['b.md'])
+    expect(ws.tabs.some(tab => tab.path === 'a.md')).toBe(false)
+  })
+
+  it('取消固定保存失败时保留标签，不丢失固定状态', async () => {
+    serverPins = ['a.md']
+    await startWorkspace()
+    vi.mocked(settingsApi.patchSettingsApi).mockRejectedValueOnce(new ApiError(503, '保存失败'))
+    expect(await closeTab('a.md')).toBe(false)
+    expect(ws.tabs.map(tab => [tab.path, tab.pinned])).toEqual([['a.md', true]])
+  })
+
+  it('关闭时草稿保存失败，保留标签和服务器固定记录', async () => {
+    serverPins = ['a.md']
+    await startWorkspace()
+    const tab = ws.tabs[0]
+    Object.assign(tab, { status: 'conflict', dirty: true })
+    const put = vi.spyOn(drafts, 'put').mockRejectedValueOnce(new Error('草稿存储不可用'))
+    expect(await closeTab('a.md')).toBe(false)
+    expect(ws.tabs).toContain(tab)
+    expect(tab.pinned).toBe(true)
+    expect(serverPins).toEqual(['a.md'])
+    expect(settingsApi.patchSettingsApi).not.toHaveBeenCalled()
+    put.mockResolvedValue('a.md')
+    tab.dirty = false
+  })
+
+  it('取消固定请求期间又输入，保留新内容并恢复固定', async () => {
+    serverPins = ['a.md']
+    await startWorkspace()
+    const v = await edit('a.md')
+    const original = v.state.doc.toString()
+    vi.spyOn(drafts, 'put').mockResolvedValue('a.md')
+    let finish!: () => void
+    vi.mocked(settingsApi.patchSettingsApi).mockImplementationOnce(async (patch) => {
+      await new Promise<void>((resolve) => {
+        finish = resolve
+      })
+      serverPins = patch.pinnedTabs as string[]
+      return apiSuccess({ pinnedTabs: serverPins })
+    })
+    const closing = closeTab('a.md')
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+    v.dispatch({ changes: { from: 0, insert: '新增输入' } })
+    finish()
+    expect(await closing).toBe(false)
+    expect(serverPins).toEqual(['a.md'])
+    expect(ws.tabs[0].pinned).toBe(true)
+    expect(ws.tabs[0].dirty).toBe(true)
+    expect(v.state.doc.toString()).toBe(`新增输入${original}`)
+    ws.tabs[0].dirty = false
+  })
+
+  it('重置设置后同步取消固定，重新登录不会迁回旧记录', async () => {
+    serverPins = ['a.md']
+    await startWorkspace()
+    const tab = ws.tabs[0]
+    tab.dirty = true
+    const state = editorStateOf('a.md')
+    serverPins = []
+    vi.mocked(connectEventsApi).mock.lastCall![0].onEvents([{ type: 'settings' }])
+    await vi.waitFor(() => expect(tab.pinned).toBe(false))
+    expect(ws.tabs).toContain(tab)
+    expect(tab.dirty).toBe(true)
+    expect(editorStateOf('a.md')).toBe(state)
+    await flushPromises()
+    expect(JSON.parse(localStorage.getItem('rawmark.tabs')!)).not.toHaveProperty('pinned')
+    tab.dirty = false
+    stopWorkspace()
+    await flushPromises()
+    // Another device may still hold a legacy cache; the reset must remain authoritative.
+    localStorage.setItem('rawmark.tabs', JSON.stringify({ paths: ['a.md'], active: 'a.md', pinned: ['a.md'] }))
+    await startWorkspace()
+    expect(ws.tabs[0].pinned).toBe(false)
+    expect(settingsApi.patchSettingsApi).not.toHaveBeenCalled()
+  })
+
+  it('在本机重命名固定笔记后，新设备仍能按新路径恢复', async () => {
+    serverPins = ['from/note.md']
+    await startWorkspace()
+    vi.spyOn(filesApi, 'moveFileApi').mockResolvedValue(apiSuccess({ ok: true }))
+    vi.mocked(treeApi.getTreeApi).mockResolvedValue(apiSuccess({ entries: [{ path: 'to/note.md', dir: false, size: 0, mtime: 0 }] }))
+    expect(await move('from', 'to')).toEqual({ ok: true })
+    expect(serverPins).toEqual(['to/note.md'])
+    stopWorkspace()
+    await flushPromises()
+    localStorage.removeItem('rawmark.tabs')
+    await startWorkspace()
+    expect(ws.tabs.map(tab => [tab.path, tab.pinned])).toEqual([['to/note.md', true]])
+  })
+
+  it('目录重命名后，服务器固定列表跟随新路径', async () => {
+    serverPins = ['from/note.md']
+    await startWorkspace()
+    vi.mocked(treeApi.getTreeApi).mockResolvedValue(apiSuccess({ entries: [{ path: 'to/note.md', dir: false, size: 0, mtime: 0 }] }))
+    vi.mocked(connectEventsApi).mock.lastCall![0].onEvents([{ type: 'moved', from: 'from', path: 'to' }, { type: 'tree' }])
+    await vi.waitFor(() => expect(serverPins).toEqual(['to/note.md']))
+    await vi.waitFor(() => expect(ws.tabs.map(tab => [tab.path, tab.pinned])).toEqual([['to/note.md', true]]))
+  })
+
+  it('旧工作区未完成的标签读取不覆盖新工作区同名笔记', async () => {
+    let finish!: (result: { content: string, rev: string }) => void
+    vi.mocked(noteFiles.readNoteFile).mockImplementationOnce(() => new Promise((resolve) => {
+      finish = resolve
+    }))
+    const opening = openNote('a.md', { background: true })
+    stopWorkspace()
+    await openNote('a.md')
+    finish({ content: '旧工作区正文', rev: 'old' })
+    await opening
+    expect(editorStateOf('a.md')?.doc.toString()).toBe('服务器正文')
+    expect(ws.tabs[0].rev).toBe('r1')
   })
 })
 

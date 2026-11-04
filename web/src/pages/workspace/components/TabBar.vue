@@ -6,7 +6,7 @@ import { t as translate } from '@@/i18n/runtime'
 import { commandTitle } from '@@/utils/commands'
 import { noteTitle } from '@@/utils/paths'
 import { nextTick, ref } from 'vue'
-import { closeTab, createNote, ws } from '../workspace'
+import { closeTab, createNote, toggleTabPin, ws } from '../workspace'
 
 // Drag sorting: dropping on a tab's left half inserts before it; its right half inserts after it.
 const TAB_TYPE = 'application/x-rawmark-tab'
@@ -113,7 +113,7 @@ function closeRight(path: string) {
     <template v-if="menu">
       <div class="rm-menu-backdrop" @click="menu = null" @contextmenu.prevent="menu = null" />
       <div ref="menuElement" class="rm-menu rm-tab-menu" :style="{ left: `${menu.x}px`, top: `${menu.y}px` }">
-        <button @click="menu.tab.pinned = !menu.tab.pinned; menu = null">
+        <button @click="toggleTabPin(menu.tab.path); menu = null">
           {{ menu.tab.pinned ? translate('workspace.unpin_20590a') : translate('workspace.pin_d4b3f4') }}
         </button>
         <button @click="closeTab(menu.tab.path); menu = null">

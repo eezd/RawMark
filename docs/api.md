@@ -53,6 +53,12 @@ Send `Accept-Language: en` or `Accept-Language: zh-CN` to select the language of
 
 Account language is the `locale` field on `/settings`, supporting only `en` and `zh-CN`. PATCH with `null` removes the override and restores default English. The field is exported, imported, and synchronized with other settings. The sign-in page's temporary choice does not write to the account. Request headers affect only the current response, not account language.
 
+## Pinned tabs
+
+The `/settings` field `pinnedTabs` is an array of Markdown paths relative to the vault. The browser saves pin/unpin actions to the server and restores existing pinned notes on other devices, including after an event connection reconnects. An explicit empty array means no pinned tabs; if the field is absent, the browser migrates its legacy local pins once. Resetting settings stores an empty array so older device caches cannot restore cleared pins. Concurrent replacements of this list use the last server write.
+
+Unpinned tabs and the active tab remain local to each device. Remote unpinning keeps local tabs and unsaved edits open. Explicitly closing a pinned tab also removes its server pin. Renaming notes or folders through the workspace updates pinned paths; unavailable paths are skipped when opening tabs.
+
 ## Browser sign-in
 
 There are no usernames, registration, or roles. Before initialization, `POST /auth/setup` sets the password using `{ password }` and returns a session. An initialized instance cannot be initialized again.

@@ -48,3 +48,31 @@ func TestOpenExistingUsesNativeEscapedPathWithoutCreating(t *testing.T) {
 		t.Fatalf("missing database was created: %v", err)
 	}
 }
+
+func TestResetPreferencesRollsBackIfPinResetFails(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "rawmark.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	original := map[string]string{
+		"app.settings":    `{"fontSize":24,"pinnedTabs":["note.md"]}`,
+		"plugins.enabled": `{"example":true}`,
+	}
+	for key, value := range original {
+		if err := st.SetSetting(key, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := st.db.Exec(`CREATE TRIGGER reject_pin_reset BEFORE INSERT ON settings WHEN NEW.key='app.settings' BEGIN SELECT RAISE(ABORT,'intentional reset failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ResetPreferences(); err == nil {
+		t.Fatal("固定标签重置失败必须返回错误")
+	}
+	for key, value := range original {
+		if got, ok, err := st.Setting(key); err != nil || !ok || got != value {
+			t.Fatalf("重置失败未回滚 %s: %q, %v", key, got, err)
+		}
+	}
+}

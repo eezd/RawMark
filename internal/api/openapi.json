@@ -481,7 +481,7 @@
             "bearer": []
           }
         ],
-        "description": "Merge top-level keys: supplied values replace existing values, and null removes a key. On success, broadcast a settings event over WebSocket. trashRetentionDays is a nonnegative safe integer (default 30; 0 disables automatic deletion); null restores the default. Retention applies to existing and new recycle-bin entries. Startup and hourly cleanup permanently delete expired entries based on their original deletion times.",
+        "description": "Merge top-level keys: supplied values replace existing values, and null removes a key. On success, broadcast a settings event over WebSocket. pinnedTabs stores vault-relative Markdown paths shared across devices; an empty array explicitly clears pins, while an absent key allows the browser to migrate legacy local pins. Concurrent replacements use the last server write. trashRetentionDays is a nonnegative safe integer (default 30; 0 disables automatic deletion); null restores the default. Retention applies to existing and new recycle-bin entries. Startup and hourly cleanup permanently delete expired entries based on their original deletion times.",
         "requestBody": {
           "required": true,
           "content": {
@@ -490,6 +490,16 @@
                 "type": "object",
                 "additionalProperties": true,
                 "properties": {
+                  "pinnedTabs": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Ordered vault-relative Markdown paths. Empty means no pins; null removes the setting."
+                  },
                   "trashRetentionDays": {
                     "type": [
                       "integer",
@@ -3789,6 +3799,7 @@
     "/maintenance/settings/reset": {
       "post": {
         "summary": "Reset confirmed preferences while retaining plugin storage",
+        "description": "Reset application preferences and plugin activation while preserving plugin data and credentials. Store pinnedTabs as an explicit empty array so legacy browser caches cannot migrate cleared pins back to the server.",
         "tags": [
           "Maintenance"
         ],

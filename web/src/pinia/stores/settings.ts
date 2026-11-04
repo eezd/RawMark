@@ -36,7 +36,7 @@ export const CONTENT_WIDTHS = [
 export const SIDEBAR_WIDTH = { min: 200, max: 480 }
 
 export const DEFAULTS = { locale: DEFAULT_LOCALE, trashRetentionDays: 30, hiddenFonts: [] as string[], selectionToolbar: true, ...DISPLAY_DEFAULTS, sidebarWidth: 288, spellcheck: false, tabSize: 4 }
-export type Settings = typeof DEFAULTS & Appearance & { shortcuts: Record<string, string[]> }
+export type Settings = typeof DEFAULTS & Appearance & { shortcuts: Record<string, string[]>, pinnedTabs?: string[] }
 
 const CACHE_KEY = 'rawmark.settings'
 
@@ -55,6 +55,8 @@ function sanitize(raw: Record<string, unknown>): Settings {
   return {
     locale: isLocale(raw.locale) ? raw.locale : DEFAULT_LOCALE,
     hiddenFonts,
+    // Absence permits a one-time migration from browser-only pinned tabs; an empty array is authoritative.
+    pinnedTabs: raw.pinnedTabs === undefined ? undefined : [...new Set(Array.isArray(raw.pinnedTabs) ? raw.pinnedTabs.filter((path): path is string => typeof path === 'string' && path.length > 0) : [])],
     trashRetentionDays: Number.isSafeInteger(raw.trashRetentionDays) && (raw.trashRetentionDays as number) >= 0 ? raw.trashRetentionDays as number : DEFAULTS.trashRetentionDays,
     ...sanitizeDisplaySettings(raw, customFonts.value.map(font => font.id), hiddenFonts),
     selectionToolbar: typeof raw.selectionToolbar === 'boolean' ? raw.selectionToolbar : true,
