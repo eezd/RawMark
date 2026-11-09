@@ -1,5 +1,6 @@
 """Release fixed remote sources under a repository-wide persistent lock."""
 import datetime
+from collections import deque
 import fcntl
 import hashlib
 import json
@@ -25,9 +26,34 @@ def ancestor(a,b):
 
 def select_baseline(records, branch, commit):
     same = [r for r in records if r.get('complete') and r.get('source_branch') == branch]
-    candidates = [r for r in same if ancestor(r['source_sha'],commit)]
+    if not same:
+        return None
+    parents = {}
+    for line in run('git', 'rev-list', '--parents', commit).splitlines():
+        sha, *ancestors = line.split()
+        parents[sha] = ancestors
+    distances = {commit: 0}
+    queue = deque([commit])
+    while queue:
+        sha = queue.popleft()
+        for parent in parents[sha]:
+            if parent not in distances:
+                distances[parent] = distances[sha] + 1
+                queue.append(parent)
+    candidates = [r for r in same if r['source_sha'] in distances]
     require(not same or candidates, 'Branch history no longer contains its successful baseline')
-    return min(candidates,key=lambda r:(int(run('git','rev-list','--count',r['source_sha']+'..'+commit)), -r['completed_at'],r['version'])) if candidates else None
+    return min(candidates,key=lambda r:(distances[r['source_sha']], -r['completed_at'],r['version']))
+
+
+def blocks_new_release(path):
+    record = json.loads(path.read_text())
+    if record.get('complete'):
+        return False
+    # Until the package checkpoint exists, failed checks leave only a reservation
+    # and empty drafts. Keep their identity for retries without blocking a fix.
+    return (record.get('phase') != 'building'
+            or (path.parent / record['version'] / 'packages.json').exists()
+            or bool(record.get('image_digest') or record.get('assets')))
 
 
 def release_notes(base, commit):
@@ -71,16 +97,18 @@ def execute():
     version=datetime.datetime.fromtimestamp(timestamp,datetime.timezone.utc).strftime('%Y%m%d')+'-'+commit[:8]
     records_dir=STATE/'releases'; records_dir.mkdir(exist_ok=True)
     record_path=records_dir/(version+'.json')
+    record = None
     if record_path.exists():
         record=json.loads(record_path.read_text())
         require(record['source_sha']==commit,'Version collision')
         if record.get('complete'):
             registry_login(); verify_complete(apis,record); print('Reused complete release',version); return
-    else:
-        require(not any(not json.loads(p.read_text()).get('complete') for p in records_dir.glob('*.json')),'Resolve the pending release before starting another version')
+    require(not any(p != record_path and blocks_new_release(p) for p in records_dir.glob('*.json')),
+            'Resolve the pending release before starting another version')
+    if record is None:
         require(not gitea.release(version) and not github.release(version),'Existing legacy version must not be overwritten')
         previous=select_baseline([json.loads(p.read_text()) for p in records_dir.glob('*.json')],branch,commit)
-        record={'source_branch':branch,'source_sha':commit,'version':version,'previous_tag':previous['version'] if previous else None,'notes':release_notes(previous,commit),'complete':False}
+        record={'source_branch':branch,'source_sha':commit,'version':version,'previous_tag':previous['version'] if previous else None,'notes':release_notes(previous,commit),'complete':False,'phase':'building'}
         write_json(record_path,record)
     cache=records_dir/version; cache.mkdir(exist_ok=True)
     for api in apis:
@@ -119,6 +147,8 @@ def execute():
         metadata['files'][archive_name(version, platform)]['sha256'] + '  ' + archive_name(version, platform) + '\n'
         for platform in PLATFORMS)
     require((cache/'SHA256SUMS').read_text()==checksums,'Checksum manifest conflicts')
+    record['phase'] = 'publishing'
+    write_json(record_path, record)
     for name in [*metadata['files'],'SHA256SUMS','packages.json']:
         gitea.upload(releases[0],cache/name)
     registry_login()
