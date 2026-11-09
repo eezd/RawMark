@@ -10,7 +10,7 @@ import subprocess
 import tarfile
 import urllib.parse
 
-from release import (API, GITEA_IMAGE, GITHUB_IMAGE, PLATFORMS, UPLOAD_LIMIT, clients,
+from release import (API, GITEA_IMAGE, GITHUB_IMAGE, PLATFORMS, UPLOAD_LIMIT, archive_name, clients,
                      digest, git_env, image_digest, registry_digest, registry_login,
                      require, run, verify_anonymous, write_json)
 from mirror import synchronize
@@ -115,6 +115,10 @@ def execute():
     require(metadata['commit']==commit and metadata['version']==version,'Cached build identity differs')
     for name,info in metadata['files'].items():
         require(digest(cache/name)==info['sha256'],'Cached package corrupt or missing')
+    checksums = ''.join(
+        metadata['files'][archive_name(version, platform)]['sha256'] + '  ' + archive_name(version, platform) + '\n'
+        for platform in PLATFORMS)
+    require((cache/'SHA256SUMS').read_text()==checksums,'Checksum manifest conflicts')
     for name in [*metadata['files'],'SHA256SUMS','packages.json']:
         gitea.upload(releases[0],cache/name)
     registry_login()
