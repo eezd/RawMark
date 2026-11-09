@@ -162,33 +162,16 @@ The Bearer authentication upgrade requires the frontend and backend to be releas
 - If the interface breaks after an update, first check that the frontend and backend come from the same build, then inspect browser network requests and application logs. See the [user guide](guide.md#plugins-and-interface-recovery) for plugin and appearance recovery entry points.
 - Note reads send `Cache-Control: no-store, no-transform` so proxies preserve the strong revision ETag used by conditional saves. A proxy rewriting it to a weak ETag can cause otherwise valid edits to return HTTP 412; preserve this response policy through the public ingress.
 
-## Managed DEV and formal artifacts
+## Native systemd and manual releases
 
-Personal use keeps only `/docker/gitea/dev/RawMark` running: container `RawMark-dev`, Compose project `rawmark-dev`, loopback port 21001 and public entry `https://raw.134333.xyz`. The raw-dev site is retired. DEV holds real private data; CI and isolated smoke tests use synthetic data.
+Run `bash /srv/RawMark/start.sh` to check and compile the current workspace and activate `rawmark-dev.service`. `stop.sh` stops only this service; `status.sh` reports service and build state without creating files. The non-root account is `rawmark`, listening on `127.0.0.1:21001`, behind `https://raw.134333.xyz`.
 
-Copy `deploy/compose.image.yml` to the instance as `compose.yml`, with a private mode-600 `.env` beside it. Preserve existing ownership and never mount repository examples as live data.
+Ignored `runtime/` contains immutable `builds/`, the active `current` symlink, `config/rawmark.env` (RAWMARK_DATA, RAWMARK_VAULT, RAWMARK_ADDR), persistent `data/`, and migration `backups/`. Scripts reuse the host Go, Node and pinned pnpm tools. Checks, compilation and synthetic-data smoke tests finish before activation. Failed activation restores the prior build and unit. Start and stop share `runtime/.deploy.lock`. Build metadata records the full SHA, dirty state and timestamps; uncommitted source is supported.
 
-```dotenv
-RAWMARK_CHANNEL=development
-RAWMARK_PROJECT=rawmark-dev
-RAWMARK_CONTAINER_NAME=RawMark-dev
-RAWMARK_BIND=127.0.0.1
-RAWMARK_PORT=21001
-RAWMARK_DATA_DIR=/docker/gitea/dev/RawMark/data
-RAWMARK_IMAGE=git.134333.xyz/eezd/dev/rawmark:<verified-version>
-```
+Gitea remains the source and GitHub the one-way mirror. Ordinary branch and TAG pushes only mirror Git references; they do not check, build, release or deploy. Mirroring retains scheduled reconciliation, manual recovery and the account-level ALL_GITHUB_TOKEN.
 
-Dev pushes deploy verified Gitea development version tags after checks and isolated smoke tests. Main pushes and PRs only validate. Manual formal releases publish packages and Gitea/GHCR images with GitHub mirrors; they do not create MAIN or update DEV. The instance-local controls share `.deploy.lock` with CD. Startup rejects unresolved pending deployments; stopping remains available after acquiring the lock.
+Set GITEA_TOKEN and run `bash /srv/RawMark/release.sh <remote-branch>` for an explicit formal release. The client works outside a Git workspace, pins the remote SHA, and dispatches trusted main control code. Tasks use RAWMARK_GITEA_TOKEN and ALL_GITHUB_TOKEN; candidate compilation receives neither credential. Releases run checks and build six Linux/Darwin/Windows amd64/arm64 packages plus Linux amd64/arm64 images. Original attachments are copied to Gitea/GitHub and full OCI images to GHCR with preserved digests. Releases neither merge branches nor update the local service.
 
-```bash
-bash /docker/gitea/dev/RawMark/start.sh
-bash /docker/gitea/dev/RawMark/stop.sh
-```
+Versions use the commit's UTC date and exactly eight SHA characters. Notes use the closest successful ancestor from the same source branch, or exactly `init` for the first version. Legacy releases without branch evidence are excluded as baselines. All branches publish immutable version tags; only main-source releases advance latest, without rollback on retries. Interrupted releases preserve original artifacts and durable state; retries fill gaps instead of overwriting published content.
 
-CD installs `deploy/start.sh` and `deploy/stop.sh` into the instance with mode 755 before stopping the service, on both first deployment and updates. The `.control-scripts.json` receipt tracks installed hashes; local edits or unrecognized existing scripts require review before deployment and are never silently overwritten. Initial manual setup can copy these two files after checking any existing entries.
-
-Controls explicitly load `.env`, followed by `images.env` when present. Application and Compose variables from the caller cannot override those files; only PATH, HOME and the listed Docker client connection/configuration variables are retained. RawMark CD stores its verified image in `.env`; no separate `images.env` is needed. Startup reuses local images with `--no-build --pull never`; stopping preserves containers, networks, volumes and data. A successful start command means Compose accepted startup; use container health to confirm readiness.
-
-Deployment stops the service and backs up complete data, including SQLite WAL, configuration and previous-image details before writing `deployment.pending.json`. Successful health checks write `deployment.json` and clear pending. A failed candidate is stopped while its backup and pending record remain; no automatic data restore or program downgrade occurs. Recovery and private-data migration require explicit authorization and compatibility review. Never run two instances sharing writable data.
-
-Domain changes require public, CDN and TLS validation while preserving resource-ticket log redaction. DNS remains user-managed.
+After migration the old Docker container is stopped with automatic restart disabled. Its data, deployment directory and backups remain under `/docker/gitea/dev/RawMark`. Once the new instance has accepted writes, reconcile those writes before reverting to the old copy. Never commit runtime configuration or migration backups.
