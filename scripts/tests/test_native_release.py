@@ -29,8 +29,11 @@ class NativeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             script=Path(__file__).resolve().parents[2]/'status.sh'
             target=Path(d)/'status.sh';target.write_bytes(script.read_bytes())
-            result=subprocess.run(['bash',str(target)],capture_output=True)
-            self.assertNotEqual(result.returncode,0)
+            import os
+            binary=Path(d)/'systemctl'
+            binary.write_text('#!/bin/sh\nexit 3\n');binary.chmod(0o755)
+            result=subprocess.run(['bash',str(target)],capture_output=True,env={**os.environ,'PATH':d+':'+os.environ['PATH']})
+            self.assertEqual(result.returncode,3)
             self.assertFalse((Path(d)/'runtime').exists())
 
 class SelectionTests(unittest.TestCase):
