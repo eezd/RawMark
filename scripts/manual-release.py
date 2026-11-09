@@ -115,6 +115,8 @@ def execute():
     require(metadata['commit']==commit and metadata['version']==version,'Cached build identity differs')
     for name,info in metadata['files'].items():
         require(digest(cache/name)==info['sha256'],'Cached package corrupt or missing')
+    checksums=''.join(f'{metadata["files"]["RawMark_"+version+"_"+platform.replace("/","_")+(".zip" if platform.startswith("windows/") else ".tar.gz")]["sha256"]}  RawMark_{version}_{platform.replace("/","_")}{".zip" if platform.startswith("windows/") else ".tar.gz"}\n' for platform in PLATFORMS)
+    require((cache/'SHA256SUMS').read_text()==checksums,'Checksum manifest conflicts')
     for name in [*metadata['files'],'SHA256SUMS','packages.json']:
         gitea.upload(releases[0],cache/name)
     registry_login()

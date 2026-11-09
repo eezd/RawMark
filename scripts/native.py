@@ -121,10 +121,10 @@ def activate(candidate):
         subprocess.run(['systemctl','stop',UNIT],check=True)
         if old: link(old)
         else: current.unlink(missing_ok=True)
+        if not enabled: subprocess.run(['systemctl','disable',UNIT],check=True)
         if old_unit: unit.write_bytes(old_unit)
         else: unit.unlink(missing_ok=True)
         run('systemctl','daemon-reload')
-        if not enabled: subprocess.run(['systemctl','disable',UNIT],check=True)
         if active:
             run('systemctl','start',UNIT); healthy(old)
         raise
