@@ -44,12 +44,12 @@ class SelectionTests(unittest.TestCase):
         self.assertIsNone(manual.select_baseline([r],'dev','b'))
     def test_rewritten_branch_cannot_look_like_first_release(self):
         r={'complete':True,'source_branch':'dev','source_sha':'a','completed_at':1,'version':'v'}
-        with patch.object(manual,'ancestor',return_value=False):
+        with patch.object(manual,'run',return_value='b'):
             with self.assertRaisesRegex(ValueError,'baseline'):manual.select_baseline([r],'dev','b')
     def test_closest_ancestor_wins(self):
         records=[{'complete':True,'source_branch':'dev','source_sha':c,'completed_at':1,'version':c} for c in ('a','b')]
-        with patch.object(manual,'ancestor',return_value=True),patch.object(manual,'run',side_effect=['5','1']):
-            self.assertEqual(manual.select_baseline(records,'dev','c')['source_sha'],'b')
+        with patch.object(manual,'run',return_value='c a\na b\nb'):
+            self.assertEqual(manual.select_baseline(records,'dev','c')['source_sha'],'a')
 if __name__=='__main__':unittest.main()
 
 class ClientTests(unittest.TestCase):
