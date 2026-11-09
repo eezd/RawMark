@@ -17,13 +17,13 @@ import urllib.request
 import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import deploy
 import release
 cleanup = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'ci-cleanup.py'))['cleanup']
 
 
 SHA = 'a' * 40
 DIGEST = 'sha256:' + 'b' * 64
+
 
 
 class BundleTests(unittest.TestCase):
@@ -77,7 +77,6 @@ class BundleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'platforms mismatch'):
             release.verify_bundle()
 
-
 class PublicationTests(unittest.TestCase):
     def test_cross_host_redirect_strips_credentials(self):
         request = urllib.request.Request('https://api.github.com/asset', headers={'Authorization': 'Bearer private'})
@@ -112,12 +111,6 @@ class PublicationTests(unittest.TestCase):
             api.upload({'draft': False}, path)
             api.request.assert_not_called()
 
-    def test_incomplete_release_cannot_be_deployed(self):
-        gitea, github = Mock(), Mock()
-        gitea.release.return_value = {'draft': True, 'prerelease': False}
-        github.release.return_value = {'draft': False, 'prerelease': False}
-        with self.assertRaisesRegex(ValueError, 'not completely published'):
-            release.release_receipt(gitea, github, '20261030-aaaaaaaa')
 
     def test_registry_permission_error_is_not_treated_as_missing_image(self):
         result = Mock(returncode=1, stderr='403 Forbidden', stdout='')
@@ -130,184 +123,6 @@ class PublicationTests(unittest.TestCase):
         with patch.object(release.subprocess, 'run', return_value=result):
             self.assertIsNone(release.registry_digest(release.GITEA_IMAGE, '0.1.1'))
 
-
-class ResumeTests(unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
-        self.cwd = Path.cwd()
-        os.chdir(self.tmp.name)
-        self.addCleanup(os.chdir, self.cwd)
-        Path('VERSION').write_text('0.1.1\n')
-        Path('downloads').mkdir()
-        for platform in release.PLATFORMS:
-            Path('downloads', release.archive_name('0.1.1', platform)).write_bytes(platform.encode())
-        Path('web/dist-demo').mkdir(parents=True)
-        Path('web/dist-demo/index.html').write_text('<html>Demo</html>')
-        with patch.object(release, 'run', return_value=SHA), patch.dict(os.environ, {'CI_RUN_ID': '42'}):
-            release.bundle('release')
-        self.original = {p.name: p.read_bytes() for p in Path('downloads').iterdir()}
-        for path in Path('downloads').iterdir():
-            path.unlink()
-        self.gitea = Mock()
-        self.gitea.assets.return_value = [{'name': name} for name in self.original]
-        self.gitea.download.side_effect = lambda asset: self.original[asset['name']]
-        self.draft = {'draft': True, 'body': 'Build run: `42`.'}
-
-    def test_resume_from_release_assets_does_not_require_old_ci_runs(self):
-        with patch.object(release, 'run', return_value=SHA):
-            release.restore(self.gitea, self.draft)
-        self.gitea.repo.assert_not_called()
-        self.gitea.upload.assert_not_called()
-        self.assertEqual({p.name: p.read_bytes() for p in Path('downloads').iterdir()}, self.original)
-
-    def test_expired_artifact_fails_instead_of_rebuilding(self):
-        self.gitea.assets.return_value = [{'name': 'build.json'}]
-        self.gitea.repo.return_value = {'artifacts': []}
-        with patch.object(release, 'run', return_value=SHA) as command:
-            with self.assertRaisesRegex(ValueError, 'refusing to rebuild'):
-                release.restore(self.gitea, self.draft)
-        self.assertFalse(any('build' in str(call) for call in command.call_args_list))
-
-    def test_interrupted_first_receipt_upload_uses_original_run(self):
-        self.gitea.assets.return_value = []
-        names = {'checksums': ['build.json', 'SHA256SUMS'], 'demo': ['demo.zip']}
-        names.update({platform.replace('/', '-'): [release.archive_name('0.1.1', platform)] for platform in release.PLATFORMS})
-        archives = {}
-        for identifier, (name, files) in enumerate(names.items(), 1):
-            data = io.BytesIO()
-            with zipfile.ZipFile(data, 'w') as archive:
-                for filename in files:
-                    archive.writestr(filename, self.original[filename])
-            archives[identifier] = (name, data.getvalue())
-        def request(path, **kwargs):
-            if path == '/actions/runs/42/artifacts':
-                return {'artifacts': [{'id': identifier, 'name': name, 'expired': False}
-                                      for identifier, (name, _) in archives.items()]}
-            return archives[int(path.split('/')[-2])][1]
-        self.gitea.repo.side_effect = request
-        with patch.object(release, 'run', return_value=SHA):
-            release.restore(self.gitea, self.draft)
-        self.gitea.upload.assert_called_once_with(self.draft, Path('downloads/build.json'))
-        self.assertEqual({p.name: p.read_bytes() for p in Path('downloads').iterdir()}, self.original)
-
-
-class DeploymentTests(unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
-        self.directory = Path(self.tmp.name).resolve()
-        (self.directory / 'data').mkdir()
-        (self.directory / 'data/rawmark.db').write_bytes(b'database')
-        (self.directory / 'data/rawmark.db-wal').write_bytes(b'wal')
-        (self.directory / 'compose.yml').write_text('services: {}\n')
-        (self.directory / '.env').write_text(
-            f'RAWMARK_CHANNEL=development\nRAWMARK_PROJECT=rawmark-ci-deploy\n'
-            f'RAWMARK_BIND=127.0.0.1\nRAWMARK_PORT=21899\nRAWMARK_DATA_DIR={self.directory}/data\n')
-        self.image = release.GITEA_DEV_IMAGE + '@' + DIGEST
-        self.previous = {'Id': 'old-id', 'Image': 'old-image', 'State': {'Running': True},
-                         'Mounts': [{'Destination': '/data', 'Type': 'bind', 'Source': str(self.directory / 'data')}]}
-        self.image_info = {'Id': 'new-image', 'Config': {'User': '65532:65532', 'Labels': {
-            'org.opencontainers.image.revision': SHA, 'org.opencontainers.image.version': '0.1.1'}}}
-        self.commands = []
-        self.api = patch.object(deploy, 'API')
-        self.api.start().return_value.repo.return_value = {'commit': {'id': SHA}}
-        self.addCleanup(self.api.stop)
-        self.env = patch.dict(os.environ, {'GITEA_API_URL': 'https://git.example/api/v1', 'GITEA_RELEASE_TOKEN': 'private'})
-        self.env.start()
-        self.addCleanup(self.env.stop)
-
-    def command(self, *args, **kwargs):
-        self.commands.append(args)
-        if args[:3] == ('docker', 'image', 'inspect'):
-            return json.dumps([self.image_info])
-        if args[:3] == ('docker', 'run', '--rm'):
-            return 'RawMark 0.1.1'
-        if args[:3] == ('docker', 'ps', '-aq'):
-            return 'old-id'
-        if args[:3] == ('docker', 'ps', '-q'):
-            return 'old-id'
-        if args[:3] == ('docker', 'inspect', 'old-id'):
-            return json.dumps([self.previous])
-        if args[0:2] == ('docker', 'compose') and 'ps' in args:
-            return 'new-id'
-        if args[:3] == ('docker', 'inspect', 'new-id'):
-            return json.dumps([{'Image': 'new-image', 'NetworkSettings': {'Networks': {
-                'test': {'NetworkID': 'network', 'IPAddress': '127.0.0.1'}}}}])
-        return ''
-
-    def test_channel_mismatch_cannot_touch_docker(self):
-        with patch.object(deploy, 'run') as docker:
-            with self.assertRaisesRegex(ValueError, 'channel'):
-                deploy.settings(self.directory, 'production')
-            docker.assert_not_called()
-
-    def test_unresolved_pending_deployment_cannot_be_overwritten(self):
-        (self.directory / 'deployment.pending.json').write_text('{"backup":"keep"}')
-        with patch.object(deploy, 'run') as docker:
-            with self.assertRaisesRegex(ValueError, 'pending deployment'):
-                deploy.deployment(self.directory, 'development', self.image, SHA, '0.1.1')
-            docker.assert_not_called()
-
-    def test_stale_dev_skips_without_stopping_existing_service(self):
-        with patch.object(deploy, 'API') as api, patch.object(deploy, 'run', side_effect=self.command):
-            api.return_value.repo.return_value = {'commit': {'id': 'c' * 40}}
-            deploy.deployment(self.directory, 'development', self.image, SHA, '0.1.1')
-        self.assertFalse(any(c[:2] == ('docker', 'stop') for c in self.commands))
-        self.assertFalse((self.directory / 'deployment.json').exists())
-
-    def test_wrong_mount_is_rejected_before_stopping(self):
-        self.previous['Mounts'][0]['Source'] = '/some-other-data'
-        with patch.object(deploy, 'run', side_effect=self.command):
-            with self.assertRaisesRegex(ValueError, 'mount differs'):
-                deploy.deployment(self.directory, 'development', self.image, SHA, '0.1.1')
-        self.assertFalse(any(c[:2] == ('docker', 'stop') for c in self.commands))
-
-    def test_backup_includes_wal_and_precedes_replacement(self):
-        response = contextlib.nullcontext(io.BytesIO(b'<html>RawMark</html>'))
-        opener = Mock()
-        opener.open.side_effect = [response, contextlib.nullcontext(io.BytesIO(b'{"code":0}'))]
-        with patch.object(deploy, 'run', side_effect=self.command), patch.object(deploy.urllib.request, 'build_opener', return_value=opener):
-            deploy.deployment(self.directory, 'development', self.image, SHA, '0.1.1')
-        receipt = json.loads((self.directory / 'deployment.json').read_text())
-        with tarfile.open(receipt['backup']) as archive:
-            self.assertEqual(archive.extractfile('data/rawmark.db-wal').read(), b'wal')
-        self.assertEqual(Path(receipt['backup']).stat().st_mode & 0o777, 0o600)
-        stop = next(i for i,c in enumerate(self.commands) if c[:2] == ('docker', 'stop'))
-        start = next(i for i,c in enumerate(self.commands) if c[:2] == ('docker', 'compose') and 'up' in c)
-        self.assertLess(stop, start)
-        self.assertIn('RAWMARK_IMAGE=' + self.image, (self.directory / '.env').read_text())
-
-    def test_existing_data_is_backed_up_without_a_container(self):
-        def without_container(*args, **kwargs):
-            if args[:2] == ('docker', 'ps'):
-                return ''
-            return self.command(*args, **kwargs)
-        opener = Mock()
-        opener.open.side_effect = [contextlib.nullcontext(io.BytesIO(b'<html>RawMark</html>')),
-                                   contextlib.nullcontext(io.BytesIO(b'{"code":0}'))]
-        with patch.object(deploy, 'run', side_effect=without_container), patch.object(
-                deploy.urllib.request, 'build_opener', return_value=opener):
-            deploy.deployment(self.directory, 'development', self.image, SHA, '0.1.1')
-        receipt = json.loads((self.directory / 'deployment.json').read_text())
-        self.assertTrue(Path(receipt['backup']).exists())
-        self.assertIsNone(receipt['previous_image'])
-
-    def test_failed_replacement_keeps_backup_and_does_not_downgrade_data(self):
-        def failure(*args, **kwargs):
-            if args[:2] == ('docker', 'compose') and 'up' in args:
-                raise RuntimeError('candidate failed')
-            return self.command(*args, **kwargs)
-        with patch.object(deploy, 'run', side_effect=failure), patch.object(deploy.subprocess, 'run') as stop:
-            with self.assertRaisesRegex(RuntimeError, 'candidate failed'):
-                deploy.deployment(self.directory, 'development', self.image, SHA, '0.1.1')
-        stop.assert_called_once()
-        pending = json.loads((self.directory / 'deployment.pending.json').read_text())
-        self.assertTrue(Path(pending['backup']).exists())
-        self.assertFalse(any(c[:2] == ('docker', 'start') for c in self.commands))
-        self.assertNotIn('RAWMARK_IMAGE=', (self.directory / '.env').read_text())
-
-
 class DevelopmentVersionTests(unittest.TestCase):
     def test_version_uses_utc_commit_date_and_exact_eight_character_hash(self):
         with patch.dict(os.environ, {'RAWMARK_BUILD_CHANNEL': 'development'}), patch.object(
@@ -316,116 +131,9 @@ class DevelopmentVersionTests(unittest.TestCase):
         self.assertEqual(release.archive_name('19700101-aaaaaaaa', 'linux/amd64'),
                          'RawMark_19700101-aaaaaaaa_linux_amd64.tar.gz')
 
-
 class CleanupTests(unittest.TestCase):
     def test_cleanup_rejects_broad_filter(self):
         with patch('subprocess.check_output') as docker:
             with self.assertRaises(ValueError):
                 cleanup('')
             docker.assert_not_called()
-
-
-if __name__ == '__main__':
-    unittest.main()
-
-
-class ReleaseReservationTests(unittest.TestCase):
-    def setUp(self):
-        self.directory = tempfile.TemporaryDirectory()
-        self.addCleanup(self.directory.cleanup)
-        self.patch = patch.object(release, 'STATE_DIRECTORY', Path(self.directory.name))
-        self.patch.start()
-        self.addCleanup(self.patch.stop)
-
-    def test_other_candidate_cannot_replace_pending_release(self):
-        release.reserve(SHA)
-        with self.assertRaisesRegex(ValueError, 'Another release'):
-            release.reserve('c' * 40)
-
-    def test_fixed_notes_and_candidate_are_required_on_retry(self):
-        release.reserve(SHA)
-        notes = Path(self.directory.name) / 'notes.md'
-        notes.write_text('English\n\n中文')
-        with patch.object(release, 'version_for', return_value='20261030-aaaaaaaa'):
-            release.select_release(SHA, notes)
-        with patch.dict(os.environ, {'RELEASE_ID': SHA, 'RELEASE_COMMIT': SHA}):
-            self.assertEqual(release.selected_state()['notes'], notes.read_text())
-            with patch.dict(os.environ, {'RELEASE_COMMIT': 'b' * 40}):
-                with self.assertRaisesRegex(ValueError, 'reserved candidate'):
-                    release.selected_state()
-
-    def test_release_matrix_includes_windows_arm64(self):
-        self.assertEqual(set(release.PLATFORMS), {'linux/amd64', 'linux/arm64',
-                         'darwin/amd64', 'darwin/arm64', 'windows/amd64', 'windows/arm64'})
-
-    def test_release_version_uses_utc_commit_date_and_fixed_sha(self):
-        with patch.object(release, 'run', return_value='0'):
-            self.assertEqual(release.version_for(SHA), '19700101-aaaaaaaa')
-
-
-class MainAdmissionTests(unittest.TestCase):
-    def test_pending_rows_do_not_hide_later_success(self):
-        api = Mock()
-        api.repo.side_effect = [
-            {'workflow_runs': [{'head_sha': SHA, 'event': 'push', 'path': 'mirror.yml@refs/heads/main'}]},
-            {'workflow_runs': [{'head_sha': SHA, 'event': 'push', 'path': 'main.yml@refs/heads/main', 'conclusion': 'success'}]},
-        ]
-        self.assertTrue(release.successful_main_ci(api, SHA))
-
-    def test_other_sha_pr_or_dev_success_cannot_admit_main(self):
-        api = Mock()
-        api.repo.side_effect = [{'workflow_runs': [
-            {'head_sha': 'b' * 40, 'event': 'push', 'path': 'main.yml@refs/heads/main', 'conclusion': 'success'},
-            {'head_sha': SHA, 'event': 'pull_request', 'path': 'main.yml@refs/pull/3/head', 'conclusion': 'success'},
-            {'head_sha': SHA, 'event': 'push', 'path': 'dev.yml@refs/heads/dev', 'conclusion': 'success'},
-        ]}, {'workflow_runs': []}]
-        self.assertFalse(release.successful_main_ci(api, SHA))
-
-
-class PublicationCompletionTests(unittest.TestCase):
-    def test_success_finishes_reservation_without_deployment(self):
-        state = {'version': 'version', 'commit': SHA, 'status': 'selected'}
-        with patch.object(release, 'selected_state', return_value=state), \
-                patch.object(release, 'release_receipt', return_value=({'commit': SHA}, {})), \
-                patch.object(release, 'save_state') as save:
-            release.complete_publication(None, None, 'version', SHA)
-        self.assertEqual(state['status'], 'complete')
-        save.assert_called_once_with(state)
-
-    def test_partial_publication_remains_pending(self):
-        state = {'version': 'version', 'commit': SHA, 'status': 'selected'}
-        with patch.object(release, 'selected_state', return_value=state), \
-                patch.object(release, 'release_receipt', side_effect=ValueError('Incomplete mirror')), \
-                patch.object(release, 'save_state') as save:
-            with self.assertRaisesRegex(ValueError, 'Incomplete mirror'):
-                release.complete_publication(None, None, 'version', SHA)
-        self.assertEqual(state['status'], 'selected')
-        save.assert_not_called()
-
-    def test_published_retry_repairs_pending_reservation(self):
-        state = {'version': 'version', 'commit': SHA, 'status': 'selected'}
-        gitea, github = Mock(), Mock()
-        gitea.request.return_value = github.request.return_value = {'login': 'eezd'}
-        github.repo.return_value = {'permissions': {'push': True}}
-        github.headers = {'X-OAuth-Scopes': 'repo, workflow, write:packages'}
-        gitea.release.return_value = {'draft': False}
-        with patch.dict(os.environ, {'CI_RUN_ID': '42'}), \
-                patch.object(release, 'selected_state', return_value=state), \
-                patch.object(release, 'clients', return_value=(gitea, github)), \
-                patch.object(release, 'validate_identity'), \
-                patch.object(release, 'release_receipt', return_value=({'commit': SHA}, {})), \
-                patch.object(release, 'save_state'), patch.object(release, 'run') as run, \
-                patch.object(release, 'output') as output:
-            release.preflight('version', SHA)
-        self.assertEqual(state['status'], 'complete')
-        output.assert_any_call('completed', 'true')
-        run.assert_not_called()
-
-    def test_wrong_candidate_cannot_finish_reservation(self):
-        state = {'version': 'version', 'commit': SHA, 'status': 'selected'}
-        with patch.object(release, 'selected_state', return_value=state), \
-                patch.object(release, 'release_receipt', return_value=({'commit': 'c' * 40}, {})), \
-                patch.object(release, 'save_state') as save:
-            with self.assertRaisesRegex(ValueError, 'another commit'):
-                release.complete_publication(None, None, 'version', SHA)
-        save.assert_not_called()

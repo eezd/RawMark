@@ -1,7 +1,7 @@
 {
   "demo_notice": "Editor preview only. Changes are not saved; refreshing restores the sample.",
   "retry_b8784c": "Retry",
-  "fonts_could_not_be_loaded_42a574": "Fonts could not be loaded. Check your connection and refresh the page.",
+  "fonts_could_not_be_loaded_42a574": "Some fonts could not be loaded. Using fallback fonts; refresh to try again.",
   "refresh_page_9366e1": "Refresh page",
   "invalid_font_catalog_b577df": "Invalid font catalog",
   "manrope_sans_serif_a8923c": "Manrope · Sans serif",

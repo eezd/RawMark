@@ -156,17 +156,19 @@ func TestSettingsPackageRoundTripMergesResourcesAndPreservesAccount(t *testing.T
 func TestResetPreferencesPreservesPluginDataAndCredentials(t *testing.T) {
 	f := newFixture(t)
 	f.write("note.md", "source")
-	f.store.SetSetting(settingsKey, `{"fontSize":24,"trashRetentionDays":0}`)
+	f.store.SetSetting(settingsKey, `{"fontSize":24,"trashRetentionDays":0,"pinnedTabs":["note.md"]}`)
 	f.store.SetSetting(pluginEnabledKey, `{"example":true}`)
 	f.store.SetSetting("plugin.data.example", `{"important":"content"}`)
 	if status := f.status(f.admin, "POST", "/api/v1/maintenance/settings/reset", `{"confirmed":false}`, nil); status != 400 {
 		t.Fatal(status)
 	}
 	assertOK(t, f.do(f.admin, "POST", "/api/v1/maintenance/settings/reset", `{"confirmed":true}`, nil))
-	for _, key := range []string{settingsKey, pluginEnabledKey} {
-		if _, ok, err := f.store.Setting(key); err != nil || ok {
-			t.Fatalf("未重置 %s", key)
-		}
+	if _, ok, err := f.store.Setting(pluginEnabledKey); err != nil || ok {
+		t.Fatal("插件启用状态未重置")
+	}
+	settings := decode[map[string]json.RawMessage](t, f.do(f.admin, "GET", "/api/v1/settings", "", nil))
+	if len(settings) != 1 || string(settings["pinnedTabs"]) != "[]" {
+		t.Fatalf("重置必须清空固定标签并阻止旧设备再次迁移: %v", settings)
 	}
 	if value, ok, err := f.store.Setting("plugin.data.example"); err != nil || !ok || value != `{"important":"content"}` {
 		t.Fatal("插件数据丢失")

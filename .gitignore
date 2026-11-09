@@ -34,3 +34,6 @@ deploy/data/**/*.log
 # Repository-maintained tool rules (other local skills stay untracked)
 .agents/skills/*
 !.agents/skills/v3-*/
+
+# Native instance and isolated build outputs
+runtime/

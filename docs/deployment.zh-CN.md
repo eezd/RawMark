@@ -146,7 +146,7 @@ docker run -d --name rawmark --restart unless-stopped \
 
 1. 确认目标版本的行为和数据兼容性，保留当前镜像及部署配置。
 2. 停止旧服务，备份应用数据与外置笔记库。
-3. 拉取选定的预构建镜像摘要，使用同一份挂载启动新实例；源码构建仅供贡献者选择，不用于托管生产更新。不要并行运行新旧服务。
+3. 拉取选定的预构建镜像版本标签，使用同一份挂载启动新实例；源码构建仅供贡献者选择，不用于托管生产更新。不要并行运行新旧服务。
 4. 核对容器健康、登录、笔记与附件。回退时使用配套的旧镜像与数据备份。
 
 Bearer 认证升级需要前后端一起发布。旧 Cookie 页面不能继续使用，需重新登录；启动程序会沿现有 SQLite 初始化流程创建资源票据表和索引，笔记、密码、设置与已有 API 令牌保留。第三方客户端的 JSON 解包方式须遵循[当前协议](api.zh-CN.md)。
@@ -162,24 +162,16 @@ Bearer 认证升级需要前后端一起发布。旧 Cookie 页面不能继续�
 - 更新后界面异常先核对前后端是否来自同一构建，再查看浏览器网络请求和应用日志；插件与外观恢复入口见[使用指南](guide.zh-CN.md#插件与界面恢复)。
 - 笔记读取返回 `Cache-Control: no-store, no-transform`，防止代理改写条件保存使用的强版本 ETag。代理将其改为弱 ETag 可能导致正常编辑返回 HTTP 412；公网入口须保留该响应策略。
 
-## DEV 托管与正式产物
+## 本地 systemd 与手动发布
 
-个人使用只保留 `/docker/gitea/dev/RawMark` 常驻实例，容器 `RawMark-dev`、Compose 项目 `rawmark-dev`、端口 `127.0.0.1:21001`，入口 `https://raw.134333.xyz`。raw-dev 站点停用。实例持有真实用户数据，CI 和隔离冒烟只使用合成数据。
+日常使用 `bash /srv/RawMark/start.sh` 编译当前工作区并更新 `rawmark-dev.service`；`stop.sh` 只停止服务，`status.sh` 只读显示服务及构建状态。运行账号为 `rawmark`，监听 `127.0.0.1:21001`，现有入口为 `https://raw.134333.xyz`。
 
-将 `deploy/compose.image.yml` 复制为实例 `compose.yml`，旁边放权限 600 的私有 `.env`。不要覆盖已有数据所有权或挂载仓库示例作为真实数据。
+`runtime/` 不入库：`builds/` 保存独立构建，`current` 指向活动产物，`config/rawmark.env` 配置 RAWMARK_DATA、RAWMARK_VAULT、RAWMARK_ADDR，`data/` 保存数据库、笔记和附件，`backups/` 保存迁移备份。脚本使用宿主 Go、Node 和锁定 pnpm，不安装全局工具链。候选检查、构建和合成数据冒烟通过后才切换服务；失败恢复旧产物和 unit。启停共用 `runtime/.deploy.lock`，构建记录包含完整 SHA、dirty 状态和时间。本地构建允许未提交源码。
 
-```dotenv
-RAWMARK_CHANNEL=development
-RAWMARK_PROJECT=rawmark-dev
-RAWMARK_CONTAINER_NAME=RawMark-dev
-RAWMARK_BIND=127.0.0.1
-RAWMARK_PORT=21001
-RAWMARK_DATA_DIR=/docker/gitea/dev/RawMark/data
-RAWMARK_IMAGE=git.134333.xyz/eezd/dev/rawmark@sha256:<已验证摘要>
-```
+Gitea 是源，GitHub 是单向镜像。main/dev 和 TAG 普通 push 只同步 Git 引用；不触发测试、构建、发布或部署。Git 镜像沿用账号级 `ALL_GITHUB_TOKEN`，具备定时对账和手动入口。
 
-DEV push 检查及隔离验收通过后自动部署 Gitea 开发镜像；main push 与 PR 只检查。正式 Release 手动发布程序包、Gitea/GHCR 镜像及 GitHub 镜像，不创建 MAIN 或更新 DEV。`/docker/gitea/dev/manage.sh start|stop` 批量管理一级项目，共用实例 `.deploy.lock`，pending 未处理时拒绝启动。
+正式发布使用 `GITEA_TOKEN` 环境变量及 `bash /srv/RawMark/release.sh <远端分支>`。该脚本可脱离本地仓库运行，只固定远端 SHA，并从可信 main 调度手动工作流。任务使用 `RAWMARK_GITEA_TOKEN`、`ALL_GITHUB_TOKEN`；候选编译不注入这些凭据。发布执行检查，构建 Linux/Darwin/Windows 的 amd64/arm64 六个包和 Linux 双架构镜像，同步相同附件至 Gitea/GitHub、相同 OCI 摘要至 GHCR。不合并分支，不更新本地服务。
 
-部署停止服务后备份完整数据（含 SQLite WAL）、配置和旧镜像信息，再写入 `deployment.pending.json`；健康检查通过才写入 `deployment.json` 并清除 pending。候选失败时停止候选、保留备份，不自动降级程序或恢复数据库。恢复和私人数据迁移需明确授权及兼容性核查；不得同时运行共享可写数据的新旧实例。
+版本为提交 UTC 日期加固定八位哈希。说明基于同分支最近成功祖先版本；首发正文为 `init`，历史缺少分支记录的版本不作为基线。所有分支发布固定版本标签，只有 main 来源版本推进 latest，旧版本重试不倒退。失败保留原件和持久发布记录，只补缺口；不得重建覆盖已有版本。
 
-域名切换须验证公网、CDN 与 TLS，并保留资源票据日志脱敏。DNS 由用户管理。
+旧 Docker 实例在迁移后停止并关闭自动重启，保留 `/docker/gitea/dev/RawMark`、原数据和备份。若新实例已有写入，不可直接启动旧数据副本回退；先停服并处理新增数据。迁移备份及运行配置不得提交到 Git。

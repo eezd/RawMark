@@ -29,7 +29,7 @@ import { CanceledError, isCancel } from 'axios'
 import { nextTick, reactive, watch } from 'vue'
 import { ApiError } from '@/http/axios'
 import { pinia } from '@/pinia'
-import { useSettingsStore } from '@/pinia/stores/settings'
+import { SettingsAppearanceError, useSettingsStore } from '@/pinia/stores/settings'
 import { useUserStore } from '@/pinia/stores/user'
 import { drafts } from './drafts'
 import { createEditorState, insertImageFiles, languageCompartment, pasteImages, pluginCompartment, pluginEditorExtensions, pluginLanguage, preferencesCompartment, previewCompartment, previewExtensions } from './editor'
@@ -38,7 +38,7 @@ import { editorLocale, localeCompartment } from './editor/locale'
 import { editorCommands } from './editor/shortcuts'
 import { refreshMetadata } from './metadata'
 
-const { loadSettings, settings } = useSettingsStore(pinia)
+const { loadSettings, settings, updateSettings } = useSettingsStore(pinia)
 
 export type TabStatus = 'loading' | 'ready' | 'conflict' | 'deleted' | 'error'
 
@@ -515,32 +515,87 @@ export function revealPending(v: EditorView, path: string): boolean {
 
 // ---- Tabs ----
 
-export async function openNote(path: string) {
+export async function openNote(path: string, options?: { background?: boolean }) {
   const version = user.getSessionVersion()
-  ws.view = 'notes'
-  ws.images = null
-  ws.sidebarOpen = false
+  const epoch = workspaceEpoch
+  if (!options?.background) {
+    ws.view = 'notes'
+    ws.images = null
+    ws.sidebarOpen = false
+  }
   // New tree notes appear optimistically; wait for actual creation before reading them.
   const pending = creating.get(path)
   if (pending && !(await pending)) return
   user.assertSession(version)
   if (tabOf(path)) {
-    ws.active = path
+    if (!options?.background) ws.active = path
     return
   }
-  const tab: Tab = { path, rev: '', status: 'loading', dirty: false }
+  const tab = reactive<Tab>({ path, pinned: settings.pinnedTabs?.includes(path) ?? false, rev: '', status: 'loading', dirty: false })
   ws.tabs.push(tab)
-  ws.active = path
+  if (!options?.background) ws.active = path
   try {
     const { content, rev } = await readNoteFile(path)
+    user.assertSession(version)
+    if (epoch !== workspaceEpoch || tabOf(path) !== tab) return
     editorStates.set(path, buildState(path, content))
     const t = tabOf(path)
     if (t) Object.assign(t, { rev, status: 'ready' })
   } catch (err) {
     if (isCancel(err)) return
+    if (epoch !== workspaceEpoch || tabOf(path) !== tab) return
     const t = tabOf(path)
     if (t) t.status = 'error'
     toast(translate('workspace.could_not_open_0ed1e1', { p0: errorText(err) }))
+  }
+}
+
+async function syncPinnedTabs() {
+  if (settings.pinnedTabs === undefined) return
+  const pinned = new Set(settings.pinnedTabs)
+  for (const tab of ws.tabs) tab.pinned = pinned.has(tab.path)
+  // Remote unpins never close tabs or discard local drafts, and remote pins never steal focus.
+  const notes = new Set(ws.entries.filter(entry => !entry.dir && entry.path.endsWith(NOTE_EXT)).map(entry => entry.path))
+  await Promise.all([...pinned].filter(path => notes.has(path) && !tabOf(path)).map(path => openNote(path, { background: true })))
+}
+
+async function syncSettings() {
+  await loadSettings()
+  await syncPinnedTabs()
+}
+
+async function savePinnedTabs(paths: string[]): Promise<boolean> {
+  try {
+    const saving = updateSettings({ pinnedTabs: paths })
+    for (const tab of ws.tabs) tab.pinned = paths.includes(tab.path)
+    await saving
+    return true
+  } catch (err) {
+    if (isCancel(err)) return false
+    if (err instanceof SettingsAppearanceError) {
+      toast(err.message)
+      return true
+    }
+    toast(translate('common.could_not_save_settings_1cdd7f', { p0: err instanceof Error ? err.message : errorText(err) }))
+    try {
+      await syncSettings()
+    } catch (reload) {
+      if (!isCancel(reload)) toast(translate('workspace.could_not_synchronize_settings_7e5bb1', { p0: errorText(reload) }))
+    }
+    return false
+  }
+}
+
+export async function toggleTabPin(path: string) {
+  if (!tabOf(path)) return
+  const pinned = settings.pinnedTabs ?? ws.tabs.filter(tab => tab.pinned).map(tab => tab.path)
+  await savePinnedTabs(pinned.includes(path) ? pinned.filter(p => p !== path) : [...pinned, path])
+}
+
+async function remapPinnedTabs(from: string, to: string) {
+  const pinned = settings.pinnedTabs
+  if (pinned?.some(path => remapPath(path, from, to) !== null)) {
+    await savePinnedTabs(pinned.map(path => remapPath(path, from, to) ?? path))
   }
 }
 
@@ -574,6 +629,19 @@ export async function closeTab(path: string): Promise<boolean> {
     }
     if (tabOf(path) !== tab || slot(path).seq !== seq || busy()) return false
     toast(translate('workspace.unsaved_changes_retained_as_a_8cb2ab'))
+  }
+  if (tab.pinned) {
+    const seq = slot(path).seq
+    const pinned = settings.pinnedTabs ?? ws.tabs.filter(tab => tab.pinned).map(tab => tab.path)
+    if (!(await savePinnedTabs(pinned.filter(p => p !== path)))) return false
+    user.assertSession(version)
+    if (!ws.tabs.includes(tab)) return true
+    // Saving the pin is asynchronous; retain a tab changed by new input or another operation while it was pending.
+    if (tab.path !== path || slot(path).seq !== seq || busy()) {
+      const current = settings.pinnedTabs ?? ws.tabs.filter(tab => tab.pinned).map(tab => tab.path)
+      if (!current.includes(tab.path)) await savePinnedTabs([...current, tab.path])
+      return false
+    }
   }
   const index = ws.tabs.indexOf(tab)
   if (index < 0) return true
@@ -875,6 +943,8 @@ export async function move(from: string, to: string, errorOwner: 'operation' | '
     } finally {
       paused.forEach(s => s.paused--)
     }
+    await remapPinnedTabs(from, to)
+    user.assertSession(version)
     // The server rewrites image links when renaming notes, changing their revisions and requiring resynchronization.
     await Promise.all(ws.tabs.map(t => t.path).map(async (p) => {
       const tab = tabOf(p)
@@ -994,7 +1064,7 @@ async function handleEvents(evs: VaultEvent[]) {
     if (ev.type === 'indexed') {
       void refreshMetadata()
     } else if (ev.type === 'settings') {
-      void loadSettings().catch((err) => {
+      await syncSettings().catch((err) => {
         if (!isCancel(err)) toast(translate('workspace.could_not_synchronize_settings_7e5bb1', { p0: errorText(err) }))
       })
       await refreshPlugins()
@@ -1024,6 +1094,7 @@ async function handleEvents(evs: VaultEvent[]) {
         if (epoch !== workspaceEpoch) return
         if (affected(ev.from!).length && !affected(ev.path!).length) remapOpenNotes(ev.from!, ev.path!)
         remapRecent(ev.from!, ev.path!)
+        await remapPinnedTabs(ev.from!, ev.path!)
       } finally {
         paused.forEach(s => s.paused--)
       }
@@ -1049,6 +1120,11 @@ async function resync() {
   await refreshTree()
   user.assertSession(version)
   if (epoch !== workspaceEpoch) return
+  await syncSettings().catch((err) => {
+    if (!isCancel(err)) toast(translate('workspace.could_not_synchronize_settings_7e5bb1', { p0: errorText(err) }))
+  })
+  user.assertSession(version)
+  if (epoch !== workspaceEpoch) return
   await Promise.all(ws.tabs.map(syncOpenTab))
   user.assertSession(version)
   if (epoch !== workspaceEpoch) return
@@ -1059,6 +1135,10 @@ async function resync() {
 // ---- Startup ----
 
 const TABS_KEY = 'rawmark.tabs'
+
+function localTabs() {
+  return { paths: ws.tabs.map(t => t.path), active: ws.active, ...(settings.pinnedTabs === undefined ? { pinned: ws.tabs.filter(t => t.pinned).map(t => t.path) } : {}) }
+}
 
 // Restore unsaved drafts: continue saving if the server revision is unchanged; otherwise enter conflict state for user resolution.
 async function recoverDrafts() {
@@ -1101,15 +1181,21 @@ export async function startWorkspace() {
   await prepareResources()
   user.assertSession(version)
   // Settings-read failures do not prevent use; retain locally cached values.
-  const settingsLoaded = loadSettings().catch((err) => {
+  const settingsLoaded = loadSettings().then(() => true).catch((err) => {
     if (!isCancel(err)) toast(translate('workspace.could_not_load_settings_246415', { p0: errorText(err) }))
+    return false
   })
   await refreshTree()
-  await settingsLoaded
+  const confirmedSettings = await settingsLoaded
   user.assertSession(version)
   const saved = JSON.parse(localStorage.getItem(TABS_KEY) ?? '{"paths":[],"active":null}') as { paths: string[], active: string | null, pinned?: string[] }
   const exists = new Set(ws.entries.map(e => e.path))
-  await Promise.all(saved.paths.filter(p => exists.has(p)).map(openNote))
+  await Promise.all(saved.paths.filter(p => exists.has(p)).map(path => openNote(path)))
+  if (settings.pinnedTabs === undefined) {
+    for (const tab of ws.tabs) tab.pinned = saved.pinned?.includes(tab.path) ?? false
+    if (confirmedSettings && saved.pinned?.length) await savePinnedTabs(saved.pinned.filter(path => exists.has(path)))
+  }
+  if (settings.pinnedTabs !== undefined) await syncPinnedTabs()
   try {
     await recoverDrafts()
   } catch (err) {
@@ -1117,9 +1203,9 @@ export async function startWorkspace() {
     toast(translate('workspace.could_not_restore_the_local_a275e8', { p0: errorText(err) }))
   }
   user.assertSession(version)
-  for (const tab of ws.tabs) tab.pinned = saved.pinned?.includes(tab.path) ?? false
   ws.active = saved.active && tabOf(saved.active) ? saved.active : (ws.tabs[0]?.path ?? null)
   workspaceRunning = true
+  localStorage.setItem(TABS_KEY, JSON.stringify(localTabs()))
   let eventQueue = Promise.resolve()
   let stopped = false
   const enqueue = (work: () => Promise<void>) => {
@@ -1151,12 +1237,10 @@ export async function startWorkspace() {
   if (listenersInstalled) return
   listenersInstalled = true
   watch(
-    () => ({ paths: ws.tabs.map(t => t.path), active: ws.active, pinned: ws.tabs.filter(t => t.pinned).map(t => t.path) }),
+    localTabs,
     (tabs) => {
       if (workspaceRunning) localStorage.setItem(TABS_KEY, JSON.stringify(tabs))
     },
-    // Record tabs opened during startup immediately, including while waiting for tree refresh.
-    { immediate: true },
   )
   watch(
     () => ws.active,

@@ -7,8 +7,7 @@ case "$mode" in development|release) ;; *) exit 2 ;; esac
 export RAWMARK_BUILD_CHANNEL="$mode"
 export RAWMARK_BUILD_VERSION="$(python3 scripts/release.py version)"
 export CGO_ENABLED=0
-corepack enable
-corepack prepare pnpm@12.11.2 --activate
+env -u RAWMARK_BUILD_VERSION -u RAWMARK_BUILD_CHANNEL python3 -m unittest discover -s scripts/tests -v
 pnpm -C web install --frozen-lockfile --registry=https://registry.npmjs.org
 pnpm -C web lint:check
 pnpm -C web typecheck
@@ -22,5 +21,5 @@ go vet ./...
 go test ./web ./cmd/rawmark
 for package in vault watch; do
   go test -c -o "/tmp/rawmark-$package.test" "./internal/$package"
-  (cd "internal/$package" && runuser -u node -- "/tmp/rawmark-$package.test" -test.v)
+  (cd "internal/$package" && runuser -u "${RAWMARK_TEST_USER:-node}" -- "/tmp/rawmark-$package.test" -test.v)
 done

@@ -628,20 +628,18 @@ textarea {
   }
 }
 
-/* opacity preserves layout and font requests; hide fallback fonts while waiting, including menus teleported to body. */
-:root:is([data-rm-fonts='loading'], [data-rm-fonts='error']) body > :not(.rm-font-error) {
-  opacity: 0;
-  pointer-events: none;
-}
 .rm-font-error {
   position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
+  z-index: 10000;
+  right: 16px;
+  bottom: 16px;
+  max-width: min(360px, calc(100vw - 64px));
+  padding: 16px;
+  border: 1px solid var(--rm-divider);
+  border-radius: 8px;
+  background: var(--rm-bg);
   color: var(--rm-text);
+  box-shadow: var(--rm-shadow);
   font:
     16px/1.5 system-ui,
     sans-serif;

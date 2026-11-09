@@ -404,6 +404,26 @@ func TestSettingsMerge(t *testing.T) {
 	}
 }
 
+func TestPinnedTabsSharedAcrossSessions(t *testing.T) {
+	f := newFixture(t)
+	other := newClient()
+	f.login(other, "password123")
+	f.do(f.admin, "PATCH", "/api/v1/settings", `{"pinnedTabs":["a.md","目录/b.md"]}`, nil).Body.Close()
+	got := decode[struct{ PinnedTabs []string }](t, f.do(other, "GET", "/api/v1/settings", "", nil))
+	if len(got.PinnedTabs) != 2 || got.PinnedTabs[0] != "a.md" || got.PinnedTabs[1] != "目录/b.md" {
+		t.Fatalf("另一会话未读取到固定标签: %v", got.PinnedTabs)
+	}
+	f.do(other, "PATCH", "/api/v1/settings", `{"pinnedTabs":[]}`, nil).Body.Close()
+	again := decode[struct{ PinnedTabs []string }](t, f.do(f.admin, "GET", "/api/v1/settings", "", nil))
+	if again.PinnedTabs == nil || len(again.PinnedTabs) != 0 {
+		t.Fatalf("取消固定必须保存为空列表: %v", again.PinnedTabs)
+	}
+	stored, ok, err := f.store.Setting(settingsKey)
+	if err != nil || !ok || !strings.Contains(stored, `"pinnedTabs":[]`) {
+		t.Fatalf("固定标签未持久化到数据库: %q, %v", stored, err)
+	}
+}
+
 func TestChangePassword(t *testing.T) {
 	f := newFixture(t)
 	other := newClient()

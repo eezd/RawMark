@@ -78,6 +78,17 @@ async function search(selector: string, query: string) {
 }
 
 describe('设置查找与重置', () => {
+  it('服务器固定标签去重并过滤无效数据，区分首次迁移与明确清空', async () => {
+    vi.mocked(settingsApi.getSettingsApi).mockResolvedValueOnce(apiSuccess({ pinnedTabs: ['a.md', 1, '', 'a.md', '目录/b.md'] }))
+    await loadSettings()
+    expect(settings.pinnedTabs).toEqual(['a.md', '目录/b.md'])
+    vi.mocked(settingsApi.getSettingsApi).mockResolvedValueOnce(apiSuccess({ pinnedTabs: [] }))
+    await loadSettings()
+    expect(settings.pinnedTabs).toEqual([])
+    await loadSettings()
+    expect(settings.pinnedTabs).toBeUndefined()
+  })
+
   it('分类按约定排序，令牌归入账户与安全', async () => {
     ws.settings = 'account'
     vi.spyOn(tokensApi, 'getTokensApi').mockResolvedValue(apiSuccess({ tokens: [] }))

@@ -14,7 +14,7 @@ export function applyFontCatalog(fonts: CustomFont[]) {
     style = document.createElement('style'); style.id = 'rm-custom-fonts'; document.head.append(style)
   }
   // Names are display-only; CSS identifiers and resource paths use only server-generated content hashes.
-  const css = fonts.map(font => `@font-face { font-family: '${font.id}'; src: url('${fontResourceRoot()}${font.id}/file'); font-display: block; }`).join('\n')
+  const css = fonts.map(font => `@font-face { font-family: '${font.id}'; src: url('${fontResourceRoot()}${font.id}/file'); font-display: swap; }`).join('\n')
   if (style.textContent !== css) style.textContent = css
 }
 

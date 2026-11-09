@@ -1,13 +1,15 @@
 const CACHE = 'rawmark-shell-__VERSION__'
 const FILES = __PRECACHE__
 const paths = new Set(FILES)
+const isFont = path => /\.(?:woff2?|ttf|otf)$/.test(path)
+const shell = FILES.filter(path => !isFont(path))
 
 globalThis.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE)
-    // Download in batches instead of requesting hundreds of syntax packages and fonts concurrently.
-    for (let i = 0; i < FILES.length; i += 16) {
-      await cache.addAll(FILES.slice(i, i + 16).map(url => new Request(url, { cache: 'reload' })))
+    // Download in batches instead of requesting hundreds of syntax packages concurrently.
+    for (let i = 0; i < shell.length; i += 16) {
+      await cache.addAll(shell.slice(i, i + 16).map(url => new Request(url, { cache: 'reload' })))
     }
   })())
 })
@@ -67,6 +69,11 @@ globalThis.addEventListener('fetch', (event) => {
         if (previous) return previous
       }
     }
-    return fetch(request)
+    const response = await fetch(request)
+    // Cache public build fonts only after use; private resource tickets never reach this branch.
+    if (paths.has(url.pathname) && isFont(url.pathname) && response.ok) {
+      event.waitUntil(cache.put(url.pathname, response.clone()))
+    }
+    return response
   })())
 })
