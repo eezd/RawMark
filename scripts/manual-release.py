@@ -15,7 +15,7 @@ import time
 import urllib.parse
 
 from release import (COMPLETION, GITEA_IMAGE, PLATFORMS, UPLOAD_LIMIT, archive_name,
-                     digest, git_env, gitea_client, image_digest, registry_digest, registry_login,
+                     digest, extract_image_package, git_env, gitea_client, image_digest, registry_digest, registry_login,
                      require, run, verify_anonymous, write_json)
 
 STATE = Path('/docker/gitea/mirrors/RawMark')
@@ -201,9 +201,8 @@ def execute():
     if not record.get('image_digest'):
         image=cache/'image';(image/'data').mkdir(parents=True,exist_ok=True)
         for platform in ('linux/amd64','linux/arm64'):
-            target=image/platform;target.mkdir(parents=True,exist_ok=True)
-            name='RawMark_'+version+'_'+platform.replace('/','_')+'.tar.gz'
-            with tarfile.open(cache/name) as archive: archive.extractall(target,filter='data')
+            name=archive_name(version, platform)
+            extract_image_package(cache/name, image/platform)
         oci=cache/'candidate.oci'
         run('docker','buildx','build','--platform=linux/amd64,linux/arm64','--provenance=false','--output=type=oci,dest='+str(oci),
             '--label','org.opencontainers.image.revision='+commit,'--label','org.opencontainers.image.version='+version,

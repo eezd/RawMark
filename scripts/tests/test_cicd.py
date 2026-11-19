@@ -77,6 +77,46 @@ class BundleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'platforms mismatch'):
             release.verify_bundle()
 
+class ImagePackageTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+
+    def package(self, extra=None):
+        path = self.root / 'package.tar.gz'
+        with tarfile.open(path, 'w:gz') as archive:
+            for name in ('rawmark', 'LICENSE', 'licenses/font-OFL.txt'):
+                data = name.encode()
+                member = tarfile.TarInfo(name)
+                member.mode = 0o777
+                member.size = len(data)
+                archive.addfile(member, io.BytesIO(data))
+            if extra is not None:
+                archive.addfile(extra)
+        return path
+
+    def test_image_uses_original_files_without_tar_extraction_filters(self):
+        target = self.root / 'image'
+        package = self.package()
+        with patch.object(tarfile.TarFile, 'extractall', side_effect=AssertionError('requires newer tarfile')):
+            release.extract_image_package(package, target)
+        for name, mode in (('rawmark', 0o755), ('LICENSE', 0o644), ('licenses/font-OFL.txt', 0o644)):
+            self.assertEqual((target / name).read_bytes(), name.encode())
+            self.assertEqual((target / name).stat().st_mode & 0o777, mode)
+
+    def test_rejects_paths_and_nonregular_members_before_writing(self):
+        target = self.root / 'image'
+        link = tarfile.TarInfo('licenses/link.txt')
+        link.type = tarfile.SYMTYPE
+        link.linkname = 'font-OFL.txt'
+        for member in (tarfile.TarInfo('licenses/../outside.txt'), link, tarfile.TarInfo('rawmark')):
+            with self.subTest(member=member.name):
+                with self.assertRaisesRegex(ValueError, 'Unexpected image package'):
+                    release.extract_image_package(self.package(member), target)
+                self.assertFalse(target.exists())
+
+
 class PublicationTests(unittest.TestCase):
     def test_cross_host_redirect_strips_credentials(self):
         request = urllib.request.Request('https://api.github.com/asset', headers={'Authorization': 'Bearer private'})

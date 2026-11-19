@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -136,6 +137,25 @@ def verify_bundle():
     return build
 
 
+def extract_image_package(package, target):
+    # The package writer stores only regular files; do not restore archive paths or modes blindly.
+    with tarfile.open(package) as archive:
+        members = archive.getmembers()
+        names = {member.name for member in members}
+        require(len(names) == len(members) and {'rawmark', 'LICENSE'} < names,
+                'Unexpected image package contents')
+        for member in members:
+            require(member.isfile() and (member.name in ('rawmark', 'LICENSE')
+                    or re.fullmatch(r'licenses/[A-Za-z0-9._-]+\.txt', member.name)),
+                    f'Unexpected image package member: {member.name}')
+        (target / 'licenses').mkdir(parents=True, exist_ok=True)
+        for member in members:
+            path = target / member.name
+            with archive.extractfile(member) as source, path.open('wb') as output:
+                shutil.copyfileobj(source, output)
+            path.chmod(0o755 if member.name == 'rawmark' else 0o644)
+
+
 def prepare_image():
     build = verify_bundle()
     Path('image/data').mkdir(parents=True, exist_ok=True)
@@ -143,9 +163,7 @@ def prepare_image():
         if not platform.startswith('linux/'):
             continue
         target = Path('image') / platform
-        target.mkdir(parents=True, exist_ok=True)
-        with tarfile.open(DOWNLOADS / archive_name(build['version'], platform)) as archive:
-            archive.extractall(target, filter='data')
+        extract_image_package(DOWNLOADS / archive_name(build['version'], platform), target)
 
 
 class SafeRedirect(urllib.request.HTTPRedirectHandler):
