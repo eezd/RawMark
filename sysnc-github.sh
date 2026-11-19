@@ -257,8 +257,9 @@ class Snapshot:
 
 
 def read_manifest(ref, authfile, *, allow_missing=False):
+    # Skopeo 1.18 can return 2 for a missing manifest; classify by Registry error, not exit code alone.
     result = run(['skopeo', 'inspect', '--raw', '--authfile', authfile, 'docker://' + ref],
-                 '读取 OCI 清单', allowed=(0, 1))
+                 '读取 OCI 清单', allowed=(0, 1, 2))
     if result.returncode != 0:
         # 首次复制时版本清单或整个包尚不存在；认证、限流等错误不视为缺失。
         if allow_missing and any(code in result.stderr.lower() for code in (b'manifest unknown', b'name unknown')):

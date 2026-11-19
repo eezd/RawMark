@@ -162,6 +162,27 @@ class PublicationTests(unittest.TestCase):
         with patch.object(release.subprocess, 'run', return_value=result):
             self.assertIsNone(release.registry_digest(release.GITEA_IMAGE, '0.1.1'))
 
+class SyncRegistryTests(unittest.TestCase):
+    def setUp(self):
+        script = Path(__file__).resolve().parents[2] / 'sysnc-github.sh'
+        source = script.read_text().split("<<'PY'\n", 1)[1].rsplit('\nPY', 1)[0]
+        scope = {'__name__': 'sync_test'}
+        exec(compile(source, str(script), 'exec'), scope)
+        self.read_manifest = scope['read_manifest']
+        self.ref = 'ghcr.io/owner/project:20261119-aaaaaaaa'
+
+    def test_missing_destination_manifest_allows_first_copy(self):
+        for status, error in ((1, b'name unknown'), (2, b'reading manifest: manifest unknown')):
+            with self.subTest(status=status), patch('subprocess.run', return_value=Mock(returncode=status, stderr=error)):
+                self.assertIsNone(self.read_manifest(self.ref, 'auth.json', allow_missing=True))
+
+    def test_missing_source_manifest_and_other_registry_errors_still_fail(self):
+        for error, allow_missing in ((b'manifest unknown', False), (b'unauthorized', True), (b'toomanyrequests', True)):
+            with self.subTest(error=error), patch('subprocess.run', return_value=Mock(returncode=2, stderr=error)):
+                with self.assertRaisesRegex(RuntimeError, '读取 OCI 清单失败'):
+                    self.read_manifest(self.ref, 'auth.json', allow_missing=allow_missing)
+
+
 class DevelopmentVersionTests(unittest.TestCase):
     def test_version_uses_utc_commit_date_and_exact_eight_character_hash(self):
         with patch.dict(os.environ, {'RAWMARK_BUILD_CHANNEL': 'development'}), patch.object(
