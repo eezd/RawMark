@@ -37,3 +37,5 @@ deploy/data/**/*.log
 
 # Native instance and isolated build outputs
 runtime/
+/package/
+/downloads/

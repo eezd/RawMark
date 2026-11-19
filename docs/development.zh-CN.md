@@ -110,14 +110,12 @@ python3 scripts/prepare-maple-font.py /path/to/MapleMonoNormalNL-NF-CN.zip
 
 ## 本地 systemd 与手动发布
 
-日常使用 `bash /srv/RawMark/start.sh` 编译当前工作区并更新 `rawmark-dev.service`；`stop.sh` 只停止服务，`status.sh` 只读显示服务及构建状态。运行账号为 `rawmark`，监听 `127.0.0.1:21001`，现有入口为 `https://raw.134333.xyz`。
+以 root 运行 `/srv/RawMark/start.sh` 可编译当前工作区并更新 `rawmark-dev.service`；`stop.sh` 只停止服务，`status.sh` 只读显示服务及构建状态。unit 以 root 运行，无需专用账号，分别调用 `start.sh --systemd` 与 `stop.sh --systemd`，不重新编译或递归调用 systemctl。默认监听 `127.0.0.1:21001`。
 
 `runtime/` 不入库：`builds/` 保存独立构建，`current` 指向活动产物，`config/rawmark.env` 配置 RAWMARK_DATA、RAWMARK_VAULT、RAWMARK_ADDR，`data/` 保存数据库、笔记和附件，`backups/` 保存迁移备份。脚本使用宿主 Go、Node 和锁定 pnpm，不安装全局工具链。候选检查、构建和合成数据冒烟通过后才切换服务；失败恢复旧产物和 unit。启停共用 `runtime/.deploy.lock`，构建记录包含完整 SHA、dirty 状态和时间。本地构建允许未提交源码。
 
-Gitea 是源，GitHub 是单向镜像。main/dev 和 TAG 普通 push 只同步 Git 引用；不触发测试、构建、发布或部署。Git 镜像沿用账号级 `ALL_GITHUB_TOKEN`，具备定时对账和手动入口。
-
-正式发布使用 `GITEA_TOKEN` 环境变量及 `bash /srv/RawMark/release.sh <远端分支>`。该脚本可脱离本地仓库运行，只固定远端 SHA，并从可信 main 调度手动工作流。任务使用 `RAWMARK_GITEA_TOKEN`、`ALL_GITHUB_TOKEN`；候选编译不注入这些凭据。发布执行检查，构建 Linux/Darwin/Windows 的 amd64/arm64 六个包和 Linux 双架构镜像，同步相同附件至 Gitea/GitHub、相同 OCI 摘要至 GHCR。不合并分支，不更新本地服务。
+普通 `git push` 只更新 Gitea。`./release.sh <远端分支>` 从可信 `main` 调度 Gitea 手动发布，构建并验收六平台程序包和双架构镜像，最后写入 `release-complete.json`。只有操作者运行 `./sysnc-github.sh` 才会同步已批准引用和已验收产物到 GitHub/GHCR。凭据、权限、恢复和历史版本限制见[部署指南](deployment.zh-CN.md#本地-systemd-与手动发布)。
 
 版本为提交 UTC 日期加固定八位哈希。说明基于同分支父提交图中距离最近的成功祖先版本（距离相同时，依次按完成时间较晚、TAG 字典序优先）；首发正文为 `init`，历史缺少分支记录的版本不作为基线。所有分支发布固定版本标签，只有 main 来源版本推进 latest，旧版本重试不倒退。检查或打包失败且尚无程序包检查点时，保留原预约供重试，但不阻止修复提交发版；已有程序包检查点或进入发布阶段后，仍须先恢复该版本。失败保留原件和持久发布记录，只补缺口；不得重建覆盖已有版本。
 
-旧 Docker 实例在迁移后停止并关闭自动重启，保留 `/docker/gitea/dev/RawMark`、原数据和备份。若新实例已有写入，不可直接启动旧数据副本回退；先停服并处理新增数据。迁移备份及运行配置不得提交到 Git。
+运行配置和迁移备份不得提交到 Git；恢复旧实例前，按部署指南处理新实例已写入的数据。

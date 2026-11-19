@@ -12,6 +12,33 @@ spec=importlib.util.spec_from_file_location('manual',Path(__file__).resolve().pa
 manual=importlib.util.module_from_spec(spec);spec.loader.exec_module(manual)
 
 class NativeTests(unittest.TestCase):
+    def test_unit_runs_as_root_with_script_hooks_and_read_only_system(self):
+        unit = native.unit_text()
+        self.assertIn('\nUser=root\nGroup=root\n', unit)
+        self.assertIn(f'ExecStart="{native.ROOT}/start.sh" --systemd\n', unit)
+        self.assertIn(f'ExecStop="{native.ROOT}/stop.sh" --systemd\n', unit)
+        self.assertIn('\nProtectSystem=strict\n', unit)
+
+    def test_failed_build_never_activates_or_leaves_lock_held(self):
+        import fcntl
+        with tempfile.TemporaryDirectory() as d:
+            runtime = Path(d)
+            (runtime / 'config').mkdir()
+            (runtime / 'config/rawmark.env').touch()
+            with (patch.object(native, 'RUNTIME', runtime), patch.object(native, 'run') as run,
+                  patch.object(native.shutil, 'which', return_value='/usr/bin/systemctl'),
+                  patch.object(native, 'build', side_effect=RuntimeError('build failed')) as build,
+                  patch.object(native, 'activate') as activate):
+                with self.assertRaisesRegex(RuntimeError, 'build failed'):
+                    native.main()
+                activate.assert_not_called()
+                with (runtime / '.deploy.lock').open('a') as lock:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    with self.assertRaises(BlockingIOError):
+                        native.main()
+                build.assert_called_once()
+                run.assert_not_called()
+
     def test_failed_health_restores_previous_link_and_unit(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);runtime=root/'runtime';runtime.mkdir()
@@ -40,14 +67,14 @@ class SelectionTests(unittest.TestCase):
     def test_first_release_notes_are_exact_init(self):
         self.assertEqual(manual.release_notes(None,'a'*40),'init')
     def test_other_branch_is_not_used_as_baseline(self):
-        r={'complete':True,'source_branch':'main','source_sha':'a','completed_at':1,'version':'v'}
+        r={'complete':True,'gitea_only':True,'source_branch':'main','source_sha':'a','completed_at':1,'version':'v'}
         self.assertIsNone(manual.select_baseline([r],'dev','b'))
     def test_rewritten_branch_cannot_look_like_first_release(self):
-        r={'complete':True,'source_branch':'dev','source_sha':'a','completed_at':1,'version':'v'}
+        r={'complete':True,'gitea_only':True,'source_branch':'dev','source_sha':'a','completed_at':1,'version':'v'}
         with patch.object(manual,'run',return_value='b'):
             with self.assertRaisesRegex(ValueError,'baseline'):manual.select_baseline([r],'dev','b')
     def test_closest_ancestor_wins(self):
-        records=[{'complete':True,'source_branch':'dev','source_sha':c,'completed_at':1,'version':c} for c in ('a','b')]
+        records=[{'complete':True,'gitea_only':True,'source_branch':'dev','source_sha':c,'completed_at':1,'version':c} for c in ('a','b')]
         with patch.object(manual,'run',return_value='c a\na b\nb'):
             self.assertEqual(manual.select_baseline(records,'dev','c')['source_sha'],'a')
 if __name__=='__main__':unittest.main()
@@ -68,8 +95,8 @@ class ClientTests(unittest.TestCase):
             self.assertIn('GITEA_TOKEN',result.stderr)
 
 class RemoteClientTests(unittest.TestCase):
-    def invoke_client(self, *, bad_sha=False, draft=False, dispatch_error=False):
-        import contextlib,io,json,os,urllib.error,urllib.request
+    def invoke_client(self, *, bad_sha=False, bad_digest=False, draft=False, dispatch_error=False):
+        import contextlib,hashlib,io,json,os,urllib.error,urllib.request
         client=(Path(__file__).resolve().parents[2]/'release.sh').read_text().split("<<'PY'\n",1)[1].rsplit('\nPY',1)[0]
         sha='a'*40;version='20261109-'+sha[:8];calls=[]
         class Response:
@@ -85,8 +112,14 @@ class RemoteClientTests(unittest.TestCase):
                 if dispatch_error:raise urllib.error.URLError('uncertain post')
                 return Response({'workflow_run_id':123})
             if '/actions/runs/' in url:return Response({'status':'completed','conclusion':'success'})
-            if '/releases/tags/' in url:return Response({'tag_name':version,'draft':draft,'prerelease':False,'assets':[{'name':'build.json','browser_download_url':'https://git.134333.xyz/download/build.json'}]})
-            if '/download/build.json' in url:return Response({'source_sha':'b'*40 if bad_sha else sha,'version':version})
+            assets = [{'name':name,'browser_download_url':'https://git.134333.xyz/download/'+name}
+                      for name in ('build.json','release-complete.json')]
+            build = {'source_sha':'b'*40 if bad_sha else sha,'version':version}
+            if '/releases/tags/' in url:return Response({'tag_name':version,'draft':draft,'prerelease':False,'assets':assets})
+            if '/download/build.json' in url:return Response(build)
+            if '/download/release-complete.json' in url:
+                digest=hashlib.sha256(json.dumps(build).encode()).hexdigest()
+                return Response({'source_sha':sha,'version':version,'build_sha256':'0'*64 if bad_digest else digest})
             raise AssertionError(url)
         from unittest.mock import Mock
         opener=Mock();opener.open.side_effect=open_request
@@ -107,6 +140,7 @@ class RemoteClientTests(unittest.TestCase):
         self.assertEqual(body['inputs']['source_sha'],'a'*40)
     def test_draft_release_cannot_succeed(self):self.assertEqual(self.invoke_client(draft=True)[0],1)
     def test_wrong_metadata_sha_cannot_succeed(self):self.assertEqual(self.invoke_client(bad_sha=True)[0],1)
+    def test_completion_must_match_build_bytes(self):self.assertEqual(self.invoke_client(bad_digest=True)[0],1)
     def test_uncertain_dispatch_is_never_reposted(self):
         code,calls,_=self.invoke_client(dispatch_error=True)
         self.assertEqual(code,1)

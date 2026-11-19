@@ -39,18 +39,18 @@ RawMark 面向**单用户、自托管**场景。目前不提供多人协作或�
 
 安装 Docker 后运行：
 
-请先从 [Releases](https://github.com/eezd/RawMark/releases) 选择已发布版本。此前版本已撤回，下方命令仅为安装示例，不代表该版本已可拉取。
+请先从 [Gitea Releases](https://git.134333.xyz/eezd/RawMark/releases) 选择已发布版本，再将 `YYYYMMDD-xxxxxxxx` 替换为其版本标签。
 
 ```sh
 docker run -d --name rawmark --restart unless-stopped \
   -p 127.0.0.1:21000:8080 \
   -v rawmark-data:/data \
-  ghcr.io/eezd/rawmark:latest
+  git.134333.xyz/eezd/rawmark:YYYYMMDD-xxxxxxxx
 ```
 
 打开 **http://localhost:21000**，首次访问设置登录密码。全新空实例会提供 7 篇英文示例笔记，可以自由编辑或删除，然后开始记录自己的内容。数据保存在 Docker 卷 `rawmark-data` 中，重建容器不会丢失。
 
-Docker 支持 Linux amd64 和 arm64；原生程序支持 Linux amd64/arm64、Windows amd64 和 macOS Intel/Apple Silicon。可在 [Releases](https://github.com/eezd/RawMark/releases) 下载原生程序，或按照部署文档从源码构建。
+Docker 支持 Linux amd64 和 arm64；原生程序支持 Linux、Windows 和 macOS 的 amd64 与 arm64。可在 [Gitea Releases](https://git.134333.xyz/eezd/RawMark/releases) 下载原生程序，或按照部署文档从源码构建。
 
 无需安装即可[在线体验编辑器](https://eezd.github.io/RawMark/)。Demo 修改仅在当前页面保留，刷新恢复示例，不提供服务端工作区。
 

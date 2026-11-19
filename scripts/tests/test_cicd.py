@@ -83,10 +83,9 @@ class PublicationTests(unittest.TestCase):
         redirected = release.SafeRedirect().redirect_request(request, None, 302, 'Found', {}, 'https://objects.example/asset')
         self.assertFalse(redirected.has_header('Authorization'))
 
-    def test_anonymous_client_cannot_write(self):
-        api = release.API('https://api.github.com', '', github=True)
-        with self.assertRaisesRegex(ValueError, 'cannot mutate'):
-            api.repo('/releases', data={}, method='POST')
+    def test_gitea_client_requires_a_credential(self):
+        with self.assertRaisesRegex(ValueError, 'Missing credential'):
+            release.API('https://git.example/api/v1', '')
 
     def test_existing_asset_conflict_is_not_overwritten(self):
         with tempfile.TemporaryDirectory() as directory:

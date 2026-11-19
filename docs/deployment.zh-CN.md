@@ -54,9 +54,9 @@ RAWMARK_DATA_DIR=/your/storage/rawmark/data \
 
 ## 预构建镜像与原生程序
 
-正式发布后提供 `ghcr.io/eezd/rawmark:<版本>`，支持 Linux amd64 和 arm64。此前版本已撤回，`VERSION` 不代表版本已可下载；使用下方示例版本前先核对 Releases 和软件包公开状态。将上述 Docker 命令中的 `rawmark` 镜像名替换为它即可跳过源码构建。`latest` 跟随最新稳定版本；需要可控升级时请固定版本标签。仓库 Compose 文件继续支持源码构建。
+Gitea 发布 `git.134333.xyz/eezd/rawmark:<版本>`，支持 Linux amd64 和 arm64。需要可控升级时请固定版本标签。只有 Gitea 更新 `latest`；操作者运行手动同步后，GHCR 才会收到版本标签。安装前先核对 Releases 和软件包公开状态。仓库 Compose 文件继续支持源码构建。
 
-[Releases 页面](https://github.com/eezd/RawMark/releases) 提供 Linux amd64/arm64、Windows amd64 和 macOS Intel/Apple Silicon 原生压缩包及 `SHA256SUMS`。下载对应系统和架构，先核对校验和再解压：
+[Gitea Releases 页面](https://git.134333.xyz/eezd/RawMark/releases) 提供 Linux、Windows 和 macOS 的 amd64 与 arm64 原生压缩包及 `SHA256SUMS`。下载对应系统和架构，先核对校验和再解压：
 
 ```sh
 sha256sum --ignore-missing --check SHA256SUMS
@@ -164,14 +164,16 @@ Bearer 认证升级需要前后端一起发布。旧 Cookie 页面不能继续�
 
 ## 本地 systemd 与手动发布
 
-日常使用 `bash /srv/RawMark/start.sh` 编译当前工作区并更新 `rawmark-dev.service`；`stop.sh` 只停止服务，`status.sh` 只读显示服务及构建状态。运行账号为 `rawmark`，监听 `127.0.0.1:21001`，现有入口为 `https://raw.134333.xyz`。
+以 root 运行 `/srv/RawMark/start.sh` 可编译当前工作区并更新 `rawmark-dev.service`；`stop.sh` 只停止服务，`status.sh` 只读显示服务及构建状态。unit 以 root 运行，无需专用账号，分别调用 `start.sh --systemd` 与 `stop.sh --systemd`，不重新编译或递归调用 systemctl。默认监听 `127.0.0.1:21001`。项目脚本、运行配置和构建产物不得允许不可信用户修改。
 
 `runtime/` 不入库：`builds/` 保存独立构建，`current` 指向活动产物，`config/rawmark.env` 配置 RAWMARK_DATA、RAWMARK_VAULT、RAWMARK_ADDR，`data/` 保存数据库、笔记和附件，`backups/` 保存迁移备份。脚本使用宿主 Go、Node 和锁定 pnpm，不安装全局工具链。候选检查、构建和合成数据冒烟通过后才切换服务；失败恢复旧产物和 unit。启停共用 `runtime/.deploy.lock`，构建记录包含完整 SHA、dirty 状态和时间。本地构建允许未提交源码。
 
-Gitea 是源，GitHub 是单向镜像。main/dev 和 TAG 普通 push 只同步 Git 引用；不触发测试、构建、发布或部署。Git 镜像沿用账号级 `ALL_GITHUB_TOKEN`，具备定时对账和手动入口。
+Gitea 是唯一主仓库，`origin` 指向 Gitea。普通 `git push` 只更新 Gitea 的 Git 引用，不触发检查、构建、发布、部署或 GitHub 同步。
 
-正式发布使用 `GITEA_TOKEN` 环境变量及 `bash /srv/RawMark/release.sh <远端分支>`。该脚本可脱离本地仓库运行，只固定远端 SHA，并从可信 main 调度手动工作流。任务使用 `RAWMARK_GITEA_TOKEN`、`ALL_GITHUB_TOKEN`；候选编译不注入这些凭据。发布执行检查，构建 Linux/Darwin/Windows 的 amd64/arm64 六个包和 Linux 双架构镜像，同步相同附件至 Gitea/GitHub、相同 OCI 摘要至 GHCR。不合并分支，不更新本地服务。
+设置 `GITEA_TOKEN` 后运行 `/srv/RawMark/release.sh <远端分支>`。客户端可以从任意目录运行：固定远端 SHA，从可信 `main` 调度手动工作流。工作流只用 `ALL_GITEA_TOKEN` 发布，候选构建环境不传递该令牌。构建 Linux/macOS/Windows 的 amd64/arm64 六个包和 Linux 双架构镜像，验收 Gitea 原件与 OCI 摘要后最后上传 `release-complete.json`。不写 GitHub、不合并分支、不更新本地服务。
 
-版本为提交 UTC 日期加固定八位哈希。说明基于同分支父提交图中距离最近的成功祖先版本（距离相同时，依次按完成时间较晚、TAG 字典序优先）；首发正文为 `init`，历史缺少分支记录的版本不作为基线。所有分支发布固定版本标签，只有 main 来源版本推进 latest，旧版本重试不倒退。检查或打包失败且尚无程序包检查点时，保留原预约供重试，但不阻止修复提交发版；已有程序包检查点或进入发布阶段后，仍须先恢复该版本。失败保留原件和持久发布记录，只补缺口；不得重建覆盖已有版本。
+GitHub 对外同步只能由操作者手动执行 `/srv/RawMark/sysnc-github.sh`。脚本读取 Gitea 远端，仅同步已公开的 `main`、`dev`、范围内的 TAG 和已验收正式版本；不构建、不强推、不删除。运行前显式设置 `GITEA_TOKEN`、`GITHUB_TOKEN`，复制镜像时另需 `skopeo` 和 `REGISTRY_AUTH_FILE`。脚本要求 GitHub 仓库级 Actions 已关闭，但不改变该设置；缺少完成凭证的历史版本报告为未同步，不篡改既有产物。
 
-旧 Docker 实例在迁移后停止并关闭自动重启，保留 `/docker/gitea/dev/RawMark`、原数据和备份。若新实例已有写入，不可直接启动旧数据副本回退；先停服并处理新增数据。迁移备份及运行配置不得提交到 Git。
+版本为提交 UTC 日期加固定八位哈希。说明基于同分支父提交图中距离最近、仅在 Gitea 验收通过的祖先版本（距离相同时，依次按完成时间较晚、TAG 字典序优先）；首发正文为 `init`。冻结基线前核对 Gitea 正式 Release、TAG 提交、完成附件及 `build.json` 的 SHA-256。`20261030-32c1c254` 等缺少完成证明的旧版本不作为基线；新流程基线核验失败则停止发布。所有分支发布固定版本标签，只有 main 来源版本推进 latest，旧版本重试不倒退。检查或打包失败且尚无程序包检查点时，保留原预约供重试，但不阻止修复提交发版；已有程序包检查点或进入发布阶段后，仍须先恢复该版本。失败保留原件和持久发布记录，只补缺口；不得重建覆盖已有版本。
+
+从旧 Docker 实例迁移后应停止旧容器并关闭自动重启。若新实例已有写入，不可直接启动旧数据副本回退；先停服并处理新增数据。运行配置和迁移备份不得提交到 Git。

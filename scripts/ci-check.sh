@@ -19,7 +19,17 @@ go test ./internal/...
 go test -tags dev ./web ./cmd/rawmark
 go vet ./...
 go test ./web ./cmd/rawmark
+test_dir=$(mktemp -d "${TMPDIR:-/tmp}/rawmark-permissions.XXXXXXXX")
+trap 'rm -rf -- "$test_dir"' EXIT
+chmod 711 "$test_dir"
 for package in vault watch; do
-  go test -c -o "/tmp/rawmark-$package.test" "./internal/$package"
-  (cd "internal/$package" && runuser -u "${RAWMARK_TEST_USER:-node}" -- "/tmp/rawmark-$package.test" -test.v)
+  test_binary="$test_dir/$package.test"
+  go test -c -o "$test_binary" "./internal/$package"
+  if [ "$(id -u)" -eq 0 ]; then
+    chmod 755 "$test_binary"
+    # Test permissions without relying on an account in the host or CI image.
+    (cd "internal/$package" && setpriv --reuid 65534 --regid 65534 --clear-groups -- "$test_binary" -test.v)
+  else
+    (cd "internal/$package" && "$test_binary" -test.v)
+  fi
 done

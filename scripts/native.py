@@ -8,7 +8,6 @@ from pathlib import Path
 import signal
 import shutil
 import subprocess
-import sys
 import time
 import urllib.request
 
@@ -35,9 +34,15 @@ def build():
     before = identity()
     stamp = run('git', '-C', str(ROOT), 'show', '-s', '--format=%ct', before['source_sha'])
     version = datetime.datetime.fromtimestamp(int(stamp), datetime.timezone.utc).strftime('%Y%m%d') + '-' + before['source_sha'][:8]
-    candidate = RUNTIME / 'builds' / (time.strftime('%Y%m%dT%H%M%SZ', time.gmtime()) + '-' + os.urandom(4).hex())
+    builds = RUNTIME / 'builds'
+    if not builds.exists():
+        builds.mkdir()
+        builds.chmod(0o755)
+    candidate = builds / (time.strftime('%Y%m%dT%H%M%SZ', time.gmtime()) + '-' + os.urandom(4).hex())
+    candidate.mkdir()
+    candidate.chmod(0o755)
     source = candidate / 'source'
-    source.mkdir(parents=True)
+    source.mkdir(mode=0o700)
     files = subprocess.check_output(['git', '-C', str(ROOT), 'ls-files', '-z', '--cached', '--others', '--exclude-standard']).decode().split('\0')
     for name in files:
         p = ROOT / name
@@ -45,9 +50,10 @@ def build():
             target = source / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(p, target)
-    env = {**os.environ, 'RAWMARK_BUILD_VERSION': version, 'RAWMARK_TEST_USER': 'rawmark', 'CGO_ENABLED': '0'}
+    env = {**os.environ, 'RAWMARK_BUILD_VERSION': version, 'CGO_ENABLED': '0'}
     subprocess.run(['sh', str(ROOT / 'scripts/ci-check.sh'), 'development'], cwd=source, env=env, check=True)
     subprocess.run(['go', 'build', '-trimpath', '-ldflags', '-s -w -X main.releaseVersion=' + version, '-o', str(candidate/'rawmark'), './cmd/rawmark'], cwd=source, env=env, check=True)
+    (candidate/'rawmark').chmod(0o755)
     subprocess.run(['python3', str(ROOT/'scripts/smoke-release.py'), str(candidate/'rawmark')], cwd=source, env=env, check=True)
     html = (source/'web/dist/index.html').read_text()
     import re
@@ -63,12 +69,12 @@ def unit_text():
 Description=RawMark native workspace
 After=network.target
 [Service]
-Type=simple
-User=rawmark
-Group=rawmark
-WorkingDirectory={RUNTIME}/current
+Type=exec
+User=root
+Group=root
 EnvironmentFile={RUNTIME}/config/rawmark.env
-ExecStart={RUNTIME}/current/rawmark
+ExecStart="{ROOT}/start.sh" --systemd
+ExecStop="{ROOT}/stop.sh" --systemd
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=30
@@ -77,7 +83,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths={RUNTIME}/data
+ReadWritePaths="{RUNTIME}/data"
 [Install]
 WantedBy=multi-user.target
 '''
@@ -89,14 +95,19 @@ def healthy(candidate):
         try:
             run('systemctl', 'is-active', '--quiet', UNIT)
             pid = run('systemctl', 'show', '-p', 'MainPID', '--value', UNIT)
-            assert sha('/proc/'+pid+'/exe') == metadata['binary_sha256']
+            if pid == '0' or sha('/proc/'+pid+'/exe') != metadata['binary_sha256']:
+                time.sleep(1)
+                continue
             with urllib.request.urlopen('http://127.0.0.1:21001/api/v1/health', timeout=3) as r:
-                assert json.load(r)['data']['ok']
+                if not json.load(r)['data']['ok']:
+                    time.sleep(1)
+                    continue
             with urllib.request.urlopen('http://127.0.0.1:21001/', timeout=3) as r:
-                assert ('content="'+metadata['frontend_build']+'"').encode() in r.read()
-            return
-        except (OSError, ValueError, AssertionError, subprocess.CalledProcessError):
-            time.sleep(1)
+                if ('content="'+metadata['frontend_build']+'"').encode() in r.read():
+                    return
+        except (OSError, ValueError, subprocess.CalledProcessError):
+            pass
+        time.sleep(1)
     raise RuntimeError('RawMark candidate did not become healthy')
 
 
@@ -110,6 +121,9 @@ def activate(candidate):
     def link(target):
         temp=RUNTIME/'current.next'
         temp.unlink(missing_ok=True); temp.symlink_to(target); temp.replace(current)
+    # Stop the old process before changing the path used by its stop hook.
+    if active:
+        run('systemctl','stop',UNIT)
     try:
         link(candidate)
         unit.write_text(unit_text())
@@ -131,9 +145,8 @@ def activate(candidate):
 
 
 def main():
-    if os.geteuid() != 0: raise RuntimeError('Native deployment requires root to manage the project unit')
     if not (RUNTIME/'config/rawmark.env').is_file(): raise RuntimeError('Missing runtime/config/rawmark.env')
-    run('id','rawmark')
+    if not shutil.which('systemctl'): raise RuntimeError('Missing systemctl')
     RUNTIME.mkdir(exist_ok=True)
     with (RUNTIME/'.deploy.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

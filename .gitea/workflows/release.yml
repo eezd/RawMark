@@ -54,8 +54,7 @@ jobs:
           SOURCE_BRANCH: ${{ inputs.source_branch }}
           SOURCE_SHA: ${{ inputs.source_sha }}
           GITEA_API_URL: ${{ gitea.server_url }}/api/v1
-          GITEA_RELEASE_TOKEN: ${{ secrets.RAWMARK_GITEA_TOKEN }}
-          GITHUB_RELEASE_TOKEN: ${{ secrets.ALL_GITHUB_TOKEN }}
+          GITEA_RELEASE_TOKEN: ${{ secrets.ALL_GITEA_TOKEN }}
           CI_RUN_ID: ${{ gitea.run_id }}
           CI_RESOURCE_LABEL: io.rawmark.ci.run=release-${{ gitea.run_id }}-${{ gitea.run_attempt }}
           DOCKER_CONFIG: /tmp/rawmark-release-auth
