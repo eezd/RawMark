@@ -92,6 +92,8 @@ go test ./web ./cmd/rawmark
 
 ### 部署、恢复与发布
 
+- 本地 Git 仅保留 `origin`，fetch/push 均指向 `https://git.134333.xyz/eezd/RawMark.git`，默认推送和业务分支跟踪均使用 origin。GitHub/GHCR 仅是 Forgejo 手动同步工作流的分发目标，不要求本地 GitHub remote 或专用 helper；清理旧连接不删除远端内容，不重置、合并或改写业务分支。
+
 - `start.sh` 可直接由 root 执行，依赖私有运行配置，不需要专用账号。`rawmark-dev.service` 以 root 运行，保留 systemd 文件系统保护；项目脚本、构建目录、运行配置和 unit 不得允许不可信用户写入。部署使用 `runtime/.deploy.lock`，为当前工作区快照构建，再切换 `runtime/current` 和 unit。unit 的 `ExecStart`/`ExecStop` 调用根目录脚本的 `--systemd` 模式，不构建、不获取部署锁或调用 `systemctl`。默认监听 `127.0.0.1:21001`，不得据此推断实际私有配置或运行身份。
 - 原生激活须验证实际进程二进制摘要、健康接口及前端指纹，失败恢复旧产物、unit 与服务状态。旧实例与新实例不能同时写同一数据集；原生写入后不能再启动旧副本造成数据分叉。容器默认 nonroot `65532:65532`；Compose 默认发布到所有网卡的 21000 端口，与原生回环监听不同。
 - 完整恢复通过 `internal/backup` 的校验、回退备份和 prepared → applying → verifying 状态机；清除会话、重建索引，HTTP 初始化通过后才提交，失败回退。不能绕过这些步骤或用真实笔记做恢复测试。

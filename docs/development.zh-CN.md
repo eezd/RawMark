@@ -114,6 +114,8 @@ python3 scripts/prepare-maple-font.py /path/to/MapleMonoNormalNL-NF-CN.zip
 
 `runtime/` 不入库：`builds/` 保存独立构建，`current` 指向活动产物，`config/rawmark.env` 配置 RAWMARK_DATA、RAWMARK_VAULT、RAWMARK_ADDR，`data/` 保存数据库、笔记和附件，`backups/` 保存迁移备份。脚本使用宿主 Go、Node 和锁定 pnpm，不安装全局工具链。候选检查、构建和合成数据冒烟通过后才切换服务；失败恢复旧产物和 unit。启停共用 `runtime/.deploy.lock`，构建记录包含完整 SHA、dirty 状态和时间。本地构建允许未提交源码。
 
+本地 Git 只保留 Forgejo `origin`（`https://git.134333.xyz/eezd/RawMark.git`），fetch/push 和业务分支跟踪均使用它；不配置 GitHub remote 或本地 GitHub 专用 credential helper。GitHub/GHCR 是 Forgejo 手动同步工作流的分发目标，使用 CI Secrets，与本地 Git 连接独立。清理旧连接不等于删除 GitHub 内容或调整分支历史。
+
 普通 `git push` 只更新 Forgejo。发布改用 Forgejo 网页 **Manual release (RawMark)**（`.forgejo/workflows/release.yml`）：选择可信 `main`，输入来源分支（默认 `main`）及可选完整 SHA；实际执行时解析并冻结远端来源。**Manual GitHub sync (RawMark)**（`.forgejo/workflows/sync-github.yml`）独立、无自定义输入，只同步已批准引用及已验收原件，不重建。根目录 `release.sh`、`sysnc-github.sh` 已移除，无兼容包装器。`RELEASE_TOKEN` 分别映射发布的 `FORGEJO_RELEASE_TOKEN`、同步的 `FORGEJO_TOKEN`；`MIRROR_TOKEN` 仅映射同步的 `GITHUB_TOKEN`，不继承宿主凭据。候选在无 Secret、Docker 连接、宿主挂载或共享 PID 的非 root 容器中执行完整检查和打包，控制器只接收有大小限制的普通产物。凭据、隔离及失败边界见[部署指南](deployment.zh-CN.md#本地-systemd-与手动发布)。
 
 版本为提交 UTC 日期加八位 SHA。发布说明基于同分支最近已验收祖先，首发严格为 `init`；历史重写丢失基线停止。schema 5 记录网页输入、来源尖端、控制 SHA、run ID 和 UUID，继续复用 schema 4 完成版。同 SHA 跨分支不改来源，版本镜像不可变；仅 OCI `:latest` 可按 main 祖先关系维持或前进，dev 不提升、历史不回退、未知别名或分叉停止。双手动工作流共享 `rawmark-delivery`、`cancel-in-progress: false`，首次须实测排队和取消后继续。无 Generic Packages、持久原件或检查点；未完成版先证明旧任务结束及归属，构建并验收替代产物后复查，再精确清理旧版，保留正确 TAG。完成或陌生内容不覆盖；清理按 run/attempt 精确进行。
