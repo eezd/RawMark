@@ -17,16 +17,15 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    if: gitea.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    if: forgejo.ref == 'refs/heads/main'
+    runs-on: docker
     timeout-minutes: 115
     container:
       image: node:24-bookworm
-      volumes:
-        - /docker/gitea/mirrors/RawMark:/docker/gitea/mirrors/RawMark
     steps:
       - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ forgejo.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -49,14 +48,21 @@ jobs:
           apt-get install -y docker-ce-cli docker-buildx-plugin
           corepack enable
           corepack prepare pnpm@12.11.2 --activate
-      - name: Build and publish fixed source once
+          node --version
+          test "$(pnpm --version)" = '12.11.2'
+          go version
+          docker version
+          skopeo --version
+      - name: Build and publish fixed source
         env:
           SOURCE_BRANCH: ${{ inputs.source_branch }}
           SOURCE_SHA: ${{ inputs.source_sha }}
-          GITEA_API_URL: ${{ gitea.server_url }}/api/v1
-          GITEA_RELEASE_TOKEN: ${{ secrets.ALL_GITEA_TOKEN }}
-          CI_RUN_ID: ${{ gitea.run_id }}
-          CI_RESOURCE_LABEL: io.rawmark.ci.run=release-${{ gitea.run_id }}-${{ gitea.run_attempt }}
+          CONTROL_REF: ${{ forgejo.ref }}
+          FORGEJO_API_URL: ${{ forgejo.server_url }}/api/v1
+          FORGEJO_RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          CI_RUN_ID: ${{ forgejo.run_id }}
+          CI_RUN_ATTEMPT: ${{ forgejo.run_attempt }}
+          CI_RESOURCE_LABEL: io.rawmark.ci.run=release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
           DOCKER_CONFIG: /tmp/rawmark-release-auth
         run: |
           mkdir -m 700 -p "$DOCKER_CONFIG"
@@ -64,5 +70,8 @@ jobs:
       - name: Clean only this run
         if: always()
         run: |
-          python3 scripts/ci-cleanup.py 'io.rawmark.ci.run=release-${{ gitea.run_id }}-${{ gitea.run_attempt }}' --client-container "$(hostname)"
+          python3 scripts/ci-cleanup.py 'io.rawmark.ci.run=release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}' --client-container "$(hostname)" --image 'rawmark-ci:release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}'
+          builder='rawmark-release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}'
+          if docker buildx inspect "$builder" >/dev/null 2>&1; then docker buildx rm "$builder"; fi
+          if docker context inspect "$builder-context" >/dev/null 2>&1; then docker context rm "$builder-context"; fi
           rm -rf /tmp/rawmark-release-auth

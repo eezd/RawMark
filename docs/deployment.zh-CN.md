@@ -54,9 +54,9 @@ RAWMARK_DATA_DIR=/your/storage/rawmark/data \
 
 ## 预构建镜像与原生程序
 
-Gitea 发布 `git.134333.xyz/eezd/rawmark:<版本>`，支持 Linux amd64 和 arm64。需要可控升级时请固定版本标签。只有 Gitea 更新 `latest`；操作者运行手动同步后，GHCR 才会收到版本标签。安装前先核对 Releases 和软件包公开状态。仓库 Compose 文件继续支持源码构建。
+Forgejo 发布 `git.134333.xyz/eezd/rawmark:<版本>`，支持 Linux amd64 和 arm64。请固定版本标签；发布和 GHCR 手动同步都不更新 `latest`。安装前先核对 Releases 和软件包公开状态。仓库 Compose 文件继续支持源码构建。
 
-[Gitea Releases 页面](https://git.134333.xyz/eezd/RawMark/releases) 提供 Linux、Windows 和 macOS 的 amd64 与 arm64 原生压缩包及 `SHA256SUMS`。下载对应系统和架构，先核对校验和再解压：
+[Forgejo Releases 页面](https://git.134333.xyz/eezd/RawMark/releases) 提供 Linux、Windows 和 macOS 的 amd64 与 arm64 原生压缩包及 `SHA256SUMS`。下载对应系统和架构，先核对校验和再解压：
 
 ```sh
 sha256sum --ignore-missing --check SHA256SUMS
@@ -168,12 +168,16 @@ Bearer 认证升级需要前后端一起发布。旧 Cookie 页面不能继续�
 
 `runtime/` 不入库：`builds/` 保存独立构建，`current` 指向活动产物，`config/rawmark.env` 配置 RAWMARK_DATA、RAWMARK_VAULT、RAWMARK_ADDR，`data/` 保存数据库、笔记和附件，`backups/` 保存迁移备份。脚本使用宿主 Go、Node 和锁定 pnpm，不安装全局工具链。候选检查、构建和合成数据冒烟通过后才切换服务；失败恢复旧产物和 unit。启停共用 `runtime/.deploy.lock`，构建记录包含完整 SHA、dirty 状态和时间。本地构建允许未提交源码。
 
-Gitea 是唯一主仓库，`origin` 指向 Gitea。普通 `git push` 只更新 Gitea 的 Git 引用，不触发检查、构建、发布、部署或 GitHub 同步。
+Forgejo 是唯一主仓库，`origin` 指向 `https://git.134333.xyz/eezd/RawMark.git`。普通 `git push` 只更新 Git 引用，不触发检查、构建、发布、部署或 GitHub 同步。
 
-设置 `GITEA_TOKEN` 后运行 `/srv/RawMark/release.sh <远端分支>`。客户端可以从任意目录运行：固定远端 SHA，从可信 `main` 调度手动工作流。工作流只用 `ALL_GITEA_TOKEN` 发布，候选构建环境不传递该令牌。构建 Linux/macOS/Windows 的 amd64/arm64 六个包和 Linux 双架构镜像，验收 Gitea 原件与 OCI 摘要后最后上传 `release-complete.json`。不写 GitHub、不合并分支、不更新本地服务。
+设置 `FORGEJO_TOKEN` 后运行 `/srv/RawMark/release.sh <远端分支>`。客户端可从任意目录运行：固定远端完整 SHA，从可信 `main` 调度 `.forgejo/workflows/release.yml`。合法 Secret `RELEASE_TOKEN` 映射到 `FORGEJO_RELEASE_TOKEN`，候选构建环境不传递令牌。六个 Linux/macOS/Windows amd64/arm64 程序包、静态 demo 和 Linux 双架构 OCI 在临时工作区构建；完成检查后创建草稿、TAG、上传附件和版本镜像。逐项下载校验包、元数据、TAG 和匿名双架构拉取，转为正式版本后最后写入并读回 `release-complete.json`。不写 GitHub、不合并分支、不更新本地服务。
 
-GitHub 对外同步只能由操作者手动执行 `/srv/RawMark/sysnc-github.sh`。脚本读取 Gitea 远端，仅同步已公开的 `main`、`dev`、范围内的 TAG 和已验收正式版本；不构建、不强推、不删除。运行前显式设置 `GITEA_TOKEN`、`GITHUB_TOKEN`，复制镜像时另需 `skopeo` 和 `REGISTRY_AUTH_FILE`。脚本要求 GitHub 仓库级 Actions 已关闭，但不改变该设置；缺少完成凭证的历史版本报告为未同步，不篡改既有产物。
+GitHub 对外同步只能由操作者手动执行 `/srv/RawMark/sysnc-github.sh`。脚本读取 Forgejo 远端，只快进同步已批准的公开 `main`、`dev`、范围内 TAG 和已验收正式版本；不构建、不强推、不删除。显式设置 `FORGEJO_TOKEN`、`GITHUB_TOKEN`，镜像复制另需 `skopeo` 和 `REGISTRY_AUTH_FILE`。脚本核对 GitHub Actions 已关闭，但不改变设置。GitHub 只接收六包、`SHA256SUMS`、`build.json` 和版本镜像，不接收内部完成记录或 demo。当前 GitHub 分支可能与本地来源分叉；不能快进时停止，由操作者决定，不为首次同步自动重写历史。
 
-版本为提交 UTC 日期加固定八位哈希。说明基于同分支父提交图中距离最近、仅在 Gitea 验收通过的祖先版本（距离相同时，依次按完成时间较晚、TAG 字典序优先）；首发正文为 `init`。冻结基线前核对 Gitea 正式 Release、TAG 提交、完成附件及 `build.json` 的 SHA-256。`20261030-32c1c254` 等缺少完成证明的旧版本不作为基线；新流程基线核验失败则停止发布。所有分支发布固定版本标签，只有 main 来源版本推进 latest，旧版本重试不倒退。检查或打包失败且尚无程序包检查点时，保留原预约供重试，但不阻止修复提交发版；已有程序包检查点或进入发布阶段后，仍须先恢复该版本。失败保留原件和持久发布记录，只补缺口；不得重建覆盖已有版本。
+版本为提交 UTC 日期加八位 SHA。发布说明取同分支已验收的最近祖先（父边最短距离；等距时按正式发布时间降序、TAG 升序），没有基线时严格为 `init`；同分支历史重写而失去基线时停止。正式历史以 Forgejo Release、TAG、`build.json` 和完成标记为准，损坏记录停止发布。同 SHA 跨分支复用原正式版本，不改变来源或说明。只发布不可变版本镜像，不操作 `latest`。
+
+工作流使用 `docker` 标签、仓库级并发组和 `cancel-in-progress: false`；首次接入须实测 A 占用、B 等待及取消 A 后 B 继续。不固定 Runner、不挂载宿主项目目录，不使用 Generic Packages、持久原件或恢复检查点。远程 TLS DIND 使用本次任务独有的 Docker context 和 Buildx builder，结束后精确清理。
+
+上传前失败只丢弃临时产物，不阻塞新 SHA。同版未完成时，必须通过注解 TAG 的来源和任务信息、草稿及 `build.json` 核实归属，确认旧任务已终止，才精确删除该版本的 Release/附件和版本镜像，从原 SHA 全量重建；正确 TAG 保留，不改指向。完成记录存在但不匹配、陌生内容、任务在途、删除结果不明时停止，不自动重试删除。同版已完成时验收后零写入复用，不覆盖。重跑旧版须从可信 `main` 使用原 `source_branch`、完整 `source_sha` 和新 `request_id`；`release.sh <分支>` 会取当前尖端，不能冒充原版重跑。
 
 从旧 Docker 实例迁移后应停止旧容器并关闭自动重启。若新实例已有写入，不可直接启动旧数据副本回退；先停服并处理新增数据。运行配置和迁移备份不得提交到 Git。

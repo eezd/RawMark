@@ -67,14 +67,14 @@ class SelectionTests(unittest.TestCase):
     def test_first_release_notes_are_exact_init(self):
         self.assertEqual(manual.release_notes(None,'a'*40),'init')
     def test_other_branch_is_not_used_as_baseline(self):
-        r={'complete':True,'gitea_only':True,'source_branch':'main','source_sha':'a','completed_at':1,'version':'v'}
+        r={'complete':True,'forgejo_only':True,'source_branch':'main','source_sha':'a','completed_at':1,'version':'v'}
         self.assertIsNone(manual.select_baseline([r],'dev','b'))
     def test_rewritten_branch_cannot_look_like_first_release(self):
-        r={'complete':True,'gitea_only':True,'source_branch':'dev','source_sha':'a','completed_at':1,'version':'v'}
+        r={'complete':True,'forgejo_only':True,'source_branch':'dev','source_sha':'a','completed_at':1,'version':'v'}
         with patch.object(manual,'run',return_value='b'):
             with self.assertRaisesRegex(ValueError,'baseline'):manual.select_baseline([r],'dev','b')
     def test_closest_ancestor_wins(self):
-        records=[{'complete':True,'gitea_only':True,'source_branch':'dev','source_sha':c,'completed_at':1,'version':c} for c in ('a','b')]
+        records=[{'complete':True,'forgejo_only':True,'source_branch':'dev','source_sha':c,'completed_at':1,'version':c} for c in ('a','b')]
         with patch.object(manual,'run',return_value='c a\na b\nb'):
             self.assertEqual(manual.select_baseline(records,'dev','c')['source_sha'],'a')
 if __name__=='__main__':unittest.main()
@@ -89,10 +89,10 @@ class ClientTests(unittest.TestCase):
         import os
         client=Path(__file__).resolve().parents[2]/'release.sh'
         with tempfile.TemporaryDirectory() as d:
-            env=dict(os.environ);env.pop('GITEA_TOKEN',None)
+            env=dict(os.environ);env.pop('FORGEJO_TOKEN',None)
             result=subprocess.run(['bash',str(client),'feature/example'],cwd=d,env=env,capture_output=True,text=True)
             self.assertEqual(result.returncode,1)
-            self.assertIn('GITEA_TOKEN',result.stderr)
+            self.assertIn('FORGEJO_TOKEN',result.stderr)
 
 class RemoteClientTests(unittest.TestCase):
     def invoke_client(self, *, bad_sha=False, bad_digest=False, draft=False, dispatch_error=False):
@@ -108,9 +108,9 @@ class RemoteClientTests(unittest.TestCase):
             url=request.full_url;calls.append(request)
             if '/branches/' in url:return Response({'commit':{'id':sha}})
             if '/git/commits/' in url:return Response({'commit':{'committer':{'date':'2026-11-09T10:00:00Z'}}})
-            if '/dispatches?' in url:
+            if url.endswith('/dispatches'):
                 if dispatch_error:raise urllib.error.URLError('uncertain post')
-                return Response({'workflow_run_id':123})
+                return Response({'id':123,'run_number':7})
             if '/actions/runs/' in url:return Response({'status':'completed','conclusion':'success'})
             assets = [{'name':name,'browser_download_url':'https://git.134333.xyz/download/'+name}
                       for name in ('build.json','release-complete.json')]
@@ -124,7 +124,7 @@ class RemoteClientTests(unittest.TestCase):
         from unittest.mock import Mock
         opener=Mock();opener.open.side_effect=open_request
         output=io.StringIO();code=0
-        with patch.object(sys,'argv',['release.sh','feature/demo']),patch.dict(os.environ,{'GITEA_TOKEN':'fixture-only'}),patch.object(urllib.request,'build_opener',return_value=opener),contextlib.redirect_stdout(output),contextlib.redirect_stderr(output):
+        with patch.object(sys,'argv',['release.sh','feature/demo']),patch.dict(os.environ,{'FORGEJO_TOKEN':'fixture-only'}),patch.object(urllib.request,'build_opener',return_value=opener),contextlib.redirect_stdout(output),contextlib.redirect_stderr(output):
             try:exec(compile(client,'release-client','exec'),{})
             except SystemExit as error:code=error.code
         return code,calls,output.getvalue()
@@ -136,6 +136,8 @@ class RemoteClientTests(unittest.TestCase):
         self.assertEqual(len(posts),1)
         body=json.loads(posts[0].data)
         self.assertEqual(body['ref'],'refs/heads/main')
+        self.assertTrue(body['return_run_info'])
+        self.assertIn('/actions/runs/123', '\n'.join(r.full_url for r in calls))
         self.assertEqual(body['inputs']['source_branch'],'feature/demo')
         self.assertEqual(body['inputs']['source_sha'],'a'*40)
     def test_draft_release_cannot_succeed(self):self.assertEqual(self.invoke_client(draft=True)[0],1)

@@ -39,7 +39,7 @@ RawMark is built for **single-user, self-hosted use**. It currently does not off
 
 With Docker installed:
 
-Choose a version from [Gitea Releases](https://git.134333.xyz/eezd/RawMark/releases) and replace `YYYYMMDD-xxxxxxxx` with its version tag.
+Choose a version from [Forgejo Releases](https://git.134333.xyz/eezd/RawMark/releases) and replace `YYYYMMDD-xxxxxxxx` with its version tag.
 
 ```sh
 docker run -d --name rawmark --restart unless-stopped \
@@ -50,7 +50,7 @@ docker run -d --name rawmark --restart unless-stopped \
 
 Open **http://localhost:21000** and set your password on first use. A new, empty instance starts with seven English example notes; edit or delete them and begin writing. Data lives in the Docker volume `rawmark-data` and persists when you recreate the container with the same volume.
 
-Docker supports Linux amd64 and arm64. Native programs are available for Linux, Windows, and macOS on amd64 and arm64. Download them from [Gitea Releases](https://git.134333.xyz/eezd/RawMark/releases), or build from source using the deployment guide.
+Docker supports Linux amd64 and arm64. Native programs are available for Linux, Windows, and macOS on amd64 and arm64. Download them from [Forgejo Releases](https://git.134333.xyz/eezd/RawMark/releases), or build from source using the deployment guide.
 
 [Try the online editor](https://eezd.github.io/RawMark/) without installing anything. Demo edits are temporary and reset on refresh; the demo does not provide a server-backed workspace.
 

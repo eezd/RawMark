@@ -26,7 +26,7 @@
 | `web/src/pages/settings/`、`web/src/common/` | 私有设置界面，以及共享 API、组件、工具、外观、插件 host/SDK |
 | `web/src/http/`、`web/src/router/`、`web/src/pinia/stores/` | 请求隔离、登录/权限守卫与共享状态 |
 | `web/vite.config.ts`、`web/embed.go`、`web/embed_dev.go` | 前端生成配置及正式/开发模式 Go 静态资源适配 |
-| `scripts/`、`scripts/tests/`、`.gitea/workflows/` | 开发、检查、打包、冒烟、原生部署与 Gitea 手动发布 |
+| `scripts/`、`scripts/tests/`、`.forgejo/workflows/` | 开发、检查、打包、冒烟、原生部署与 Forgejo 手动发布 |
 | `deploy/`、`Dockerfile` | 部署模板、公开示例和镜像；真实原生运行目录为被忽略的 `runtime/` |
 
 - **关键数据流**：浏览器读取原始 Markdown → CodeMirror 保存原文并携带 revision 条件 → vault 原子写入；外部文件修改 → watch 快照 → search 索引事务 → events 通知 → 浏览器同步。不能用预览 HTML 替代正文真源。
@@ -45,8 +45,8 @@
 | 完整检查 | `sh scripts/ci-check.sh development` | Python 测试、锁定依赖、前端检查/构建、Go 开发/生产模式检查和强制非 root 权限测试；会生成产物及临时文件，root 下用 `setpriv` 切换数字 UID/GID，不需要专用账号 |
 | 本地构建与打包 | `pnpm -C web build`；随后 `sh scripts/ci-package.sh development` | 前端产物在 `web/dist`；打包写入 `package/`、`downloads/`，并用临时合成数据运行 Linux amd64 冒烟；`release` 模式编译六平台 |
 | 本地服务部署 | `./start.sh`；`./stop.sh`；只读状态入口 `./status.sh` | 前两者改变实际 systemd 服务，需明确授权；`start.sh` 还会检查、构建、冒烟并切换 `runtime/current`，不是轻量开发启动入口 |
-| 正式发布 | `./release.sh <remote-branch>` | `GITEA_TOKEN` 分派 Gitea 手动发布；普通 push 只更新 Gitea Git 引用，不检查、构建、发布、部署或同步 |
-| 手动同步 | `./sysnc-github.sh` | 仅操作者执行；从 Gitea 同步已公开范围的 `main`、`dev`、TAG 和已验收版本到 GitHub/GHCR，不修改仓库设置 |
+| 正式发布 | `./release.sh <remote-branch>` | `FORGEJO_TOKEN` 分派 Forgejo 手动发布；普通 push 只更新 Git 引用，不检查、构建、发布、部署或同步 |
+| 手动同步 | `./sysnc-github.sh` | 仅操作者执行；从 Forgejo 同步已公开范围的 `main`、`dev`、TAG 和已验收版本到 GitHub/GHCR，不修改仓库设置 |
 
 - **强制检查入口**：代码变更按影响执行下列检查；完整顺序及开发/正式模式覆盖以 `scripts/ci-check.sh` 为准，不能删减检查以制造通过结果。单纯文档修改核对事实、引用路径及 `git diff --check` 即可，不必启动服务。
 
@@ -95,7 +95,7 @@ go test ./web ./cmd/rawmark
 - `start.sh` 可直接由 root 执行，依赖私有运行配置，不需要专用账号。`rawmark-dev.service` 以 root 运行，保留 systemd 文件系统保护；项目脚本、构建目录、运行配置和 unit 不得允许不可信用户写入。部署使用 `runtime/.deploy.lock`，为当前工作区快照构建，再切换 `runtime/current` 和 unit。unit 的 `ExecStart`/`ExecStop` 调用根目录脚本的 `--systemd` 模式，不构建、不获取部署锁或调用 `systemctl`。默认监听 `127.0.0.1:21001`，不得据此推断实际私有配置或运行身份。
 - 原生激活须验证实际进程二进制摘要、健康接口及前端指纹，失败恢复旧产物、unit 与服务状态。旧实例与新实例不能同时写同一数据集；原生写入后不能再启动旧副本造成数据分叉。容器默认 nonroot `65532:65532`；Compose 默认发布到所有网卡的 21000 端口，与原生回环监听不同。
 - 完整恢复通过 `internal/backup` 的校验、回退备份和 prepared → applying → verifying 状态机；清除会话、重建索引，HTTP 初始化通过后才提交，失败回退。不能绕过这些步骤或用真实笔记做恢复测试。
-- 发布入口以 `release.sh`、`scripts/manual-release.py` 和 `.gitea/workflows/release.yml` 为准：可信 main 控制器与候选源码分离，候选构建环境不传递发布令牌；固定远端完整 SHA，版本采用提交 UTC 日期与 8 位 SHA。标签及已发布产物不可变，重试复用原产物；只有 main 可推进 Gitea `latest` 且不能降级。Gitea 验收后最后上传 `release-complete.json`，发布不写 GitHub。
+- 发布入口以 `release.sh`、`scripts/manual-release.py` 和 `.forgejo/workflows/release.yml` 为准：可信 main 控制器与候选源码分离，候选构建环境不传递发布令牌；固定远端完整 SHA，版本采用提交 UTC 日期与 8 位 SHA。`FORGEJO_TOKEN` 用于客户端，合法 Secret `RELEASE_TOKEN` 映射到 `FORGEJO_RELEASE_TOKEN`。工作流按 `docker` 标签调度，不依赖 Runner 身份或项目宿主挂载；仓库级并发组 `cancel-in-progress: false`，首次实测排队及取消后继续。产物只存临时目录，不用 Generic Packages、持久原件或检查点；正式历史只认 Forgejo Release、TAG、`build.json` 和完成标记。未完成同版须核实旧任务已结束与来源归属后，精确清理该版本 Release/镜像，从原 SHA 全量重建，保留正确 TAG；完成或陌生内容不覆盖，同 SHA 跨分支零写入复用。只发布不可变版本镜像，不更新 `latest`，不写 GitHub。
 - `sysnc-github.sh` 是唯一 GitHub 写入入口，运行前核对 GitHub Actions 已关闭，不修改仓库设置；只快进同步批准的引用，不强推、不删除。六平台附件逐项核对原件，版本镜像复制保留 OCI 摘要，缺少完成凭证的历史版本不冒充已验收。
 - 远端分派结果不明时先核实 request_id，不重复提交；本地中断不会取消远端发布。发布不会部署服务、合并分支或切换 Pages。CI 资源只按当前任务标识清理，不能全局 prune；完整运维和回滚说明见 `docs/deployment.zh-CN.md`。
 

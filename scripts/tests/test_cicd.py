@@ -57,10 +57,10 @@ class BundleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checksum mismatch'):
             release.verify_bundle()
 
-    def test_archive_at_cdn_budget_is_rejected(self):
-        with patch.object(release, 'UPLOAD_LIMIT', 7):
-            with self.assertRaisesRegex(ValueError, 'CDN upload budget'):
-                release.bundle('development')
+    def test_empty_archive_is_rejected(self):
+        Path('downloads/rawmark_0.1.1_linux_amd64.tar.gz').write_bytes(b'')
+        with self.assertRaisesRegex(ValueError, 'is empty'):
+            release.bundle('development')
 
     def test_receipt_from_other_commit_is_rejected(self):
         release.bundle('development')
@@ -123,7 +123,7 @@ class PublicationTests(unittest.TestCase):
         redirected = release.SafeRedirect().redirect_request(request, None, 302, 'Found', {}, 'https://objects.example/asset')
         self.assertFalse(redirected.has_header('Authorization'))
 
-    def test_gitea_client_requires_a_credential(self):
+    def test_forgejo_client_requires_a_credential(self):
         with self.assertRaisesRegex(ValueError, 'Missing credential'):
             release.API('https://git.example/api/v1', '')
 
@@ -155,12 +155,12 @@ class PublicationTests(unittest.TestCase):
         result = Mock(returncode=1, stderr='403 Forbidden', stdout='')
         with patch.object(release.subprocess, 'run', return_value=result):
             with self.assertRaisesRegex(RuntimeError, '403 Forbidden'):
-                release.registry_digest(release.GITEA_IMAGE, '0.1.1')
+                release.registry_digest(release.FORGEJO_IMAGE, '0.1.1')
 
     def test_registry_missing_tag_is_distinct_from_other_failures(self):
         result = Mock(returncode=1, stderr='manifest unknown', stdout='')
         with patch.object(release.subprocess, 'run', return_value=result):
-            self.assertIsNone(release.registry_digest(release.GITEA_IMAGE, '0.1.1'))
+            self.assertIsNone(release.registry_digest(release.FORGEJO_IMAGE, '0.1.1'))
 
 class SyncRegistryTests(unittest.TestCase):
     def setUp(self):

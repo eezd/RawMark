@@ -1,5 +1,7 @@
-"""Release reservation recovery and baseline selection with synthetic state/history."""
-import contextlib
+"""Exercise disposable Forgejo publication and precise failed-version cleanup."""
+
+import copy
+import hashlib
 import importlib.util
 import json
 import os
@@ -11,239 +13,189 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-spec = importlib.util.spec_from_file_location('manual', Path(__file__).resolve().parents[1] / 'manual-release.py')
+from release import COMPLETION, digest, write_json
+spec = importlib.util.spec_from_file_location('manual_recovery', Path(__file__).resolve().parents[1] / 'manual-release.py')
 manual = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(manual)
+SHA = 'a' * 40
+VERSION = '20261121-aaaaaaaa'
+IMAGE_DIGEST = 'sha256:' + 'b' * 64
+PLATFORMS = {'linux/amd64': 'sha256:' + 'c' * 64, 'linux/arm64': 'sha256:' + 'd' * 64}
 
 
 class FakeAPI:
-    def __init__(self):
-        self.current_release = None
-        self.files = {}
-        self.writes = []
-        self.tag_sha = None
-        self.interrupt = None
+    def __init__(self, registry):
+        self.registry, self.tags, self.releases, self.blobs, self.writes = registry, {}, {}, {}, []
+        self.old_status = 'failure'
 
-    def request(self, path):
-        return {'login': 'eezd'}
+    def pages(self, path):
+        return list(self.releases.values())
 
     def release(self, version):
-        if self.current_release and self.current_release['tag_name'] == version:
-            return self.current_release
+        return self.releases.get(version)
 
     def assets(self, release):
-        return [{'name': name} for name in self.files]
+        return [{'name': name} for name in self.blobs[release['tag_name']]]
 
     def asset_bytes(self, release, name):
-        return self.files[name]
-
-    def repo(self, path='', **kwargs):
-        if not path:
-            return {'permissions': {'push': True}}
-        if path.startswith('/branches/'):
-            return {'commit': {'id': os.environ['SOURCE_SHA']}}
-        if path.startswith('/commits/'):
-            return {'sha': self.tag_sha} if self.tag_sha else None
-        if path.startswith('/tags/'):
-            return {'name': path.removeprefix('/tags/'), 'commit': {'sha': self.tag_sha}} if self.tag_sha else None
-        if path == '/releases':
-            self.current_release = {**kwargs['data'], 'id': 1, 'prerelease': False}
-            return self.current_release
-        if path == '/releases/1' and kwargs['method'] == 'PATCH':
-            self.current_release.update(kwargs['data'])
-            self.writes.append('publish')
-            return self.current_release
-        raise AssertionError(path)
+        return self.blobs[release['tag_name']][name]
 
     def upload(self, release, path):
-        if path.name in self.files:
-            assert self.files[path.name] == path.read_bytes()
-            return
-        if path.name == self.interrupt:
-            raise KeyboardInterrupt()
-        self.files[path.name] = path.read_bytes()
-        self.writes.append(path.name)
+        self.writes.append(('upload', path.name))
+        self.blobs[release['tag_name']][path.name] = path.read_bytes()
+
+    def repo(self, path, method=None, data=None, missing=False):
+        if method:
+            self.writes.append((method, path))
+        if path.startswith('/actions/runs/'):
+            return {'status': self.old_status, 'event': 'workflow_dispatch', 'workflow_id': 'release.yml',
+                    'event_payload': json.dumps({'inputs': {'source_branch': 'dev', 'source_sha': SHA}})}
+        if path.startswith('/tags/'):
+            return self.tags.get(path.removeprefix('/tags/'))
+        if path == '/tags':
+            self.tags[data['tag_name']] = {'name': data['tag_name'], 'commit': {'sha': data['target']}, 'message': data['message']}
+        elif path == '/releases':
+            version = data['tag_name']
+            value = {**data, 'id': len(self.releases) + 1, 'prerelease': False, 'published_at': '2026-11-21T00:00:00Z'}
+            self.releases[version], self.blobs[version] = value, {}
+            return value
+        elif path.startswith('/releases/'):
+            release = next(r for r in self.releases.values() if str(r['id']) == path.split('/')[-1])
+            if method == 'PATCH':
+                release.update(data)
+            elif method == 'DELETE':
+                del self.blobs[release['tag_name']]
+                del self.releases[release['tag_name']]
+        else:
+            raise AssertionError(path)
+
+    def request(self, path, method):
+        self.writes.append((method, path))
+        assert path == '/packages/eezd/container/rawmark/' + VERSION
+        del self.registry[VERSION]
 
 
 class RecoveryTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        self.state = Path(temporary.name)
-        self.stack = contextlib.ExitStack()
-        self.addCleanup(self.stack.close)
-        for name, value in (
-            ('STATE', self.state),
-            ('gitea_client', FakeAPI),
-            ('ancestor', lambda a, b: True),
-            ('run', lambda *args, **kwargs: '1794215712' if args[:3] == ('git', 'show', '-s') else ''),
-            ('git_env', lambda api: {}),
-        ):
-            self.stack.enter_context(patch.object(manual, name, value))
-        self.stack.enter_context(patch.dict(os.environ, {'SOURCE_BRANCH': 'dev', 'CI_RUN_ID': '1', 'GITHUB_REF': 'refs/heads/main'}))
+        self.root = Path(temporary.name)
+        self.registry = {}
+        self.api = FakeAPI(self.registry)
+        self.builds = 0
+        self.enterContext(patch.dict(os.environ, {'CI_RUN_ID': '1', 'CI_RUN_ATTEMPT': '1'}))
+        self.enterContext(patch.object(manual, 'registry_digest', side_effect=lambda image, version: self.registry.get(version)))
+        self.enterContext(patch.object(manual, 'copy_image', side_effect=self.copy_image))
+        self.enterContext(patch.object(manual, 'image_metadata', return_value=(IMAGE_DIGEST, PLATFORMS)))
+        self.enterContext(patch.object(manual, 'verify_image'))
+        self.enterContext(patch.object(manual, 'build_originals', side_effect=self.build))
 
-    def fail_build(self, sha, failure):
-        with patch.dict(os.environ, {'SOURCE_SHA': sha}), patch.object(manual.subprocess, 'run', side_effect=failure) as build:
-            with self.assertRaises(type(failure)):
-                manual.execute()
-        return build
+    def copy_image(self, source, reference):
+        self.registry[reference.rsplit(':', 1)[1]] = IMAGE_DIGEST
 
-    def record(self, sha):
-        return next(p for p in (self.state / 'releases').glob('*.json') if json.loads(p.read_text())['source_sha'] == sha)
-
-    def test_failed_checks_allow_a_fixed_commit_and_preserve_retry_identity(self):
-        self.fail_build('a' * 40, subprocess.CalledProcessError(1, ['lint']))
-        path = self.record('a' * 40)
-        original = path.read_bytes()
-        self.assertFalse(manual.blocks_new_release(path))
-        build = self.fail_build('b' * 40, subprocess.CalledProcessError(1, ['lint']))
-        self.assertEqual(build.call_count, 1)
-        self.assertEqual(path.read_bytes(), original)
-        self.fail_build('a' * 40, subprocess.CalledProcessError(1, ['lint']))
-        self.assertEqual(path.read_bytes(), original)
-
-    def test_packaging_failure_allows_a_fixed_commit(self):
-        with patch.dict(os.environ, {'SOURCE_SHA': 'a' * 40}), patch.object(manual.subprocess, 'run', side_effect=[None, subprocess.CalledProcessError(1, ['package'])]) as build:
-            with self.assertRaises(subprocess.CalledProcessError):
-                manual.execute()
-        self.assertEqual(build.call_count, 2)
-        self.assertFalse(manual.blocks_new_release(self.record('a' * 40)))
-        self.fail_build('b' * 40, subprocess.CalledProcessError(1, ['lint']))
-
-    def test_interrupted_checks_do_not_block_a_fixed_commit(self):
-        self.fail_build('a' * 40, KeyboardInterrupt())
-        self.assertFalse(manual.blocks_new_release(self.record('a' * 40)))
-        self.fail_build('b' * 40, subprocess.CalledProcessError(1, ['lint']))
-
-    def test_package_checkpoint_blocks_other_versions_even_before_phase_update(self):
-        self.fail_build('a' * 40, subprocess.CalledProcessError(1, ['lint']))
-        path = self.record('a' * 40)
-        cache = path.with_suffix('')
-        (cache / 'packages.json').write_text('{}')
-        self.assertTrue(manual.blocks_new_release(path))
-        with patch.dict(os.environ, {'SOURCE_SHA': 'b' * 40}):
-            with self.assertRaisesRegex(ValueError, 'pending release'):
-                manual.execute()
-        self.assertTrue((cache / 'packages.json').exists())
-
-    def test_old_reservation_cannot_bypass_another_pending_publication(self):
-        for sha in ('a' * 40, 'b' * 40):
-            self.fail_build(sha, subprocess.CalledProcessError(1, ['lint']))
-        path = self.record('b' * 40)
-        record = json.loads(path.read_text())
-        record['phase'] = 'publishing'
-        path.write_text(json.dumps(record))
-        with patch.dict(os.environ, {'SOURCE_SHA': 'a' * 40}):
-            with self.assertRaisesRegex(ValueError, 'pending release'):
-                manual.execute()
-
-    def test_legacy_pending_records_remain_protected(self):
-        sha = 'a' * 40
-        self.fail_build(sha, subprocess.CalledProcessError(1, ['lint']))
-        path = self.record(sha)
-        record = json.loads(path.read_text())
-        del record['phase']
-        del record['gitea_only']
-        manual.write_json(path, record)
-        original = path.read_bytes()
-        self.assertTrue(manual.blocks_new_release(path))
-        for source, error in ((sha, 'Historical partial release'), ('b' * 40, 'pending release')):
-            with patch.dict(os.environ, {'SOURCE_SHA': source}), self.assertRaisesRegex(ValueError, error):
-                manual.execute()
-        self.assertEqual(path.read_bytes(), original)
-
-    def test_invalid_new_baseline_stops_before_reservation_and_tag(self):
-        api, record = published_baseline()
-        self.state.joinpath('releases').mkdir()
-        manual.write_json(self.state / 'releases' / (record['version'] + '.json'), record)
-        for issue, error in (
-            ('draft', 'not formally published'), ('tag', 'Published tag differs'),
-            ('marker', 'Release completion differs'), ('hash', 'Published asset differs: build.json'),
-        ):
-            with self.subTest(issue=issue):
-                api, record = published_baseline()
-                if issue == 'draft':
-                    api.current_release['draft'] = True
-                elif issue == 'tag':
-                    api.tag_sha = 'c' * 40
-                elif issue == 'marker':
-                    api.files[manual.COMPLETION] = b'{}'
-                else:
-                    api.files['build.json'] = b'{}'
-                tip = 'b' * 40
-                original_run = manual.run
-                with (patch.dict(os.environ, {'SOURCE_SHA': tip}), patch.object(manual, 'gitea_client', return_value=api),
-                      patch.object(manual, 'run', side_effect=lambda *args: f'{tip} {record["source_sha"]}\n{record["source_sha"]}'
-                                   if args[:2] == ('git', 'rev-list') else original_run(*args)) as run,
-                      self.assertRaisesRegex(ValueError, error)):
-                    manual.execute()
-                self.assertEqual([call.args[1] for call in run.call_args_list], ['fetch', 'show', 'rev-list'])
-                self.assertEqual(list((self.state / 'releases').iterdir()), [self.state / 'releases' / (record['version'] + '.json')])
-                self.assertEqual(api.writes, [])
-
-    def test_partial_upload_and_missing_completion_retry_without_rebuilding(self):
-        sha = 'a' * 40
-        self.fail_build(sha, subprocess.CalledProcessError(1, ['lint']))
-        path = self.record(sha)
-        cache = path.with_suffix('')
-        version = cache.name
-        names = [manual.archive_name(version, platform) for platform in manual.PLATFORMS]
+    def build(self, cache, record):
+        self.builds += 1
         files = {}
-        for name in names + ['demo.zip']:
-            (cache / name).write_text(name)
-            files[name] = {'sha256': manual.digest(cache / name), 'size': len(name)}
-        (cache / 'SHA256SUMS').write_text(''.join(f'{files[name]["sha256"]}  {name}\n' for name in names))
-        manual.write_json(cache / 'packages.json', {'mode': 'release', 'commit': sha, 'version': version,
-                                                   'platforms': list(manual.PLATFORMS), 'files': files})
-        digest = 'sha256:' + '1' * 64
-        record = json.loads(path.read_text())
-        record['image_digest'] = digest
-        manual.write_json(path, record)
-        api = FakeAPI()
-        api.tag_sha = sha
-        manifest = {'manifests': [{'platform': {'os': 'linux', 'architecture': arch}, 'digest': digest}
-                                  for arch in ('amd64', 'arm64')]}
-        basic_run = manual.run
-        with (patch.dict(os.environ, {'SOURCE_SHA': sha, 'CI_RESOURCE_LABEL': 'fixture', 'HOSTNAME': 'fixture'}),
-              patch.object(manual, 'gitea_client', return_value=api),
-              patch.object(manual, 'run', side_effect=lambda *args: json.dumps(manifest) if '--raw' in args else basic_run(*args)),
-              patch.object(manual, 'registry_login'), patch.object(manual, 'verify_anonymous'),
-              patch.object(manual, 'registry_digest', return_value=digest),
-              patch.object(manual, 'image_digest', return_value=digest),
-              patch.object(manual.subprocess, 'run') as commands):
-            api.interrupt = 'build.json'
-            with self.assertRaises(KeyboardInterrupt):
-                manual.execute()
-            self.assertTrue(api.release(version)['draft'])
-            already_uploaded = list(api.writes)
-            self.assertTrue(already_uploaded)
-            api.interrupt = manual.COMPLETION
-            with self.assertRaises(KeyboardInterrupt):
-                manual.execute()
-            self.assertNotIn(manual.COMPLETION, api.files)
-            self.assertEqual(api.writes[len(already_uploaded):], ['build.json', 'publish'])
-            api.interrupt = None
-            manual.execute()
-            self.assertEqual(api.writes[-1], manual.COMPLETION)
-            self.assertEqual(json.loads(api.files[manual.COMPLETION]), manual.completion(json.loads(path.read_text())))
-            self.assertTrue(json.loads(path.read_text())['complete'])
-            self.assertTrue(all('smoke-docker.py' in call.args[0][1] for call in commands.call_args_list))
-            writes = api.writes.copy()
-            manual.execute()
-            self.assertEqual(api.writes, writes)
+        for name in (*manual.package_names(record['version']), 'demo.zip'):
+            path = cache / name
+            path.write_bytes(name.encode() + str(self.builds).encode())
+            files[name] = {'sha256': digest(path), 'size': path.stat().st_size}
+        metadata = {'schema': 1, 'version': record['version'], 'commit': record['source_sha'], 'mode': 'release',
+                    'platforms': list(manual.PLATFORMS), 'files': files, 'run_id': int(os.environ['CI_RUN_ID']),
+                    'runtime_tested': ['linux/amd64']}
+        write_json(cache / 'packages.json', metadata)
+        (cache / 'SHA256SUMS').write_text(''.join(files[n]['sha256'] + '  ' + n + '\n' for n in manual.package_names(record['version'])))
+        metadata.update(schema=2, source_sha=record['source_sha'], source_branch=record['source_branch'],
+                        previous_tag=record['previous_tag'], packages=[{'name': n, 'sha256': files[n]['sha256']}
+                                                                    for n in manual.package_names(record['version'])],
+                        image={'ref': manual.FORGEJO_IMAGE + ':' + record['version'], 'digest': IMAGE_DIGEST, 'platforms': PLATFORMS})
+        write_json(cache / 'build.json', metadata)
 
+    def publish(self, branch='dev', sha=SHA, version=VERSION):
+        with tempfile.TemporaryDirectory(dir=self.root) as directory:
+            manual.release_source(self.api, Path(directory), branch, sha, version)
 
-def published_baseline():
-    record = {'version': '20261109-aaaaaaaa', 'source_sha': 'a' * 40, 'source_branch': 'dev',
-              'gitea_only': True, 'complete': True, 'completed_at': 1, 'notes': 'init'}
-    api = FakeAPI()
-    api.tag_sha = record['source_sha']
-    api.current_release = {'name': 'RawMark ' + record['version'], 'tag_name': record['version'],
-                           'body': record['notes'], 'draft': False, 'prerelease': False}
-    build = json.dumps({key: record[key] for key in ('version', 'source_sha', 'source_branch')}).encode()
-    record['assets'] = {'build.json': manual.hashlib.sha256(build).hexdigest()}
-    api.files = {'build.json': build, manual.COMPLETION: json.dumps(manual.completion(record)).encode()}
-    return api, record
+    def fail_after_upload(self):
+        with patch.object(manual, 'verify_attachments', side_effect=RuntimeError('download interrupted')):
+            with self.assertRaisesRegex(RuntimeError, 'download interrupted'):
+                self.publish()
+        os.environ['CI_RUN_ID'] = '2'
+
+    def test_first_release_and_complete_cross_branch_reuse_have_zero_writes(self):
+        self.publish()
+        self.assertEqual(self.api.releases[VERSION]['body'], 'init')
+        self.assertEqual(self.registry, {VERSION: IMAGE_DIGEST})
+        self.assertIn(COMPLETION, self.api.blobs[VERSION])
+        self.api.writes.clear()
+        self.publish(branch='main')
+        self.assertEqual(self.builds, 1)
+        self.assertEqual(self.api.writes, [])
+
+    def test_partial_upload_is_precisely_deleted_and_fully_rebuilt_in_new_workspace(self):
+        self.fail_after_upload()
+        self.registry['unrelated'] = 'keep'
+        tag = copy.deepcopy(self.api.tags[VERSION])
+        self.publish()
+        self.assertEqual(self.builds, 2)
+        self.assertIn(('DELETE', '/packages/eezd/container/rawmark/' + VERSION), self.api.writes)
+        self.assertIn(('DELETE', '/releases/1'), self.api.writes)
+        self.assertEqual(self.api.tags[VERSION], tag)
+        self.assertEqual(self.registry['unrelated'], 'keep')
+
+    def test_running_old_task_is_never_cleaned(self):
+        self.fail_after_upload()
+        self.api.old_status = 'running'
+        self.api.writes.clear()
+        with self.assertRaisesRegex(ValueError, 'has not ended'):
+            self.publish()
+        self.assertEqual(self.api.writes, [])
+
+    def test_unknown_identity_and_sha_collision_are_not_cleaned(self):
+        self.fail_after_upload()
+        self.api.writes.clear()
+        with self.assertRaisesRegex(ValueError, 'Version collision'):
+            self.publish(sha='e' * 40)
+        self.api.tags[VERSION]['message'] = 'unknown legacy tag'
+        with self.assertRaisesRegex(ValueError, 'Unknown tag ownership'):
+            self.publish()
+        self.assertEqual(self.api.writes, [])
+
+    def test_bad_completion_and_completed_corrupt_package_are_never_cleaned(self):
+        self.publish()
+        marker = self.api.blobs[VERSION][COMPLETION]
+        self.api.blobs[VERSION][COMPLETION] = b'{}'
+        self.api.writes.clear()
+        with self.assertRaisesRegex(ValueError, 'completion differs'):
+            self.publish()
+        self.api.blobs[VERSION][COMPLETION] = marker
+        self.api.blobs[VERSION][manual.package_names(VERSION)[0]] = b'corrupt'
+        with self.assertRaisesRegex(ValueError, 'Package differs'):
+            self.publish()
+        self.assertEqual(self.api.writes, [])
+
+    def test_unknown_image_is_never_deleted(self):
+        self.fail_after_upload()
+        self.registry[VERSION] = 'sha256:' + 'e' * 64
+        self.api.writes.clear()
+        with self.assertRaisesRegex(ValueError, 'Unknown incomplete image'):
+            self.publish()
+        self.assertEqual(self.api.writes, [])
+
+    def test_failed_preupload_build_does_not_block_new_sha(self):
+        with patch.object(manual, 'build_originals', side_effect=RuntimeError('compile failed')):
+            with self.assertRaisesRegex(RuntimeError, 'compile failed'):
+                self.publish()
+        self.assertEqual(self.api.writes, [])
+        self.publish(sha='e' * 40, version='20261121-eeeeeeee')
+        self.assertIn('20261121-eeeeeeee', self.api.releases)
+
+    def test_named_docker_context_is_disposable_and_separate_from_builder(self):
+        calls = []
+        with patch.object(manual, 'run', side_effect=lambda *args: calls.append(args)):
+            manual.build_image(Path('image'), Path('out.oci'), {'version': VERSION, 'source_sha': SHA}, 'checksum')
+        self.assertEqual(calls[0], ('docker', 'context', 'create', 'rawmark-release-1-1-context'))
+        self.assertEqual(calls[-1], ('docker', 'context', 'rm', 'rawmark-release-1-1-context'))
+        self.assertIn(('docker', '--context', 'rawmark-release-1-1-context', 'buildx', 'rm', 'rawmark-release-1-1'), calls)
 
 
 class GraphBaselineTests(unittest.TestCase):
@@ -256,9 +208,7 @@ class GraphBaselineTests(unittest.TestCase):
         self.git('init', '-q')
         self.tree = self.git('mktree', input='')
         real_run = manual.run
-        self.patch = patch.object(manual, 'run', side_effect=lambda *args: real_run(*args, cwd=self.repo))
-        self.patch.start()
-        self.addCleanup(self.patch.stop)
+        self.enterContext(patch.object(manual, 'run', side_effect=lambda *args: real_run(*args, cwd=self.repo)))
 
     def git(self, *args, input=None):
         return subprocess.check_output(['git', '-C', str(self.repo), *args], input=input, text=True, env=self.env).strip()
@@ -267,21 +217,16 @@ class GraphBaselineTests(unittest.TestCase):
         return self.git('commit-tree', self.tree, *[value for parent in parents for value in ('-p', parent)], input=message + '\n')
 
     def record(self, version, sha, completed_at=1):
-        return {'complete': True, 'gitea_only': True, 'source_branch': 'dev', 'source_sha': sha,
+        return {'complete': True, 'forgejo_only': True, 'source_branch': 'dev', 'source_sha': sha,
                 'version': version, 'completed_at': completed_at}
 
-    def test_legacy_completion_is_excluded_even_if_it_is_the_closest_ancestor(self):
+    def test_legacy_completion_is_excluded(self):
         root = self.commit('verified baseline')
         tip = self.commit('legacy completion', root)
         legacy = self.record('legacy', tip, 2)
-        del legacy['gitea_only']
+        del legacy['forgejo_only']
         self.assertIsNone(manual.select_baseline([legacy], 'dev', tip))
         self.assertEqual(manual.select_baseline([legacy, self.record('new', root)], 'dev', tip)['version'], 'new')
-
-    def test_verified_baseline_needs_only_release_tag_marker_and_build(self):
-        api, record = published_baseline()
-        manual.verify_baseline(api, record)
-        self.assertEqual(api.writes, [])
 
     def test_merge_shortcut_wins_over_commit_set_size(self):
         a = self.commit('release A')
@@ -293,8 +238,7 @@ class GraphBaselineTests(unittest.TestCase):
         main = self.commit('main change 2', main)
         tip = self.commit('merge feature', main, feature)
         self.assertLess(int(self.git('rev-list', '--count', b + '..' + tip)), int(self.git('rev-list', '--count', a + '..' + tip)))
-        selected = manual.select_baseline([self.record('A', a), self.record('B', b, 2)], 'dev', tip)
-        self.assertEqual(selected['version'], 'A')
+        self.assertEqual(manual.select_baseline([self.record('A', a), self.record('B', b, 2)], 'dev', tip)['version'], 'A')
 
     def test_equal_distances_use_completion_time_then_tag(self):
         root = self.commit('root')
@@ -304,14 +248,24 @@ class GraphBaselineTests(unittest.TestCase):
         records = [self.record('old', left, 1), self.record('z', right, 2), self.record('a', left, 2)]
         self.assertEqual(manual.select_baseline(records, 'dev', tip)['version'], 'a')
 
-    def test_nonancestor_and_other_branch_are_excluded(self):
+    def test_nonancestor_other_branch_and_normal_progression(self):
         root = self.commit('root')
         selected = self.commit('selected', root)
         unrelated = self.commit('unrelated root')
         other = self.record('other branch', selected, 3)
         other['source_branch'] = 'main'
-        records = [self.record('valid', root), self.record('unrelated', unrelated, 2), other]
-        self.assertEqual(manual.select_baseline(records, 'dev', selected)['version'], 'valid')
+        self.assertEqual(manual.select_baseline([self.record('valid', root), self.record('unrelated', unrelated, 2), other],
+                                               'dev', selected)['version'], 'valid')
+        with self.assertRaisesRegex(ValueError, 'no longer contains'):
+            manual.select_baseline([self.record('unrelated', unrelated, 2)], 'dev', selected)
+        with patch.object(manual.subprocess, 'run', wraps=subprocess.run):
+            cwd = Path.cwd()
+            os.chdir(self.repo)
+            try:
+                self.assertTrue(manual.ancestor(root, selected))
+                self.assertFalse(manual.ancestor(selected, root))
+            finally:
+                os.chdir(cwd)
 
 
 if __name__ == '__main__':

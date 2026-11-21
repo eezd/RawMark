@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Build receipts and publish exact Gitea artifacts without rebuilding on retry."""
+"""Build receipts and publish exact RawMark artifacts to Forgejo."""
 
 import sys
-import base64
 import datetime
 import hashlib
 import json
@@ -13,7 +12,6 @@ import secrets
 import shutil
 import subprocess
 import tarfile
-import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -21,10 +19,9 @@ import zipfile
 
 
 REPOSITORY = 'eezd/RawMark'
-GITEA_IMAGE = 'git.134333.xyz/eezd/rawmark'
+FORGEJO_IMAGE = 'git.134333.xyz/eezd/rawmark'
 COMPLETION = 'release-complete.json'
 PLATFORMS = ('linux/amd64', 'linux/arm64', 'windows/amd64', 'windows/arm64', 'darwin/amd64', 'darwin/arm64')
-UPLOAD_LIMIT = 90_000_000
 DOWNLOADS = Path('downloads')
 
 
@@ -85,7 +82,7 @@ def bundle(mode):
         name = archive_name(version, platform)
         path = DOWNLOADS / name
         size = path.stat().st_size
-        require(size < UPLOAD_LIMIT, f'{name} exceeds the CDN upload budget')
+        require(size > 0, f'{name} is empty')
         files[name] = {'sha256': digest(path), 'size': size}
         checksums.append(f'{files[name]["sha256"]}  {name}\n')
     (DOWNLOADS / 'SHA256SUMS').write_text(''.join(checksums))
@@ -97,7 +94,7 @@ def bundle(mode):
             archive.writestr('.nojekyll', '')
             archive.writestr('rawmark-release.json', json.dumps({'version': version, 'commit': commit}))
         path = DOWNLOADS / 'demo.zip'
-        require(path.stat().st_size < UPLOAD_LIMIT, 'Demo exceeds the CDN upload budget')
+        require(path.stat().st_size > 0, 'Demo is empty')
         files[path.name] = {'sha256': digest(path), 'size': path.stat().st_size}
     write_json(DOWNLOADS / 'build.json', {
         'schema': 1, 'version': version, 'commit': commit, 'mode': mode,
@@ -119,7 +116,7 @@ def validate_build(build):
         names.add('demo.zip')
     require(set(build['files']) == names, 'Unexpected build files')
     for info in build['files'].values():
-        require(re.fullmatch(r'[0-9a-f]{64}', info['sha256']) and 0 < info['size'] < UPLOAD_LIMIT,
+        require(re.fullmatch(r'[0-9a-f]{64}', info['sha256']) and 0 < info['size'],
                 'Invalid build file metadata')
 
 
@@ -129,7 +126,7 @@ def verify_bundle():
     expected = PLATFORMS if build['mode'] == 'release' else PLATFORMS[:1]
     for name, info in build['files'].items():
         path = DOWNLOADS / name
-        require(path.stat().st_size == info['size'] < UPLOAD_LIMIT, f'Invalid size: {name}')
+        require(path.stat().st_size == info['size'], f'Invalid size: {name}')
         require(digest(path) == info['sha256'], f'Checksum mismatch: {name}')
     checksums = ''.join(f'{build["files"][archive_name(build["version"], p)]["sha256"]}  '
                         f'{archive_name(build["version"], p)}\n' for p in expected)
@@ -178,10 +175,11 @@ class API:
     def __init__(self, root, token):
         require(token, f'Missing credential for {root}')
         self.root, self.token = root.rstrip('/'), token
+        self.headers = {'Authorization': 'token ' + token, 'User-Agent': 'RawMark Forgejo release'}
         self.opener = urllib.request.build_opener(SafeRedirect())
 
     def request(self, path, data=None, method=None, *, missing=False, content_type=None):
-        headers = {'Authorization': 'token ' + self.token, 'User-Agent': 'RawMark Gitea release'}
+        headers = self.headers.copy()
         if data is not None and not isinstance(data, bytes):
             data = json.dumps(data).encode()
             content_type = 'application/json'
@@ -197,6 +195,16 @@ class API:
             raise RuntimeError(f'{method or "GET"} {path}: HTTP {error.code}') from error
         return json.loads(body) if body else None
 
+    def pages(self, path, *, missing=False):
+        separator = '&' if '?' in path else '?'
+        for page in range(1, 10001):
+            items = self.request(f'{path}{separator}page={page}&limit=50', missing=missing and page == 1)
+            if not items:
+                return
+            require(isinstance(items, list), f'Invalid listing: {path}')
+            yield from items
+        raise ValueError(f'Pagination did not finish: {path}')
+
     def repo(self, path='', **kwargs):
         return self.request('/repos/' + REPOSITORY + path, **kwargs)
 
@@ -210,11 +218,11 @@ class API:
         url = asset['browser_download_url']
         require(urllib.parse.urlsplit(url).netloc in {
             urllib.parse.urlsplit(self.root).netloc, 'git.134333.xyz',
-        }, 'Unexpected Gitea release download host')
-        # Use the same configured Gitea origin as the API (also inside CI's private network).
+        }, 'Unexpected Forgejo release download host')
+        # Use the configured Forgejo origin, never forward credentials across hosts.
         public = urllib.parse.urlsplit(url)
         url = self.root.removesuffix('/api/v1') + public.path + ('?' + public.query if public.query else '')
-        request = urllib.request.Request(url, headers={'Authorization': 'token ' + self.token})
+        request = urllib.request.Request(url, headers=self.headers)
         with self.opener.open(request, timeout=120) as response:
             return response.read()
 
@@ -232,7 +240,6 @@ class API:
             return
         require(release['draft'] != (path.name == COMPLETION),
                 f'Asset cannot be added in this release state: {path.name}')
-        require(path.stat().st_size < UPLOAD_LIMIT, f'Asset exceeds CDN budget: {path.name}')
         boundary = 'rawmark-' + secrets.token_hex(12)
         body = (f'--{boundary}\r\nContent-Disposition: form-data; name="attachment"; '
                 f'filename="{path.name}"\r\nContent-Type: application/octet-stream\r\n\r\n').encode()
@@ -243,17 +250,8 @@ class API:
                 f'Uploaded asset verification failed: {path.name}')
 
 
-def gitea_client():
-    return API(os.environ['GITEA_API_URL'], os.environ['GITEA_RELEASE_TOKEN'])
-
-
-def git_env(api):
-    root = api.root.removesuffix('/api/v1')
-    authorization = base64.b64encode(('x-access-token:' + api.token).encode()).decode()
-    return {**os.environ, 'GIT_TERMINAL_PROMPT': '0', 'GIT_CONFIG_COUNT': '2',
-            'GIT_CONFIG_KEY_0': 'credential.helper', 'GIT_CONFIG_VALUE_0': '',
-            'GIT_CONFIG_KEY_1': f'http.{root}/.extraheader',
-            'GIT_CONFIG_VALUE_1': 'Authorization: Basic ' + authorization}
+def forgejo_client():
+    return API(os.environ['FORGEJO_API_URL'], os.environ['FORGEJO_RELEASE_TOKEN'])
 
 
 def version_for(commit):
@@ -263,7 +261,7 @@ def version_for(commit):
 
 def registry_login():
     subprocess.run(['docker', 'login', 'git.134333.xyz', '--username', 'eezd', '--password-stdin'],
-                   input=os.environ['GITEA_RELEASE_TOKEN'], text=True, check=True)
+                   input=os.environ['FORGEJO_RELEASE_TOKEN'], text=True, check=True)
 
 
 def registry_digest(image, reference):
@@ -278,25 +276,6 @@ def registry_digest(image, reference):
     value = json.loads(result.stdout)['digest']
     require(re.fullmatch(r'sha256:[0-9a-f]{64}', value), 'Invalid registry content digest')
     return value
-
-
-def image_digest(reference):
-    raw = run('docker', 'buildx', 'imagetools', 'inspect', reference, '--raw')
-    manifest = json.loads(raw)
-    platforms = {(d['platform']['os'], d['platform']['architecture']) for d in manifest['manifests']}
-    require(platforms == {('linux', 'amd64'), ('linux', 'arm64')}, 'Unexpected image platforms')
-    image, separator, requested = reference.partition('@')
-    if not separator:
-        image, requested = reference.rsplit(':', 1)
-    value = registry_digest(image, requested)
-    require(value, 'Registry returned no image digest')
-    return value
-
-
-def verify_anonymous(image):
-    with tempfile.TemporaryDirectory(prefix='rawmark-anonymous-') as directory:
-        env = {**os.environ, 'DOCKER_CONFIG': directory}
-        run('docker', 'pull', image, env=env)
 
 
 if __name__ == "__main__":

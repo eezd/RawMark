@@ -114,8 +114,8 @@ python3 scripts/prepare-maple-font.py /path/to/MapleMonoNormalNL-NF-CN.zip
 
 `runtime/` 不入库：`builds/` 保存独立构建，`current` 指向活动产物，`config/rawmark.env` 配置 RAWMARK_DATA、RAWMARK_VAULT、RAWMARK_ADDR，`data/` 保存数据库、笔记和附件，`backups/` 保存迁移备份。脚本使用宿主 Go、Node 和锁定 pnpm，不安装全局工具链。候选检查、构建和合成数据冒烟通过后才切换服务；失败恢复旧产物和 unit。启停共用 `runtime/.deploy.lock`，构建记录包含完整 SHA、dirty 状态和时间。本地构建允许未提交源码。
 
-普通 `git push` 只更新 Gitea。`./release.sh <远端分支>` 从可信 `main` 调度 Gitea 手动发布，构建并验收六平台程序包和双架构镜像，最后写入 `release-complete.json`。只有操作者运行 `./sysnc-github.sh` 才会同步已批准引用和已验收产物到 GitHub/GHCR。凭据、权限、恢复和历史版本限制见[部署指南](deployment.zh-CN.md#本地-systemd-与手动发布)。
+普通 `git push` 只更新 Forgejo。`./release.sh <远端分支>` 从可信 `main` 调度 `.forgejo/workflows/release.yml`，构建并验收六平台程序包和双架构镜像，最后写入并读回 `release-complete.json`。使用 `FORGEJO_TOKEN`，工作流 Secret 为 `RELEASE_TOKEN`，候选构建不接收令牌。只有操作者运行 `./sysnc-github.sh` 才会同步已批准引用和已验收产物到 GitHub/GHCR。凭据、权限和失败重建边界见[部署指南](deployment.zh-CN.md#本地-systemd-与手动发布)。
 
-版本为提交 UTC 日期加固定八位哈希。说明基于同分支父提交图中距离最近的成功祖先版本（距离相同时，依次按完成时间较晚、TAG 字典序优先）；首发正文为 `init`，历史缺少分支记录的版本不作为基线。所有分支发布固定版本标签，只有 main 来源版本推进 latest，旧版本重试不倒退。检查或打包失败且尚无程序包检查点时，保留原预约供重试，但不阻止修复提交发版；已有程序包检查点或进入发布阶段后，仍须先恢复该版本。失败保留原件和持久发布记录，只补缺口；不得重建覆盖已有版本。
+版本为提交 UTC 日期加八位 SHA。说明基于同分支父提交图中距离最近的已验收祖先（距离相同时按正式发布时间降序、TAG 升序），首发正文严格为 `init`；历史重写丢失基线时停止。同 SHA 跨分支零写入复用已完成版本，不更新 `latest`。工作流按 `docker` 标签调度，以仓库级并发组串行且不自动取消旧任务；首次接入实测排队及取消后继续。产物只存临时目录，不用 Generic Packages、持久原件或检查点。未完成版本须核实旧任务已终止及来源归属，精确清理该版本 Release/镜像后从原 SHA 全量重建，保留正确 TAG；完成或陌生内容绝不覆盖。
 
 运行配置和迁移备份不得提交到 Git；恢复旧实例前，按部署指南处理新实例已写入的数据。
