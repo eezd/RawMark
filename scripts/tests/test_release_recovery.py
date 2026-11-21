@@ -197,6 +197,12 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(calls[-1], ('docker', 'context', 'rm', 'rawmark-release-1-1-context'))
         self.assertIn(('docker', '--context', 'rawmark-release-1-1-context', 'buildx', 'rm', 'rawmark-release-1-1'), calls)
 
+    def test_workflow_cleanup_uses_the_build_docker_configuration(self):
+        workflow = (manual.CONTROL / '.forgejo/workflows/release.yml').read_text()
+        build, cleanup = workflow.split('      - name: Clean only this run\n')
+        for step in (build.split('      - name: Build and publish fixed source\n')[1], cleanup):
+            self.assertIn('DOCKER_CONFIG: /tmp/rawmark-release-auth', step)
+
 
 class GraphBaselineTests(unittest.TestCase):
     def setUp(self):

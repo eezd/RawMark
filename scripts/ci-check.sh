@@ -11,7 +11,8 @@ env -u RAWMARK_BUILD_VERSION -u RAWMARK_BUILD_CHANNEL python3 -m unittest discov
 pnpm -C web install --frozen-lockfile --registry=https://registry.npmjs.org
 pnpm -C web lint:check
 pnpm -C web typecheck
-pnpm -C web test
+# Bound concurrent transforms in the Runner without relaxing test deadlines.
+pnpm -C web test --maxWorkers=2
 pnpm -C web build
 if [ "$mode" = release ]; then pnpm -C web build:demo; fi
 go vet -tags dev ./...

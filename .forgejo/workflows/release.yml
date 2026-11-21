@@ -69,6 +69,8 @@ jobs:
           python3 scripts/manual-release.py
       - name: Clean only this run
         if: always()
+        env:
+          DOCKER_CONFIG: /tmp/rawmark-release-auth
         run: |
           python3 scripts/ci-cleanup.py 'io.rawmark.ci.run=release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}' --client-container "$(hostname)" --image 'rawmark-ci:release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}'
           builder='rawmark-release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}'
