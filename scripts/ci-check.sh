@@ -7,7 +7,7 @@ case "$mode" in development|release) ;; *) exit 2 ;; esac
 export RAWMARK_BUILD_CHANNEL="$mode"
 export RAWMARK_BUILD_VERSION="$(python3 scripts/release.py version)"
 export CGO_ENABLED=0
-env -u RAWMARK_BUILD_VERSION -u RAWMARK_BUILD_CHANNEL python3 -m unittest discover -s scripts/tests -v
+env -u RAWMARK_BUILD_VERSION -u RAWMARK_BUILD_CHANNEL -u RAWMARK_BUILD_SHA python3 -m unittest discover -s scripts/tests -v
 pnpm -C web install --frozen-lockfile --registry=https://registry.npmjs.org
 pnpm -C web lint:check
 pnpm -C web typecheck

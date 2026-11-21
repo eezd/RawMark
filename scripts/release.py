@@ -55,12 +55,18 @@ def output(name, value):
             target.write(f'{name}={value}\n')
 
 
+def build_commit():
+    commit = os.environ.get('RAWMARK_BUILD_SHA') or run('git', 'rev-parse', 'HEAD')
+    require(re.fullmatch('[0-9a-f]{40}', commit), 'Invalid build source SHA')
+    return commit
+
+
 def build_version():
     if os.environ.get('RAWMARK_BUILD_VERSION'):
         return os.environ['RAWMARK_BUILD_VERSION']
     if os.environ.get('RAWMARK_BUILD_CHANNEL') not in ('development', 'release'):
         return Path('VERSION').read_text().strip()
-    commit = run('git', 'rev-parse', 'HEAD')
+    commit = build_commit()
     timestamp = int(run('git', 'show', '-s', '--format=%ct', commit))
     date = datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).strftime('%Y%m%d')
     return date + '-' + commit[:8]
@@ -74,7 +80,7 @@ def archive_name(version, platform):
 
 def bundle(mode):
     version = build_version()
-    commit = run('git', 'rev-parse', 'HEAD')
+    commit = build_commit()
     platforms = PLATFORMS if mode == 'release' else PLATFORMS[:1]
     files = {}
     checksums = []
@@ -107,7 +113,7 @@ def bundle(mode):
 def validate_build(build):
     require(build['schema'] == 1, 'Unsupported build receipt')
     require(build['version'] == build_version(), 'Build version mismatch')
-    require(build['commit'] == run('git', 'rev-parse', 'HEAD'), 'Build commit mismatch')
+    require(build['commit'] == build_commit(), 'Build commit mismatch')
     require(build['mode'] in ('development', 'release'), 'Unknown build mode')
     expected = PLATFORMS if build['mode'] == 'release' else PLATFORMS[:1]
     require(build['platforms'] == list(expected), 'Build platforms mismatch')

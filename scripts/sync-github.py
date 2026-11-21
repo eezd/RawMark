@@ -1,19 +1,13 @@
-#!/usr/bin/env bash
-# 仅在操作者显式运行时，从 Forgejo 向 GitHub 同步。
-set -euo pipefail
-(( $# == 0 )) || { printf '用法：bash %s\n' "$0" >&2; exit 2; }
-command -v python3 >/dev/null || { printf '缺少命令：python3\n' >&2; exit 1; }
-project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
-exec python3 - "$project_dir" <<'PY'
-import fcntl
+"""Actions 专用原件同步；认证目录须为 RUNNER_TEMP/rawmark-sync-{run_id}-{attempt}。"""
+
 import hashlib
 import http.client
 import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
-import stat
 import subprocess
 import sys
 import tempfile
@@ -25,14 +19,14 @@ FORGEJO_API = 'https://git.134333.xyz/api/v1'
 FORGEJO_OWNER = 'eezd'
 FORGEJO_REPO = 'RawMark'
 FORGEJO_GIT = 'https://git.134333.xyz/eezd/RawMark.git'
-FORGEJO_IMAGE = 'git.134333.xyz/eezd/rawmark'  # 仓库路径，无 docker://、版本或摘要
+FORGEJO_IMAGE = 'git.134333.xyz/eezd/rawmark'
 GITHUB_OWNER = 'eezd'
 GITHUB_REPO = 'RawMark'
 GITHUB_GIT = 'https://github.com/eezd/RawMark.git'
-GITHUB_PRIVATE = 'false'  # true / false
-BRANCHES_JSON = r'''["main", "dev"]'''
+GITHUB_PRIVATE = 'false'
+BRANCHES_JSON = '["main","dev"]'
 BRANCHES = None  # 在 main 中解析已确认的分支范围
-USE_LFS = 'false'  # true / false，接入时检查整个纳入同步的历史
+USE_LFS = 'false'
 FORGEJO_DOWNLOAD_HOSTS = ()  # 如有对象存储，填入已核实的 HTTPS authority；不发送令牌
 GITHUB_DOWNLOAD_HOSTS = ('release-assets.githubusercontent.com', 'objects.githubusercontent.com')
 
@@ -50,19 +44,28 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
-def load_token(variable, service):
-    token = os.environ.get(variable)
-    if token:
-        return token
-    path = Path.home() / '.config' / service / 'token'
-    try:
-        token = path.read_text(encoding='utf-8').strip()
-    except FileNotFoundError:
-        token = ''
-    except (OSError, UnicodeError):
-        raise RuntimeError(f'读取凭据文件失败：{path}；请检查文件、编码及读取权限，或设置 {variable}') from None
-    require(token, f'缺少 {variable}；请设置该环境变量或将非空 Token 写入 {path}')
+def load_token(variable):
+    token = os.environ.get(variable, '').strip()
+    require(token, f'缺少非空 {variable} Actions Secret')
     return token
+
+
+def ci_auth_directory():
+    require(os.environ.get('CONTROL_REF') == 'refs/heads/main', '控制代码必须来自 refs/heads/main')
+    run_id = os.environ.get('CI_RUN_ID', '')
+    attempt = os.environ.get('CI_RUN_ATTEMPT', '1')
+    require(re.fullmatch(r'[1-9][0-9]*', run_id) and re.fullmatch(r'[1-9][0-9]*', attempt),
+            'CI run ID 和 attempt 必须为正整数')
+    runner_temp = os.environ.get('RUNNER_TEMP', '')
+    value = os.environ.get('CI_AUTH_DIR', '')
+    require(runner_temp and value, '缺少 RUNNER_TEMP 或 CI_AUTH_DIR')
+    parent = Path(runner_temp).resolve()
+    path = Path(value)
+    # 只接受 run/attempt 专属的直接子目录；不复用既有目录或跟随符号链接。
+    require(path.is_absolute() and path.resolve() == parent / f'rawmark-sync-{run_id}-{attempt}'
+            and path.parent.resolve() == parent and not os.path.lexists(path), 'CI_AUTH_DIR 不属于本次 run/attempt')
+    require(parent.is_dir(), 'RUNNER_TEMP 必须为现有目录')
+    return path
 
 
 def encode(value):
@@ -194,14 +197,54 @@ def index(items, key, phase):
     return result
 
 
-def run(args, phase, *, cwd=None, allowed=(0,)):
-    environment = {name: value for name, value in os.environ.items() if name not in
-                   ('FORGEJO_TOKEN', 'GITHUB_TOKEN', 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_COMMON_DIR',
-                    'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_NAMESPACE')}
-    environment.update(GIT_TERMINAL_PROMPT='0', LC_ALL='C')
-    result = subprocess.run(args, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment)
-    require(result.returncode in allowed, f'{phase}失败（退出码 {result.returncode}）')
-    return result
+class Runtime:
+    def __init__(self, directory):
+        self.directory = directory
+        self.config = directory / 'gitconfig'
+        self.authfile = directory / 'registry.json'
+
+    def run(self, args, phase, *, cwd=None, allowed=(0,), input=None):
+        # 不继承宿主 HOME、Git 配置、credential helper、askpass 或 API Secret。
+        environment = {
+            'PATH': os.environ.get('PATH', os.defpath), 'HOME': str(self.directory),
+            'XDG_CONFIG_HOME': str(self.directory), 'LC_ALL': 'C', 'GIT_TERMINAL_PROMPT': '0',
+            'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_SYSTEM': '/dev/null',
+            'GIT_CONFIG_GLOBAL': str(self.config), 'REGISTRY_AUTH_FILE': str(self.authfile),
+        }
+        result = subprocess.run(args, cwd=cwd or self.directory, input=input, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, env=environment)
+        require(result.returncode in allowed, f'{phase}失败（退出码 {result.returncode}）')
+        return result
+
+    def configure_git(self, source_login, target_login, forgejo_token, github_token):
+        config = ['[credential]', '\thelper =', '\tuseHttpPath = true',
+                  '[core]', '\thooksPath = /dev/null', '[init]', '\ttemplateDir =']
+        for name, url, login, token in (
+                ('source', FORGEJO_GIT, source_login, forgejo_token),
+                ('destination', GITHUB_GIT, target_login, github_token)):
+            path = self.directory / (name + '.credentials')
+            parsed = urllib.parse.urlsplit(url)
+            credential = f'https://{encode(login)}:{encode(token)}@{parsed.netloc}{parsed.path}\n'
+            self.write_private(path, credential)
+            # Git 配置的双引号值接受此处 JSON 使用的转义形式。
+            helper = 'store --file=' + shlex.quote(str(path))
+            config.extend([f'[credential "{url}"]', '\thelper = ' + json.dumps(helper)])
+        self.write_private(self.config, '\n'.join(config) + '\n')
+
+    @staticmethod
+    def write_private(path, content):
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, 'w', encoding='utf-8') as output:
+            output.write(content)
+
+    def login_registry(self, registry, login, token):
+        self.run(['skopeo', 'login', '--authfile', str(self.authfile), '--username', login,
+                  '--password-stdin', registry], '登录 Registry', input=(token + '\n').encode())
+        os.chmod(self.authfile, 0o600)
+
+
+# main 只在 CI 校验后绑定本次运行的隔离环境；测试可替换此传输边界。
+run = None
 
 
 class Snapshot:
@@ -290,6 +333,7 @@ def verify_image(ref, image, authfile, *, allow_missing=False):
     digest = 'sha256:' + hashlib.sha256(raw).hexdigest()
     require(digest == image['digest'], 'OCI 顶层摘要冲突')
     manifests = json.loads(raw)['manifests']
+    require(len(manifests) == 2 and set(image['platforms']) == set(PLATFORMS), 'OCI 必须恰好包含两个发布架构')
     for platform, expected in image['platforms'].items():
         system, arch = platform.split('/')
         matches = [m['digest'] for m in manifests if m.get('platform', {}).get('os') == system
@@ -311,15 +355,10 @@ def is_formal(release):
     return release['draft'] is False and release['prerelease'] is False
 
 
-def auth_file():
-    require(shutil.which('skopeo'), '缺少命令：skopeo')
-    value = os.environ.get('REGISTRY_AUTH_FILE')
-    require(value and Path(value).is_file(), '请显式提供可读的 REGISTRY_AUTH_FILE')
-    return str(Path(value).resolve())
 
 
 class Version:
-    def __init__(self, tag, release, directory, source, target, snapshot, target_release):
+    def __init__(self, tag, release, directory, source, target, snapshot, target_release, authfile):
         self.tag = tag
         self.path = directory / tag
         self.path.mkdir()
@@ -335,6 +374,7 @@ class Version:
         build = json.loads((self.path / BUILD).read_bytes())
         completion = json.loads((self.path / COMPLETE).read_bytes())
         self.sha = build['source_sha']
+        self.source_branch = build['source_branch']
         require(SHA.fullmatch(self.sha) and tag.endswith('-' + self.sha[:8]) and
                 snapshot.commit('refs/tags/' + tag) == self.sha and
                 build['version'] == completion['version'] == tag and completion['source_sha'] == self.sha and
@@ -358,7 +398,7 @@ class Version:
                     digest.startswith('sha256:') and HASH.fullmatch(digest[7:])
                     for digest in [self.image['digest'], *self.image['platforms'].values()]),
                 'OCI 仓库、架构或摘要不符合固定发布契约')
-        self.authfile = auth_file()
+        self.authfile = authfile
         self.source_image = FORGEJO_IMAGE + '@' + self.image['digest']
         self.target_image = f'ghcr.io/{GITHUB_OWNER.lower()}/{GITHUB_REPO.lower()}:{tag}'
         verify_image(self.image['ref'], self.image, self.authfile)
@@ -409,7 +449,49 @@ class Version:
         print(f'{self.tag}：GitHub Release 与镜像已验收', flush=True)
 
 
-def sync(directory, source, target):
+def select_latest(versions, snapshot):
+    """按 main 祖先关系选择；不按版本名、日期或同步迭代顺序提升。"""
+    records = [version for version in versions if version.source_branch == 'main']
+    if not records:
+        return None
+    head = snapshot.heads['refs/heads/main']
+    require(all(snapshot.ancestor(version.sha, head) for version in records),
+            '已完成 main 版本不在当前 main 历史中')
+    candidates = [version for version in records
+                  if all(snapshot.ancestor(other.sha, version.sha) for other in records)]
+    require(len(candidates) == 1, '已完成 main 版本没有唯一的最新祖先')
+    return candidates[0]
+
+
+def check_latest(versions, latest, authfile):
+    # 写入前证明现有别名；未知／dev 镜像不能被静默覆盖。
+    if latest is None:
+        return
+    for repository in (FORGEJO_IMAGE, latest.target_image.rsplit(':', 1)[0]):
+        raw = read_manifest(repository + ':latest', authfile, allow_missing=True)
+        if raw is not None:
+            value = 'sha256:' + hashlib.sha256(raw).hexdigest()
+            record = next((version for version in versions
+                           if version.source_branch == 'main' and version.image['digest'] == value), None)
+            require(record is not None, '现有 latest 不是已验收的 main 镜像')
+            verify_image(repository + ':latest', record.image, authfile)
+
+
+def promote_latest(latest, authfile):
+    if latest is None:
+        return
+    source = FORGEJO_IMAGE + '@' + latest.image['digest']
+    for repository in (FORGEJO_IMAGE, latest.target_image.rsplit(':', 1)[0]):
+        reference = repository + ':latest'
+        raw = read_manifest(reference, authfile, allow_missing=True)
+        if raw is None or 'sha256:' + hashlib.sha256(raw).hexdigest() != latest.image['digest']:
+            run(['skopeo', 'copy', '--all', '--preserve-digests', '--authfile', authfile,
+                 'docker://' + source, 'docker://' + reference], '更新 OCI latest')
+        verify_image(reference, latest.image, authfile)
+    print(f'两端 OCI latest 已验收：{latest.tag}', flush=True)
+
+
+def sync(directory, source, target, authfile):
     settings = target.json('', '读取 GitHub 仓库')
     require(settings.get('full_name', '').lower() == f'{GITHUB_OWNER}/{GITHUB_REPO}'.lower() and
             settings.get('private') is (GITHUB_PRIVATE == 'true') and settings.get('archived') is False and
@@ -445,7 +527,7 @@ def sync(directory, source, target):
         require(ref in snapshot.refs, 'Forgejo 正式版本缺少对应 TAG；请在发布结束后重跑')
         require(tag not in target_releases or dest_refs.get(ref) == snapshot.refs[ref],
                 'GitHub 已有同名 Release，但 TAG 缺失或冲突：' + tag)
-        versions.append(Version(tag, release, directory, source, target, snapshot, target_releases.get(tag)))
+        versions.append(Version(tag, release, directory, source, target, snapshot, target_releases.get(tag), authfile))
         refs[ref] = snapshot.refs[ref]
     for ref, sha in sorted(snapshot.refs.items()):
         if not ref.startswith('refs/tags/') or not snapshot.in_scope(ref):
@@ -455,6 +537,8 @@ def sync(directory, source, target):
             refs[ref] = sha
         elif tag not in releases:
             print(f'跳过尚无验收 Release 的版本 TAG：{tag!r}', flush=True)
+    latest = select_latest(versions, snapshot)
+    check_latest(versions, latest, authfile)
     changes = snapshot.changes(refs, dest_refs)
     if USE_LFS == 'true':
         snapshot.lfs(sorted(refs))
@@ -469,11 +553,38 @@ def sync(directory, source, target):
         print(f'{version.tag}：开始同步正式产物', flush=True)
         version.sync(target)
     require(not gaps, f'仍有 {len(gaps)} 个正式版本未同步；需核实并补录原始发布证据')
-    print(f'GitHub 手动同步完成，已验收 {len(versions)} 个正式版本', flush=True)
+    promote_latest(latest, authfile)
+    print(f'GitHub 原件和认证镜像已验收，版本数 {len(versions)}', flush=True)
+    return versions, latest
 
 
-def main(project):
-    global BRANCHES
+def verify_public_images(versions, latest, directory):
+    """Empty authfile and HOME; never let an authenticated pull stand in for public access."""
+    global run
+    if GITHUB_PRIVATE == 'true' or not versions:
+        return
+    anonymous = directory / 'anonymous'
+    anonymous.mkdir(mode=0o700)
+    runtime = Runtime(anonymous)
+    runtime.write_private(runtime.authfile, '{"auths": {}}\n')
+    previous = run
+    try:
+        run = runtime.run
+        for version in versions:
+            for reference in (version.image['ref'], version.target_image):
+                verify_image(reference, version.image, str(runtime.authfile))
+        if latest is not None:
+            for repository in (FORGEJO_IMAGE, latest.target_image.rsplit(':', 1)[0]):
+                verify_image(repository + ':latest', latest.image, str(runtime.authfile))
+    except RuntimeError as error:
+        raise RuntimeError('公开镜像匿名双架构验收失败；GHCR 首次发布须在网页确认包为 public 后重跑。' + str(error)) from None
+    finally:
+        run = previous
+    print('Forgejo / GHCR 版本及 latest 的匿名双架构清单已验收', flush=True)
+
+
+def main():
+    global BRANCHES, run
     values = (FORGEJO_API, FORGEJO_OWNER, FORGEJO_REPO, FORGEJO_GIT, FORGEJO_IMAGE, GITHUB_OWNER, GITHUB_REPO, GITHUB_GIT,
               BRANCHES_JSON)
     require(not any('@@' in value for value in values) and GITHUB_PRIVATE in ('true', 'false') and
@@ -483,39 +594,46 @@ def main(project):
             (BRANCHES == ['*'] or ('main' in BRANCHES and '*' not in BRANCHES)), '分支同步范围无效')
     require(all(re.fullmatch(r'[A-Za-z0-9_.-]+', name) and name not in ('.', '..')
                 for name in (FORGEJO_OWNER, FORGEJO_REPO, GITHUB_OWNER, GITHUB_REPO)), '仓库名称配置无效')
-    for url in (FORGEJO_GIT, GITHUB_GIT):
-        require(not url.startswith('-') and '::' not in url, 'Git 远端地址配置无效')
-        if url.startswith('https://'):
-            require(not urllib.parse.urlsplit(url).query, 'Git URL 不得携带查询凭据')
-            authority(url)
-        else:
-            require(url.startswith('ssh://') or re.fullmatch(r'[\w.-]+@[\w.-]+:[^\s]+', url),
-                    'Git URL 必须使用配置好的 SSH 或 HTTPS')
-            if url.startswith('ssh://'):
-                require(urllib.parse.urlsplit(url).password is None, 'Git URL 不得携带密码')
-    forgejo_token = load_token('FORGEJO_TOKEN', 'forgejo')
-    github_token = load_token('GITHUB_TOKEN', 'github')
+    source_host = authority(FORGEJO_API)
+    require(FORGEJO_GIT == f'https://{source_host}/{FORGEJO_OWNER}/{FORGEJO_REPO}.git' and
+            GITHUB_GIT == f'https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}.git' and
+            FORGEJO_IMAGE == f'{source_host}/{FORGEJO_OWNER.lower()}/{FORGEJO_REPO.lower()}',
+            'Git 或 Registry 必须匹配配置的确切 HTTPS 仓库')
+    directory = ci_auth_directory()
+    forgejo_token = load_token('FORGEJO_TOKEN')
+    github_token = load_token('GITHUB_TOKEN')
+    for tool in ('git', 'skopeo', *(('git-lfs',) if USE_LFS == 'true' else ())):
+        require(shutil.which(tool), '缺少命令：' + tool)
+    source_identity = API(FORGEJO_API.rstrip('/'), 'token ' + forgejo_token).json('/user', '核对 Forgejo 身份')
+    target_identity = API('https://api.github.com', 'Bearer ' + github_token).json('/user', '核对 GitHub 身份')
+    source_login, target_login = source_identity.get('login'), target_identity.get('login')
+    require(source_login == FORGEJO_OWNER and target_login == GITHUB_OWNER,
+            'Token 身份必须与配置的 owner 一致')
     source = API(f'{FORGEJO_API.rstrip("/")}/repos/{FORGEJO_OWNER}/{FORGEJO_REPO}',
                  'token ' + forgejo_token, FORGEJO_DOWNLOAD_HOSTS)
     target = API(f'https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}',
                  'Bearer ' + github_token, GITHUB_DOWNLOAD_HOSTS)
-    require(shutil.which('git'), '缺少命令：git')
-    runtime = project / 'runtime'
-    runtime.mkdir(exist_ok=True)
-    fd = os.open(runtime / '.sync-github.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, 0o660)
-    with os.fdopen(fd, 'rb') as lock:
-        require(stat.S_ISREG(os.fstat(lock.fileno()).st_mode), '同步锁必须为普通文件')
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise RuntimeError('本项目已有同步任务，请稍后重试') from None
-        with tempfile.TemporaryDirectory(prefix='forgejo-sync-') as directory:
-            sync(Path(directory), source, target)
+    directory.mkdir(mode=0o700)
+    previous_run = run
+    try:
+        runtime = Runtime(directory)
+        run = runtime.run
+        runtime.configure_git(source_login, target_login, forgejo_token, github_token)
+        runtime.login_registry(source_host, source_login, forgejo_token)
+        runtime.login_registry('ghcr.io', target_login, github_token)
+        with tempfile.TemporaryDirectory(prefix='forgejo-sync-') as work:
+            versions, latest = sync(Path(work), source, target, str(runtime.authfile))
+            verify_public_images(versions, latest, Path(work))
+        print('GitHub 手动同步完成', flush=True)
+    finally:
+        run = previous_run
+        shutil.rmtree(directory)
 
 
 if __name__ == '__main__':
     try:
-        main(Path(sys.argv[1]))
+        require(len(sys.argv) == 1, 'Actions 控制器不接受命令行参数')
+        main()
     except KeyboardInterrupt:
         print('同步中断；已写入的内容保留，核查后重跑以补齐缺口', file=sys.stderr)
         sys.exit(130)
@@ -525,4 +643,3 @@ if __name__ == '__main__':
     except (OSError, http.client.HTTPException, ValueError, KeyError, TypeError, AttributeError, IndexError):
         print('同步失败：配置、响应数据或 I/O 异常；已完成阶段见前文，核查后重跑', file=sys.stderr)
         sys.exit(1)
-PY

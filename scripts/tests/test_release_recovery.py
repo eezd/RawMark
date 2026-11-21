@@ -27,44 +27,59 @@ class FakeAPI:
     def __init__(self, registry):
         self.registry, self.tags, self.releases, self.blobs, self.writes = registry, {}, {}, {}, []
         self.old_status = 'failure'
+        self.runs = {}
+        self.attachments = {}
+        self.next_attachment_id = 1
 
     def pages(self, path):
-        return list(self.releases.values())
+        return [self.release(version) for version in self.releases]
 
     def release(self, version):
-        return self.releases.get(version)
+        value = self.releases.get(version)
+        if value is not None:
+            return {**copy.deepcopy(value), 'assets': self.assets(value)}
+        return None
 
     def assets(self, release):
-        return [{'name': name} for name in self.blobs[release['tag_name']]]
+        return copy.deepcopy(list(self.attachments[release['tag_name']].values()))
 
     def asset_bytes(self, release, name):
-        return self.blobs[release['tag_name']][name]
+        version = release['tag_name']
+        self.attachments[version][name]['download_count'] += 1
+        return self.blobs[version][name]
 
     def upload(self, release, path):
         self.writes.append(('upload', path.name))
-        self.blobs[release['tag_name']][path.name] = path.read_bytes()
+        version, raw = release['tag_name'], path.read_bytes()
+        self.blobs[version][path.name] = raw
+        identifier = self.next_attachment_id
+        self.next_attachment_id += 1
+        self.attachments[version][path.name] = {
+            'id': identifier, 'uuid': f'00000000-0000-0000-0000-{identifier:012d}',
+            'name': path.name, 'size': len(raw), 'type': 'attachment', 'download_count': 0,
+        }
 
     def repo(self, path, method=None, data=None, missing=False):
         if method:
             self.writes.append((method, path))
         if path.startswith('/actions/runs/'):
-            return {'status': self.old_status, 'event': '', 'trigger_event': 'workflow_dispatch', 'workflow_id': 'release.yml',
-                    'event_payload': json.dumps({'inputs': {'source_branch': 'dev', 'source_sha': SHA}})}
+            return {**self.runs[int(path.rsplit('/', 1)[1])], 'status': self.old_status}
         if path.startswith('/tags/'):
-            return self.tags.get(path.removeprefix('/tags/'))
+            return copy.deepcopy(self.tags.get(path.removeprefix('/tags/')))
         if path == '/tags':
             self.tags[data['tag_name']] = {'name': data['tag_name'], 'commit': {'sha': data['target']}, 'message': data['message']}
         elif path == '/releases':
             version = data['tag_name']
             value = {**data, 'id': len(self.releases) + 1, 'prerelease': False, 'published_at': '2026-11-21T00:00:00Z'}
-            self.releases[version], self.blobs[version] = value, {}
-            return value
+            self.releases[version], self.blobs[version], self.attachments[version] = value, {}, {}
+            return self.release(version)
         elif path.startswith('/releases/'):
             release = next(r for r in self.releases.values() if str(r['id']) == path.split('/')[-1])
             if method == 'PATCH':
                 release.update(data)
             elif method == 'DELETE':
                 del self.blobs[release['tag_name']]
+                del self.attachments[release['tag_name']]
                 del self.releases[release['tag_name']]
         else:
             raise AssertionError(path)
@@ -105,14 +120,23 @@ class RecoveryTests(unittest.TestCase):
                     'runtime_tested': ['linux/amd64']}
         write_json(cache / 'packages.json', metadata)
         (cache / 'SHA256SUMS').write_text(''.join(files[n]['sha256'] + '  ' + n + '\n' for n in manual.package_names(record['version'])))
-        metadata.update(schema=2, source_sha=record['source_sha'], source_branch=record['source_branch'],
+        metadata.update({key: record[key] for key in ('release_run_id', 'release_request_id', 'release_inputs',
+                                                       'control_sha', 'source_branch_head')})
+        metadata.update(schema=5, source_sha=record['source_sha'], source_branch=record['source_branch'],
                         previous_tag=record['previous_tag'], packages=[{'name': n, 'sha256': files[n]['sha256']}
                                                                     for n in manual.package_names(record['version'])],
                         image={'ref': manual.FORGEJO_IMAGE + ':' + record['version'], 'digest': IMAGE_DIGEST, 'platforms': PLATFORMS})
         write_json(cache / 'build.json', metadata)
 
     def publish(self, branch='dev', sha=SHA, version=VERSION):
-        with tempfile.TemporaryDirectory(dir=self.root) as directory:
+        context = {'schema': 1, 'version': version, 'source_sha': sha, 'source_branch': branch,
+                   'release_inputs': {'source_branch': branch, 'source_sha': ''}, 'source_branch_head': sha,
+                   'control_sha': 'f' * 40, 'release_run_id': int(os.environ['CI_RUN_ID']),
+                   'release_request_id': '12345678-1234-1234-1234-123456789012'}
+        self.api.runs.setdefault(context['release_run_id'], {'event': '', 'trigger_event': 'workflow_dispatch',
+                                'workflow_id': 'release.yml', 'commit_sha': context['control_sha'],
+                                'event_payload': json.dumps({'ref': 'refs/heads/main', 'inputs': context['release_inputs']})})
+        with tempfile.TemporaryDirectory(dir=self.root) as directory, patch.object(manual, 'CONTEXT', context):
             manual.release_source(self.api, Path(directory), branch, sha, version)
 
     def fail_after_upload(self):
@@ -141,6 +165,89 @@ class RecoveryTests(unittest.TestCase):
         self.assertIn(('DELETE', '/releases/1'), self.api.writes)
         self.assertEqual(self.api.tags[VERSION], tag)
         self.assertEqual(self.registry['unrelated'], 'keep')
+
+    def test_recovery_ignores_download_statistics_and_asset_order(self):
+        self.fail_after_upload()
+        tag = copy.deepcopy(self.api.tags[VERSION])
+        def replacement(cache, record):
+            self.build(cache, record)
+            self.api.asset_bytes(self.api.release(VERSION), 'build.json')
+            self.api.releases[VERSION]['archive_download_count'] = {'zip': 7, 'tar_gz': 3}
+            self.api.attachments[VERSION] = dict(reversed(list(self.api.attachments[VERSION].items())))
+        with patch.object(manual, 'build_originals', side_effect=replacement):
+            self.publish()
+        self.assertEqual(self.builds, 2)
+        self.assertIn(('DELETE', '/releases/1'), self.api.writes)
+        self.assertEqual(self.api.tags[VERSION], tag)
+        self.assertIn(COMPLETION, self.api.blobs[VERSION])
+
+    def test_stable_release_and_attachment_changes_after_replacement_are_not_deleted(self):
+        cases = [
+            ('release id', lambda: self.api.releases[VERSION].update(id=100)),
+            ('release target', lambda: self.api.releases[VERSION].update(target_commitish='e' * 40)),
+            ('release status', lambda: self.api.releases[VERSION].update(draft=False)),
+            ('attachment id', lambda: self.api.attachments[VERSION]['build.json'].update(id=100)),
+            ('attachment uuid', lambda: self.api.attachments[VERSION]['build.json'].update(uuid='different')),
+            ('attachment size', lambda: self.api.attachments[VERSION]['build.json'].update(size=1)),
+            ('attachment type', lambda: self.api.attachments[VERSION]['build.json'].update(type='external')),
+        ]
+        for name, mutate in cases:
+            with self.subTest(changed=name):
+                os.environ['CI_RUN_ID'] = '1'
+                self.registry.clear()
+                self.api = FakeAPI(self.registry)
+                self.fail_after_upload()
+                self.api.writes.clear()
+                def replacement(cache, record):
+                    self.build(cache, record)
+                    mutate()
+                with patch.object(manual, 'build_originals', side_effect=replacement):
+                    with self.assertRaisesRegex(ValueError, 'Incomplete state changed during replacement build'):
+                        self.publish()
+                self.assertEqual(self.api.writes, [])
+                self.assertIn(VERSION, self.api.releases)
+                self.assertIn(VERSION, self.registry)
+
+    def test_remote_image_checks_precede_formal_release_and_marker_is_last(self):
+        events = []
+        upload = self.api.upload
+        def verify(*args):
+            self.assertTrue(self.api.release(VERSION)['draft'])
+            self.assertNotIn(COMPLETION, self.api.blobs[VERSION])
+            events.append('image verified')
+        def record_upload(release, path):
+            if path.name == COMPLETION:
+                self.assertFalse(self.api.release(VERSION)['draft'])
+                events.append('marker')
+            upload(release, path)
+        with patch.object(manual, 'verify_image', side_effect=verify), \
+             patch.object(self.api, 'upload', side_effect=record_upload):
+            self.publish()
+        self.assertEqual(events, ['image verified', 'marker'])
+        self.assertEqual(self.api.writes[-1], ('upload', COMPLETION))
+
+    def test_failed_remote_image_checks_leave_draft_and_retry_before_latest(self):
+        for failure in ('top-level digest mismatch', 'ARM64 child mismatch', 'anonymous access denied'):
+            with self.subTest(failure=failure):
+                os.environ['CI_RUN_ID'] = '1'
+                self.registry.clear()
+                self.api = FakeAPI(self.registry)
+                self.builds = 0
+                with patch.object(manual, 'promote_latest') as promote:
+                    with patch.object(manual, 'verify_image', side_effect=RuntimeError(failure)):
+                        with self.assertRaisesRegex(RuntimeError, failure):
+                            self.publish(branch='main')
+                    self.assertTrue(self.api.release(VERSION)['draft'])
+                    self.assertNotIn(COMPLETION, self.api.blobs[VERSION])
+                    self.assertNotIn(('PATCH', '/releases/1'), self.api.writes)
+                    promote.assert_not_called()
+                    os.environ['CI_RUN_ID'] = '2'
+                    self.publish(branch='main')
+                    promote.assert_called_once()
+                self.assertEqual(self.builds, 2)
+                self.assertIn(('DELETE', '/releases/1'), self.api.writes)
+                self.assertFalse(self.api.release(VERSION)['draft'])
+                self.assertIn(COMPLETION, self.api.blobs[VERSION])
 
     def test_running_old_task_is_never_cleaned(self):
         self.fail_after_upload()
@@ -189,19 +296,107 @@ class RecoveryTests(unittest.TestCase):
         self.publish(sha='e' * 40, version='20261121-eeeeeeee')
         self.assertIn('20261121-eeeeeeee', self.api.releases)
 
+    def test_replacement_build_failure_preserves_old_release_image_and_tag(self):
+        self.fail_after_upload()
+        before = copy.deepcopy((self.api.tags, self.api.releases, self.api.blobs, self.registry))
+        self.api.writes.clear()
+        with patch.object(manual, 'build_originals', side_effect=RuntimeError('replacement failed')):
+            with self.assertRaisesRegex(RuntimeError, 'replacement failed'):
+                self.publish()
+        self.assertEqual(self.api.writes, [])
+        self.assertEqual((self.api.tags, self.api.releases, self.api.blobs, self.registry), before)
+
+    def test_changed_identity_after_replacement_is_not_deleted(self):
+        self.fail_after_upload()
+        self.api.writes.clear()
+        def replacement(cache, record):
+            self.build(cache, record)
+            self.api.releases[VERSION]['body'] = 'unattributed change'
+        with patch.object(manual, 'build_originals', side_effect=replacement):
+            with self.assertRaisesRegex(ValueError, 'Unknown incomplete release identity'):
+                self.publish()
+        self.assertEqual(self.api.writes, [])
+
+    def test_schema5_requires_exact_commit_sha_main_ref_and_normalized_web_inputs(self):
+        self.fail_after_upload()
+        original = copy.deepcopy(self.api.runs[1])
+        cases = [dict(commit_sha='e' * 40, head_sha='f' * 40), dict(workflow_id='sync-github.yml'),
+                 dict(event_payload=json.dumps({'ref': 'refs/heads/dev', 'inputs': {'source_branch': 'dev', 'source_sha': ''}})),
+                 dict(event_payload=json.dumps({'ref': 'refs/heads/main', 'inputs': {'source_branch': 'dev', 'source_sha': SHA}})),
+                 dict(event_payload=json.dumps({'ref': 'refs/heads/main', 'inputs': {'source_branch': 'dev', 'source_sha': '', 'extra': 'x'}}))]
+        for changed in cases:
+            self.api.runs[1] = {**original, **changed}
+            self.api.writes.clear()
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                self.publish()
+            self.assertEqual(self.api.writes, [])
+        self.api.runs[1] = original
+
+    def downgrade_to_schema4(self, complete=False):
+        tag = self.api.tags[VERSION]
+        record = json.loads(tag['message'])
+        record['schema'] = 4
+        tag['message'] = json.dumps(record)
+        build = json.loads(self.api.blobs[VERSION]['build.json'])
+        build['schema'] = 4
+        raw = json.dumps(build).encode()
+        self.api.blobs[VERSION]['build.json'] = raw
+        self.api.runs[1]['event_payload'] = json.dumps({'inputs': {'source_branch': 'dev', 'source_sha': SHA,
+                                                                 'request_id': record['release_request_id']}})
+        if complete:
+            self.api.blobs[VERSION][COMPLETION] = json.dumps({'version': VERSION, 'source_sha': SHA,
+                                                              'build_sha256': hashlib.sha256(raw).hexdigest()}).encode()
+
+    def test_schema4_unfinished_keeps_strict_three_inputs_and_rebuilds_as_schema5(self):
+        self.fail_after_upload()
+        self.downgrade_to_schema4()
+        event = self.api.runs[1]['event_payload']
+        self.api.runs[1]['event_payload'] = json.dumps({'inputs': {'source_branch': 'dev', 'source_sha': SHA}})
+        self.api.writes.clear()
+        with self.assertRaisesRegex(ValueError, 'Previous legacy inputs differ'):
+            self.publish()
+        self.assertEqual(self.api.writes, [])
+        self.api.runs[1]['event_payload'] = event
+        self.publish()
+        self.assertEqual(json.loads(self.api.blobs[VERSION]['build.json'])['schema'], 5)
+        self.assertEqual(self.builds, 2)
+
+    def test_schema4_completed_reuses_without_rebuild_or_rewriting_marker(self):
+        self.publish()
+        self.downgrade_to_schema4(complete=True)
+        original = copy.deepcopy(self.api.blobs)
+        self.api.writes.clear()
+        self.publish(branch='main')
+        self.assertEqual(self.builds, 1)
+        self.assertEqual(self.api.writes, [])
+        self.assertEqual(self.api.blobs, original)
+
+    def test_latest_failure_retries_only_alias_for_completed_main(self):
+        with patch.object(manual, 'promote_latest', side_effect=RuntimeError('alias failed')):
+            with self.assertRaisesRegex(RuntimeError, 'alias failed'):
+                self.publish(branch='main')
+        self.assertIn(COMPLETION, self.api.blobs[VERSION])
+        self.api.writes.clear()
+        with patch.object(manual, 'promote_latest') as promote:
+            self.publish(branch='main')
+        promote.assert_called_once()
+        self.assertEqual(self.builds, 1)
+        self.assertEqual(self.api.writes, [])
+
     def test_named_docker_context_is_disposable_and_separate_from_builder(self):
         calls = []
-        with patch.object(manual, 'run', side_effect=lambda *args: calls.append(args)):
+        with patch.object(manual.candidate, 'ensure_builder', return_value='owned-builder') as builder, \
+             patch.object(manual, 'run', side_effect=lambda *args: calls.append(args)):
             manual.build_image(Path('image'), Path('out.oci'), {'version': VERSION, 'source_sha': SHA}, 'checksum')
-        self.assertEqual(calls[0], ('docker', 'context', 'create', 'rawmark-release-1-1-context'))
-        self.assertEqual(calls[-1], ('docker', 'context', 'rm', 'rawmark-release-1-1-context'))
-        self.assertIn(('docker', '--context', 'rawmark-release-1-1-context', 'buildx', 'rm', 'rawmark-release-1-1'), calls)
+        builder.assert_called_once()
+        self.assertEqual(calls[0][:5], ('docker', 'buildx', 'build', '--builder', 'owned-builder'))
+        self.assertIn('io.rawmark.ci.run=release-1-1', calls[0])
 
     def test_workflow_cleanup_uses_the_build_docker_configuration(self):
         workflow = (manual.CONTROL / '.forgejo/workflows/release.yml').read_text()
         build, cleanup = workflow.split('      - name: Clean only this run\n')
-        for step in (build.split('      - name: Build and publish fixed source\n')[1], cleanup):
-            self.assertIn('DOCKER_CONFIG: /tmp/rawmark-release-auth', step)
+        for step in (build.split('      - name: Build and publish fixed source once\n')[1], cleanup):
+            self.assertIn('DOCKER_CONFIG: ${{ runner.temp }}/rawmark-release-auth-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}', step)
 
 
 class GraphBaselineTests(unittest.TestCase):

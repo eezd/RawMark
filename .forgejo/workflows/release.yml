@@ -1,19 +1,20 @@
-name: Manual release
-run-name: Release ${{ inputs.source_branch }} (${{ inputs.request_id }})
+name: Manual release (RawMark)
+run-name: Release ${{ inputs.source_branch }}
 on:
   workflow_dispatch:
     inputs:
       source_branch:
+        description: Remote source branch (frozen when execution starts)
         required: true
+        default: main
         type: string
       source_sha:
-        required: true
-        type: string
-      request_id:
-        required: true
+        description: Optional full SHA; leave empty for branch HEAD
+        required: false
+        default: ''
         type: string
 concurrency:
-  group: rawmark-release
+  group: rawmark-delivery
   cancel-in-progress: false
 jobs:
   release:
@@ -28,52 +29,57 @@ jobs:
           ref: ${{ forgejo.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ inputs.source_sha }}
-          path: source
-          persist-credentials: false
-      - uses: https://github.com/actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
-        with:
-          go-version-file: source/go.mod
-          cache: false
       - name: Install release tools
         run: |
           apt-get update
-          apt-get install -y python3 skopeo git-lfs ca-certificates curl
+          apt-get install -y --no-install-recommends python3 skopeo git ca-certificates curl
           install -m 0755 -d /etc/apt/keyrings
           curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-          echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable' > /etc/apt/sources.list.d/docker.list
+          echo 'deb [signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable' > /etc/apt/sources.list.d/docker.list
           apt-get update
-          apt-get install -y docker-ce-cli docker-buildx-plugin
-          corepack enable
-          corepack prepare pnpm@12.11.2 --activate
-          node --version
-          test "$(pnpm --version)" = '12.11.2'
-          go version
+          apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
+          python3 --version
           docker version
           skopeo --version
-      - name: Build and publish fixed source
+      - name: Resolve source once
+        id: source
         env:
           SOURCE_BRANCH: ${{ inputs.source_branch }}
           SOURCE_SHA: ${{ inputs.source_sha }}
           CONTROL_REF: ${{ forgejo.ref }}
+          CONTROL_SHA: ${{ forgejo.sha }}
+          CI_RUN_ID: ${{ forgejo.run_id }}
+          FORGEJO_RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          RELEASE_CONTEXT: ${{ runner.temp }}/rawmark-release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}.json
+        run: python3 scripts/resolve-release.py
+      - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.source.outputs.source_sha }}
+          path: source
+          persist-credentials: false
+      - name: Build and publish fixed source once
+        env:
+          CONTROL_REF: ${{ forgejo.ref }}
+          CONTROL_SHA: ${{ forgejo.sha }}
+          RELEASE_CONTEXT: ${{ runner.temp }}/rawmark-release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}.json
           FORGEJO_API_URL: ${{ forgejo.server_url }}/api/v1
           FORGEJO_RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           CI_RUN_ID: ${{ forgejo.run_id }}
           CI_RUN_ATTEMPT: ${{ forgejo.run_attempt }}
           CI_RESOURCE_LABEL: io.rawmark.ci.run=release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
-          DOCKER_CONFIG: /tmp/rawmark-release-auth
+          DOCKER_CONFIG: ${{ runner.temp }}/rawmark-release-auth-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
         run: |
           mkdir -m 700 -p "$DOCKER_CONFIG"
           python3 scripts/manual-release.py
       - name: Clean only this run
         if: always()
         env:
-          DOCKER_CONFIG: /tmp/rawmark-release-auth
+          CI_RUN_ID: ${{ forgejo.run_id }}
+          CI_RUN_ATTEMPT: ${{ forgejo.run_attempt }}
+          DOCKER_CONFIG: ${{ runner.temp }}/rawmark-release-auth-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
         run: |
-          python3 scripts/ci-cleanup.py 'io.rawmark.ci.run=release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}' --client-container "$(hostname)" --image 'rawmark-ci:release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}'
-          builder='rawmark-release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}'
-          if docker buildx inspect "$builder" >/dev/null 2>&1; then docker buildx rm "$builder"; fi
-          if docker context inspect "$builder-context" >/dev/null 2>&1; then docker context rm "$builder-context"; fi
-          rm -rf /tmp/rawmark-release-auth
+          status=0
+          python3 scripts/release-candidate.py --cleanup || status=$?
+          rm -rf -- "$DOCKER_CONFIG"
+          rm -f -- "${{ runner.temp }}/rawmark-release-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}.json"
+          exit "$status"
