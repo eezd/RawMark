@@ -252,7 +252,7 @@ def require_ended_run(api, run_id, record):
     require(previous['status'] in ('success', 'failure', 'cancelled', 'skipped', 'completed'),
             'The previous publication has not ended')
     payload = json.loads(previous['event_payload'])
-    require(previous['event'] == 'workflow_dispatch' and previous['workflow_id'] == 'release.yml'
+    require(previous['trigger_event'] == 'workflow_dispatch' and previous['workflow_id'] == 'release.yml'
             and payload['inputs']['source_sha'] == record['source_sha']
             and payload['inputs']['source_branch'] == record['source_branch'], 'Previous run identity differs')
 

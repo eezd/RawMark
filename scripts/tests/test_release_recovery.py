@@ -48,7 +48,7 @@ class FakeAPI:
         if method:
             self.writes.append((method, path))
         if path.startswith('/actions/runs/'):
-            return {'status': self.old_status, 'event': 'workflow_dispatch', 'workflow_id': 'release.yml',
+            return {'status': self.old_status, 'event': '', 'trigger_event': 'workflow_dispatch', 'workflow_id': 'release.yml',
                     'event_payload': json.dumps({'inputs': {'source_branch': 'dev', 'source_sha': SHA}})}
         if path.startswith('/tags/'):
             return self.tags.get(path.removeprefix('/tags/'))
