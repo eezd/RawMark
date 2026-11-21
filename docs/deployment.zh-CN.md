@@ -170,7 +170,7 @@ Bearer 认证升级需要前后端一起发布。旧 Cookie 页面不能继续�
 
 Forgejo 是唯一主仓库，`origin` 指向 `https://git.134333.xyz/eezd/RawMark.git`。普通 `git push` 只更新 Git 引用，不触发检查、构建、发布、部署或 GitHub 同步。
 
-设置 `FORGEJO_TOKEN` 后运行 `/srv/RawMark/release.sh <远端分支>`。客户端可从任意目录运行：固定远端完整 SHA，从可信 `main` 调度 `.forgejo/workflows/release.yml`。合法 Secret `RELEASE_TOKEN` 映射到 `FORGEJO_RELEASE_TOKEN`，候选构建环境不传递令牌。六个 Linux/macOS/Windows amd64/arm64 程序包、静态 demo 和 Linux 双架构 OCI 在临时工作区构建；完成检查后创建草稿、TAG、上传附件和版本镜像。逐项下载校验包、元数据、TAG 和匿名双架构拉取，转为正式版本后最后写入并读回 `release-complete.json`。不写 GitHub、不合并分支、不更新本地服务。
+运行 `/srv/RawMark/release.sh <远端分支>` 时，优先使用非空 `FORGEJO_TOKEN`；未设置或为空时自动读取当前用户的 `~/.config/forgejo/token`（root 为 `/root/.config/forgejo/token`），去除文件首尾空白。凭据文件保存单个纯文本 Token，建议权限 `0600`；文件缺失、为空或读取失败会明确报错，不输出 Token。客户端可从任意目录运行：固定远端完整 SHA，从可信 `main` 调度 `.forgejo/workflows/release.yml`。合法 Secret `RELEASE_TOKEN` 映射到 `FORGEJO_RELEASE_TOKEN`，候选构建环境不传递令牌。六个 Linux/macOS/Windows amd64/arm64 程序包、静态 demo 和 Linux 双架构 OCI 在临时工作区构建；完成检查后创建草稿、TAG、上传附件和版本镜像。逐项下载校验包、元数据、TAG 和匿名双架构拉取，转为正式版本后最后写入并读回 `release-complete.json`。不写 GitHub、不合并分支、不更新本地服务。
 
 GitHub 对外同步只能由操作者手动执行 `/srv/RawMark/sysnc-github.sh`。脚本读取 Forgejo 远端，只快进同步已批准的公开 `main`、`dev`、范围内 TAG 和已验收正式版本；不构建、不强推、不删除。显式设置 `FORGEJO_TOKEN`、`GITHUB_TOKEN`，镜像复制另需 `skopeo` 和 `REGISTRY_AUTH_FILE`。脚本核对 GitHub Actions 已关闭，但不改变设置。GitHub 只接收六包、`SHA256SUMS`、`build.json` 和版本镜像，不接收内部完成记录或 demo。当前 GitHub 分支可能与本地来源分叉；不能快进时停止，由操作者决定，不为首次同步自动重写历史。
 

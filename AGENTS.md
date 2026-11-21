@@ -45,7 +45,7 @@
 | 完整检查 | `sh scripts/ci-check.sh development` | Python 测试、锁定依赖、前端检查/构建、Go 开发/生产模式检查和强制非 root 权限测试；会生成产物及临时文件，root 下用 `setpriv` 切换数字 UID/GID，不需要专用账号 |
 | 本地构建与打包 | `pnpm -C web build`；随后 `sh scripts/ci-package.sh development` | 前端产物在 `web/dist`；打包写入 `package/`、`downloads/`，并用临时合成数据运行 Linux amd64 冒烟；`release` 模式编译六平台 |
 | 本地服务部署 | `./start.sh`；`./stop.sh`；只读状态入口 `./status.sh` | 前两者改变实际 systemd 服务，需明确授权；`start.sh` 还会检查、构建、冒烟并切换 `runtime/current`，不是轻量开发启动入口 |
-| 正式发布 | `./release.sh <remote-branch>` | `FORGEJO_TOKEN` 分派 Forgejo 手动发布；普通 push 只更新 Git 引用，不检查、构建、发布、部署或同步 |
+| 正式发布 | `./release.sh <remote-branch>` | 优先非空 `FORGEJO_TOKEN`，否则读取当前用户 `~/.config/forgejo/token`；分派 Forgejo 手动发布，普通 push 只更新 Git 引用，不检查、构建、发布、部署或同步 |
 | 手动同步 | `./sysnc-github.sh` | 仅操作者执行；从 Forgejo 同步已公开范围的 `main`、`dev`、TAG 和已验收版本到 GitHub/GHCR，不修改仓库设置 |
 
 - **强制检查入口**：代码变更按影响执行下列检查；完整顺序及开发/正式模式覆盖以 `scripts/ci-check.sh` 为准，不能删减检查以制造通过结果。单纯文档修改核对事实、引用路径及 `git diff --check` 即可，不必启动服务。

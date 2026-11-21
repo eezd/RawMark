@@ -12,6 +12,7 @@ import hashlib
 import http.client
 import json
 import os
+from pathlib import Path
 import re
 import sys
 import time
@@ -32,6 +33,22 @@ POLL_SECONDS = 5
 
 def fail(message):
     raise RuntimeError(message)
+
+
+def load_token():
+    token = os.environ.get('FORGEJO_TOKEN')
+    if token:
+        return token
+    path = Path.home() / '.config/forgejo/token'
+    try:
+        token = path.read_text(encoding='utf-8').strip()
+    except FileNotFoundError:
+        token = ''
+    except (OSError, UnicodeError):
+        fail(f'读取 Forgejo 凭据文件失败：{path}；请检查文件、编码及读取权限，或设置 FORGEJO_TOKEN')
+    if not token:
+        fail(f'缺少 FORGEJO_TOKEN；请设置该环境变量或将非空 Token 写入 {path}')
+    return token
 
 
 def quote(value):
@@ -105,9 +122,7 @@ def main():
     parsed = urllib.parse.urlsplit(API_URL)
     if parsed.scheme != 'https' or not parsed.netloc or parsed.username or parsed.password:
         fail('Forgejo API 地址必须为不含凭据的 HTTPS 地址')
-    token = os.environ.get('FORGEJO_TOKEN')
-    if not token:
-        fail('缺少 FORGEJO_TOKEN；请通过现有凭据机制或环境变量提供')
+    token = load_token()
     branch = sys.argv[1]
     if (branch.startswith(('-', '/')) or branch.endswith('/') or
             any(ord(c) < 32 for c in branch)):

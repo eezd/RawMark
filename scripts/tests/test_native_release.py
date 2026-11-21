@@ -89,10 +89,64 @@ class ClientTests(unittest.TestCase):
         import os
         client=Path(__file__).resolve().parents[2]/'release.sh'
         with tempfile.TemporaryDirectory() as d:
-            env=dict(os.environ);env.pop('FORGEJO_TOKEN',None)
+            env=dict(os.environ);env.pop('FORGEJO_TOKEN',None);env['HOME']=d
             result=subprocess.run(['bash',str(client),'feature/example'],cwd=d,env=env,capture_output=True,text=True)
             self.assertEqual(result.returncode,1)
             self.assertIn('FORGEJO_TOKEN',result.stderr)
+
+class TokenTests(unittest.TestCase):
+    def setUp(self):
+        import os
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.home = Path(temporary.name)
+        self.enterContext(patch.dict(os.environ, {'HOME': str(self.home)}))
+        os.environ.pop('FORGEJO_TOKEN', None)
+        source = (Path(__file__).resolve().parents[2] / 'release.sh').read_text().split("<<'PY'\n", 1)[1].rsplit('\nPY', 1)[0]
+        source = source.rsplit('\ntry:\n    main()', 1)[0]
+        scope = {'__name__': 'token_test'}
+        exec(compile(source, 'release-client', 'exec'), scope)
+        self.load_token = scope['load_token']
+
+    def write_token(self, value):
+        path = self.home / '.config/forgejo/token'
+        path.parent.mkdir(parents=True)
+        path.write_text(value, encoding='utf-8')
+        path.chmod(0o600)
+
+    def test_environment_has_priority_without_reading_file(self):
+        import os
+        os.environ['FORGEJO_TOKEN'] = 'environment-fixture'
+        with patch.object(Path, 'read_text', side_effect=AssertionError('Must not read token file')):
+            self.assertEqual(self.load_token(), 'environment-fixture')
+
+    def test_unset_environment_reads_current_home_and_strips_whitespace(self):
+        self.write_token('  file-fixture\n')
+        self.assertEqual(self.load_token(), 'file-fixture')
+
+    def test_empty_environment_uses_file(self):
+        import os
+        os.environ['FORGEJO_TOKEN'] = ''
+        self.write_token('file-fixture\n')
+        self.assertEqual(self.load_token(), 'file-fixture')
+
+    def test_missing_file_reports_configuration_path(self):
+        with self.assertRaisesRegex(RuntimeError, str(self.home / '.config/forgejo/token')):
+            self.load_token()
+
+    def test_empty_file_is_rejected(self):
+        self.write_token(' \n\t')
+        with self.assertRaisesRegex(RuntimeError, '缺少 FORGEJO_TOKEN'):
+            self.load_token()
+
+    def test_unreadable_or_invalid_utf8_file_reports_safe_error(self):
+        errors = (PermissionError('private-error-fixture'), UnicodeError('private-error-fixture'))
+        for error in errors:
+            with self.subTest(error=type(error).__name__), patch.object(Path, 'read_text', side_effect=error):
+                with self.assertRaisesRegex(RuntimeError, '读取 Forgejo 凭据文件失败') as caught:
+                    self.load_token()
+                self.assertNotIn('private-error-fixture', str(caught.exception))
+
 
 class RemoteClientTests(unittest.TestCase):
     def invoke_client(self, *, bad_sha=False, bad_digest=False, draft=False, dispatch_error=False):
@@ -124,7 +178,7 @@ class RemoteClientTests(unittest.TestCase):
         from unittest.mock import Mock
         opener=Mock();opener.open.side_effect=open_request
         output=io.StringIO();code=0
-        with patch.object(sys,'argv',['release.sh','feature/demo']),patch.dict(os.environ,{'FORGEJO_TOKEN':'fixture-only'}),patch.object(urllib.request,'build_opener',return_value=opener),contextlib.redirect_stdout(output),contextlib.redirect_stderr(output):
+        with tempfile.TemporaryDirectory() as home, patch.object(sys,'argv',['release.sh','feature/demo']),patch.dict(os.environ,{'FORGEJO_TOKEN':'fixture-only','HOME':home}),patch.object(urllib.request,'build_opener',return_value=opener),contextlib.redirect_stdout(output),contextlib.redirect_stderr(output):
             try:exec(compile(client,'release-client','exec'),{})
             except SystemExit as error:code=error.code
         return code,calls,output.getvalue()
