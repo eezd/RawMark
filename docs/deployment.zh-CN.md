@@ -176,10 +176,13 @@ Forgejo 是唯一主仓库，`origin` 指向 `https://git.134333.xyz/eezd/RawMar
 
 | 入口 | 输入与行为 |
 | --- | --- |
+| **Manual promote dev to main (RawMark)** | `.forgejo/workflows/promote-main.yml`：无自定义输入。`scripts/promote-main.py` 在实际开始时冻结远程 main/dev，只将 main 快进到冻结的 dev SHA；一致零写入，分叉或回退拒绝。不检出或执行 dev，不运行应用测试，不触发发布、同步或部署。 |
 | **Manual release (RawMark)** | `.forgejo/workflows/release.yml`：`source_branch` 默认 `main`，`source_sha` 可空或完整 40 位小写 SHA。任务实际开始时解析远端分支，空 SHA 冻结该时刻尖端，显式 SHA 须属于指定分支；`scripts/resolve-release.py` 写临时 `RELEASE_CONTEXT`。随后 `scripts/manual-release.py` 构建六平台包、静态 demo 及 Linux 双架构 OCI，只发布 Forgejo。 |
 | **Manual GitHub sync (RawMark)** | `.forgejo/workflows/sync-github.yml`：无自定义输入，运行 `scripts/sync-github.py`，仅同步已批准公开的 `main`、`dev`、范围内 TAG、已验收正式原件和镜像到 GitHub/GHCR，不重建。 |
 
-两个工作流控制代码均检出本次 run 固定的可信 `forgejo.sha`，只接受 `workflow_dispatch`，按 `docker` 标签调度，共享静态并发组 `rawmark-delivery`、`cancel-in-progress: false`。不绑定 Runner 身份、不挂载项目宿主目录。首次接入或改动并发规则后须实测 A 占用、B 等待、取消 A 后 B 继续；平台可能取消多余 pending 请求，被取消的等待请求需人工重新运行。
+三个工作流控制代码均检出本次 run 固定的可信 `forgejo.sha`，只接受 `workflow_dispatch`，按 `docker` 标签调度，共享静态并发组 `rawmark-delivery`、`cancel-in-progress: false`。不绑定 Runner 身份、不挂载项目宿主目录。首次接入或改动并发规则后须实测 A 占用、B 等待、取消 A 后 B 继续；平台可能取消多余 pending 请求，被取消的等待请求需人工重新运行。
+
+**分支提升**将 `RELEASE_TOKEN` 映射为 `FORGEJO_TOKEN`，只作 API 身份验证及精确 URL 的 HTTPS Git 认证，不需要 GitHub 或 Registry 凭据。固定控制 SHA 必须仍属于冻结 main 的祖先。日志展示两端冻结 SHA 和纳入提交；普通非强制 push 前复查两端，写后读回。人工 push 不受 Actions 并发组约束：发现变化明确失败，不静默改用新来源；推送确认丢失、写后读回传输/解析失败或结果不一致时，main 可能已经更新；错误保留阶段、冻结目标及安全原因，须人工核对，不自动重试或回滚，也不回显原始 Git stderr。写前失败未尝试 push，仍保持零写入语义；只有写后成功读回符合预期的两端引用，才报告完成。只写 main，不改 dev、TAG、本地分支或分支保护。令牌的 Git 写权限及 main 保护策略须真实验收，工作流不绕过限制。首次把入口安装到可信 main，仍需另行授权提交/推送及初次人工快进；仅存在于 dev 的入口不能自行安装。之后提升、发布、同步每一步都由操作者分别手动启动。
 
 **凭据仅由 Actions Secrets 显式提供**：`RELEASE_TOKEN` 在发布映射为 `FORGEJO_RELEASE_TOKEN`，在同步映射为 `FORGEJO_TOKEN`；`MIRROR_TOKEN` 仅在同步映射为 `GITHUB_TOKEN`。令牌分别需要对应仓库、Release 和 Registry 的读写权限。API、精确 HTTPS Git URL 和 Registry 各自认证；临时认证文件权限 `0600`、目录 `0700`，任务结束精确删除。缺 Secret 在远端写入前停止。不读取宿主 HOME Token、credential helper、Registry authfile 或本地锁，也不修改 GitHub Actions 设置。同步前必须确认 GitHub Actions 已关闭；分支分叉或 TAG 冲突停止，不强推、不删除历史。
 
