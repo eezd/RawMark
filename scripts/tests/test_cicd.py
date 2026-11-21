@@ -183,6 +183,78 @@ class SyncRegistryTests(unittest.TestCase):
                     self.read_manifest(self.ref, 'auth.json', allow_missing=allow_missing)
 
 
+class SyncTokenTests(unittest.TestCase):
+    credentials = (('FORGEJO_TOKEN', 'forgejo'), ('GITHUB_TOKEN', 'github'))
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.home = Path(temporary.name)
+        self.enterContext(patch.dict(os.environ, {'HOME': str(self.home)}))
+        for variable, _ in self.credentials:
+            os.environ.pop(variable, None)
+        script = Path(__file__).resolve().parents[2] / 'sysnc-github.sh'
+        source = script.read_text().split("<<'PY'\n", 1)[1].rsplit('\nPY', 1)[0]
+        self.scope = {'__name__': 'sync_test'}
+        exec(compile(source, str(script), 'exec'), self.scope)
+        self.load_token = self.scope['load_token']
+
+    def write_token(self, service, value):
+        path = self.home / '.config' / service / 'token'
+        path.parent.mkdir(parents=True)
+        path.write_text(value, encoding='utf-8')
+        path.chmod(0o600)
+
+    def test_environment_has_priority_without_reading_files(self):
+        for variable, service in self.credentials:
+            with self.subTest(service=service), patch.dict(os.environ, {variable: 'environment-fixture'}):
+                with patch.object(Path, 'read_text', side_effect=AssertionError('Must not read token file')):
+                    self.assertEqual(self.load_token(variable, service), 'environment-fixture')
+
+    def test_unset_and_empty_environment_read_corresponding_config(self):
+        for variable, service in self.credentials:
+            self.write_token(service, '  ' + service + '-fixture\n')
+            for value in (None, ''):
+                with self.subTest(service=service, value=value):
+                    if value is None:
+                        os.environ.pop(variable, None)
+                    else:
+                        os.environ[variable] = value
+                    self.assertEqual(self.load_token(variable, service), service + '-fixture')
+
+    def test_missing_or_empty_file_reports_variable_and_path(self):
+        for variable, service in self.credentials:
+            path = self.home / '.config' / service / 'token'
+            for value in (None, ' \n\t'):
+                with self.subTest(service=service, value=value):
+                    if value is not None:
+                        self.write_token(service, value)
+                    with self.assertRaises(RuntimeError) as caught:
+                        self.load_token(variable, service)
+                    self.assertIn(variable, str(caught.exception))
+                    self.assertIn(str(path), str(caught.exception))
+
+    def test_read_and_encoding_failures_do_not_expose_details(self):
+        for variable, service in self.credentials:
+            for error in (PermissionError('private-fixture'), UnicodeError('private-fixture')):
+                with self.subTest(service=service, error=type(error).__name__):
+                    with patch.object(Path, 'read_text', side_effect=error):
+                        with self.assertRaisesRegex(RuntimeError, '读取凭据文件失败') as caught:
+                            self.load_token(variable, service)
+                    self.assertNotIn('private-fixture', str(caught.exception))
+
+    def test_main_uses_independent_environment_and_file_credentials(self):
+        self.write_token('github', 'github-file-fixture\n')
+        with patch.dict(os.environ, {'FORGEJO_TOKEN': 'forgejo-environment-fixture'}):
+            with patch.dict(self.scope, {'API': Mock()}) as scope, patch('shutil.which', return_value=None):
+                with self.assertRaisesRegex(RuntimeError, '缺少命令：git'):
+                    scope['main'](self.home)
+                calls = scope['API'].call_args_list
+        self.assertEqual(calls[0].args[1], 'token forgejo-environment-fixture')
+        self.assertEqual(calls[1].args[1], 'Bearer github-file-fixture')
+        self.assertFalse((self.home / 'runtime').exists())
+
+
 class DevelopmentVersionTests(unittest.TestCase):
     def test_version_uses_utc_commit_date_and_exact_eight_character_hash(self):
         with patch.dict(os.environ, {'RAWMARK_BUILD_CHANNEL': 'development'}), patch.object(
