@@ -397,13 +397,15 @@ class SyncTests(unittest.TestCase):
                                          stderr=b'manifest unknown' if content is None else b'')
                 with patch('subprocess.run', return_value=result):
                     return self.original_run(args, phase, **kwargs)
-            self.assertEqual(args[1:4], ['copy', '--all', '--preserve-digests'])
+            mode = '--multi-arch=index-only' if ref.startswith(SOURCE_IMAGE + ':') else '--all'
+            self.assertEqual(args[1:4], ['copy', mode, '--preserve-digests'])
             src = args[-2].removeprefix('docker://')
             self.assertTrue(src.startswith(SOURCE_IMAGE + '@sha256:'))
             top = self.manifests[ref] = self.manifests[src]
-            for item in json.loads(top)['manifests']:
-                suffix = '@' + item['digest']
-                self.manifests[TARGET_IMAGE + suffix] = self.manifests[SOURCE_IMAGE + suffix]
+            if mode == '--all':
+                for item in json.loads(top)['manifests']:
+                    suffix = '@' + item['digest']
+                    self.manifests[TARGET_IMAGE + suffix] = self.manifests[SOURCE_IMAGE + suffix]
             self.oci_writes.append(ref)
             return None
         if 'lfs' in args and args[0] == 'git':

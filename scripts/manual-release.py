@@ -253,8 +253,17 @@ def smoke_image(cache, version):
             run('docker', 'image', 'rm', image)
 
 
-def copy_image(source, reference):
-    run('skopeo', 'copy', '--all', '--preserve-digests', '--authfile', str(AUTH.authfile),
+def version_image_digests(version, image):
+    return {version: image['digest'],
+            **{version + '-' + arch: image['platforms']['linux/' + arch] for arch in ('amd64', 'arm64')}}
+
+
+def copy_image(source, reference, *, architecture=None):
+    # Name the children before uploading the index. --all creates digest-named
+    # package versions in Forgejo even when the top-level reference is a tag.
+    options = ['--override-os', 'linux', '--override-arch', architecture] if architecture else []
+    mode = [] if architecture else ['--multi-arch=index-only']
+    run('skopeo', *options, 'copy', *mode, '--preserve-digests', '--authfile', str(AUTH.authfile),
         source, 'docker://' + reference)
 
 
@@ -304,8 +313,10 @@ def require_ended_run(api, record):
 
 def inspect_incomplete(api, version, commit):
     tag, release = api.repo('/tags/' + version, missing=True), api.release(version)
-    image_digest = registry_digest(FORGEJO_IMAGE, version)
-    if not tag and not release and image_digest is None:
+    images = {name: registry_digest(FORGEJO_IMAGE, name)
+              for name in (version, version + '-amd64', version + '-arm64')}
+    images = {name: value for name, value in images.items() if value is not None}
+    if not tag and not release and not images:
         return None
     require(tag, 'Unowned release or image: ' + version)
     record = tag_record(tag, version, commit)
@@ -327,17 +338,18 @@ def inspect_incomplete(api, version, commit):
         release_identity['assets'] = sorted(
             ({key: asset[key] for key in ('id', 'uuid', 'name', 'size', 'type')} for asset in assets),
             key=lambda asset: asset['id'])
-    if image_digest is not None:
-        require(build and image_digest == build['image']['digest'], 'Unknown incomplete image identity: ' + version)
+    if images:
+        require(build and all(version_image_digests(version, build['image'])[name] == value
+                              for name, value in images.items()), 'Unknown incomplete image identity: ' + version)
     # Ignore download counters and response ordering, not ownership or asset replacement.
-    return {'record': record, 'tag': tag, 'release': release_identity, 'image': image_digest, 'build': build}
+    return {'record': record, 'tag': tag, 'release': release_identity, 'images': images, 'build': build}
 
 
 def clean_incomplete(api, version, commit, expected):
     require(inspect_incomplete(api, version, commit) == expected, 'Incomplete state changed during replacement build')
-    if expected['image'] is not None:
-        api.request('/packages/eezd/container/rawmark/' + version, method='DELETE')
-        require(registry_digest(FORGEJO_IMAGE, version) is None, 'Incomplete image deletion was not confirmed')
+    for name in expected['images']:
+        api.request('/packages/eezd/container/rawmark/' + name, method='DELETE')
+        require(registry_digest(FORGEJO_IMAGE, name) is None, 'Incomplete image deletion was not confirmed')
     if expected['release']:
         api.repo('/releases/' + str(expected['release']['id']), method='DELETE')
         require(api.release(version) is None, 'Incomplete release deletion was not confirmed')
@@ -357,8 +369,14 @@ def publish(api, record, cache, build):
     api.upload(release, cache / 'build.json')
     for name in sorted(asset_names(version) - {'build.json'}):
         api.upload(release, cache / name)
-    require(registry_digest(FORGEJO_IMAGE, version) is None, 'Unexpected existing image version')
-    copy_image('oci-archive:' + str(cache / 'image.oci'), build['image']['ref'])
+    images = version_image_digests(version, build['image'])
+    require(all(registry_digest(FORGEJO_IMAGE, name) is None for name in images), 'Unexpected existing image version')
+    source = 'oci-archive:' + str(cache / 'image.oci')
+    for arch in ('amd64', 'arm64'):
+        copy_image(source, FORGEJO_IMAGE + ':' + version + '-' + arch, architecture=arch)
+    copy_image(source, build['image']['ref'])
+    for name, expected in images.items():
+        require(registry_digest(FORGEJO_IMAGE, name) == expected, 'Published image tag differs: ' + name)
     verify_attachments(api, release, cache, build)
     verify_tag(api, version, commit)
     verify_image(build['image']['ref'], build['image'], cache)

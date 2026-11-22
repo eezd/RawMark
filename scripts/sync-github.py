@@ -485,7 +485,8 @@ def promote_latest(latest, authfile):
         reference = repository + ':latest'
         raw = read_manifest(reference, authfile, allow_missing=True)
         if raw is None or 'sha256:' + hashlib.sha256(raw).hexdigest() != latest.image['digest']:
-            run(['skopeo', 'copy', '--all', '--preserve-digests', '--authfile', authfile,
+            mode = '--multi-arch=index-only' if repository == FORGEJO_IMAGE else '--all'
+            run(['skopeo', 'copy', mode, '--preserve-digests', '--authfile', authfile,
                  'docker://' + source, 'docker://' + reference], '更新 OCI latest')
         verify_image(reference, latest.image, authfile)
     print(f'两端 OCI latest 已验收：{latest.tag}', flush=True)

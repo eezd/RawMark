@@ -54,7 +54,7 @@ RAWMARK_DATA_DIR=/your/storage/rawmark/data \
 
 ## 预构建镜像与原生程序
 
-Forgejo 发布 `git.134333.xyz/eezd/rawmark:<版本>`，支持 Linux amd64 和 arm64。建议固定版本标签；OCI `:latest` 仅指向按 main 祖先关系确定的最新已验收 main 正式版本，同步后 GHCR 使用同摘要。没有 `latest` Git TAG。安装前先核对 Releases 和软件包公开状态。仓库 Compose 文件继续支持源码构建。
+Forgejo 发布 `git.134333.xyz/eezd/rawmark:<版本>`，支持 Linux amd64 和 arm64，Docker 会自动选择对应架构。建议固定版本标签；需要明确指定单架构时，可用同版本的 `<版本>-amd64` 或 `<版本>-arm64`。软件包列表使用这些可读标签，不把子镜像 SHA256 当版本名；摘要仍用于完整性校验。OCI `:latest` 仅指向按 main 祖先关系确定的最新已验收 main 正式版本，同步后 GHCR 使用同摘要。没有 `latest` Git TAG。安装前先核对 Releases 和软件包公开状态。仓库 Compose 文件继续支持源码构建。
 
 [Forgejo Releases 页面](https://git.134333.xyz/eezd/RawMark/releases) 提供 Linux、Windows 和 macOS 的 amd64 与 arm64 原生压缩包及 `SHA256SUMS`。下载对应系统和架构，先核对校验和再解压：
 
@@ -190,9 +190,9 @@ Forgejo 是唯一主仓库，`origin` 指向 `https://git.134333.xyz/eezd/RawMar
 
 版本为提交 UTC 日期加八位 SHA。发布说明取同分支已验收的最近祖先（父边最短距离；等距时按正式发布时间降序、TAG 升序），没有基线时严格为 `init`；同分支历史重写而失去基线时停止。正式历史以 Forgejo Release、TAG、`build.json` 和最后写入并读回的 `release-complete.json` 为准。schema 5 元数据记录冻结的网页输入、来源分支尖端、控制 SHA、run ID 和请求 UUID；schema 4 已完成记录继续按原证明复用。损坏完成记录停止，不能覆盖。
 
-同 SHA 跨分支复用原完成版，不改变来源或说明；dev 版本复用为 main 请求时不会伪造 main 完成记录。版本镜像不可变，唯一可变分发别名为 Forgejo/GHCR OCI `:latest`：仅在完成证明和原件验收后，按 main 祖先关系选最新正式版本、固定源摘要同双架构复制。dev 发布不移动别名，历史 main 重跑不回退；未知别名、不可达或分叉的 main 历史停止核对。若只更新别名失败，重跑只验收完成版并修复别名，不重建或覆盖版本。
+同 SHA 跨分支复用原完成版，不改变来源或说明；dev 版本复用为 main 请求时不会伪造 main 完成记录。版本镜像及其 `-amd64` / `-arm64` 标签不可变：Forgejo 先按可读架构标签上传子镜像，读回确认标签与构建摘要相符；主版本和 Forgejo `:latest` 只复制 OCI 索引，不再用 `--all` 产生 SHA256 命名的软件包条目。唯一可变分发别名为 Forgejo/GHCR OCI `:latest`：仅在完成证明和原件验收后，按 main 祖先关系选最新正式版本、固定源摘要同双架构复制。dev 发布不移动别名，历史 main 重跑不回退；未知别名、不可达或分叉的 main 历史停止核对。若只更新别名失败，重跑只验收完成版并修复别名，不重建或覆盖版本。
 
-上传前失败只丢弃临时产物，不阻塞新 SHA。不用 Generic Packages、持久原件或恢复检查点。未完成同版先证明旧任务已结束及 TAG/Release/镜像归属，从原 SHA 全量构建并验收替代产物，再复查身份不变，才精确删除该版本 Release/附件和镜像；正确 TAG 保留。schema 5 核对旧 run 的 `commit_sha`、可信 main 事件 ref 及归一化网页输入；schema 4 未完成记录仍严格核对旧三输入，不静默升级证明。陌生内容、任务在途、完成记录损坏或删除结果不明均停止。重跑旧版在网页填原 `source_branch` 和完整 `source_sha`，新请求 UUID 由解析器生成。所有 Docker context、Buildx builder、容器、卷、网络和认证目录按 run/attempt 精确清理，不全局 prune。
+上传前失败只丢弃临时产物，不阻塞新 SHA。不用 Generic Packages、持久原件或恢复检查点。未完成同版先证明旧任务已结束及 TAG/Release/镜像归属，从原 SHA 全量构建并验收替代产物，再复查身份不变，才精确删除该版本 Release/附件、主版本镜像及已归属的版本架构标签；正确 TAG 保留。schema 5 核对旧 run 的 `commit_sha`、可信 main 事件 ref 及归一化网页输入；schema 4 未完成记录仍严格核对旧三输入，不静默升级证明。陌生内容、任务在途、完成记录损坏或删除结果不明均停止。重跑旧版在网页填原 `source_branch` 和完整 `source_sha`，新请求 UUID 由解析器生成。所有 Docker context、Buildx builder、容器、卷、网络和认证目录按 run/attempt 精确清理，不全局 prune。
 
 GitHub 接收六包、`SHA256SUMS`、`build.json` 和同摘要镜像，不接收内部完成记录、`packages.json` 或 demo。正式原件哈希、TAG/SHA 和两端双架构摘要逐项核对；缺验收证据的旧正式版本不冒充成功。GHCR 首次分发如仍为 private，须操作者在网页设为 public 后重跑同步；认证复制成功不代表匿名可拉取，匿名验收失败会明确报错。发布不会部署、合并分支或写 GitHub，同步也不会重新构建、部署或切换 Pages。
 

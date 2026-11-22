@@ -86,8 +86,11 @@ class FakeAPI:
 
     def request(self, path, method):
         self.writes.append((method, path))
-        assert path == '/packages/eezd/container/rawmark/' + VERSION
-        del self.registry[VERSION]
+        prefix = '/packages/eezd/container/rawmark/'
+        assert path.startswith(prefix)
+        name = path.removeprefix(prefix)
+        assert name in (VERSION, VERSION + '-amd64', VERSION + '-arm64')
+        del self.registry[name]
 
 
 class RecoveryTests(unittest.TestCase):
@@ -98,6 +101,7 @@ class RecoveryTests(unittest.TestCase):
         self.registry = {}
         self.api = FakeAPI(self.registry)
         self.builds = 0
+        self.image_copies = []
         self.enterContext(patch.dict(os.environ, {'CI_RUN_ID': '1', 'CI_RUN_ATTEMPT': '1'}))
         self.enterContext(patch.object(manual, 'registry_digest', side_effect=lambda image, version: self.registry.get(version)))
         self.enterContext(patch.object(manual, 'copy_image', side_effect=self.copy_image))
@@ -105,8 +109,9 @@ class RecoveryTests(unittest.TestCase):
         self.enterContext(patch.object(manual, 'verify_image'))
         self.enterContext(patch.object(manual, 'build_originals', side_effect=self.build))
 
-    def copy_image(self, source, reference):
-        self.registry[reference.rsplit(':', 1)[1]] = IMAGE_DIGEST
+    def copy_image(self, source, reference, *, architecture=None):
+        self.image_copies.append((reference, architecture))
+        self.registry[reference.rsplit(':', 1)[1]] = PLATFORMS['linux/' + architecture] if architecture else IMAGE_DIGEST
 
     def build(self, cache, record):
         self.builds += 1
@@ -148,7 +153,10 @@ class RecoveryTests(unittest.TestCase):
     def test_first_release_and_complete_cross_branch_reuse_have_zero_writes(self):
         self.publish()
         self.assertEqual(self.api.releases[VERSION]['body'], 'init')
-        self.assertEqual(self.registry, {VERSION: IMAGE_DIGEST})
+        self.assertEqual(self.image_copies, [(manual.FORGEJO_IMAGE + ':' + VERSION + '-amd64', 'amd64'),
+                                            (manual.FORGEJO_IMAGE + ':' + VERSION + '-arm64', 'arm64'),
+                                            (manual.FORGEJO_IMAGE + ':' + VERSION, None)])
+        self.assertEqual(self.registry, manual.version_image_digests(VERSION, {'digest': IMAGE_DIGEST, 'platforms': PLATFORMS}))
         self.assertIn(COMPLETION, self.api.blobs[VERSION])
         self.api.writes.clear()
         self.publish(branch='main')
@@ -161,10 +169,82 @@ class RecoveryTests(unittest.TestCase):
         tag = copy.deepcopy(self.api.tags[VERSION])
         self.publish()
         self.assertEqual(self.builds, 2)
-        self.assertIn(('DELETE', '/packages/eezd/container/rawmark/' + VERSION), self.api.writes)
+        for name in (VERSION, VERSION + '-amd64', VERSION + '-arm64'):
+            self.assertIn(('DELETE', '/packages/eezd/container/rawmark/' + name), self.api.writes)
         self.assertIn(('DELETE', '/releases/1'), self.api.writes)
         self.assertEqual(self.api.tags[VERSION], tag)
         self.assertEqual(self.registry['unrelated'], 'keep')
+
+    def test_child_only_partial_push_is_owned_and_precisely_rebuilt(self):
+        def interrupted(source, reference, *, architecture=None):
+            if architecture == 'arm64':
+                raise RuntimeError('arm64 upload interrupted')
+            self.copy_image(source, reference, architecture=architecture)
+        with patch.object(manual, 'copy_image', side_effect=interrupted):
+            with self.assertRaisesRegex(RuntimeError, 'arm64 upload interrupted'):
+                self.publish()
+        self.assertEqual(self.registry, {VERSION + '-amd64': PLATFORMS['linux/amd64']})
+        tag = copy.deepcopy(self.api.tags[VERSION])
+        os.environ['CI_RUN_ID'] = '2'
+        self.api.writes.clear()
+        self.publish()
+        deletes = [path for method, path in self.api.writes if method == 'DELETE']
+        self.assertEqual(deletes, ['/packages/eezd/container/rawmark/' + VERSION + '-amd64', '/releases/1'])
+        self.assertEqual(self.api.tags[VERSION], tag)
+        self.assertEqual(self.builds, 2)
+        self.assertIn(COMPLETION, self.api.blobs[VERSION])
+
+    def test_unowned_architecture_tag_stops_before_build_or_writes(self):
+        self.registry[VERSION + '-amd64'] = PLATFORMS['linux/amd64']
+        with self.assertRaisesRegex(ValueError, 'Unowned release or image'):
+            self.publish()
+        self.assertEqual(self.builds, 0)
+        self.assertEqual(self.api.writes, [])
+        self.assertEqual(self.registry, {VERSION + '-amd64': PLATFORMS['linux/amd64']})
+
+    def test_unknown_or_changed_architecture_tag_is_not_deleted(self):
+        self.fail_after_upload()
+        self.registry[VERSION + '-arm64'] = 'sha256:' + 'e' * 64
+        before = copy.deepcopy(self.registry)
+        self.api.writes.clear()
+        with self.assertRaisesRegex(ValueError, 'Unknown incomplete image identity'):
+            self.publish()
+        self.assertEqual(self.api.writes, [])
+        self.assertEqual(self.registry, before)
+        self.assertEqual(self.builds, 1)
+
+    def test_architecture_tag_change_during_replacement_is_not_deleted(self):
+        self.fail_after_upload()
+        self.api.writes.clear()
+        def replacement(cache, record):
+            self.build(cache, record)
+            del self.registry[VERSION + '-amd64']
+        with patch.object(manual, 'build_originals', side_effect=replacement):
+            with self.assertRaisesRegex(ValueError, 'Incomplete state changed during replacement build'):
+                self.publish()
+        self.assertEqual(self.api.writes, [])
+        self.assertIn(VERSION, self.api.releases)
+
+    def test_wrong_architecture_tag_digest_leaves_draft_without_completion(self):
+        def wrong_architecture(source, reference, *, architecture=None):
+            self.registry[reference.rsplit(':', 1)[1]] = IMAGE_DIGEST
+        with patch.object(manual, 'copy_image', side_effect=wrong_architecture):
+            with self.assertRaisesRegex(ValueError, 'Published image tag differs: ' + VERSION + '-amd64'):
+                self.publish()
+        self.assertTrue(self.api.release(VERSION)['draft'])
+        self.assertNotIn(COMPLETION, self.api.blobs[VERSION])
+        self.assertNotIn(('PATCH', '/releases/1'), self.api.writes)
+
+    def test_legacy_parent_only_partial_image_still_recovers(self):
+        self.fail_after_upload()
+        del self.registry[VERSION + '-amd64'], self.registry[VERSION + '-arm64']
+        self.api.writes.clear()
+        self.publish()
+        deletes = [path for method, path in self.api.writes if method == 'DELETE']
+        self.assertEqual(deletes, ['/packages/eezd/container/rawmark/' + VERSION, '/releases/1'])
+        self.assertIn(VERSION + '-amd64', self.registry)
+        self.assertIn(VERSION + '-arm64', self.registry)
+        self.assertIn(COMPLETION, self.api.blobs[VERSION])
 
     def test_recovery_ignores_download_statistics_and_asset_order(self):
         self.fail_after_upload()
@@ -397,6 +477,29 @@ class RecoveryTests(unittest.TestCase):
         build, cleanup = workflow.split('      - name: Clean only this run\n')
         for step in (build.split('      - name: Build and publish fixed source once\n')[1], cleanup):
             self.assertIn('DOCKER_CONFIG: ${{ runner.temp }}/rawmark-release-auth-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}', step)
+
+
+class ImageCopyTests(unittest.TestCase):
+    def test_named_children_and_index_only_publication_preserve_digests(self):
+        calls = []
+        source = 'oci-archive:/tmp/synthetic/image.oci'
+        image = manual.FORGEJO_IMAGE + ':' + VERSION
+        with patch.object(manual, 'AUTH') as auth, patch.object(manual, 'run', side_effect=lambda *args: calls.append(args)):
+            auth.authfile = Path('/tmp/synthetic/auth.json')
+            for arch in ('amd64', 'arm64'):
+                manual.copy_image(source, image + '-' + arch, architecture=arch)
+            manual.copy_image(source, image)
+            manual.copy_image('docker://' + manual.FORGEJO_IMAGE + '@' + IMAGE_DIGEST, manual.FORGEJO_IMAGE + ':latest')
+        for index, arch in enumerate(('amd64', 'arm64')):
+            self.assertEqual(calls[index], ('skopeo', '--override-os', 'linux', '--override-arch', arch, 'copy',
+                                            '--preserve-digests', '--authfile', '/tmp/synthetic/auth.json',
+                                            source, 'docker://' + image + '-' + arch))
+        for args in calls[2:]:
+            self.assertEqual(args[:6], ('skopeo', 'copy', '--multi-arch=index-only', '--preserve-digests',
+                                       '--authfile', '/tmp/synthetic/auth.json'))
+        self.assertEqual(calls[2][-2:], (source, 'docker://' + image))
+        self.assertEqual(calls[3][-2:], ('docker://' + manual.FORGEJO_IMAGE + '@' + IMAGE_DIGEST,
+                                       'docker://' + manual.FORGEJO_IMAGE + ':latest'))
 
 
 class GraphBaselineTests(unittest.TestCase):
