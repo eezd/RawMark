@@ -162,8 +162,6 @@ textarea {
 /* Headings. */
 .cm-line:is(.cm-rm-h1, .cm-rm-h2, .cm-rm-h3, .cm-rm-h4, .cm-rm-h5, .cm-rm-h6) {
   line-height: 1.4;
-  padding-top: 1rem;
-  padding-bottom: 0.5rem;
 }
 .cm-line.cm-rm-h1 {
   font-size: 2.2em;
